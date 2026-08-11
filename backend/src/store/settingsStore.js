@@ -11,7 +11,8 @@ export const SECRET_FIELDS = {
   proxmox: ['tokenSecret'],
   traefik: ['password'],
   certManager: [],
-  grafana: ['apiKey']
+  grafana: ['apiKey'],
+  wazuh: ['password']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -77,7 +78,8 @@ function isConfigured(key, entry) {
     proxmox: ['baseUrl'],
     traefik: ['apiUrl'],
     certManager: [],
-    grafana: ['baseUrl']
+    grafana: ['baseUrl'],
+    wazuh: ['baseUrl']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

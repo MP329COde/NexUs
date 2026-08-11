@@ -12,9 +12,11 @@ import proxmoxRoutes from './proxmox.routes.js';
 import traefikRoutes from './traefik.routes.js';
 import certmanagerRoutes from './certmanager.routes.js';
 import grafanaRoutes from './grafana.routes.js';
+import wazuhRoutes from './wazuh.routes.js';
 import proxiesRoutes from './proxies.routes.js';
 import domainsRoutes from './domains.routes.js';
 import deploymentsRoutes from './deployments.routes.js';
+import networkTopologyRoutes from './networkTopology.routes.js';
 
 const router = Router();
 
@@ -31,8 +33,10 @@ router.use('/proxmox', proxmoxRoutes);
 router.use('/traefik', traefikRoutes);
 router.use('/certmanager', certmanagerRoutes);
 router.use('/grafana', grafanaRoutes);
+router.use('/wazuh', wazuhRoutes);
 router.use('/proxies', proxiesRoutes);
 router.use('/domains', domainsRoutes);
 router.use('/deployments', deploymentsRoutes);
+router.use('/network', networkTopologyRoutes);
 
 export default router;
