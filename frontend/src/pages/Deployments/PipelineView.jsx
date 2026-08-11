@@ -1,6 +1,7 @@
 import Panel from '../../components/ui/Panel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 const STAGES = [
   { key: 'git', label: 'GitLab · CI/CD' },
@@ -11,13 +12,14 @@ const STAGES = [
 
 export default function PipelineView({ linkId, span }) {
   const { data, reload } = useApi(() => api.get(`/deployments/${linkId}/pipeline`), [linkId], { pollMs: 15000 });
+  const notify = useNotify();
 
   async function sync() {
     try {
       const res = await api.post(`/deployments/${linkId}/sync`, {});
-      alert(res.message);
+      notify(res.message, { type: 'ok', title: 'Argo CD' });
     } catch (err) {
-      alert(err.message);
+      notify(err.message, { type: 'crit', title: 'Synchronisation échouée' });
     } finally {
       reload();
     }

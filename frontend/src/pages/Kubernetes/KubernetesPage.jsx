@@ -5,6 +5,7 @@ import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 export default function KubernetesPage() {
   const [namespace, setNamespace] = useState('');
@@ -12,16 +13,18 @@ export default function KubernetesPage() {
   const namespaces = useApi(() => api.get('/kubernetes/namespaces'), [], { pollMs: 30000 });
   const deployments = useApi(() => api.get(`/kubernetes/deployments${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
   const pods = useApi(() => api.get(`/kubernetes/pods${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
+  const notify = useNotify();
 
   const configured = status.data?.status?.configured;
 
   async function restart(ns, name) {
     if (!confirm(`Redémarrer le déploiement ${ns}/${name} ?`)) return;
     try {
-      await api.post(`/kubernetes/deployments/${ns}/${name}/restart`, {});
+      const res = await api.post(`/kubernetes/deployments/${ns}/${name}/restart`, {});
+      notify(res.message, { type: 'ok', title: 'Redémarrage déclenché' });
       deployments.reload();
     } catch (err) {
-      alert(err.message);
+      notify(err.message, { type: 'crit', title: 'Échec du redémarrage' });
     }
   }
 

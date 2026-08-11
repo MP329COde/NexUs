@@ -5,12 +5,14 @@ import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 export default function ProxmoxPage() {
   const status = useApi(() => api.get('/proxmox/status'), []);
   const nodes = useApi(() => api.get('/proxmox/nodes'), [], { pollMs: 20000 });
   const [selectedNode, setSelectedNode] = useState(null);
   const vms = useApi(() => (selectedNode ? api.get(`/proxmox/nodes/${selectedNode}/vms`) : Promise.resolve(null)), [selectedNode], { pollMs: 15000 });
+  const notify = useNotify();
 
   if (status.data && !status.data.status.configured) {
     return (
@@ -24,10 +26,11 @@ export default function ProxmoxPage() {
   async function action(node, type, vmid, act) {
     if (!confirm(`${act} sur ${type}/${vmid} (${node}) ?`)) return;
     try {
-      await api.post(`/proxmox/nodes/${node}/${type}/${vmid}/${act}`, {});
+      const res = await api.post(`/proxmox/nodes/${node}/${type}/${vmid}/${act}`, {});
+      notify(res.message, { type: 'ok' });
       vms.reload();
     } catch (err) {
-      alert(err.message);
+      notify(err.message, { type: 'crit', title: 'Action Proxmox échouée' });
     }
   }
 

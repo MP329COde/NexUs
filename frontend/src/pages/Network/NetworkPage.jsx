@@ -4,6 +4,8 @@ import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
+import Icon from '../../components/ui/Icon.jsx';
 import ProxyFormDialog from './ProxyFormDialog.jsx';
 
 export default function NetworkPage() {
@@ -11,13 +13,14 @@ export default function NetworkPage() {
   const domains = useApi(() => api.get('/domains'), [], { pollMs: 30000 });
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
+  const notify = useNotify();
 
   async function apply(id) {
     try {
       const res = await api.post(`/proxies/${id}/apply`, {});
-      alert(res.message);
+      notify(res.message, { type: 'ok', title: 'Proxy appliqué' });
     } catch (err) {
-      alert(err.message);
+      notify(err.message, { type: 'crit', title: "Échec de l'application" });
     } finally {
       proxies.reload();
     }
@@ -25,12 +28,14 @@ export default function NetworkPage() {
 
   async function testConnection(id) {
     const res = await api.post(`/proxies/${id}/test`, {});
-    alert(res.result.ok ? `OK · ${res.result.statusCode} · ${res.result.latencyMs} ms` : `Échec · ${res.result.error}`);
+    if (res.result.ok) notify(`${res.result.statusCode} · ${res.result.latencyMs} ms`, { type: 'ok', title: 'Connexion réussie' });
+    else notify(res.result.error, { type: 'crit', title: 'Connexion impossible' });
   }
 
   async function remove(id) {
     if (!confirm('Supprimer ce proxy ?')) return;
     await api.del(`/proxies/${id}`);
+    notify('Proxy supprimé', { type: 'info' });
     proxies.reload();
     domains.reload();
   }
@@ -40,7 +45,11 @@ export default function NetworkPage() {
       <PageHeader
         title="Réseaux"
         sub="Reverse proxies, domaines, TLS et routage vers vos services"
-        actions={<button className="btn" onClick={() => { setEditing(null); setFormOpen(true); }}>Nouveau proxy</button>}
+        actions={(
+          <button className="btn" onClick={() => { setEditing(null); setFormOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Icon name="plus" size={15} />Nouveau proxy
+          </button>
+        )}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
@@ -64,10 +73,10 @@ export default function NetworkPage() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <span className="btn-outline miniBtn" style={btnMini} onClick={() => { setEditing(p); setFormOpen(true); }}>Modifier</span>
-                    <span className="btn-outline miniBtn" style={btnMini} onClick={() => apply(p.id)}>Appliquer</span>
-                    <span className="btn-outline miniBtn" style={btnMini} onClick={() => testConnection(p.id)}>Tester</span>
-                    <span className="btn-outline miniBtn" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => remove(p.id)}>Suppr.</span>
+                    <span className="btn-outline" style={btnMini} onClick={() => { setEditing(p); setFormOpen(true); }}><Icon name="edit" size={13} />Modifier</span>
+                    <span className="btn-outline" style={btnMini} onClick={() => apply(p.id)}><Icon name="sync" size={13} />Appliquer</span>
+                    <span className="btn-outline" style={btnMini} onClick={() => testConnection(p.id)}><Icon name="externalLink" size={13} />Tester</span>
+                    <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => remove(p.id)}><Icon name="trash" size={13} />Suppr.</span>
                   </div>
                 </td>
               </tr>
@@ -107,4 +116,4 @@ export default function NetworkPage() {
   );
 }
 
-const btnMini = { height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center' };
+const btnMini = { height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 5 };
