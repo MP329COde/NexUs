@@ -127,3 +127,7 @@ tbody tr:nth-child(4) { animation-delay: .07s; }
 tbody tr:nth-child(5) { animation-delay: .09s; }
 
 .spin { animation: spin 1s linear infinite; }
+
+@media (max-width: 860px) {
+  .login-visual { display: none; }
+}

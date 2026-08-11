@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      PORT: 4000
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:${CONSOLE_PORT:-8080}}
+      JWT_SECRET: ${JWT_SECRET:?Définissez JWT_SECRET dans .env (voir .env.example)}
+      NEXUS_MASTER_KEY: ${NEXUS_MASTER_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - nexus_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/status/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${CONSOLE_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  nexus_data:

@@ -88,3 +88,8 @@
 @keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blobA { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(60px,-40px) scale(1.18); } }
+@keyframes blobB { 0%, 100% { transform: translate(0,0) scale(1.05); } 50% { transform: translate(-50px,50px) scale(.9); } }
+@keyframes gridDrift { from { background-position: 0 0; } to { background-position: 40px 40px; } }
+@keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes dashFlow { from { stroke-dashoffset: 34; } to { stroke-dashoffset: 0; } }
