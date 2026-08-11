@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, signSession, SESSION_COOKIE } from '../middleware/auth.js';
-import { findUserByEmail } from '../store/usersStore.js';
+import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
+import { findUserByEmail, updateUser } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
 import { env } from '../config/env.js';
 
 const router = Router();
+const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
@@ -20,7 +21,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     secure: env.isProd,
     maxAge: 12 * 60 * 60 * 1000
   });
-  res.json({ ok: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  res.json({ ok: true, user: toPublicUser(user) });
 }));
 
 router.post('/logout', (req, res) => {
@@ -31,5 +32,17 @@ router.post('/logout', (req, res) => {
 router.get('/me', requireAuth, (req, res) => {
   res.json({ ok: true, user: req.user });
 });
+
+router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
+  const { name, avatarEmoji, avatarColor } = req.body || {};
+  if (avatarColor && !AVATAR_COLOR_PATTERN.test(avatarColor)) {
+    return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
+  }
+  if (avatarEmoji && [...avatarEmoji].length > 2) {
+    return res.status(400).json({ ok: false, error: 'Avatar trop long (1 à 2 caractères/emoji)' });
+  }
+  const updated = updateUser(req.user.id, { name, avatarEmoji, avatarColor });
+  res.json({ ok: true, user: toPublicUser(updated) });
+}));
 
 export default router;
