@@ -12,7 +12,9 @@ import NetworkPage from './pages/Network/NetworkPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
 import TopologyPage from './pages/Network/TopologyPage.jsx';
 import CertificatesPage from './pages/Network/CertificatesPage.jsx';
+import InfrastructureLayout from './pages/Infrastructure/InfrastructureLayout.jsx';
 import ProxmoxPage from './pages/Infrastructure/ProxmoxPage.jsx';
+import HostsPage from './pages/Infrastructure/HostsPage.jsx';
 import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
 import DeploymentsPage from './pages/Deployments/DeploymentsPage.jsx';
 import SecurityPage from './pages/Security/SecurityPage.jsx';
@@ -35,7 +37,15 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage />, handle: { title: 'Vue générale' } },
           { path: 'deployments', element: <DeploymentsPage />, handle: { title: 'Développement' } },
-          { path: 'infrastructure', element: <ProxmoxPage />, handle: { title: 'Infrastructure' } },
+          {
+            path: 'infrastructure',
+            element: <InfrastructureLayout />,
+            handle: { title: 'Infrastructure' },
+            children: [
+              { index: true, element: <ProxmoxPage /> },
+              { path: 'hosts', element: <RequireRole role="admin"><HostsPage /></RequireRole> }
+            ]
+          },
           { path: 'kubernetes', element: <KubernetesPage />, handle: { title: 'Kubernetes' } },
           {
             path: 'network',
