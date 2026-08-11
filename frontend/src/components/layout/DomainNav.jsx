@@ -1,11 +1,15 @@
 import { NavLink } from 'react-router-dom';
 import { DOMAINS } from '../../config/domains.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import Icon from '../ui/Icon.jsx';
 
 export default function DomainNav() {
+  const { user } = useAuth();
+  const visible = DOMAINS.filter((d) => !d.adminOnly || user?.role === 'admin');
+
   return (
     <nav style={{ flex: 'none', width: 64, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 0', overflowY: 'auto' }}>
-      {DOMAINS.map((d) => (
+      {visible.map((d) => (
         <NavLink
           key={d.id}
           to={d.path}
