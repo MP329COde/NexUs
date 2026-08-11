@@ -1,0 +1,20 @@
+# Dépendances
+node_modules/
+
+# Build
+frontend/dist/
+
+# Environnement / secrets
+backend/.env
+.env
+*.local
+
+# Données locales du backend (secrets chiffrés, sessions...)
+backend/data/*.json
+backend/data/.master.key
+
+# Système
+.DS_Store
+
+# Logs
+*.log
