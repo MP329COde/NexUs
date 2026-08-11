@@ -19,7 +19,11 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+// 10 Mo plutôt que le défaut 1 Mo : suffisant pour l'import d'une sauvegarde
+// SQLite (POST /api/backups/import) sans avoir à relever la limite par route
+// (un express.json() déclaré après celui-ci sur une route donnée est un
+// no-op : le corps est déjà consommé par ce middleware global).
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/status/health' } }));
 

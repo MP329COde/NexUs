@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import express from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createBackup, listBackups, getBackupPath, deleteBackup, importBackup, restoreBackup } from '../services/backupService.js';
@@ -22,8 +21,8 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // Import en base64 (JSON) plutôt qu'un multipart classique : évite une
 // dépendance supplémentaire (multer) pour un fichier de quelques Mo tout au
-// plus. Limite de taille de requête relevée uniquement sur cette route.
-router.post('/import', express.json({ limit: '50mb' }), asyncHandler(async (req, res) => {
+// plus (borné par la limite globale express.json() de index.js).
+router.post('/import', asyncHandler(async (req, res) => {
   const { filename, dataBase64 } = req.body || {};
   if (!dataBase64) return res.status(400).json({ ok: false, error: 'Fichier requis' });
   const buffer = Buffer.from(dataBase64, 'base64');
