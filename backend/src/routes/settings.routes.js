@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS } from '../store/settingsStore.js';
 import { integrations } from '../services/integrationRegistry.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
+import { logAudit } from '../services/auditService.js';
 
 // Connexions à l'infrastructure (tokens, URLs...) : réservé aux administrateurs.
 // Les préférences propres à chaque utilisateur vivent dans /api/auth/profile.
@@ -27,6 +28,9 @@ router.get('/:key', asyncHandler(async (req, res) => {
 router.put('/:key', asyncHandler(async (req, res) => {
   assertKey(req.params.key);
   const saved = saveIntegration(req.params.key, req.body || {});
+  // Ne jamais consigner le corps de la requête (secrets en clair) : seule la
+  // clé d'intégration modifiée est journalisée.
+  logAudit(req, 'settings.integration.save', { key: req.params.key });
   res.json({ ok: true, integration: saved });
 }));
 

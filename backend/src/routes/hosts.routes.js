@@ -5,6 +5,7 @@ import * as store from '../store/hostsStore.js';
 import { listCatalog, previewScript } from '../services/agentCatalog.js';
 import { runScript } from '../services/sshExecutor.js';
 import { getConsolePublicKey } from '../utils/sshKeypair.js';
+import { logAudit } from '../services/auditService.js';
 
 // Gestion des hôtes et installation d'agents : réservée aux administrateurs.
 // L'exécution est toujours limitée au catalogue fermé (agentCatalog.js).
@@ -26,17 +27,21 @@ router.get('/', (req, res) => {
 router.post('/', asyncHandler(async (req, res) => {
   const { name, address, port, sshUser } = req.body || {};
   if (!name || !address) return res.status(400).json({ ok: false, error: 'Nom et adresse requis' });
-  res.status(201).json({ ok: true, host: store.createHost({ name, address, port, sshUser }) });
+  const host = store.createHost({ name, address, port, sshUser });
+  logAudit(req, 'host.create', { hostId: host.id, address: host.address });
+  res.status(201).json({ ok: true, host });
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const updated = store.updateHost(req.params.id, req.body || {});
   if (!updated) return res.status(404).json({ ok: false, error: 'Hôte introuvable' });
+  logAudit(req, 'host.update', { hostId: updated.id });
   res.json({ ok: true, host: updated });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
   if (!store.deleteHost(req.params.id)) return res.status(404).json({ ok: false, error: 'Hôte introuvable' });
+  logAudit(req, 'host.delete', { hostId: req.params.id });
   res.json({ ok: true });
 }));
 
@@ -50,6 +55,7 @@ router.post('/:id/agents/:agentId/install', asyncHandler(async (req, res) => {
   const script = previewScript(req.params.agentId);
   const result = await runScript(host, script);
   store.recordInstallResult(host.id, { agentId: req.params.agentId, ok: result.ok, message: result.ok ? 'Installation réussie' : `Échec (code ${result.exitCode})` });
+  logAudit(req, 'host.agent.install', { hostId: host.id, agentId: req.params.agentId, ok: result.ok, exitCode: result.exitCode });
   res.json({ ok: true, result });
 }));
 

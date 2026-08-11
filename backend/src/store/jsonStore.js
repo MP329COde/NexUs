@@ -1,11 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { logger } from '../utils/logger.js';
+import { dataDir } from '../config/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.resolve(__dirname, '../../data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 export const DB_FILE = path.join(dataDir, 'nexus.db');
@@ -17,6 +15,7 @@ const DEFAULTS = {
   domains: [], // domaines + certificats suivis
   deployments: [], // liaisons GitLab -> Argo CD -> Kubernetes -> Proxy par application
   hosts: [], // hôtes gérés via SSH pour l'installation d'agents (catalogue fermé)
+  audit: [], // journal des actions administratives sensibles (voir services/auditService.js)
   console: { name: 'Nexus Console', baseDomain: 'homelab.local' }
 };
 

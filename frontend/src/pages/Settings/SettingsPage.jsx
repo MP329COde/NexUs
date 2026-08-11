@@ -6,11 +6,13 @@ import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationFo
 import IntegrationPanel from './IntegrationPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
+import AuditPanel from './AuditPanel.jsx';
 
 const TABS = [
   { id: 'integrations', label: 'Intégrations' },
   { id: 'users', label: 'Utilisateurs' },
-  { id: 'system', label: 'Système' }
+  { id: 'system', label: 'Système' },
+  { id: 'audit', label: 'Journal' }
 ];
 
 export default function SettingsPage() {
@@ -52,6 +54,7 @@ export default function SettingsPage() {
       )}
       {tab === 'users' && <UsersPanel />}
       {tab === 'system' && <SystemPanel />}
+      {tab === 'audit' && <AuditPanel />}
     </>
   );
 }
