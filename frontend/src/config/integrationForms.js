@@ -36,6 +36,13 @@ export const INTEGRATION_FORMS = {
       { key: 'token', label: 'Token d\'accès personnel', type: 'password', secret: true }
     ]
   },
+  github: {
+    label: 'GitHub',
+    hint: "Dépôts, GitHub Actions et pull requests. Utilise l'API publique api.github.com.",
+    fields: [
+      { key: 'token', label: 'Token d\'accès personnel (scope repo + workflow)', type: 'password', secret: true }
+    ]
+  },
   proxmox: {
     label: 'Proxmox VE',
     hint: 'Nœuds, VM et conteneurs LXC.',
@@ -79,4 +86,4 @@ export const INTEGRATION_FORMS = {
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh'];
