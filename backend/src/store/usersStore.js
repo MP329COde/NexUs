@@ -8,6 +8,10 @@ export function listUsers() {
   return readStore('users');
 }
 
+export function hasAnyUser() {
+  return listUsers().length > 0;
+}
+
 export function findUserByEmail(email) {
   return listUsers().find((u) => u.email.toLowerCase() === String(email).toLowerCase());
 }
@@ -16,15 +20,26 @@ export function findUserById(id) {
   return listUsers().find((u) => u.id === id);
 }
 
+export function countAdmins(users = listUsers()) {
+  return users.filter((u) => u.role === 'admin' && u.active !== false).length;
+}
+
 const AVATAR_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899'];
 
-export function createUser({ email, password, name, role = 'admin' }) {
+// role: 'admin' (accès complet, y compris Paramètres/intégrations et gestion des
+// utilisateurs) ou 'user' (accède à la console et à ses propres préférences
+// uniquement — cf. requireRole() dans middleware/auth.js).
+export function createUser({ email, password, name, role = 'user' }) {
+  if (findUserByEmail(email)) {
+    throw Object.assign(new Error('Un utilisateur avec cet e-mail existe déjà'), { status: 409 });
+  }
   const users = listUsers();
   const user = {
     id: uuid(),
     email,
     name: name || email.split('@')[0],
     role,
+    active: true,
     passwordHash: hashPassword(password),
     avatarEmoji: null,
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
@@ -47,11 +62,51 @@ export function updateUser(id, patch) {
   return users[idx];
 }
 
-// Au premier démarrage, crée le compte admin depuis les variables d'environnement
-// afin que la console soit utilisable immédiatement derrière le reverse proxy.
-export function ensureBootstrapAdmin() {
+export function updatePassword(id, passwordHash) {
   const users = listUsers();
-  if (users.length > 0) return;
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].passwordHash = passwordHash;
+  writeStore('users', users);
+  return users[idx];
+}
+
+// Réservé aux admins (routes/users.routes.js) : changement de rôle / activation.
+// Refuse de retirer le dernier admin actif pour ne jamais verrouiller la console.
+export function setUserAdminFields(id, { role, active }) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  const wouldRemoveLastAdmin = users[idx].role === 'admin'
+    && ((role && role !== 'admin') || active === false)
+    && countAdmins(users) <= 1;
+  if (wouldRemoveLastAdmin) {
+    throw Object.assign(new Error("Impossible de retirer le dernier compte administrateur"), { status: 409 });
+  }
+  if (role) users[idx].role = role;
+  if (active !== undefined) users[idx].active = active;
+  writeStore('users', users);
+  return users[idx];
+}
+
+export function deleteUser(id) {
+  const users = listUsers();
+  const target = users.find((u) => u.id === id);
+  if (!target) return false;
+  if (target.role === 'admin' && countAdmins(users) <= 1) {
+    throw Object.assign(new Error("Impossible de supprimer le dernier compte administrateur"), { status: 409 });
+  }
+  writeStore('users', users.filter((u) => u.id !== id));
+  return true;
+}
+
+// Bootstrap non-interactif optionnel : ne crée un compte que si ADMIN_EMAIL et
+// ADMIN_PASSWORD sont explicitement définis (déploiement automatisé/headless).
+// Sans ces variables, la console reste sans utilisateur et affiche l'assistant
+// de première configuration (GET /api/setup/status → needsSetup: true).
+export function ensureBootstrapAdmin() {
+  if (hasAnyUser()) return;
+  if (!env.adminEmail || !env.adminPassword) return;
   createUser({ email: env.adminEmail, password: env.adminPassword, name: 'Administrateur', role: 'admin' });
-  logger.warn(`Aucun utilisateur trouvé : compte admin créé (${env.adminEmail}). Changez son mot de passe depuis les Paramètres.`);
+  logger.warn(`Compte admin créé depuis les variables d'environnement (${env.adminEmail}).`);
 }
