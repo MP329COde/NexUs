@@ -8,10 +8,12 @@ import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { ensureBootstrapAdmin } from './store/usersStore.js';
+import { scheduleDailyBackups } from './services/backupService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import router from './routes/index.js';
 
 ensureBootstrapAdmin();
+scheduleDailyBackups();
 
 const app = express();
 

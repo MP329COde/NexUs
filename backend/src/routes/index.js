@@ -19,6 +19,8 @@ import domainsRoutes from './domains.routes.js';
 import deploymentsRoutes from './deployments.routes.js';
 import networkTopologyRoutes from './networkTopology.routes.js';
 import hostsRoutes from './hosts.routes.js';
+import backupsRoutes from './backups.routes.js';
+import systemRoutes from './system.routes.js';
 
 const router = Router();
 
@@ -42,5 +44,7 @@ router.use('/domains', domainsRoutes);
 router.use('/deployments', deploymentsRoutes);
 router.use('/network', networkTopologyRoutes);
 router.use('/hosts', hostsRoutes);
+router.use('/backups', backupsRoutes);
+router.use('/system', systemRoutes);
 
 export default router;
