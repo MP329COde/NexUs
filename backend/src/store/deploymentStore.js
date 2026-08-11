@@ -12,7 +12,11 @@ export function createLink(payload) {
   const link = {
     id: uuid(),
     name: payload.name,
+    // 'gitlab' utilise gitlabProjectId ; 'github' utilise githubOwner + githubRepo.
+    gitProvider: payload.gitProvider === 'github' ? 'github' : 'gitlab',
     gitlabProjectId: payload.gitlabProjectId || null,
+    githubOwner: payload.githubOwner || null,
+    githubRepo: payload.githubRepo || null,
     argocdAppName: payload.argocdAppName || null,
     k8sNamespace: payload.k8sNamespace || null,
     k8sDeployment: payload.k8sDeployment || null,
