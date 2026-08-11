@@ -10,7 +10,7 @@ export function signSession(user) {
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
 export function toPublicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor };
 }
 
 export function requireAuth(req, res, next) {
@@ -19,10 +19,22 @@ export function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, env.jwtSecret);
     const user = findUserById(payload.sub);
-    if (!user) return res.status(401).json({ ok: false, error: 'Session invalide' });
+    if (!user || user.active === false) return res.status(401).json({ ok: false, error: 'Session invalide' });
     req.user = toPublicUser(user);
     next();
   } catch {
     return res.status(401).json({ ok: false, error: 'Session expirée ou invalide' });
   }
+}
+
+// À chaîner après requireAuth. Réserve une route à un rôle donné (typiquement
+// 'admin' pour les intégrations d'infrastructure et la gestion des utilisateurs) :
+// le reste de la console reste accessible à tout utilisateur authentifié.
+export function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user?.role !== role) {
+      return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+    }
+    next();
+  };
 }

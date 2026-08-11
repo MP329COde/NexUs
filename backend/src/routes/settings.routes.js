@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS } from '../store/settingsStore.js';
 import { integrations } from '../services/integrationRegistry.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
 
+// Connexions à l'infrastructure (tokens, URLs...) : réservé aux administrateurs.
+// Les préférences propres à chaque utilisateur vivent dans /api/auth/profile.
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requireRole('admin'));
 
 router.get('/', asyncHandler(async (req, res) => {
   res.json({ ok: true, integrations: getAllRedacted(), console: readStore('console') });

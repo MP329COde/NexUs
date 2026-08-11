@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
+import setupRoutes from './setup.routes.js';
+import usersRoutes from './users.routes.js';
 import settingsRoutes from './settings.routes.js';
 import statusRoutes from './status.routes.js';
 import kubernetesRoutes from './kubernetes.routes.js';
@@ -17,6 +19,8 @@ import deploymentsRoutes from './deployments.routes.js';
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/setup', setupRoutes);
+router.use('/users', usersRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/status', statusRoutes);
 router.use('/kubernetes', kubernetesRoutes);

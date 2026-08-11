@@ -1,11 +1,11 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../ui/Icon.jsx';
-import AvatarEditor from './AvatarEditor.jsx';
 
 const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: 'info' };
 
@@ -15,7 +15,6 @@ export default function Header({ title }) {
   const { history, clearHistory } = useNotifications();
   const [userMenu, setUserMenu] = useState(false);
   const [notifMenu, setNotifMenu] = useState(false);
-  const [editingAvatar, setEditingAvatar] = useState(false);
   const { data } = useApi(() => api.get('/status/overview'), [], { pollMs: 20000 });
   const score = data?.score ?? null;
   const tone = score === null ? 'mut' : score >= 90 ? 'ok' : score >= 60 ? 'warn' : 'crit';
@@ -101,18 +100,14 @@ export default function Header({ title }) {
                 </div>
               </div>
 
-              {editingAvatar
-                ? <AvatarEditor onClose={() => setEditingAvatar(false)} />
-                : (
-                  <div style={{ padding: 6 }}>
-                    <div onClick={() => setEditingAvatar(true)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
-                      <Icon name="edit" size={15} />Personnaliser l'avatar
-                    </div>
-                    <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--tone-crit-fg)' }}>
-                      <Icon name="logout" size={15} />Se déconnecter
-                    </div>
-                  </div>
-                )}
+              <div style={{ padding: 6 }}>
+                <Link to="/account" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+                  <Icon name="edit" size={15} />Mon compte
+                </Link>
+                <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--tone-crit-fg)' }}>
+                  <Icon name="logout" size={15} />Se déconnecter
+                </div>
+              </div>
             </div>
           )}
         </div>
