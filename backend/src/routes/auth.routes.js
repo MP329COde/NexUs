@@ -4,6 +4,7 @@ import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middl
 import { findUserByEmail, updateUser, updatePassword } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { env } from '../config/env.js';
+import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -12,6 +13,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
   const user = email && findUserByEmail(email);
   if (!user || user.active === false || !verifyPassword(password || '', user.passwordHash)) {
+    logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', {});
     return res.status(401).json({ ok: false, error: 'Identifiants invalides' });
   }
   const token = signSession(user);
@@ -21,6 +23,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     secure: env.isProd,
     maxAge: 12 * 60 * 60 * 1000
   });
+  logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login', {});
   res.json({ ok: true, user: toPublicUser(user) });
 }));
 
@@ -55,6 +58,7 @@ router.put('/password', requireAuth, asyncHandler(async (req, res) => {
     return res.status(401).json({ ok: false, error: 'Mot de passe actuel incorrect' });
   }
   updatePassword(user.id, hashPassword(newPassword));
+  logAudit(req, 'auth.password.changed', {});
   res.json({ ok: true });
 }));
 

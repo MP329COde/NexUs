@@ -21,6 +21,7 @@ import networkTopologyRoutes from './networkTopology.routes.js';
 import hostsRoutes from './hosts.routes.js';
 import backupsRoutes from './backups.routes.js';
 import systemRoutes from './system.routes.js';
+import auditRoutes from './audit.routes.js';
 
 const router = Router();
 
@@ -46,5 +47,6 @@ router.use('/network', networkTopologyRoutes);
 router.use('/hosts', hostsRoutes);
 router.use('/backups', backupsRoutes);
 router.use('/system', systemRoutes);
+router.use('/audit', auditRoutes);
 
 export default router;

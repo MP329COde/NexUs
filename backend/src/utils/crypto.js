@@ -1,11 +1,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { env } from '../config/env.js';
+import { dataDir } from '../config/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.resolve(__dirname, '../../data');
 const keyFile = path.join(dataDir, '.master.key');
 
 function loadOrCreateKey() {
@@ -54,8 +52,13 @@ export function hashPassword(plain) {
 export function verifyPassword(plain, stored) {
   if (!stored) return false;
   const [saltHex, hashHex] = stored.split(':');
-  const salt = Buffer.from(saltHex, 'hex');
-  const hash = Buffer.from(hashHex, 'hex');
-  const attempt = crypto.scryptSync(plain, salt, 64);
-  return hash.length === attempt.length && crypto.timingSafeEqual(hash, attempt);
+  if (!saltHex || !hashHex) return false;
+  try {
+    const salt = Buffer.from(saltHex, 'hex');
+    const hash = Buffer.from(hashHex, 'hex');
+    const attempt = crypto.scryptSync(plain, salt, 64);
+    return hash.length === attempt.length && crypto.timingSafeEqual(hash, attempt);
+  } catch {
+    return false;
+  }
 }

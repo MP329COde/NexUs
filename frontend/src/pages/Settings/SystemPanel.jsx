@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import RestoreBackupDialog from './RestoreBackupDialog.jsx';
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} o`;
@@ -12,11 +13,23 @@ function formatSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
 }
 
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SystemPanel() {
   const version = useApi(() => api.get('/system/version'), []);
   const backups = useApi(() => api.get('/backups'), []);
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
   const notify = useNotify();
 
   async function checkUpdates() {
@@ -45,6 +58,23 @@ export default function SystemPanel() {
     if (!confirm(`Supprimer la sauvegarde ${file} ?`)) return;
     await api.del(`/backups/${file}`);
     backups.reload();
+  }
+
+  async function onFileSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const dataBase64 = await readFileAsBase64(file);
+      await api.post('/backups/import', { filename: file.name, dataBase64 });
+      notify(`${file.name} importé — utilisez "Restaurer" pour l'appliquer`, { type: 'ok' });
+      backups.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Import échoué' });
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -82,8 +112,18 @@ export default function SystemPanel() {
       <Panel
         title="Sauvegardes"
         sub="Copie horodatée de la base (nexus.db), planifiée chaque nuit à 3h — 14 dernières conservées"
-        span={6}
-        actions={<span className="btn-outline" onClick={createBackup} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="plus" size={13} />Sauvegarder maintenant</span>}
+        span={12}
+        actions={(
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input ref={fileInputRef} type="file" accept=".db" style={{ display: 'none' }} onChange={onFileSelected} />
+            <span className="btn-outline" onClick={() => fileInputRef.current?.click()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="externalLink" size={13} className={importing ? 'spin' : ''} />{importing ? 'Import…' : 'Importer un fichier .db'}
+            </span>
+            <span className="btn-outline" onClick={createBackup} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="plus" size={13} />Sauvegarder maintenant
+            </span>
+          </div>
+        )}
       >
         <DataTable
           columns={['Fichier', 'Taille', 'Créée le', '']}
@@ -97,6 +137,7 @@ export default function SystemPanel() {
               <td>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <a className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center' }} href={`/api/backups/${b.file}/download`} target="_blank" rel="noreferrer">Télécharger</a>
+                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => setRestoreTarget(b.file)}>Restaurer</span>
                   <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => removeBackup(b.file)}>Suppr.</span>
                 </div>
               </td>
@@ -104,6 +145,14 @@ export default function SystemPanel() {
           )}
         />
       </Panel>
+
+      {restoreTarget && (
+        <RestoreBackupDialog
+          file={restoreTarget}
+          onClose={() => setRestoreTarget(null)}
+          onRestored={() => { setRestoreTarget(null); backups.reload(); }}
+        />
+      )}
     </div>
   );
 }
