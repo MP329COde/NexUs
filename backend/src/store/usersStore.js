@@ -16,6 +16,8 @@ export function findUserById(id) {
   return listUsers().find((u) => u.id === id);
 }
 
+const AVATAR_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899'];
+
 export function createUser({ email, password, name, role = 'admin' }) {
   const users = listUsers();
   const user = {
@@ -24,11 +26,25 @@ export function createUser({ email, password, name, role = 'admin' }) {
     name: name || email.split('@')[0],
     role,
     passwordHash: hashPassword(password),
+    avatarEmoji: null,
+    avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
     createdAt: new Date().toISOString()
   };
   users.push(user);
   writeStore('users', users);
   return user;
+}
+
+export function updateUser(id, patch) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  const allowed = ['name', 'avatarEmoji', 'avatarColor'];
+  for (const key of allowed) {
+    if (patch[key] !== undefined) users[idx][key] = patch[key] || null;
+  }
+  writeStore('users', users);
+  return users[idx];
 }
 
 // Au premier démarrage, crée le compte admin depuis les variables d'environnement
