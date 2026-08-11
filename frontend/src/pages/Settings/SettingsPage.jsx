@@ -5,10 +5,12 @@ import { api } from '../../lib/apiClient.js';
 import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
 import IntegrationPanel from './IntegrationPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
+import SystemPanel from './SystemPanel.jsx';
 
 const TABS = [
   { id: 'integrations', label: 'Intégrations' },
-  { id: 'users', label: 'Utilisateurs' }
+  { id: 'users', label: 'Utilisateurs' },
+  { id: 'system', label: 'Système' }
 ];
 
 export default function SettingsPage() {
@@ -35,7 +37,7 @@ export default function SettingsPage() {
         )}
       />
 
-      {tab === 'integrations' ? (
+      {tab === 'integrations' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(360px,1fr))', gap: 16 }}>
           {INTEGRATION_ORDER.map((key) => (
             <IntegrationPanel
@@ -47,9 +49,9 @@ export default function SettingsPage() {
             />
           ))}
         </div>
-      ) : (
-        <UsersPanel />
       )}
+      {tab === 'users' && <UsersPanel />}
+      {tab === 'system' && <SystemPanel />}
     </>
   );
 }
