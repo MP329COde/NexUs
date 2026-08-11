@@ -1,14 +1,15 @@
 import Panel from '../../components/ui/Panel.jsx';
+import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
-const STAGES = [
-  { key: 'git', label: 'GitLab · CI/CD' },
-  { key: 'argocd', label: 'Argo CD' },
-  { key: 'kubernetes', label: 'Kubernetes' },
-  { key: 'proxy', label: 'Reverse proxy' }
-];
+const STAGE_LABELS = {
+  git: { gitlab: 'GitLab · CI/CD', github: 'GitHub · Actions' },
+  argocd: 'Argo CD',
+  kubernetes: 'Kubernetes',
+  proxy: 'Reverse proxy'
+};
 
 export default function PipelineView({ linkId, span }) {
   const { data, reload } = useApi(() => api.get(`/deployments/${linkId}/pipeline`), [linkId], { pollMs: 15000 });
@@ -25,12 +26,24 @@ export default function PipelineView({ linkId, span }) {
     }
   }
 
+  const gitLabel = typeof STAGE_LABELS.git === 'object' ? (STAGE_LABELS.git[data?.stages.git.provider] || 'Git') : STAGE_LABELS.git;
+
   return (
-    <Panel title={`Pipeline · ${data?.link.name || ''}`} sub="développement → Git → CI/CD → Argo CD → Kubernetes → reverse proxy → domaine" span={span} actions={<span className="btn-outline" onClick={sync}>Synchroniser Argo CD</span>}>
+    <Panel
+      title={`Pipeline · ${data?.link.name || ''}`}
+      sub="développement → Git → CI/CD → Argo CD → Kubernetes → reverse proxy → domaine"
+      span={span}
+      actions={(
+        <span className="btn-outline" onClick={sync} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="sync" size={13} />Synchroniser Argo CD
+        </span>
+      )}
+    >
       <div style={{ display: 'flex', gap: 12, padding: 16, flexWrap: 'wrap' }}>
-        {STAGES.map((s) => (
-          <StageCard key={s.key} label={s.label} stage={data?.stages[s.key]} stageKey={s.key} />
-        ))}
+        <StageCard label={gitLabel} stage={data?.stages.git} stageKey="git" />
+        <StageCard label={STAGE_LABELS.argocd} stage={data?.stages.argocd} stageKey="argocd" />
+        <StageCard label={STAGE_LABELS.kubernetes} stage={data?.stages.kubernetes} stageKey="kubernetes" />
+        <StageCard label={STAGE_LABELS.proxy} stage={data?.stages.proxy} stageKey="proxy" />
       </div>
     </Panel>
   );
@@ -39,6 +52,7 @@ export default function PipelineView({ linkId, span }) {
 function StageCard({ label, stage, stageKey }) {
   if (!stage) return null;
   const tone = !stage.configured ? 'mut' : stage.error ? 'crit' : 'ok';
+  const externalUrl = stage.latestPipeline?.webUrl || stage.webUrl;
   return (
     <div className="card" style={{ flex: '1 1 220px', padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -46,6 +60,11 @@ function StageCard({ label, stage, stageKey }) {
         <span className={`badge badge-${tone}`}><span className="dot" />{stage.configured ? (stage.error ? 'Erreur' : 'OK') : 'Non lié'}</span>
       </div>
       <StageDetail stageKey={stageKey} stage={stage} />
+      {externalUrl && (
+        <a href={externalUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, marginTop: 8 }}>
+          <Icon name="externalLink" size={12} />Ouvrir dans l'outil
+        </a>
+      )}
     </div>
   );
 }

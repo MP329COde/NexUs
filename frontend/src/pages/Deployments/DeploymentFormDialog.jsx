@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 
 export default function DeploymentFormDialog({ onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', gitlabProjectId: '', argocdAppName: '', k8sNamespace: '', k8sDeployment: '' });
+  const [form, setForm] = useState({ name: '', gitProvider: 'gitlab', gitlabProjectId: '', githubOwner: '', githubRepo: '', argocdAppName: '', k8sNamespace: '', k8sDeployment: '' });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,7 +30,23 @@ export default function DeploymentFormDialog({ onClose, onSaved }) {
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Lier une application</div>
 
         <Field label="Nom de l'application"><input className="input" required value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
-        <Field label="ID projet GitLab"><input className="input" value={form.gitlabProjectId} onChange={(e) => set('gitlabProjectId', e.target.value)} /></Field>
+
+        <Field label="Fournisseur Git">
+          <select className="input" value={form.gitProvider} onChange={(e) => set('gitProvider', e.target.value)}>
+            <option value="gitlab">GitLab</option>
+            <option value="github">GitHub</option>
+          </select>
+        </Field>
+
+        {form.gitProvider === 'gitlab' ? (
+          <Field label="ID projet GitLab"><input className="input" value={form.gitlabProjectId} onChange={(e) => set('gitlabProjectId', e.target.value)} /></Field>
+        ) : (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}><Field label="Propriétaire GitHub"><input className="input" placeholder="org-ou-utilisateur" value={form.githubOwner} onChange={(e) => set('githubOwner', e.target.value)} /></Field></div>
+            <div style={{ flex: 1 }}><Field label="Dépôt GitHub"><input className="input" placeholder="mon-app" value={form.githubRepo} onChange={(e) => set('githubRepo', e.target.value)} /></Field></div>
+          </div>
+        )}
+
         <Field label="Nom application Argo CD"><input className="input" value={form.argocdAppName} onChange={(e) => set('argocdAppName', e.target.value)} /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1 }}><Field label="Namespace K8s"><input className="input" value={form.k8sNamespace} onChange={(e) => set('k8sNamespace', e.target.value)} /></Field></div>
