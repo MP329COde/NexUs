@@ -67,7 +67,16 @@ export const INTEGRATION_FORMS = {
       { key: 'baseUrl', label: 'URL de l\'instance', placeholder: 'https://grafana.homelab.local' },
       { key: 'apiKey', label: 'Clé API', type: 'password', secret: true }
     ]
+  },
+  wazuh: {
+    label: 'Wazuh',
+    hint: 'Agents, alertes de sécurité et conformité (API du gestionnaire, port 55000 par défaut).',
+    fields: [
+      { key: 'baseUrl', label: 'URL de l\'API', placeholder: 'https://wazuh.homelab.local:55000' },
+      { key: 'username', label: "Nom d'utilisateur", placeholder: 'wazuh-wui' },
+      { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
+    ]
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'proxmox', 'traefik', 'certManager', 'grafana'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh'];

@@ -6,6 +6,7 @@ import * as proxmoxService from './integrations/proxmoxService.js';
 import * as traefikService from './integrations/traefikService.js';
 import * as certManagerService from './integrations/certManagerService.js';
 import * as grafanaService from './integrations/grafanaService.js';
+import * as wazuhService from './integrations/wazuhService.js';
 
 // Point d'entrée unique listant les intégrations disponibles: utilisé par
 // l'agrégateur de statut (dashboard) et pouvant accueillir de futures intégrations
@@ -18,10 +19,11 @@ export const integrations = {
   proxmox: { label: 'Proxmox', service: proxmoxService, domain: 'inf' },
   traefik: { label: 'Traefik', service: traefikService, domain: 'net' },
   certManager: { label: 'Cert-Manager', service: certManagerService, domain: 'net' },
-  grafana: { label: 'Grafana', service: grafanaService, domain: 'mon' }
+  grafana: { label: 'Grafana', service: grafanaService, domain: 'mon' },
+  wazuh: { label: 'Wazuh', service: wazuhService, domain: 'sec' }
 };
 
 export {
   kubernetesService, argocdService, haproxyService, gitlabService,
-  proxmoxService, traefikService, certManagerService, grafanaService
+  proxmoxService, traefikService, certManagerService, grafanaService, wazuhService
 };

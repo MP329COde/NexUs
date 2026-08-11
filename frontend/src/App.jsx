@@ -7,10 +7,15 @@ import LoginPage from './pages/Login/LoginPage.jsx';
 import SetupPage from './pages/Setup/SetupPage.jsx';
 import HomePage from './pages/Home/HomePage.jsx';
 import KubernetesPage from './pages/Kubernetes/KubernetesPage.jsx';
+import NetworkLayout from './pages/Network/NetworkLayout.jsx';
 import NetworkPage from './pages/Network/NetworkPage.jsx';
+import HAProxyPage from './pages/Network/HAProxyPage.jsx';
+import TopologyPage from './pages/Network/TopologyPage.jsx';
+import CertificatesPage from './pages/Network/CertificatesPage.jsx';
 import ProxmoxPage from './pages/Infrastructure/ProxmoxPage.jsx';
 import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
 import DeploymentsPage from './pages/Deployments/DeploymentsPage.jsx';
+import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
 import StubPage from './components/ui/StubPage.jsx';
@@ -32,9 +37,19 @@ export const router = createBrowserRouter([
           { path: 'deployments', element: <DeploymentsPage />, handle: { title: 'Développement' } },
           { path: 'infrastructure', element: <ProxmoxPage />, handle: { title: 'Infrastructure' } },
           { path: 'kubernetes', element: <KubernetesPage />, handle: { title: 'Kubernetes' } },
-          { path: 'network', element: <NetworkPage />, handle: { title: 'Réseaux' } },
+          {
+            path: 'network',
+            element: <NetworkLayout />,
+            handle: { title: 'Réseaux' },
+            children: [
+              { index: true, element: <NetworkPage /> },
+              { path: 'haproxy', element: <HAProxyPage /> },
+              { path: 'topology', element: <TopologyPage /> },
+              { path: 'certificates', element: <CertificatesPage /> }
+            ]
+          },
           { path: 'monitoring', element: <MonitoringPage />, handle: { title: 'Monitoring' } },
-          { path: 'security', element: <StubPage title="Cybersécurité" sub="Vulnérabilités, accès et audit" />, handle: { title: 'Cybersécurité' } },
+          { path: 'security', element: <SecurityPage />, handle: { title: 'Cybersécurité' } },
           { path: 'storage', element: <StubPage title="Stockage" sub="Volumes, NAS et sauvegardes" />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'settings', element: <RequireRole role="admin"><SettingsPage /></RequireRole>, handle: { title: 'Paramètres' } }
