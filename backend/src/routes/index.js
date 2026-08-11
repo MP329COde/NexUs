@@ -18,6 +18,7 @@ import proxiesRoutes from './proxies.routes.js';
 import domainsRoutes from './domains.routes.js';
 import deploymentsRoutes from './deployments.routes.js';
 import networkTopologyRoutes from './networkTopology.routes.js';
+import hostsRoutes from './hosts.routes.js';
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use('/proxies', proxiesRoutes);
 router.use('/domains', domainsRoutes);
 router.use('/deployments', deploymentsRoutes);
 router.use('/network', networkTopologyRoutes);
+router.use('/hosts', hostsRoutes);
 
 export default router;

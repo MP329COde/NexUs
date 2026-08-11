@@ -27,6 +27,7 @@ const strictLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: tr
 app.use('/api/auth/login', strictLimiter);
 app.use('/api/setup', strictLimiter);
 app.use('/api/settings', strictLimiter);
+app.use('/api/hosts', strictLimiter);
 
 app.use('/api', router);
 

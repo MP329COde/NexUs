@@ -12,6 +12,7 @@ const DEFAULTS = {
   proxies: [], // reverse-proxy entries gérées par la console
   domains: [], // domaines + certificats suivis
   deployments: [], // liaisons GitLab -> Argo CD -> Kubernetes -> Proxy par application
+  hosts: [], // hôtes gérés via SSH pour l'installation d'agents (catalogue fermé)
   console: { name: 'Nexus Console', baseDomain: 'homelab.local' }
 };
 
