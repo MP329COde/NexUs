@@ -4,6 +4,14 @@ import { requireAuth } from '../middleware/auth.js';
 import { integrations } from '../services/integrationRegistry.js';
 
 const router = Router();
+
+// Sonde de vie publique (aucune authentification) pour Docker/systemd/le
+// reverse proxy : répond dès que le process Express écoute, sans dépendre
+// d'aucune intégration externe. Doit rester avant router.use(requireAuth).
+router.get('/health', (req, res) => {
+  res.json({ ok: true, status: 'healthy', uptimeSeconds: Math.round(process.uptime()) });
+});
+
 router.use(requireAuth);
 
 // Vue d'ensemble consommée par le dashboard "Vue générale": interroge toutes
