@@ -1,12 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import sshpk from 'sshpk';
 import { encryptSecret, decryptSecret } from './crypto.js';
+import { dataDir } from '../config/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.resolve(__dirname, '../../data');
 const privFile = path.join(dataDir, '.ssh_console_key.enc');
 const pubFile = path.join(dataDir, '.ssh_console_key.pub');
 
