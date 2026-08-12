@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 import StatusBadge, { toneFromStatus } from '../../components/ui/StatusBadge.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import { suggestHostUrl } from '../../lib/urlSuggest.js';
 
-export default function IntegrationPanel({ integrationKey, schema, initial, onSaved }) {
+export default function IntegrationPanel({ integrationKey, schema, initial, allIntegrations, onSaved }) {
   const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -23,6 +24,16 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
   }
+
+  // Complète automatiquement le schéma "https://" si l'utilisateur a saisi
+  // juste un nom d'hôte (aucune requête réseau, juste une normalisation locale).
+  function normalizeUrlOnBlur(field, value) {
+    if (value && !/^https?:\/\//i.test(value)) set(field, `https://${value}`);
+  }
+
+  const suggestion = schema.hostSuggestion && !form[schema.hostSuggestion.field]
+    ? suggestHostUrl(allIntegrations, schema.hostSuggestion)
+    : null;
 
   async function save(e) {
     e.preventDefault();
@@ -154,9 +165,16 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
                   placeholder={f.placeholder}
                   value={form[f.key] ?? ''}
                   onChange={(e) => set(f.key, e.target.value)}
+                  onBlur={f.placeholder?.startsWith('http') ? (e) => normalizeUrlOnBlur(f.key, e.target.value) : undefined}
                 />
               )}
               {f.hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{f.hint}</div>}
+              {schema.hostSuggestion?.field === f.key && suggestion && (
+                <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-faint)' }}>
+                  Suggestion (déduite de vos autres intégrations) : <span className="mono">{suggestion}</span>{' '}
+                  <span style={{ color: 'var(--primary)', fontWeight: 500, cursor: 'pointer' }} onClick={() => set(f.key, suggestion)}>Utiliser</span>
+                </div>
+              )}
             </div>
           ))}
 
