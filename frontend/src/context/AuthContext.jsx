@@ -37,8 +37,14 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const completeOnboarding = useCallback(async (patch) => {
+    const data = await api.put('/auth/onboarding/complete', patch);
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, completeOnboarding, refresh }}>
       {children}
     </AuthContext.Provider>
   );

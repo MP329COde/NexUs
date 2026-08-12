@@ -29,7 +29,12 @@ const AVATAR_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#
 // role: 'admin' (accès complet, y compris Paramètres/intégrations et gestion des
 // utilisateurs) ou 'user' (accède à la console et à ses propres préférences
 // uniquement — cf. requireRole() dans middleware/auth.js).
-export function createUser({ email, password, name, role = 'user' }) {
+// mustOnboard : affiche l'assistant de première connexion (nom, mot de passe,
+// compte Git) avant d'accéder au reste de la console. Faux par défaut — le
+// bootstrap admin et le setup initial n'en ont pas besoin ; seule la création
+// d'un compte par un admin (routes/users.routes.js) le met à true, sauf si
+// l'admin indique avoir déjà configuré le compte lui-même.
+export function createUser({ email, password, name, role = 'user', mustOnboard = false }) {
   if (findUserByEmail(email)) {
     throw Object.assign(new Error('Un utilisateur avec cet e-mail existe déjà'), { status: 409 });
   }
@@ -44,6 +49,7 @@ export function createUser({ email, password, name, role = 'user' }) {
     avatarEmoji: null,
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
     theme: null,
+    mustOnboard,
     createdAt: new Date().toISOString()
   };
   users.push(user);
@@ -68,6 +74,16 @@ export function updatePassword(id, passwordHash) {
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
   users[idx].passwordHash = passwordHash;
+  writeStore('users', users);
+  return users[idx];
+}
+
+// Sort l'utilisateur de l'assistant de première connexion, une fois pour toutes.
+export function clearOnboarding(id) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].mustOnboard = false;
   writeStore('users', users);
   return users[idx];
 }
