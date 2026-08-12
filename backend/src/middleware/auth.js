@@ -5,8 +5,10 @@ import { getSessionMinutes } from '../store/identityStore.js';
 
 export const SESSION_COOKIE = 'nexus_session';
 
+const JWT_ALGORITHM = 'HS256';
+
 export function signSession(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m` });
+  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
 }
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
@@ -18,7 +20,11 @@ export function requireAuth(req, res, next) {
   const token = req.cookies?.[SESSION_COOKIE] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ ok: false, error: 'Authentification requise' });
   try {
-    const payload = jwt.verify(token, env.jwtSecret);
+    // algorithms: restreint explicitement à HS256 (défense en profondeur contre
+    // une confusion d'algorithme si le secret venait à être mal réutilisé ailleurs) :
+    // la bibliothèque jsonwebtoken rejette déjà "none" par défaut, mais autant
+    // ne jamais dépendre du comportement implicite pour une vérification de session.
+    const payload = jwt.verify(token, env.jwtSecret, { algorithms: [JWT_ALGORITHM] });
     const user = findUserById(payload.sub);
     if (!user || user.active === false) return res.status(401).json({ ok: false, error: 'Session invalide' });
     req.user = toPublicUser(user);

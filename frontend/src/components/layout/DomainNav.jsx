@@ -18,6 +18,7 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
         style={{
           flex: 'none',
           width,
+          height: '100%',
           background: 'var(--surface)',
           borderRight: '1px solid var(--border)',
           display: 'flex',

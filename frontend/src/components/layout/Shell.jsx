@@ -42,7 +42,7 @@ export default function Shell() {
         <Header title={title} onOpenSearch={() => setSearchOpen(true)} onOpenNav={() => setMobileNavOpen(true)} />
       </div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <div className="no-print">
+        <div className="no-print" style={{ height: '100%' }}>
           <DomainNav
             collapsed={collapsed}
             onToggleCollapsed={toggleCollapsed}
