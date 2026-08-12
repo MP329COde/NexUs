@@ -17,6 +17,11 @@ scheduleDailyBackups();
 
 const app = express();
 
+// Nécessaire pour que req.secure reflète le X-Forwarded-Proto envoyé par un
+// reverse proxy en amont (nginx du conteneur frontend, Traefik/HAProxy externe)
+// plutôt que la connexion brute vers ce process Node (voir cookies de session).
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
 // 10 Mo plutôt que le défaut 1 Mo : suffisant pour l'import d'une sauvegarde
