@@ -16,6 +16,7 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Stockage', group: 'Pages', path: '/storage', keywords: 'volumes nas sauvegardes' },
   { label: 'Mon compte', group: 'Pages', path: '/account', keywords: 'profil mot de passe avatar thème' },
   { label: "Manuel d'utilisation", group: 'Pages', path: '/manual', keywords: 'aide documentation guide manuel help' },
+  { label: 'Rapport de santé', group: 'Pages', path: '/report', keywords: 'rapport pdf export imprimer santé' },
   { label: 'Paramètres — Intégrations', group: 'Administration', path: '/settings', keywords: 'kubernetes argocd haproxy gitlab github proxmox traefik grafana wazuh token', adminOnly: true },
   { label: 'Paramètres — Utilisateurs', group: 'Administration', path: '/settings?tab=users', keywords: 'comptes rôles admin utilisateur', adminOnly: true },
   { label: 'Paramètres — Système', group: 'Administration', path: '/settings?tab=system', keywords: 'version mise à jour sauvegarde backup restaurer', adminOnly: true },

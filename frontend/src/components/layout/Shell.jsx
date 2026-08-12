@@ -21,11 +21,11 @@ export default function Shell() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <Header title={title} onOpenSearch={() => setSearchOpen(true)} />
+    <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <div className="no-print"><Header title={title} onOpenSearch={() => setSearchOpen(true)} /></div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <DomainNav />
-        <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+        <div className="no-print"><DomainNav /></div>
+        <main className="app-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
           <div style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 28px 56px' }}>
             <Outlet />
           </div>
