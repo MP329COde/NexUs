@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
@@ -17,7 +17,10 @@ const TABS = [
 
 export default function SettingsPage() {
   const { data, reload } = useApi(() => api.get('/settings'), []);
-  const [tab, setTab] = useState('integrations');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'integrations';
+  const setTab = (id) => setSearchParams(id === 'integrations' ? {} : { tab: id }, { replace: true });
 
   return (
     <>

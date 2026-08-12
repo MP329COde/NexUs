@@ -9,7 +9,7 @@ import Icon from '../ui/Icon.jsx';
 
 const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: 'info' };
 
-export default function Header({ title }) {
+export default function Header({ title, onOpenSearch }) {
   const { user, logout } = useAuth();
   const { resolved, toggle } = useTheme();
   const { history, clearHistory } = useNotifications();
@@ -39,6 +39,15 @@ export default function Header({ title }) {
           Santé globale
           <span className="mono">{score === null ? '—' : `${score} %`}</span>
         </div>
+
+        <button
+          onClick={onOpenSearch}
+          title="Recherche globale (Ctrl/⌘+K)"
+          style={{ ...iconBtn, width: 'auto', gap: 7, padding: '0 10px' }}
+        >
+          <Icon name="search" size={15} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)' }}>⌘K</span>
+        </button>
 
         <Link to="/manual" title="Manuel d'utilisation" style={iconBtn}>
           <Icon name="book" size={16} />
