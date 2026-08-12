@@ -43,6 +43,7 @@ export function createUser({ email, password, name, role = 'user' }) {
     passwordHash: hashPassword(password),
     avatarEmoji: null,
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
+    theme: null,
     createdAt: new Date().toISOString()
   };
   users.push(user);
@@ -54,7 +55,7 @@ export function updateUser(id, patch) {
   const users = listUsers();
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
-  const allowed = ['name', 'avatarEmoji', 'avatarColor'];
+  const allowed = ['name', 'avatarEmoji', 'avatarColor', 'theme'];
   for (const key of allowed) {
     if (patch[key] !== undefined) users[idx][key] = patch[key] || null;
   }

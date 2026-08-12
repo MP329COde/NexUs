@@ -5,7 +5,7 @@ const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: '
 export default function ToastStack({ toasts, onDismiss }) {
   if (toasts.length === 0) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 18, right: 18, display: 'flex', flexDirection: 'column', gap: 10, zIndex: 200, width: 340, maxWidth: 'calc(100vw - 36px)' }}>
+    <div style={{ position: 'fixed', top: 66, right: 18, display: 'flex', flexDirection: 'column', gap: 10, zIndex: 250, width: 340, maxWidth: 'calc(100vw - 36px)' }}>
       {toasts.map((t) => (
         <div
           key={t.id}

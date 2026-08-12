@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import ToastStack from '../components/ui/ToastStack.jsx';
+import { setGlobalErrorHandler } from '../lib/apiClient.js';
 
 const NotificationContext = createContext(null);
 let idSeq = 0;
@@ -24,6 +25,14 @@ export function NotificationProvider({ children }) {
   }, [dismiss]);
 
   const clearHistory = useCallback(() => setHistory([]), []);
+
+  // Toute erreur API réseau/serveur (pas les 4xx attendus, cf. apiClient.js)
+  // remonte automatiquement en toast, sur toutes les pages, sans que chacune
+  // ait à appeler notify() explicitement.
+  useEffect(() => {
+    setGlobalErrorHandler((message) => notify(message, { type: 'crit', title: 'Erreur' }));
+    return () => setGlobalErrorHandler(null);
+  }, [notify]);
 
   return (
     <NotificationContext.Provider value={{ notify, history, clearHistory }}>

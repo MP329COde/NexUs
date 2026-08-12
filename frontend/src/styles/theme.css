@@ -29,34 +29,11 @@
   --tone-mut-fg: #475569;   --tone-mut-bg: #F1F5F9;   --tone-mut-br: #E2E8F0;   --tone-mut-dot: #94A3B8;
 }
 
-/* Palette sombre : appliquée soit via prefers-color-scheme (mode "système"),
-   soit explicitement via data-theme sur <html> (bascule manuelle, cf. ThemeContext). */
-:root[data-theme='dark'],
-:root:not([data-theme='light']) {
-  @media (prefers-color-scheme: dark) {
-    --bg: #0B1120;
-    --surface: #121A2C;
-    --border: #232E45;
-    --border-soft: #1A2338;
-    --text: #E7ECF5;
-    --text-muted: #9AA7C2;
-    --text-faint: #6B7A9C;
-    --text-faintest: #4A5878;
-    --primary: #3B82F6;
-    --primary-hover: #60A5FA;
-    --primary-soft: rgba(59, 130, 246, .16);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3);
-    --shadow-card-hover: 0 6px 20px rgba(0, 0, 0, .4);
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .55);
-
-    --tone-ok-fg: #34D399;    --tone-ok-bg: rgba(16,185,129,.14);   --tone-ok-br: rgba(52,211,153,.35);   --tone-ok-dot: #34D399;
-    --tone-warn-fg: #FBBF24;  --tone-warn-bg: rgba(245,158,11,.14); --tone-warn-br: rgba(251,191,36,.35); --tone-warn-dot: #FBBF24;
-    --tone-crit-fg: #FB7185;  --tone-crit-bg: rgba(244,63,94,.14);  --tone-crit-br: rgba(251,113,133,.35);--tone-crit-dot: #FB7185;
-    --tone-info-fg: #60A5FA;  --tone-info-bg: rgba(59,130,246,.14); --tone-info-br: rgba(96,165,250,.35); --tone-info-dot: #60A5FA;
-    --tone-vio-fg: #A78BFA;   --tone-vio-bg: rgba(139,92,246,.14);  --tone-vio-br: rgba(167,139,250,.35); --tone-vio-dot: #A78BFA;
-    --tone-mut-fg: #9AA7C2;   --tone-mut-bg: rgba(154,167,194,.12); --tone-mut-br: rgba(154,167,194,.3);  --tone-mut-dot: #6B7A9C;
-  }
-}
+/* Palette sombre : appliquée explicitement via data-theme='dark' sur <html>.
+   ThemeContext résout toujours les modes 'system'/'schedule' en 'light' ou
+   'dark' côté JS et pose l'attribut en conséquence (voir aussi le script
+   inline dans index.html qui le fait une première fois avant l'hydratation
+   React, pour éviter un flash de mauvais thème). */
 :root[data-theme='dark'] {
   --bg: #0B1120;
   --surface: #121A2C;

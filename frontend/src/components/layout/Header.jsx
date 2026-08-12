@@ -6,10 +6,11 @@ import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../ui/Icon.jsx';
+import BrandMark from '../ui/BrandMark.jsx';
 
 const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: 'info' };
 
-export default function Header({ title, onOpenSearch }) {
+export default function Header({ title, onOpenSearch, onOpenNav }) {
   const { user, logout } = useAuth();
   const { resolved, toggle } = useTheme();
   const { history, clearHistory } = useNotifications();
@@ -21,20 +22,24 @@ export default function Header({ title, onOpenSearch }) {
 
   return (
     <header style={{ flex: 'none', height: 56, display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'relative', zIndex: 30 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: 246, flex: 'none' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13 }}>N</div>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Nexus Console</span>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>homelab.local</span>
+      <button onClick={onOpenNav} title="Ouvrir la navigation" className="icon-btn mobile-only" style={{ flex: 'none' }}>
+        <Icon name="menu" size={18} />
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 'none' }}>
+        <BrandMark size={28} />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>Nexus Console</span>
+          <span className="mono header-brand-sub" style={{ fontSize: 11, color: 'var(--text-faint)' }}>homelab.local</span>
         </div>
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>{title}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{title}</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div title="Santé globale de l'infrastructure" className={`badge badge-${tone}`} style={{ height: 30 }}>
+        <div title="Santé globale de l'infrastructure" className={`badge badge-${tone} header-health-badge`} style={{ height: 30 }}>
           <span className="dot" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} />
           Santé globale
           <span className="mono">{score === null ? '—' : `${score} %`}</span>
@@ -43,26 +48,27 @@ export default function Header({ title, onOpenSearch }) {
         <button
           onClick={onOpenSearch}
           title="Recherche globale (Ctrl/⌘+K)"
-          style={{ ...iconBtn, width: 'auto', gap: 7, padding: '0 10px' }}
+          className="icon-btn"
+          style={{ width: 'auto', gap: 7, padding: '0 10px' }}
         >
           <Icon name="search" size={15} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)' }}>⌘K</span>
+          <span className="header-search-label" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)' }}>⌘K</span>
         </button>
 
-        <Link to="/manual" title="Manuel d'utilisation" style={iconBtn}>
+        <Link to="/manual" title="Manuel d'utilisation" className="icon-btn header-manual-link">
           <Icon name="book" size={16} />
         </Link>
 
         <button
           onClick={toggle}
           title={resolved === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'}
-          style={iconBtn}
+          className="icon-btn"
         >
           <Icon name={resolved === 'dark' ? 'sun' : 'moon'} size={16} />
         </button>
 
         <div style={{ position: 'relative' }}>
-          <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" style={{ ...iconBtn, position: "relative" }}>
+          <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn" style={{ position: 'relative' }}>
             <Icon name="bell" size={16} />
             {history.length > 0 && <span style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: 'var(--tone-crit-dot)', border: '2px solid var(--surface)' }} />}
           </button>
@@ -128,5 +134,3 @@ export default function Header({ title, onOpenSearch }) {
     </header>
   );
 }
-
-const iconBtn = { width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };

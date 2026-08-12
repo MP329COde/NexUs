@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../../components/ui/Icon.jsx';
+import BrandMark from '../../components/ui/BrandMark.jsx';
 
 // Rapport imprimable : couleurs fixes (indépendantes du thème clair/sombre de
 // l'app) pour garantir un rendu papier/PDF lisible via le dialogue d'impression
@@ -52,7 +53,7 @@ export default function ReportPage() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>N</div>
+        <BrandMark size={34} />
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Rapport de santé — Nexus Console</div>
           <div style={{ fontSize: 12, color: muted }}>Généré le {generatedAt.toLocaleString('fr-FR')}</div>

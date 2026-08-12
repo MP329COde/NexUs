@@ -29,6 +29,12 @@ button { cursor: pointer; }
   box-shadow: var(--shadow-card);
 }
 
+/* Opt-in pour les cartes/lignes cliquables (liens d'intégration de la Vue
+   générale, résultats de recherche...) : lift au survol, jamais sur les
+   panneaux statiques pour ne pas suggérer une interactivité qui n'existe pas. */
+.card-hover { transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease; }
+.card-hover:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); border-color: var(--text-faintest); }
+
 .btn {
   height: 34px;
   padding: 0 15px;
@@ -39,9 +45,10 @@ button { cursor: pointer; }
   font-size: 13px;
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(37, 99, 235, .35);
-  transition: background .15s ease;
+  transition: background .15s ease, transform .1s ease, box-shadow .15s ease;
 }
 .btn:hover { background: var(--primary-hover); }
+.btn:active:not(:disabled) { transform: scale(.96); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 
 .btn-outline {
@@ -53,12 +60,22 @@ button { cursor: pointer; }
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
-  transition: all .15s ease;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
 }
 .btn-outline:hover { background: var(--border-soft); border-color: var(--text-faintest); }
+.btn-outline:active { transform: scale(.96); }
 
 .btn-danger { color: var(--tone-crit-fg); border-color: var(--tone-crit-br); background: var(--tone-crit-bg); }
 .btn-danger:hover { filter: brightness(.97); }
+.btn-danger:active { transform: scale(.96); }
+
+.icon-btn {
+  width: 34px; height: 34px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
+}
+.icon-btn:hover { background: var(--border-soft); color: var(--text); }
+.icon-btn:active { transform: scale(.9); }
 
 .input {
   height: 34px;
@@ -118,6 +135,9 @@ tbody tr:hover { background: var(--border-soft); }
 
 .domain-nav-item:hover { background: var(--primary-soft); color: var(--primary); }
 
+.home-integration-row { transition: background .12s ease, padding-left .12s ease; }
+.home-integration-row:hover { background: var(--border-soft); padding-left: 20px; }
+
 @keyframes tableRowIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 tbody tr { animation: tableRowIn .25s ease both; }
 tbody tr:nth-child(1) { animation-delay: .01s; }
@@ -131,3 +151,65 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
 @media (max-width: 860px) {
   .login-visual { display: none; }
 }
+
+/* Responsive : le rail de navigation devient un tiroir plein écran sous 860px
+   (voir DomainNav.jsx), déclenché par le bouton hamburger du header. Les
+   éléments secondaires du header (recherche, santé globale) se réduisent
+   pour laisser la place sur petit écran. */
+.nav-backdrop { display: none; }
+.mobile-only { display: none !important; }
+
+@media (max-width: 860px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+
+  .app-domain-nav {
+    position: fixed;
+    inset: 0 25% 0 0;
+    z-index: 120;
+    width: auto !important;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-pop);
+  }
+  .app-domain-nav.open { transform: translateX(0); }
+
+  .nav-backdrop.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, .5);
+    z-index: 110;
+    animation: fadeIn .15s ease both;
+  }
+
+  .header-health-badge { display: none !important; }
+  .header-search-label { display: none !important; }
+}
+
+@media (max-width: 560px) {
+  .header-brand-sub { display: none; }
+  .header-manual-link { display: none !important; }
+}
+
+/* Layouts à deux colonnes (Manuel, futures pages similaires) : empilées sous
+   860px plutôt que compressées à une colonne de quelques pixels de large. */
+@media (max-width: 860px) {
+  .manual-layout { flex-direction: column; align-items: stretch !important; }
+  .manual-toc { width: 100% !important; position: static !important; }
+  .manual-content { max-width: 100% !important; }
+}
+
+/* Respecte la préférence système "réduire les animations" (accessibilité) :
+   coupe toutes les animations/transitions plutôt que de les laisser tourner
+   pour les utilisateurs qui les ont explicitement désactivées. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.route-page { animation: pageIn .22s cubic-bezier(.16,1,.3,1) both; }

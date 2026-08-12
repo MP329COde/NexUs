@@ -10,7 +10,7 @@ export function signSession(user) {
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
 export function toPublicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role, active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor, theme: user.theme || 'system' };
 }
 
 export function requireAuth(req, res, next) {

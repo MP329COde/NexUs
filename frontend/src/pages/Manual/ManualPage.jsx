@@ -51,8 +51,8 @@ export default function ManualPage() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
-      <nav style={{ flex: 'none', width: 220, position: 'sticky', top: 24 }}>
+    <div className="manual-layout" style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
+      <nav className="manual-toc" style={{ flex: 'none', width: 220, position: 'sticky', top: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: 10 }}>Sommaire</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {MANUAL_SECTIONS.map((s) => (
@@ -76,7 +76,7 @@ export default function ManualPage() {
         </div>
       </nav>
 
-      <div style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
+      <div className="manual-content" style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
         <div className="card" style={{ padding: 20, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <Icon name="book" size={20} style={{ flex: 'none', color: 'var(--primary)', marginTop: 1 }} />
           <div>

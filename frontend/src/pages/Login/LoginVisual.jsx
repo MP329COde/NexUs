@@ -1,4 +1,5 @@
 import Icon from '../../components/ui/Icon.jsx';
+import BrandMark from '../../components/ui/BrandMark.jsx';
 
 // Panneau décoratif de la page de connexion : toujours sur fond sombre
 // (indépendant du thème clair/sombre choisi par l'utilisateur, comme un
@@ -32,7 +33,7 @@ export default function LoginVisual() {
       ))}
 
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 56px 64px', background: 'linear-gradient(180deg, transparent 40%, rgba(11,17,32,.85) 90%)' }}>
-        <div style={{ width: 40, height: 40, borderRadius: 11, background: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 17, marginBottom: 18 }}>N</div>
+        <BrandMark size={40} style={{ marginBottom: 18 }} />
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', margin: 0, lineHeight: 1.25, maxWidth: 380 }}>
           Le centre de contrôle de votre infrastructure
         </h1>
