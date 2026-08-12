@@ -103,7 +103,7 @@ export const MANUAL_SECTIONS = [
     id: 'monitoring-security',
     title: 'Monitoring et Cybersécurité',
     blocks: [
-      { type: 'p', text: "Monitoring affiche les alertes actives et les tableaux de bord Grafana. Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact." },
+      { type: 'p', text: "Monitoring affiche les alertes actives (filtrables par sévérité), les tableaux de bord Grafana, et — si Proxmox est aussi configuré — la charge CPU/RAM en direct de chaque hôte. Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact." },
       { type: 'p', text: "Deux outils supplémentaires, réservés aux administrateurs, apparaissent en bas de la page Cybersécurité :" },
       { type: 'ul', items: [
         'IPs bannies : bloque une adresse IPv4 à l\'entrée de la console (toutes les routes, avant même l\'authentification). Impossible de bannir sa propre adresse — la console refuse pour éviter un verrouillage accidentel.',
