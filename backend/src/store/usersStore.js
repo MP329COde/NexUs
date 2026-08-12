@@ -34,7 +34,7 @@ const AVATAR_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#
 // bootstrap admin et le setup initial n'en ont pas besoin ; seule la création
 // d'un compte par un admin (routes/users.routes.js) le met à true, sauf si
 // l'admin indique avoir déjà configuré le compte lui-même.
-export function createUser({ email, password, name, role = 'user', mustOnboard = false }) {
+export function createUser({ email, password, name, username, role = 'user', mustOnboard = false }) {
   if (findUserByEmail(email)) {
     throw Object.assign(new Error('Un utilisateur avec cet e-mail existe déjà'), { status: 409 });
   }
@@ -43,6 +43,9 @@ export function createUser({ email, password, name, role = 'user', mustOnboard =
     id: uuid(),
     email,
     name: name || email.split('@')[0],
+    // Cosmétique uniquement : la connexion reste basée sur l'e-mail (voir
+    // routes/auth.routes.js). Conservé pour affichage (ex. "alex.lambert").
+    username: username || null,
     role,
     active: true,
     passwordHash: hashPassword(password),

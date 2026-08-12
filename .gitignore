@@ -17,6 +17,11 @@ backend/data/.master.key
 backend/data/.ssh_console_key.*
 backend/data/backups/
 
+# Playwright (suite e2e — voir frontend/playwright.config.js)
+frontend/.pw-data/
+frontend/test-results/
+frontend/playwright-report/
+
 # Système
 .DS_Store
 
