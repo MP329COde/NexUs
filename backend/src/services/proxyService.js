@@ -59,6 +59,12 @@ export async function testConnection(id) {
   }
 }
 
+// Ces champs sont interpolés tels quels dans un fragment YAML écrit sur disque
+// (traefikService.writeDynamicRoute) puis lu en direct par Traefik : une valeur
+// non validée permettrait à n'importe quel utilisateur authentifié (la création
+// de proxy n'est pas réservée aux admins) d'injecter des clés YAML arbitraires
+// et de détourner du routage. On valide donc strictement leur format, pas
+// seulement leur présence.
 function validate(payload) {
   const required = ['name', 'domain', 'targetService', 'targetPort'];
   const missing = required.filter((f) => !payload[f]);
@@ -68,10 +74,24 @@ function validate(payload) {
     throw err;
   }
   if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(payload.domain)) {
-    const err = new Error(`Domaine invalide: ${payload.domain}`);
-    err.status = 400;
-    throw err;
+    invalid('domaine', payload.domain);
   }
+  if (!/^[a-z0-9.-]+$/i.test(payload.targetService)) {
+    invalid('service cible', payload.targetService);
+  }
+  const port = Number(payload.targetPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    invalid('port cible', payload.targetPort);
+  }
+  if (payload.certResolver && !/^[a-z0-9-]+$/i.test(payload.certResolver)) {
+    invalid('resolver de certificat', payload.certResolver);
+  }
+}
+
+function invalid(field, value) {
+  const err = new Error(`Valeur invalide pour ${field}: ${value}`);
+  err.status = 400;
+  throw err;
 }
 
 function notFound(id) {
