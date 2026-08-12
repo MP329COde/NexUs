@@ -83,6 +83,7 @@
 
 * { transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
 
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
 @keyframes riseIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: none; } }

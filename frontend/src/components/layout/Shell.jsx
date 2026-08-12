@@ -1,14 +1,28 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useMatches } from 'react-router-dom';
 import Header from './Header.jsx';
 import DomainNav from './DomainNav.jsx';
+import CommandPalette from '../search/CommandPalette.jsx';
 
 export default function Shell() {
   const matches = useMatches();
   const title = [...matches].reverse().find((m) => m.handle?.title)?.handle?.title ?? 'Nexus Console';
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <Header title={title} />
+      <Header title={title} onOpenSearch={() => setSearchOpen(true)} />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <DomainNav />
         <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
@@ -17,6 +31,7 @@ export default function Shell() {
           </div>
         </main>
       </div>
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }
