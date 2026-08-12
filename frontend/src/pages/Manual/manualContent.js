@@ -114,6 +114,45 @@ export const MANUAL_SECTIONS = [
     ]
   },
   {
+    id: 'admin-groups',
+    title: 'Administration : Groupes & permissions',
+    blocks: [
+      { type: 'p', text: "Paramètres → Groupes & permissions : créez des groupes fonctionnels (ex. « ops », « audit »), affectez-leur des membres, et réglez pour chacun un niveau d'accès (Aucun / Lecture / Écriture / Admin) par domaine (Infrastructure, Réseaux, Sécurité, Automatisation)." },
+      { type: 'note', text: "Cette matrice décrit et enregistre le modèle de droits souhaité ; son application fine à chaque route de la console (au-delà d'admin/utilisateur) est un chantier en cours — voir le Manuel, section Sécurité, pour l'état actuel des rôles réellement appliqués." }
+    ]
+  },
+  {
+    id: 'admin-inventory',
+    title: 'Administration : Inventaire',
+    blocks: [
+      { type: 'p', text: "Paramètres → Inventaire : suivi des actifs matériels (serveurs, stockage, réseau) avec numéro de série, date d'acquisition, garantie et statut. Utile pour anticiper les fins de garantie et estimer la valeur du parc." }
+    ]
+  },
+  {
+    id: 'admin-platform',
+    title: 'Administration : Plateforme',
+    blocks: [
+      { type: 'p', text: "Paramètres → Plateforme : identité de l'organisation (nom, affiché dans l'en-tête), fuseau horaire, langue et format de date par défaut, adresse de contact." },
+      { type: 'note', text: "Langue et format de date sont enregistrés pour l'instant sans effet sur l'interface (pas de traduction multilingue à ce stade) ; seul le nom de l'organisation est déjà appliqué." }
+    ]
+  },
+  {
+    id: 'admin-identity',
+    title: 'Administration : Connexion & identité',
+    blocks: [
+      { type: 'p', text: "Paramètres → Connexion & identité : durée de session et longueur minimale de mot de passe (appliquées immédiatement à toute la console), plus une configuration OIDC/LDAP enregistrée et testable (Tester l'issuer effectue une vraie requête vers le document de découverte OpenID)." },
+      { type: 'note', text: "Important : configurer un fournisseur OIDC/LDAP ici l'enregistre et permet de le tester, mais n'active pas encore un second chemin de connexion — seul le mot de passe local authentifie aujourd'hui. C'est une limite volontaire (voir Sécurité de la console)." }
+    ]
+  },
+  {
+    id: 'admin-git',
+    title: 'Administration : Services Git',
+    blocks: [
+      { type: 'p', text: "Paramètres → Services Git : choisissez la forge principale (GitLab ou GitHub) utilisée par défaut pour lier de nouveaux projets, et testez la connexion à chaque forge déjà configurée dans Intégrations & outils." },
+      { type: 'note', text: "La réplication automatique (miroirs) entre forges n'est pas encore implémentée — l'emplacement est prévu dans l'interface pour quand elle le sera." }
+    ]
+  },
+  {
     id: 'admin-system',
     title: 'Administration : Système',
     blocks: [
@@ -132,10 +171,11 @@ export const MANUAL_SECTIONS = [
     blocks: [
       { type: 'ul', items: [
         'Secrets (tokens, mots de passe d\'intégration) chiffrés au repos (AES-256-GCM) et jamais renvoyés en clair au navigateur.',
-        'Sessions par cookie httpOnly signé (JWT), 12h de validité.',
-        'Limite de débit sur les routes sensibles (connexion, paramètres, sauvegardes, hôtes) contre le bruteforce.',
+        'Sessions par cookie httpOnly signé (JWT), durée configurable dans Paramètres → Connexion & identité (12h par défaut).',
+        'Limite de débit sur les routes sensibles (connexion, mot de passe, paramètres, sauvegardes, hôtes, identité) contre le bruteforce.',
         'Restauration de sauvegarde protégée par re-saisie du mot de passe.',
-        'Installation d\'agents SSH limitée à un catalogue fermé de scripts, avec clé dédiée à la console (jamais de mot de passe par hôte).'
+        'Installation d\'agents SSH limitée à un catalogue fermé de scripts, avec clé dédiée à la console (jamais de mot de passe par hôte).',
+        'Rôles réellement appliqués aujourd\'hui : administrateur / utilisateur (deux niveaux, vérifiés sur chaque route sensible). La matrice de permissions par groupe (Groupes & permissions) enregistre un modèle de droits plus fin, mais son application automatique à chaque route est un chantier en cours.'
       ] }
     ]
   },

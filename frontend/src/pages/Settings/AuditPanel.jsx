@@ -23,7 +23,14 @@ const ACTION_LABELS = {
   'backup.create': 'Sauvegarde créée',
   'backup.import': 'Sauvegarde importée',
   'backup.restore': 'Base restaurée',
-  'backup.delete': 'Sauvegarde supprimée'
+  'backup.delete': 'Sauvegarde supprimée',
+  'group.create': 'Groupe créé',
+  'group.update': 'Groupe modifié',
+  'group.delete': 'Groupe supprimé',
+  'inventory.create': 'Actif ajouté',
+  'inventory.update': 'Actif modifié',
+  'inventory.delete': 'Actif retiré',
+  'identity.update': 'Politique de connexion modifiée'
 };
 
 function toneFor(action) {

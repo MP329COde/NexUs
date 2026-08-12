@@ -16,7 +16,10 @@ const DEFAULTS = {
   deployments: [], // liaisons GitLab -> Argo CD -> Kubernetes -> Proxy par application
   hosts: [], // hôtes gérés via SSH pour l'installation d'agents (catalogue fermé)
   audit: [], // journal des actions administratives sensibles (voir services/auditService.js)
-  console: { name: 'Nexus Console', baseDomain: 'homelab.local' }
+  console: { name: 'Nexus Console', baseDomain: 'homelab.local' },
+  groups: [], // groupes fonctionnels + matrice de permissions (voir store/groupsStore.js)
+  inventory: [], // actifs matériels suivis (voir store/inventoryStore.js)
+  identity: {} // politique de connexion + config SSO (voir store/identityStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

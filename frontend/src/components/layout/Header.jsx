@@ -17,6 +17,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
   const [userMenu, setUserMenu] = useState(false);
   const [notifMenu, setNotifMenu] = useState(false);
   const { data } = useApi(() => api.get('/status/overview'), [], { pollMs: 20000 });
+  const { data: consoleData } = useApi(() => api.get('/console'), []);
   const score = data?.score ?? null;
   const tone = score === null ? 'mut' : score >= 90 ? 'ok' : score >= 60 ? 'warn' : 'crit';
 
@@ -29,7 +30,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 'none' }}>
         <BrandMark size={28} />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>Nexus Console</span>
+          <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>{consoleData?.name || 'Nexus Console'}</span>
           <span className="mono header-brand-sub" style={{ fontSize: 11, color: 'var(--text-faint)' }}>homelab.local</span>
         </div>
       </div>

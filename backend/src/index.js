@@ -41,6 +41,7 @@ app.use('/api/setup', strictLimiter);
 app.use('/api/settings', strictLimiter);
 app.use('/api/hosts', strictLimiter);
 app.use('/api/backups', strictLimiter);
+app.use('/api/identity', strictLimiter);
 
 app.use('/api', router);
 

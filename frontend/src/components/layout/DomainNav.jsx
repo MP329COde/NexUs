@@ -52,7 +52,15 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
                 transition: 'all .15s ease'
               })}
             >
-              <Icon name={d.id} size={19} strokeWidth={1.7} style={{ flex: 'none' }} />
+              <span style={{ position: 'relative', display: 'flex', flex: 'none' }}>
+                <Icon name={d.id} size={19} strokeWidth={1.7} />
+                {d.id === 'adm' && (
+                  <span
+                    title="Accès administrateur"
+                    style={{ position: 'absolute', top: -2, right: -3, width: 6, height: 6, borderRadius: '50%', background: 'var(--tone-crit-dot)' }}
+                  />
+                )}
+              </span>
               {effectiveCollapsed
                 ? <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.02em' }}>{d.code}</span>
                 : <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>{d.label}</span>}

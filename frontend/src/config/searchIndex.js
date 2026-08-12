@@ -19,6 +19,11 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Rapport de santé', group: 'Pages', path: '/report', keywords: 'rapport pdf export imprimer santé' },
   { label: 'Paramètres — Intégrations', group: 'Administration', path: '/settings', keywords: 'kubernetes argocd haproxy gitlab github proxmox traefik grafana wazuh token', adminOnly: true },
   { label: 'Paramètres — Utilisateurs', group: 'Administration', path: '/settings?tab=users', keywords: 'comptes rôles admin utilisateur', adminOnly: true },
+  { label: 'Paramètres — Groupes & permissions', group: 'Administration', path: '/settings?tab=groups', keywords: 'groupes permissions matrice droits rbac', adminOnly: true },
+  { label: 'Paramètres — Inventaire', group: 'Administration', path: '/settings?tab=inventory', keywords: 'actifs matériel garantie serveurs', adminOnly: true },
+  { label: 'Paramètres — Plateforme', group: 'Administration', path: '/settings?tab=platform', keywords: 'organisation fuseau horaire langue', adminOnly: true },
+  { label: 'Paramètres — Connexion & identité', group: 'Administration', path: '/settings?tab=identity', keywords: 'oidc ldap sso session mot de passe', adminOnly: true },
+  { label: 'Paramètres — Services Git', group: 'Administration', path: '/settings?tab=git', keywords: 'gitlab github forge miroir', adminOnly: true },
   { label: 'Paramètres — Système', group: 'Administration', path: '/settings?tab=system', keywords: 'version mise à jour sauvegarde backup restaurer', adminOnly: true },
   { label: 'Paramètres — Journal', group: 'Administration', path: '/settings?tab=audit', keywords: 'audit log historique actions', adminOnly: true }
 ];

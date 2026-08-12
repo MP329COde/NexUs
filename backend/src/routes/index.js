@@ -22,6 +22,10 @@ import hostsRoutes from './hosts.routes.js';
 import backupsRoutes from './backups.routes.js';
 import systemRoutes from './system.routes.js';
 import auditRoutes from './audit.routes.js';
+import groupsRoutes from './groups.routes.js';
+import inventoryRoutes from './inventory.routes.js';
+import identityRoutes from './identity.routes.js';
+import consoleRoutes from './console.routes.js';
 
 const router = Router();
 
@@ -48,5 +52,9 @@ router.use('/hosts', hostsRoutes);
 router.use('/backups', backupsRoutes);
 router.use('/system', systemRoutes);
 router.use('/audit', auditRoutes);
+router.use('/groups', groupsRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/identity', identityRoutes);
+router.use('/console', consoleRoutes);
 
 export default router;

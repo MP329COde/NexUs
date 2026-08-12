@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole, toPublicUser } from '../middleware/auth.js';
 import { listUsers, createUser, setUserAdminFields, deleteUser } from '../store/usersStore.js';
 import { logAudit } from '../services/auditService.js';
+import { getMinPasswordLength } from '../store/identityStore.js';
 
 // Gestion des comptes : réservée aux administrateurs. Chaque utilisateur gère
 // ses propres préférences (nom, avatar, mot de passe) via /api/auth/profile.
@@ -15,8 +16,9 @@ router.get('/', (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { email, password, name, role } = req.body || {};
-  if (!email || !password || password.length < 8) {
-    return res.status(400).json({ ok: false, error: "E-mail requis et mot de passe d'au moins 8 caractères" });
+  const minLength = getMinPasswordLength();
+  if (!email || !password || password.length < minLength) {
+    return res.status(400).json({ ok: false, error: `E-mail requis et mot de passe d'au moins ${minLength} caractères` });
   }
   const user = createUser({ email, password, name, role: role === 'admin' ? 'admin' : 'user' });
   logAudit(req, 'user.create', { userId: user.id, email: user.email, role: user.role });
