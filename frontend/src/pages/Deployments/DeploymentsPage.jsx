@@ -9,8 +9,10 @@ import { api } from '../../lib/apiClient.js';
 import DeploymentFormDialog from './DeploymentFormDialog.jsx';
 import PipelineView from './PipelineView.jsx';
 import GitProjectsPanel from './GitProjectsPanel.jsx';
+import CodeReviewPanel from './CodeReviewPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
 import PasswordGeneratorPanel from './PasswordGeneratorPanel.jsx';
+import VaultPanel from './VaultPanel.jsx';
 
 export default function DeploymentsPage() {
   const links = useApi(() => api.get('/deployments'), []);
@@ -74,9 +76,11 @@ export default function DeploymentsPage() {
 
         {selected && <PipelineView linkId={selected} span={12} />}
 
+        <CodeReviewPanel apps={apps} />
         <GitProjectsPanel />
         <DevToolsPanel />
         <PasswordGeneratorPanel />
+        <VaultPanel />
       </div>
 
       {formOpen && <DeploymentFormDialog onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); links.reload(); }} />}

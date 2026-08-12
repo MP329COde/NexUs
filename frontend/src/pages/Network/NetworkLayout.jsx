@@ -1,37 +1,46 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import Icon from '../../components/ui/Icon.jsx';
 
-const TABS = [
-  { to: '/network', label: 'Topologie', end: true },
-  { to: '/network/proxies', label: 'Proxies & domaines' },
-  { to: '/network/haproxy', label: 'HAProxy' },
-  { to: '/network/certificates', label: 'Certificats' },
-  { to: '/network/firewall', label: 'Pare-feu' }
+// Barre latérale propre à Réseaux : elle vit dans ce layout et ne doit pas
+// être mutualisée avec les autres domaines, chacun définit la sienne.
+const ITEMS = [
+  { to: '/network', label: 'Topologie', icon: 'layers', end: true },
+  { to: '/network/proxies', label: 'Proxies & domaines', icon: 'globe' },
+  { to: '/network/haproxy', label: 'HAProxy', icon: 'server' },
+  { to: '/network/certificates', label: 'Certificats', icon: 'lock' },
+  { to: '/network/firewall', label: 'Pare-feu', icon: 'shield' }
 ];
 
 export default function NetworkLayout() {
   return (
-    <>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
-        {TABS.map((t) => (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <nav style={{ flex: 'none', width: 190, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {ITEMS.map((it) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.end}
+            key={it.to}
+            to={it.to}
+            end={it.end}
             style={({ isActive }) => ({
-              padding: '9px 4px',
-              marginBottom: -1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '9px 11px',
+              borderRadius: 9,
               fontSize: 13,
               fontWeight: isActive ? 600 : 500,
+              textDecoration: 'none',
               color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-              borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
-              textDecoration: 'none'
+              background: isActive ? 'var(--primary-soft)' : 'transparent'
             })}
           >
-            <span style={{ padding: '0 8px' }}>{t.label}</span>
+            <Icon name={it.icon} size={16} strokeWidth={1.7} />
+            <span>{it.label}</span>
           </NavLink>
         ))}
+      </nav>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Outlet />
       </div>
-      <Outlet />
-    </>
+    </div>
   );
 }

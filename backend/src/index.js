@@ -51,6 +51,7 @@ app.use('/api/hosts', strictLimiter);
 app.use('/api/backups', strictLimiter);
 app.use('/api/identity', strictLimiter);
 app.use('/api/security/banlist', strictLimiter);
+app.use('/api/vault', strictLimiter);
 
 // Un scan nmap est coûteux (jusqu'à 2 min, charge CPU/réseau) : limite bien
 // plus stricte que le reste pour empêcher d'en déclencher en rafale.
