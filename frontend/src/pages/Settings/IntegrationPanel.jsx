@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 import StatusBadge, { toneFromStatus } from '../../components/ui/StatusBadge.jsx';
+import Icon from '../../components/ui/Icon.jsx';
 
 export default function IntegrationPanel({ integrationKey, schema, initial, onSaved }) {
   const [form, setForm] = useState({});
@@ -8,6 +9,7 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [error, setError] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const values = {};
@@ -52,7 +54,25 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
         <div style={{ fontSize: 14, fontWeight: 600 }}>{schema.label}</div>
         <StatusBadge tone={toneFromStatus(initial)} label={initial?.configured ? 'Configuré' : 'Non configuré'} />
       </div>
-      {schema.hint && <div className="faint" style={{ fontSize: 12, marginBottom: 14 }}>{schema.hint}</div>}
+      {schema.hint && <div className="faint" style={{ fontSize: 12, marginBottom: 10 }}>{schema.hint}</div>}
+
+      {schema.guide?.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <span
+            onClick={() => setGuideOpen((v) => !v)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: 'var(--primary)', cursor: 'pointer' }}
+          >
+            <Icon name="info" size={13} />
+            Comment obtenir ces informations ?
+            <Icon name="chevronDown" size={12} style={{ transform: guideOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }} />
+          </span>
+          {guideOpen && (
+            <ol style={{ margin: '10px 0 0', padding: '10px 14px 10px 28px', background: 'var(--border-soft)', borderRadius: 8, fontSize: 12, lineHeight: 1.6, color: 'var(--text-muted)', animation: 'riseIn .2s ease both' }}>
+              {schema.guide.map((step, i) => <li key={i} style={{ marginBottom: i < schema.guide.length - 1 ? 6 : 0 }}>{step}</li>)}
+            </ol>
+          )}
+        </div>
+      )}
 
       {schema.fields.length > 0 && (
         <form onSubmit={save}>
@@ -73,6 +93,7 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
                   onChange={(e) => set(f.key, e.target.value)}
                 />
               )}
+              {f.hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{f.hint}</div>}
             </div>
           ))}
 

@@ -40,6 +40,10 @@ export default function Header({ title }) {
           <span className="mono">{score === null ? '—' : `${score} %`}</span>
         </div>
 
+        <Link to="/manual" title="Manuel d'utilisation" style={iconBtn}>
+          <Icon name="book" size={16} />
+        </Link>
+
         <button
           onClick={toggle}
           title={resolved === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'}
