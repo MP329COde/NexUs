@@ -129,6 +129,31 @@ export async function getPodLogs(namespace, pod, container, tailLines = 200) {
   return wrap('logs', async () => c.core.readNamespacedPodLog({ name: pod, namespace, container, tailLines }));
 }
 
+export async function scaleDeployment(namespace, name, replicas) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('scale deployment', async () => {
+    await c.apps.patchNamespacedDeploymentScale({
+      name,
+      namespace,
+      body: { spec: { replicas } }
+    });
+    return { ok: true, message: `${namespace}/${name} mis à l'échelle sur ${replicas} réplique(s)` };
+  });
+}
+
+// Suppression directe (pas d'éviction) : le contrôleur du deployment/replicaset
+// recrée immédiatement un pod de remplacement. Sans danger pour un pod géré,
+// mais définitif pour un pod nu (rare dans cette console orientée deployments).
+export async function deletePod(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('delete pod', async () => {
+    await c.core.deleteNamespacedPod({ name, namespace });
+    return { ok: true, message: `Pod ${namespace}/${name} supprimé` };
+  });
+}
+
 export async function listCertManagerCertificates(namespace) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
