@@ -19,7 +19,9 @@ const DEFAULTS = {
   console: { name: 'Nexus Console', baseDomain: 'homelab.local' },
   groups: [], // groupes fonctionnels + matrice de permissions (voir store/groupsStore.js)
   inventory: [], // actifs matériels suivis (voir store/inventoryStore.js)
-  identity: {} // politique de connexion + config SSO (voir store/identityStore.js)
+  identity: {}, // politique de connexion + config SSO (voir store/identityStore.js)
+  banlist: [], // adresses IP bloquées à l'entrée de la console (voir store/banlistStore.js)
+  networkScans: [] // historique des scans réseau nmap (voir services/networkScanService.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

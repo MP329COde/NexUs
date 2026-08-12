@@ -102,7 +102,12 @@ export const MANUAL_SECTIONS = [
     id: 'monitoring-security',
     title: 'Monitoring et Cybersécurité',
     blocks: [
-      { type: 'p', text: "Monitoring affiche les alertes actives et les tableaux de bord Grafana. Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact." }
+      { type: 'p', text: "Monitoring affiche les alertes actives et les tableaux de bord Grafana. Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact." },
+      { type: 'p', text: "Deux outils supplémentaires, réservés aux administrateurs, apparaissent en bas de la page Cybersécurité :" },
+      { type: 'ul', items: [
+        'IPs bannies : bloque une adresse IPv4 à l\'entrée de la console (toutes les routes, avant même l\'authentification). Impossible de bannir sa propre adresse — la console refuse pour éviter un verrouillage accidentel.',
+        'Scans réseau : lance un vrai scan nmap (-sV) sur une IP ou un CIDR IPv4 de votre choix, pour découvrir les hôtes et services exposés sur votre réseau. Nécessite que nmap soit installé sur la machine qui héberge le backend ; sinon un message clair l\'indique. Limité à 5 scans toutes les 10 minutes (opération coûteuse en CPU/réseau).'
+      ] }
     ]
   },
   {
