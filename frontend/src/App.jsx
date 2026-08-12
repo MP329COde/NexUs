@@ -20,6 +20,7 @@ import DeploymentsPage from './pages/Deployments/DeploymentsPage.jsx';
 import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
+import ManualPage from './pages/Manual/ManualPage.jsx';
 import StubPage from './components/ui/StubPage.jsx';
 
 // createBrowserRouter (plutôt que <Routes>) est nécessaire ici car Shell utilise
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: 'security', element: <SecurityPage />, handle: { title: 'Cybersécurité' } },
           { path: 'storage', element: <StubPage title="Stockage" sub="Volumes, NAS et sauvegardes" />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
+          { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
           { path: 'settings', element: <RequireRole role="admin"><SettingsPage /></RequireRole>, handle: { title: 'Paramètres' } }
         ]
       }
