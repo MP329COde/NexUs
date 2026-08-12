@@ -33,7 +33,9 @@ const ACTION_LABELS = {
   'identity.update': 'Politique de connexion modifiée',
   'security.ip.banned': 'IP bannie',
   'security.ip.unbanned': 'IP débannie',
-  'security.scan.run': 'Scan réseau lancé'
+  'security.scan.run': 'Scan réseau lancé',
+  'volume.create': 'Volume ajouté',
+  'volume.delete': 'Volume retiré'
 };
 
 function toneFor(action) {

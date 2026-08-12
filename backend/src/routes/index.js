@@ -27,6 +27,7 @@ import inventoryRoutes from './inventory.routes.js';
 import identityRoutes from './identity.routes.js';
 import consoleRoutes from './console.routes.js';
 import securityRoutes from './security.routes.js';
+import volumesRoutes from './volumes.routes.js';
 
 const router = Router();
 
@@ -58,5 +59,6 @@ router.use('/inventory', inventoryRoutes);
 router.use('/identity', identityRoutes);
 router.use('/console', consoleRoutes);
 router.use('/security', securityRoutes);
+router.use('/volumes', volumesRoutes);
 
 export default router;
