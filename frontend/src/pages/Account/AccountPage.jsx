@@ -2,7 +2,7 @@ import { useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useTheme } from '../../context/ThemeContext.jsx';
+import { useTheme, THEME_MODES } from '../../context/ThemeContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { api } from '../../lib/apiClient.js';
 
@@ -83,8 +83,8 @@ export default function AccountPage() {
         <Panel title="Apparence" span={6}>
           <div style={{ padding: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 8 }}>Thème</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[['system', 'Système'], ['light', 'Clair'], ['dark', 'Sombre']].map(([value, label]) => (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {THEME_MODES.map(({ value, label }) => (
                 <span
                   key={value}
                   onClick={() => setTheme(value)}
@@ -94,6 +94,9 @@ export default function AccountPage() {
                   {label}
                 </span>
               ))}
+            </div>
+            <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
+              Système suit le réglage de votre appareil ; Auto (horaire) bascule sombre entre 20h et 7h, quel que soit l'appareil.
             </div>
           </div>
         </Panel>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import LoginVisual from './LoginVisual.jsx';
+import BrandMark from '../../components/ui/BrandMark.jsx';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -31,7 +32,7 @@ export default function LoginPage() {
       <div style={{ flex: '1 1 440px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <form onSubmit={onSubmit} style={{ width: '100%', maxWidth: 340, animation: 'riseIn .4s ease both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>N</div>
+            <BrandMark size={32} />
             <div>
               <div style={{ fontWeight: 600, fontSize: 15 }}>Nexus Console</div>
               <div className="mono faint" style={{ fontSize: 11 }}>homelab.local</div>

@@ -39,15 +39,20 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ ok: true, user: req.user });
 });
 
+const THEME_VALUES = ['system', 'light', 'dark', 'schedule'];
+
 router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
-  const { name, avatarEmoji, avatarColor } = req.body || {};
+  const { name, avatarEmoji, avatarColor, theme } = req.body || {};
   if (avatarColor && !AVATAR_COLOR_PATTERN.test(avatarColor)) {
     return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
   }
   if (avatarEmoji && [...avatarEmoji].length > 2) {
     return res.status(400).json({ ok: false, error: 'Avatar trop long (1 à 2 caractères/emoji)' });
   }
-  const updated = updateUser(req.user.id, { name, avatarEmoji, avatarColor });
+  if (theme && !THEME_VALUES.includes(theme)) {
+    return res.status(400).json({ ok: false, error: `Thème invalide (attendu: ${THEME_VALUES.join(', ')})` });
+  }
+  const updated = updateUser(req.user.id, { name, avatarEmoji, avatarColor, theme });
   res.json({ ok: true, user: toPublicUser(updated) });
 }));
 

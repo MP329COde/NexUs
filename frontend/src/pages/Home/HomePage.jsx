@@ -59,6 +59,7 @@ export default function HomePage() {
               <Link
                 key={entry.key}
                 to={DOMAIN_PATH[entry.domain] || '/settings'}
+                className="home-integration-row"
                 style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', borderBottom: '1px solid var(--border-soft)', textDecoration: 'none', color: 'inherit' }}
               >
                 <span style={{ color: 'var(--text-faint)', flex: 'none' }}><Icon name={DOMAIN_ICON[entry.domain] || 'server'} size={16} /></span>

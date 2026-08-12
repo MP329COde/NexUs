@@ -28,7 +28,7 @@ export default function SettingsPage() {
         title="Paramètres d'administration"
         sub="Connexions à l'infrastructure et gestion des comptes. Réservé aux administrateurs — les secrets sont chiffrés au repos et ne sont jamais renvoyés au navigateur."
         actions={(
-          <div style={{ display: 'flex', background: 'var(--border-soft)', borderRadius: 9, padding: 3, gap: 2 }}>
+          <div style={{ display: 'flex', background: 'var(--border-soft)', borderRadius: 9, padding: 3, gap: 2, overflowX: 'auto', maxWidth: '100%' }}>
             {TABS.map((t) => (
               <div
                 key={t.id}

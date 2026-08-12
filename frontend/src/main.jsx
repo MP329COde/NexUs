@@ -9,12 +9,12 @@ import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <NotificationProvider>
-        <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <NotificationProvider>
           <RouterProvider router={router} />
-        </AuthProvider>
-      </NotificationProvider>
-    </ThemeProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </AuthProvider>
   </React.StrictMode>
 );

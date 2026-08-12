@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
+import BrandMark from '../../components/ui/BrandMark.jsx';
 
 export default function SetupPage() {
   const [form, setForm] = useState({ consoleName: 'Nexus Console', name: '', email: '', password: '', confirm: '' });
@@ -39,7 +40,7 @@ export default function SetupPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <form onSubmit={onSubmit} className="card" style={{ width: 420, padding: 30 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>N</div>
+          <BrandMark size={32} />
           <div style={{ fontWeight: 600, fontSize: 15 }}>Bienvenue sur votre console</div>
         </div>
         <p style={{ margin: '0 0 22px', fontSize: 12.5, color: 'var(--text-faint)' }}>
