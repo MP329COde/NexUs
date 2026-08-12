@@ -1,14 +1,41 @@
+import { useEffect, useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
+import KpiCard from '../../components/ui/KpiCard.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+
+const SEVERITY_FILTERS = [
+  { value: '', label: 'Toutes' },
+  { value: 'critical', label: 'Critiques' },
+  { value: 'warning', label: 'Avertissements' }
+];
 
 export default function MonitoringPage() {
   const status = useApi(() => api.get('/grafana/status'), [], { pollMs: 30000 });
   const dashboards = useApi(() => api.get('/grafana/dashboards'), [], { pollMs: 60000 });
   const alerts = useApi(() => api.get('/grafana/alerts'), [], { pollMs: 15000 });
+  const [severityFilter, setSeverityFilter] = useState('');
+  const [nodes, setNodes] = useState(null);
+
+  // Les hôtes (nœuds Proxmox) sont chargés en best-effort : cette page reste
+  // utile même si seul Grafana (pas Proxmox) est configuré.
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await api.get('/proxmox/nodes');
+        if (!cancelled) setNodes(res.items);
+      } catch {
+        if (!cancelled) setNodes([]);
+      }
+    }
+    load();
+    const id = setInterval(load, 20000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   if (status.data && !status.data.status.configured) {
     return (
@@ -19,15 +46,45 @@ export default function MonitoringPage() {
     );
   }
 
+  const allAlerts = alerts.data?.items || [];
+  const critCount = allAlerts.filter((a) => a.severity === 'critical').length;
+  const warnCount = allAlerts.filter((a) => a.severity === 'warning').length;
+  const filteredAlerts = severityFilter ? allAlerts.filter((a) => a.severity === severityFilter) : allAlerts;
+
   return (
     <>
       <PageHeader title="Monitoring" sub={status.data?.status?.message} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+        <KpiCard label="Alertes critiques" value={critCount} tint={critCount > 0 ? '#F43F5E' : '#10B981'} />
+        <KpiCard label="Avertissements" value={warnCount} tint={warnCount > 0 ? '#F59E0B' : '#10B981'} />
+        <KpiCard label="Tableaux de bord" value={dashboards.data?.items?.length ?? '—'} tint="#3B82F6" />
+        <KpiCard label="Hôtes surveillés" value={nodes === null ? '—' : nodes.length} tint="#8B5CF6" note={nodes?.length === 0 ? 'Proxmox non configuré' : undefined} />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
-        <Panel title="Alertes actives" span={12}>
+        <Panel
+          title="Alertes actives"
+          sub="Grafana, temps réel"
+          span={12}
+          actions={(
+            <div style={{ display: 'flex', gap: 4, background: 'var(--border-soft)', borderRadius: 8, padding: 3 }}>
+              {SEVERITY_FILTERS.map((f) => (
+                <span
+                  key={f.value}
+                  onClick={() => setSeverityFilter(f.value)}
+                  style={{ padding: '4px 11px', borderRadius: 6, fontSize: 12, fontWeight: severityFilter === f.value ? 600 : 500, color: severityFilter === f.value ? 'var(--text)' : 'var(--text-muted)', background: severityFilter === f.value ? 'var(--surface)' : 'transparent', boxShadow: severityFilter === f.value ? 'var(--shadow-card)' : 'none', cursor: 'pointer' }}
+                >
+                  {f.label}
+                </span>
+              ))}
+            </div>
+          )}
+        >
           <DataTable
             columns={['Alerte', 'Sévérité', 'État', 'Déclenchée le']}
-            rows={alerts.data?.items}
-            emptyTitle="Aucune alerte active"
+            rows={filteredAlerts}
+            emptyTitle={severityFilter ? 'Aucune alerte pour ce filtre' : 'Aucune alerte active'}
             renderRow={(a, i) => (
               <tr key={i}>
                 <td style={{ fontWeight: 500 }}>{a.name}</td>
@@ -38,6 +95,25 @@ export default function MonitoringPage() {
             )}
           />
         </Panel>
+
+        {nodes && nodes.length > 0 && (
+          <Panel title="Hôtes" sub="Charge en direct (nœuds Proxmox)" span={12}>
+            <div style={{ padding: 6 }}>
+              {nodes.map((n) => {
+                const cpuPct = Math.round((n.cpu || 0) * 100);
+                const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
+                return (
+                  <div key={n.node} style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '11px 12px', borderBottom: '1px solid var(--border-soft)' }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, width: 120 }}>{n.node}</span>
+                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'}`} style={{ flex: 'none' }}><span className="dot" />{n.status}</span>
+                    <MiniGauge label="CPU" pct={cpuPct} />
+                    <MiniGauge label="RAM" pct={memPct} />
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        )}
 
         <Panel title="Tableaux de bord" span={12}>
           <DataTable
@@ -55,5 +131,18 @@ export default function MonitoringPage() {
         </Panel>
       </div>
     </>
+  );
+}
+
+function MiniGauge({ label, pct }) {
+  const color = pct > 85 ? 'var(--tone-crit-dot)' : pct > 65 ? 'var(--tone-warn-dot)' : 'var(--tone-ok-dot)';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
+      <span className="faint" style={{ fontSize: 10.5, width: 26, flex: 'none' }}>{label}</span>
+      <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, transition: 'width .3s ease' }} />
+      </div>
+      <span className="mono" style={{ fontSize: 11, width: 32, flex: 'none', textAlign: 'right' }}>{pct}%</span>
+    </div>
   );
 }
