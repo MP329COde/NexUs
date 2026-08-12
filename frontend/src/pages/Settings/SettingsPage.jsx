@@ -50,6 +50,7 @@ export default function SettingsPage() {
               integrationKey={key}
               schema={INTEGRATION_FORMS[key]}
               initial={data?.integrations[key]}
+              allIntegrations={data?.integrations}
               onSaved={reload}
             />
           ))}

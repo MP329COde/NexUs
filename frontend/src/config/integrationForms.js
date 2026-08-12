@@ -32,7 +32,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'baseUrl', label: 'URL du serveur', placeholder: 'https://argocd.homelab.local' },
       { key: 'token', label: 'Token API', type: 'password', secret: true, hint: 'Généré via `argocd account generate-token`.' }
-    ]
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'argocd' }
   },
   haproxy: {
     label: 'HAProxy',
@@ -47,7 +48,8 @@ export const INTEGRATION_FORMS = {
       { key: 'dataPlaneUrl', label: 'URL Data Plane API', placeholder: 'https://haproxy.homelab.local:5555' },
       { key: 'username', label: "Nom d'utilisateur" },
       { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
-    ]
+    ],
+    hostSuggestion: { field: 'dataPlaneUrl', subdomain: 'haproxy', port: 5555 }
   },
   gitlab: {
     label: 'GitLab',
@@ -61,7 +63,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'baseUrl', label: 'URL de l\'instance', placeholder: 'https://gitlab.homelab.local' },
       { key: 'token', label: 'Token d\'accès personnel', type: 'password', secret: true, hint: 'Scope « api » requis.' }
-    ]
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'gitlab' }
   },
   github: {
     label: 'GitHub',
@@ -88,7 +91,8 @@ export const INTEGRATION_FORMS = {
       { key: 'baseUrl', label: 'URL de l\'API', placeholder: 'https://pve.homelab.local:8006' },
       { key: 'tokenId', label: 'Token ID', placeholder: 'root@pam!nexus', hint: 'Format utilisateur@royaume!nomdutoken.' },
       { key: 'tokenSecret', label: 'Token Secret', type: 'password', secret: true, hint: "Affiché une seule fois à la création du token." }
-    ]
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'pve', port: 8006 }
   },
   traefik: {
     label: 'Traefik',
@@ -103,7 +107,8 @@ export const INTEGRATION_FORMS = {
       { key: 'username', label: "Nom d'utilisateur (optionnel)" },
       { key: 'password', label: 'Mot de passe (optionnel)', type: 'password', secret: true },
       { key: 'dynamicConfigDir', label: 'Dossier de configuration dynamique', placeholder: '/etc/traefik/dynamic', hint: 'Doit correspondre au provider "file" de Traefik.' }
-    ]
+    ],
+    hostSuggestion: { field: 'apiUrl', subdomain: 'traefik' }
   },
   certManager: {
     label: 'Cert-Manager',
@@ -125,7 +130,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'baseUrl', label: 'URL de l\'instance', placeholder: 'https://grafana.homelab.local' },
       { key: 'apiKey', label: 'Clé API', type: 'password', secret: true, hint: 'Service account token, rôle Viewer suffisant.' }
-    ]
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'grafana' }
   },
   wazuh: {
     label: 'Wazuh',
@@ -139,7 +145,8 @@ export const INTEGRATION_FORMS = {
       { key: 'baseUrl', label: 'URL de l\'API', placeholder: 'https://wazuh.homelab.local:55000' },
       { key: 'username', label: "Nom d'utilisateur", placeholder: 'wazuh-wui' },
       { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
-    ]
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'wazuh', port: 55000 }
   }
 };
 
