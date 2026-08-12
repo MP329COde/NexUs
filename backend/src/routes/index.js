@@ -26,6 +26,7 @@ import groupsRoutes from './groups.routes.js';
 import inventoryRoutes from './inventory.routes.js';
 import identityRoutes from './identity.routes.js';
 import consoleRoutes from './console.routes.js';
+import securityRoutes from './security.routes.js';
 
 const router = Router();
 
@@ -56,5 +57,6 @@ router.use('/groups', groupsRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/identity', identityRoutes);
 router.use('/console', consoleRoutes);
+router.use('/security', securityRoutes);
 
 export default router;

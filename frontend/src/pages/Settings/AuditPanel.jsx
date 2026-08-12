@@ -30,7 +30,10 @@ const ACTION_LABELS = {
   'inventory.create': 'Actif ajouté',
   'inventory.update': 'Actif modifié',
   'inventory.delete': 'Actif retiré',
-  'identity.update': 'Politique de connexion modifiée'
+  'identity.update': 'Politique de connexion modifiée',
+  'security.ip.banned': 'IP bannie',
+  'security.ip.unbanned': 'IP débannie',
+  'security.scan.run': 'Scan réseau lancé'
 };
 
 function toneFor(action) {

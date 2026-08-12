@@ -10,6 +10,7 @@ import { logger } from './utils/logger.js';
 import { ensureBootstrapAdmin } from './store/usersStore.js';
 import { scheduleDailyBackups } from './services/backupService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { banlistGuard } from './middleware/banlist.js';
 import router from './routes/index.js';
 
 ensureBootstrapAdmin();
@@ -24,6 +25,8 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
+// Coupe les IP bannies (Cybersécurité → IPs bannies) avant tout le reste.
+app.use(banlistGuard);
 // 10 Mo plutôt que le défaut 1 Mo : suffisant pour l'import d'une sauvegarde
 // SQLite (POST /api/backups/import) sans avoir à relever la limite par route
 // (un express.json() déclaré après celui-ci sur une route donnée est un
@@ -42,6 +45,12 @@ app.use('/api/settings', strictLimiter);
 app.use('/api/hosts', strictLimiter);
 app.use('/api/backups', strictLimiter);
 app.use('/api/identity', strictLimiter);
+app.use('/api/security/banlist', strictLimiter);
+
+// Un scan nmap est coûteux (jusqu'à 2 min, charge CPU/réseau) : limite bien
+// plus stricte que le reste pour empêcher d'en déclencher en rafale.
+const scanLimiter = rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
+app.use('/api/security/scans', scanLimiter);
 
 app.use('/api', router);
 
