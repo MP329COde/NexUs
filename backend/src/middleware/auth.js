@@ -1,11 +1,12 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { findUserById } from '../store/usersStore.js';
+import { getSessionMinutes } from '../store/identityStore.js';
 
 export const SESSION_COOKIE = 'nexus_session';
 
 export function signSession(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: '12h' });
+  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m` });
 }
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
