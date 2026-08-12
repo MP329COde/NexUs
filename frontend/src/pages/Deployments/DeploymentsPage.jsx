@@ -11,6 +11,7 @@ import PipelineView from './PipelineView.jsx';
 import GitProjectsPanel from './GitProjectsPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
 import PasswordGeneratorPanel from './PasswordGeneratorPanel.jsx';
+import VaultPanel from './VaultPanel.jsx';
 
 export default function DeploymentsPage() {
   const links = useApi(() => api.get('/deployments'), []);
@@ -77,6 +78,7 @@ export default function DeploymentsPage() {
         <GitProjectsPanel />
         <DevToolsPanel />
         <PasswordGeneratorPanel />
+        <VaultPanel />
       </div>
 
       {formOpen && <DeploymentFormDialog onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); links.reload(); }} />}
