@@ -23,6 +23,7 @@ const DEFAULTS = {
   banlist: [], // adresses IP bloquées à l'entrée de la console (voir store/banlistStore.js)
   networkScans: [], // historique des scans réseau nmap (voir services/networkScanService.js)
   volumes: [], // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
+  firewall: {}, // réglages du pare-feu applicatif : blocage automatique (voir store/firewallStore.js)
   vault: [] // secrets dev/prod chiffrés au repos (voir store/vaultStore.js)
 };
 

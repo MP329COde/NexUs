@@ -7,7 +7,8 @@ const ITEMS = [
   { to: '/network', label: 'Topologie', icon: 'layers', end: true },
   { to: '/network/proxies', label: 'Proxies & domaines', icon: 'globe' },
   { to: '/network/haproxy', label: 'HAProxy', icon: 'server' },
-  { to: '/network/certificates', label: 'Certificats', icon: 'lock' }
+  { to: '/network/certificates', label: 'Certificats', icon: 'lock' },
+  { to: '/network/firewall', label: 'Pare-feu', icon: 'shield' }
 ];
 
 export default function NetworkLayout() {

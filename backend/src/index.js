@@ -11,6 +11,7 @@ import { ensureBootstrapAdmin } from './store/usersStore.js';
 import { scheduleDailyBackups } from './services/backupService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
+import { trafficLogger } from './middleware/trafficLogger.js';
 import router from './routes/index.js';
 
 ensureBootstrapAdmin();
@@ -27,6 +28,10 @@ app.use(helmet());
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
 // Coupe les IP bannies (Cybersécurité → IPs bannies) avant tout le reste.
 app.use(banlistGuard);
+// Alimente le pare-feu applicatif (Réseaux → Pare-feu) : trafic temps réel
+// et blocage automatique. Placé après banlistGuard pour ne pas comptabiliser
+// une requête déjà coupée, et avant express.json() car il ne touche pas au corps.
+app.use(trafficLogger);
 // 10 Mo plutôt que le défaut 1 Mo : suffisant pour l'import d'une sauvegarde
 // SQLite (POST /api/backups/import) sans avoir à relever la limite par route
 // (un express.json() déclaré après celui-ci sur une route donnée est un

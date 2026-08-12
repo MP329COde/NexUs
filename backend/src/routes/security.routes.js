@@ -3,6 +3,8 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { listBannedIps, banIp, unbanIp, normalizeIp } from '../store/banlistStore.js';
 import { listScans, getLastScan, runScan } from '../services/networkScanService.js';
+import { getRecentTraffic, getSuspiciousIps } from '../services/trafficMonitorService.js';
+import { getFirewallSettings, setAutoBlockEnabled } from '../store/firewallStore.js';
 import { logAudit } from '../services/auditService.js';
 
 // IPs bannies + scans réseau : réservé aux administrateurs.
@@ -40,6 +42,16 @@ router.post('/scans', asyncHandler(async (req, res) => {
   const scan = await runScan(target);
   logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
   res.status(201).json({ ok: true, scan });
+}));
+
+router.get('/traffic', (req, res) => {
+  res.json({ ok: true, items: getRecentTraffic(150), suspicious: getSuspiciousIps(), settings: getFirewallSettings() });
+});
+
+router.put('/traffic/auto-block', asyncHandler(async (req, res) => {
+  const settings = setAutoBlockEnabled(req.body?.enabled);
+  logAudit(req, 'security.firewall.autoblock', { enabled: settings.autoBlockEnabled });
+  res.json({ ok: true, settings });
 }));
 
 export default router;

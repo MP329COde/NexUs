@@ -14,6 +14,7 @@ import NetworkPage from './pages/Network/NetworkPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
 import TopologyPage from './pages/Network/TopologyPage.jsx';
 import CertificatesPage from './pages/Network/CertificatesPage.jsx';
+import FirewallPage from './pages/Network/FirewallPage.jsx';
 import InfrastructureLayout from './pages/Infrastructure/InfrastructureLayout.jsx';
 import ProxmoxPage from './pages/Infrastructure/ProxmoxPage.jsx';
 import HostsPage from './pages/Infrastructure/HostsPage.jsx';
@@ -67,7 +68,8 @@ export const router = createBrowserRouter([
               { index: true, element: <TopologyPage /> },
               { path: 'proxies', element: <NetworkPage /> },
               { path: 'haproxy', element: <HAProxyPage /> },
-              { path: 'certificates', element: <CertificatesPage /> }
+              { path: 'certificates', element: <CertificatesPage /> },
+              { path: 'firewall', element: <FirewallPage /> }
             ]
           },
           { path: 'monitoring', element: <MonitoringPage />, handle: { title: 'Monitoring' } },
