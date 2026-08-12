@@ -6,9 +6,11 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import PodLogsDialog from './PodLogsDialog.jsx';
 
 export default function KubernetesPage() {
   const [namespace, setNamespace] = useState('');
+  const [logsPod, setLogsPod] = useState(null);
   const status = useApi(() => api.get('/kubernetes/status'), []);
   const namespaces = useApi(() => api.get('/kubernetes/namespaces'), [], { pollMs: 30000 });
   const deployments = useApi(() => api.get(`/kubernetes/deployments${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
@@ -68,9 +70,9 @@ export default function KubernetesPage() {
           />
         </Panel>
 
-        <Panel title="Pods" sub="État en temps réel" span={12}>
+        <Panel title="Pods" sub="État en temps réel — cliquez sur un pod pour voir ses logs" span={12}>
           <DataTable
-            columns={['Nom', 'Namespace', 'Phase', 'Redémarrages', 'Nœud']}
+            columns={['Nom', 'Namespace', 'Phase', 'Redémarrages', 'Nœud', '']}
             rows={pods.data?.items}
             emptyTitle="Aucun pod"
             renderRow={(p) => (
@@ -80,11 +82,14 @@ export default function KubernetesPage() {
                 <td><span className={`badge badge-${p.phase === 'Running' ? 'ok' : p.phase === 'Pending' ? 'warn' : 'crit'}`}><span className="dot" />{p.phase}</span></td>
                 <td className="mono">{p.restarts}</td>
                 <td className="mono faint">{p.node}</td>
+                <td><span className="btn-outline" style={{ height: 26, padding: '0 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center' }} onClick={() => setLogsPod(p)}>Logs</span></td>
               </tr>
             )}
           />
         </Panel>
       </div>
+
+      {logsPod && <PodLogsDialog pod={logsPod} onClose={() => setLogsPod(null)} />}
     </>
   );
 }

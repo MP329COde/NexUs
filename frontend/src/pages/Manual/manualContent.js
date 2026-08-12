@@ -58,7 +58,8 @@ export const MANUAL_SECTIONS = [
     id: 'kubernetes',
     title: 'Kubernetes',
     blocks: [
-      { type: 'p', text: "Liste les namespaces, pods et deployments du cluster configuré. Le bouton Redémarrer sur un deployment déclenche un rolling restart (nouvelle annotation, sans changer l'image)." },
+      { type: 'p', text: "Liste les namespaces, pods et deployments du cluster configuré (onglet Charges de travail), et les services réseau (onglet Services : ClusterIP, NodePort, LoadBalancer). Le bouton Redémarrer sur un deployment déclenche un rolling restart (nouvelle annotation, sans changer l'image)." },
+      { type: 'p', text: "Le bouton Logs sur un pod affiche ses 300 dernières lignes de log (rafraîchissable), utile pour diagnostiquer un pod en erreur sans quitter la console." },
       { type: 'note', text: "Le ServiceAccount utilisé doit avoir le rôle « edit » (pas seulement « view ») pour pouvoir redémarrer un déploiement — voir le guide dans Paramètres → Kubernetes." }
     ]
   },

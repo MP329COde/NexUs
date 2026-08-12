@@ -6,7 +6,9 @@ import Shell from './components/layout/Shell.jsx';
 import LoginPage from './pages/Login/LoginPage.jsx';
 import SetupPage from './pages/Setup/SetupPage.jsx';
 import HomePage from './pages/Home/HomePage.jsx';
+import KubernetesLayout from './pages/Kubernetes/KubernetesLayout.jsx';
 import KubernetesPage from './pages/Kubernetes/KubernetesPage.jsx';
+import ServicesPage from './pages/Kubernetes/ServicesPage.jsx';
 import NetworkLayout from './pages/Network/NetworkLayout.jsx';
 import NetworkPage from './pages/Network/NetworkPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
@@ -48,7 +50,15 @@ export const router = createBrowserRouter([
               { path: 'hosts', element: <RequireRole role="admin"><HostsPage /></RequireRole> }
             ]
           },
-          { path: 'kubernetes', element: <KubernetesPage />, handle: { title: 'Kubernetes' } },
+          {
+            path: 'kubernetes',
+            element: <KubernetesLayout />,
+            handle: { title: 'Kubernetes' },
+            children: [
+              { index: true, element: <KubernetesPage /> },
+              { path: 'services', element: <ServicesPage /> }
+            ]
+          },
           {
             path: 'network',
             element: <NetworkLayout />,
