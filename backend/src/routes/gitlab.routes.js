@@ -15,6 +15,11 @@ router.get('/projects/:id/merge-requests', asyncHandler(async (req, res) => res.
 router.post('/projects/:id/pipelines/:pipelineId/retry', asyncHandler(async (req, res) => {
   res.json({ ok: true, ...(await gitlab.retryPipeline(req.params.id, req.params.pipelineId)) });
 }));
+router.post('/projects/:id/merge-requests/:iid/approve', asyncHandler(async (req, res) => {
+  const result = await gitlab.approveMergeRequest(req.params.id, req.params.iid);
+  logAudit(req, 'git.review.approved', { provider: 'gitlab', projectId: req.params.id, iid: req.params.iid });
+  res.json({ ok: true, ...result });
+}));
 
 router.get('/projects/:id/mirrors', requireRole('admin'), asyncHandler(async (req, res) => {
   res.json({ ok: true, items: await listMirrors(req.params.id) });

@@ -72,6 +72,19 @@ export async function listPullRequests(owner, repo) {
   return data.map((p) => ({ number: p.number, title: p.title, sourceBranch: p.head?.ref, targetBranch: p.base?.ref, author: p.user?.login, webUrl: p.html_url }));
 }
 
+// Revue de code approuvée directement depuis la console, sans quitter
+// l'interface — équivaut à cliquer "Approve" dans l'UI GitHub.
+export async function approvePullRequest(owner, repo, number, body) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  await request(c.http, {
+    method: 'POST',
+    url: `/repos/${owner}/${repo}/pulls/${number}/reviews`,
+    data: { event: 'APPROVE', body: body || 'Approuvé depuis Nexus Console' }
+  }, 'GitHub');
+  return { ok: true, message: `Pull request #${number} approuvée` };
+}
+
 export async function rerunWorkflow(owner, repo, runId) {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });

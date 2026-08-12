@@ -35,6 +35,17 @@ export async function listMergeRequests(projectId) {
   return data.map((m) => ({ iid: m.iid, title: m.title, sourceBranch: m.source_branch, targetBranch: m.target_branch, author: m.author?.username, webUrl: m.web_url }));
 }
 
+// Revue de code approuvée directement depuis la console — équivaut à
+// cliquer "Approve" dans l'UI GitLab. Nécessite que les approbations soient
+// activées sur le projet (fonctionnalité GitLab Premium/Ultimate côté
+// serveur) ; sinon l'API répond 404, remonté tel quel par request().
+export async function approveMergeRequest(projectId, iid) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  await request(c.http, { method: 'POST', url: `/projects/${projectId}/merge_requests/${iid}/approve` }, 'GitLab');
+  return { ok: true, message: `Merge request !${iid} approuvée` };
+}
+
 // Miroir de sauvegarde (push mirror natif GitLab) : GitLab pousse lui-même
 // vers l'URL distante à intervalle régulier, on n'a pas à gérer le git
 // push nous-mêmes. Utilisé par le miroir automatique GitLab → GitHub
