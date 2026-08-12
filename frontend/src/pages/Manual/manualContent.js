@@ -96,7 +96,10 @@ export const MANUAL_SECTIONS = [
     blocks: [
       { type: 'p', text: "Liez une application à un projet GitLab ou GitHub, une application Argo CD et un deployment Kubernetes pour suivre en un coup d'œil tout le pipeline : Git → CI/CD → Argo CD → Kubernetes → reverse proxy." },
       { type: 'p', text: "Le panneau Projets permet de parcourir vos dépôts GitLab/GitHub accessibles et de les ouvrir directement dans l'outil, sans avoir à deviner un identifiant de projet." },
-      { type: 'p', text: "Chaque étape du pipeline propose un bouton « Ouvrir dans l'outil » qui pointe directement vers le pipeline/run Git ou l'application Argo CD concernée." }
+      { type: 'p', text: "Chaque étape du pipeline propose un bouton « Ouvrir dans l'outil » qui pointe directement vers le pipeline/run Git ou l'application Argo CD concernée." },
+      { type: 'p', text: "Outils installés : détecte quels outils de développement courants (Git, Docker, kubectl, Node.js, Helm, Terraform...) sont présents sur la machine qui héberge le backend de la console — pas sur vos postes de développement individuels, que la console ne peut pas inspecter." },
+      { type: 'p', text: "Générateur de mots de passe : génération 100% locale au navigateur (jamais envoyée au serveur), longueur et jeu de caractères réglables. Adapté à un mot de passe de dev ponctuel." },
+      { type: 'note', text: "Pour des secrets de production, utilisez un vrai gestionnaire de secrets dédié (Vault, Bitwarden/Vaultwarden...) plutôt que ce générateur — volontairement simple, il ne remplace pas un coffre-fort avec contrôle d'accès et rotation." }
     ]
   },
   {

@@ -2,17 +2,25 @@ import { useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
+import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import DeploymentFormDialog from './DeploymentFormDialog.jsx';
 import PipelineView from './PipelineView.jsx';
 import GitProjectsPanel from './GitProjectsPanel.jsx';
+import DevToolsPanel from './DevToolsPanel.jsx';
+import PasswordGeneratorPanel from './PasswordGeneratorPanel.jsx';
 
 export default function DeploymentsPage() {
   const links = useApi(() => api.get('/deployments'), []);
+  const devtools = useApi(() => api.get('/devtools'), []);
   const [formOpen, setFormOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+
+  const apps = links.data?.items || [];
+  const fullyLinked = apps.filter((l) => l.argocdAppName && l.k8sDeployment).length;
+  const missingTools = (devtools.data?.items || []).filter((t) => !t.installed).length;
 
   async function remove(id) {
     if (!confirm('Retirer cette application suivie ?')) return;
@@ -32,6 +40,12 @@ export default function DeploymentsPage() {
           </button>
         )}
       />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+        <KpiCard label="Applications suivies" value={apps.length} tint="#3B82F6" />
+        <KpiCard label="Pipeline complet" value={fullyLinked} unit={`/ ${apps.length}`} tint="#10B981" />
+        <KpiCard label="Outils manquants" value={missingTools} tint={missingTools > 0 ? '#F59E0B' : '#10B981'} note="Sur cette machine" />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
         <Panel title="Applications suivies" span={12}>
@@ -61,6 +75,8 @@ export default function DeploymentsPage() {
         {selected && <PipelineView linkId={selected} span={12} />}
 
         <GitProjectsPanel />
+        <DevToolsPanel />
+        <PasswordGeneratorPanel />
       </div>
 
       {formOpen && <DeploymentFormDialog onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); links.reload(); }} />}
