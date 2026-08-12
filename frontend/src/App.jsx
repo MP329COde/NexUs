@@ -21,6 +21,7 @@ import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
 import ManualPage from './pages/Manual/ManualPage.jsx';
+import ReportPage from './pages/Report/ReportPage.jsx';
 import StubPage from './components/ui/StubPage.jsx';
 
 // createBrowserRouter (plutôt que <Routes>) est nécessaire ici car Shell utilise
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
           { path: 'storage', element: <StubPage title="Stockage" sub="Volumes, NAS et sauvegardes" />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
+          { path: 'report', element: <ReportPage />, handle: { title: 'Rapport de santé' } },
           { path: 'settings', element: <RequireRole role="admin"><SettingsPage /></RequireRole>, handle: { title: 'Paramètres' } }
         ]
       }

@@ -30,9 +30,14 @@ export default function HomePage() {
         title="Vue générale"
         sub="État global de l'infrastructure : Kubernetes, Argo CD, HAProxy, GitLab, Proxmox, Traefik, Cert-Manager et Grafana."
         actions={(
-          <button className="btn-outline" onClick={onRefresh} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Icon name="refresh" size={14} className={spinning ? 'spin' : ''} />Actualiser
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link to="/report" className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
+              <Icon name="externalLink" size={14} />Rapport
+            </Link>
+            <button className="btn-outline" onClick={onRefresh} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <Icon name="refresh" size={14} className={spinning ? 'spin' : ''} />Actualiser
+            </button>
+          </div>
         )}
       />
 

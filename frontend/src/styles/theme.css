@@ -94,3 +94,11 @@
 @keyframes gridDrift { from { background-position: 0 0; } to { background-position: 40px 40px; } }
 @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes dashFlow { from { stroke-dashoffset: 34; } to { stroke-dashoffset: 0; } }
+
+/* Impression (rapport de santé) : masque le chrome de l'application (header,
+   navigation latérale, palette de commande) et laisse le contenu s'étendre
+   sur toute la hauteur, plutôt que d'être limité au scroll de la fenêtre. */
+@media print {
+  .no-print { display: none !important; }
+  html, body, #root, .app-shell, .app-main { height: auto !important; overflow: visible !important; }
+}
