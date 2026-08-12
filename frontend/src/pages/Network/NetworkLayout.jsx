@@ -4,7 +4,8 @@ const TABS = [
   { to: '/network', label: 'Topologie', end: true },
   { to: '/network/proxies', label: 'Proxies & domaines' },
   { to: '/network/haproxy', label: 'HAProxy' },
-  { to: '/network/certificates', label: 'Certificats' }
+  { to: '/network/certificates', label: 'Certificats' },
+  { to: '/network/firewall', label: 'Pare-feu' }
 ];
 
 export default function NetworkLayout() {
