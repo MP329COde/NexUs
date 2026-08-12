@@ -67,14 +67,14 @@ export const MANUAL_SECTIONS = [
     id: 'network',
     title: 'Réseaux',
     blocks: [
-      { type: 'p', text: 'Quatre onglets :' },
+      { type: 'p', text: "Quatre onglets, Topologie en page d'arrivée :" },
       { type: 'ul', items: [
+        'Topologie : schéma reconstitué automatiquement à partir de ce qui est réellement configuré (proxies, HAProxy, Traefik, Kubernetes, Proxmox) — rien n\'est illustré tant qu\'aucune donnée réelle n\'est disponible. Cliquez sur un nœud pour aller directement le gérer.',
         'Proxies & domaines : créez un reverse proxy (domaine → service:port), Appliquez-le (écrit la configuration sur Traefik ou HAProxy selon le moteur choisi), Testez la connexion HTTP, ou Supprimez-le.',
         'HAProxy : liste des backends et bascule d\'état des serveurs en temps réel (ready / drain / maint).',
-        'Topologie : schéma reconstitué automatiquement à partir de ce qui est réellement configuré (proxies, HAProxy, Traefik, Kubernetes, Proxmox) — rien n\'est illustré tant qu\'aucune donnée réelle n\'est disponible.',
         'Certificats : statut de renouvellement des certificats cert-manager (dépend de l\'intégration Kubernetes).'
       ] },
-      { type: 'note', text: "Limite connue : l'application d'un proxy sur HAProxy crée le backend/serveur, mais le rattachement à une règle de frontend (ACL) reste manuel pour l'instant. Sur Traefik, l'application écrit un fichier dans le dossier de configuration dynamique (voir Paramètres → Traefik)." }
+      { type: 'note', text: "Pour un proxy sur moteur HAProxy, Appliquer crée le backend/serveur mais pas le routage : cliquez ensuite sur Frontend (visible uniquement pour les proxies HAProxy) pour choisir un frontend HAProxy et compléter automatiquement le rattachement (ACL sur l'en-tête Host + règle de commutation). Sur Traefik, l'application écrit directement un fichier dans le dossier de configuration dynamique (voir Paramètres → Traefik), sans étape supplémentaire." }
     ]
   },
   {

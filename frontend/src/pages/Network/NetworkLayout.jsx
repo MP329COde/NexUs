@@ -1,9 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const TABS = [
-  { to: '/network', label: 'Proxies & domaines', end: true },
+  { to: '/network', label: 'Topologie', end: true },
+  { to: '/network/proxies', label: 'Proxies & domaines' },
   { to: '/network/haproxy', label: 'HAProxy' },
-  { to: '/network/topology', label: 'Topologie' },
   { to: '/network/certificates', label: 'Certificats' }
 ];
 

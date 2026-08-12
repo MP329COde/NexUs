@@ -7,12 +7,14 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import ProxyFormDialog from './ProxyFormDialog.jsx';
+import AttachFrontendDialog from './AttachFrontendDialog.jsx';
 
 export default function NetworkPage() {
   const proxies = useApi(() => api.get('/proxies'), [], { pollMs: 20000 });
   const domains = useApi(() => api.get('/domains'), [], { pollMs: 30000 });
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [attaching, setAttaching] = useState(null);
   const notify = useNotify();
 
   async function apply(id) {
@@ -75,6 +77,9 @@ export default function NetworkPage() {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <span className="btn-outline" style={btnMini} onClick={() => { setEditing(p); setFormOpen(true); }}><Icon name="edit" size={13} />Modifier</span>
                     <span className="btn-outline" style={btnMini} onClick={() => apply(p.id)}><Icon name="sync" size={13} />Appliquer</span>
+                    {p.engine === 'haproxy' && (
+                      <span className="btn-outline" style={btnMini} onClick={() => setAttaching(p)}><Icon name="gitBranch" size={13} />Frontend</span>
+                    )}
                     <span className="btn-outline" style={btnMini} onClick={() => testConnection(p.id)}><Icon name="externalLink" size={13} />Tester</span>
                     <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => remove(p.id)}><Icon name="trash" size={13} />Suppr.</span>
                   </div>
@@ -112,6 +117,8 @@ export default function NetworkPage() {
           onSaved={() => { setFormOpen(false); proxies.reload(); domains.reload(); }}
         />
       )}
+
+      {attaching && <AttachFrontendDialog proxy={attaching} onClose={() => setAttaching(null)} />}
     </>
   );
 }

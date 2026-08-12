@@ -30,7 +30,7 @@ export async function getTopology() {
         label: p.domain,
         meta: `${p.engine} → ${p.targetService}:${p.targetPort}`,
         tone: p.status === 'applied' ? 'ok' : p.status === 'error' ? 'crit' : 'mut',
-        linkTo: '/network'
+        linkTo: '/network/proxies'
       }))
     });
   }
@@ -54,7 +54,7 @@ export async function getTopology() {
       layers.push({
         id: 'traefik',
         label: 'Routeurs Traefik',
-        nodes: routers.map((r) => ({ id: `tr-${r.name}`, label: r.name, meta: r.rule, tone: r.status === 'enabled' ? 'ok' : 'mut', linkTo: '/network' }))
+        nodes: routers.map((r) => ({ id: `tr-${r.name}`, label: r.name, meta: r.rule, tone: r.status === 'enabled' ? 'ok' : 'mut', linkTo: '/network/proxies' }))
       });
     }
   }
