@@ -4,6 +4,8 @@ import DataTable from '../../components/ui/DataTable.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 const PROVIDERS = [
   { id: 'gitlab', label: 'GitLab' },
@@ -11,11 +13,28 @@ const PROVIDERS = [
 ];
 
 export default function GitProjectsPanel() {
+  const { user } = useAuth();
+  const notify = useNotify();
   const [provider, setProvider] = useState('gitlab');
   const gitlab = useApi(() => api.get('/gitlab/projects'), [], { pollMs: 60000 });
   const github = useApi(() => api.get('/github/repos'), [], { pollMs: 60000 });
+  const [mirroring, setMirroring] = useState(null); // id du projet dont le formulaire de miroir est ouvert
+  const [repoName, setRepoName] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const active = provider === 'gitlab' ? gitlab : github;
+  async function enableMirror(project) {
+    setBusy(true);
+    try {
+      const res = await api.post(`/gitlab/projects/${project.id}/mirror-to-github`, { githubRepoName: repoName });
+      notify(`Sauvegarde automatique activée vers ${res.githubRepo}`, { type: 'ok' });
+      setMirroring(null);
+      setRepoName('');
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Panel
@@ -43,12 +62,41 @@ export default function GitProjectsPanel() {
           emptyTitle={gitlab.error ? 'GitLab non configuré' : 'Aucun projet'}
           emptyHint={gitlab.error ? "Renseignez l'URL et un token depuis Paramètres → GitLab." : undefined}
           renderRow={(p) => (
-            <tr key={p.id}>
-              <td className="mono muted">{p.id}</td>
-              <td style={{ fontWeight: 500 }}>{p.path}</td>
-              <td className="mono faint">{p.defaultBranch}</td>
-              <td><a href={p.webUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Icon name="externalLink" size={12} />Ouvrir</a></td>
-            </tr>
+            <>
+              <tr key={p.id}>
+                <td className="mono muted">{p.id}</td>
+                <td style={{ fontWeight: 500 }}>{p.path}</td>
+                <td className="mono faint">{p.defaultBranch}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    {user?.role === 'admin' && (
+                      <span
+                        className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }}
+                        onClick={() => { setMirroring(mirroring === p.id ? null : p.id); setRepoName(p.path.split('/').pop()); }}
+                        title="Sauvegarde automatique vers un dépôt GitHub"
+                      >
+                        <Icon name="refresh" size={11} /> Miroir GitHub
+                      </span>
+                    )}
+                    <a href={p.webUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Icon name="externalLink" size={12} />Ouvrir</a>
+                  </div>
+                </td>
+              </tr>
+              {mirroring === p.id && (
+                <tr key={`${p.id}-mirror`}>
+                  <td colSpan={4} style={{ background: 'var(--border-soft)' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 4px' }}>
+                      <span className="faint" style={{ fontSize: 11.5, flex: 'none' }}>Créer/utiliser le dépôt GitHub :</span>
+                      <input className="input" value={repoName} onChange={(e) => setRepoName(e.target.value)} style={{ height: 28, fontSize: 12, flex: '0 1 220px' }} />
+                      <button className="btn" disabled={busy || !repoName} onClick={() => enableMirror(p)} style={{ height: 28, fontSize: 12 }}>
+                        {busy ? 'Activation…' : 'Autoriser & activer'}
+                      </button>
+                      <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center' }} onClick={() => setMirroring(null)}>Annuler</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
           )}
         />
       ) : (

@@ -22,7 +22,8 @@ const DEFAULTS = {
   identity: {}, // politique de connexion + config SSO (voir store/identityStore.js)
   banlist: [], // adresses IP bloquées à l'entrée de la console (voir store/banlistStore.js)
   networkScans: [], // historique des scans réseau nmap (voir services/networkScanService.js)
-  volumes: [] // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
+  volumes: [], // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
+  vault: [] // secrets dev/prod chiffrés au repos (voir store/vaultStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

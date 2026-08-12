@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
+import { enableGitlabToGithubMirror, listMirrors } from '../services/gitMirrorService.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
@@ -18,6 +19,18 @@ router.post('/projects/:id/merge-requests/:iid/approve', asyncHandler(async (req
   const result = await gitlab.approveMergeRequest(req.params.id, req.params.iid);
   logAudit(req, 'git.review.approved', { provider: 'gitlab', projectId: req.params.id, iid: req.params.iid });
   res.json({ ok: true, ...result });
+}));
+
+router.get('/projects/:id/mirrors', requireRole('admin'), asyncHandler(async (req, res) => {
+  res.json({ ok: true, items: await listMirrors(req.params.id) });
+}));
+
+router.post('/projects/:id/mirror-to-github', requireRole('admin'), asyncHandler(async (req, res) => {
+  const { githubRepoName } = req.body || {};
+  if (!githubRepoName) return res.status(400).json({ ok: false, error: 'Nom du dépôt GitHub de sauvegarde requis' });
+  const result = await enableGitlabToGithubMirror(req.params.id, githubRepoName);
+  logAudit(req, 'git.mirror.enabled', { projectId: req.params.id, githubRepo: result.githubRepo });
+  res.status(201).json(result);
 }));
 
 export default router;

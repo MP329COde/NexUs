@@ -11,7 +11,7 @@ export default function UsersPanel() {
   const { user: me } = useAuth();
   const notify = useNotify();
   const { data, reload } = useApi(() => api.get('/users'), []);
-  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'user' });
+  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'user', skipOnboarding: false });
   const [busy, setBusy] = useState(false);
 
   async function invite(e) {
@@ -20,7 +20,7 @@ export default function UsersPanel() {
     try {
       await api.post('/users', form);
       notify(`Compte créé pour ${form.email}`, { type: 'ok' });
-      setForm({ email: '', name: '', password: '', role: 'user' });
+      setForm({ email: '', name: '', password: '', role: 'user', skipOnboarding: false });
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
@@ -96,6 +96,10 @@ export default function UsersPanel() {
               <option value="admin">Administrateur</option>
             </select>
           </Field>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 14px' }}>
+            <input type="checkbox" checked={form.skipOnboarding} onChange={(e) => setForm((f) => ({ ...f, skipOnboarding: e.target.checked }))} />
+            Compte déjà configuré (pas d'écran de première connexion)
+          </label>
           <button className="btn" type="submit" disabled={busy} style={{ width: '100%' }}>{busy ? 'Création…' : 'Créer le compte'}</button>
         </form>
       </Panel>

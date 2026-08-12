@@ -15,12 +15,12 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', asyncHandler(async (req, res) => {
-  const { email, password, name, role } = req.body || {};
+  const { email, password, name, role, skipOnboarding } = req.body || {};
   const minLength = getMinPasswordLength();
   if (!email || !password || password.length < minLength) {
     return res.status(400).json({ ok: false, error: `E-mail requis et mot de passe d'au moins ${minLength} caractères` });
   }
-  const user = createUser({ email, password, name, role: role === 'admin' ? 'admin' : 'user' });
+  const user = createUser({ email, password, name, role: role === 'admin' ? 'admin' : 'user', mustOnboard: !skipOnboarding });
   logAudit(req, 'user.create', { userId: user.id, email: user.email, role: user.role });
   res.status(201).json({ ok: true, user: toPublicUser(user) });
 }));

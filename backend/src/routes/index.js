@@ -29,6 +29,7 @@ import consoleRoutes from './console.routes.js';
 import securityRoutes from './security.routes.js';
 import volumesRoutes from './volumes.routes.js';
 import devtoolsRoutes from './devtools.routes.js';
+import vaultRoutes from './vault.routes.js';
 
 const router = Router();
 
@@ -62,5 +63,6 @@ router.use('/console', consoleRoutes);
 router.use('/security', securityRoutes);
 router.use('/volumes', volumesRoutes);
 router.use('/devtools', devtoolsRoutes);
+router.use('/vault', vaultRoutes);
 
 export default router;
