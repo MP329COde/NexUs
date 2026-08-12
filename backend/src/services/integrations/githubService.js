@@ -17,6 +17,31 @@ export async function getStatus() {
   return { configured: true, ok: true, message: `Connecté en tant que ${user.login}` };
 }
 
+export async function getAuthenticatedUser() {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const user = await request(c.http, { method: 'GET', url: '/user' }, 'GitHub');
+  return { login: user.login };
+}
+
+// Utilisé par le miroir automatique GitLab → GitHub (services/gitMirrorService.js) :
+// crée le dépôt de sauvegarde s'il n'existe pas encore. 422 = existe déjà,
+// toléré (idempotent) plutôt que remonté comme une erreur.
+export async function createRepo(name, { private: isPrivate = true, description } = {}) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  try {
+    const repo = await request(c.http, { method: 'POST', url: '/user/repos', data: { name, private: isPrivate, description, auto_init: false } }, 'GitHub');
+    return { created: true, fullName: repo.full_name, cloneUrl: repo.clone_url };
+  } catch (err) {
+    if (err.status === 502 && /422/.test(err.message)) {
+      const user = await getAuthenticatedUser();
+      return { created: false, fullName: `${user.login}/${name}`, cloneUrl: `https://github.com/${user.login}/${name}.git` };
+    }
+    throw err;
+  }
+}
+
 export async function listRepos() {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });

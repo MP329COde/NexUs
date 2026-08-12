@@ -35,6 +35,24 @@ export async function listMergeRequests(projectId) {
   return data.map((m) => ({ iid: m.iid, title: m.title, sourceBranch: m.source_branch, targetBranch: m.target_branch, author: m.author?.username, webUrl: m.web_url }));
 }
 
+// Miroir de sauvegarde (push mirror natif GitLab) : GitLab pousse lui-même
+// vers l'URL distante à intervalle régulier, on n'a pas à gérer le git
+// push nous-mêmes. Utilisé par le miroir automatique GitLab → GitHub
+// (services/gitMirrorService.js).
+export async function listRemoteMirrors(projectId) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/remote_mirrors` }, 'GitLab');
+  return data.map((m) => ({ id: m.id, url: m.safe_url || m.url, enabled: m.enabled, lastUpdateAt: m.last_update_at, lastError: m.last_error }));
+}
+
+export async function createRemoteMirror(projectId, url) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const m = await request(c.http, { method: 'POST', url: `/projects/${projectId}/remote_mirrors`, data: { url, enabled: true } }, 'GitLab');
+  return { id: m.id, url: m.safe_url || m.url, enabled: m.enabled };
+}
+
 export async function retryPipeline(projectId, pipelineId) {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
