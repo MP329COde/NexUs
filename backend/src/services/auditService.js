@@ -25,6 +25,8 @@ export function logAudit(req, action, meta = {}) {
   }
 }
 
-export function listAuditEntries({ limit = 200 } = {}) {
-  return readStore('audit').slice(0, limit);
+export function listAuditEntries({ limit = 200, integrationKey = null } = {}) {
+  const entries = readStore('audit');
+  const filtered = integrationKey ? entries.filter((e) => e.meta?.key === integrationKey) : entries;
+  return filtered.slice(0, limit);
 }
