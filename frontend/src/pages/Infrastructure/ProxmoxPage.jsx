@@ -3,6 +3,8 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
+import KpiCard from '../../components/ui/KpiCard.jsx';
+import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
@@ -34,26 +36,56 @@ export default function ProxmoxPage() {
     }
   }
 
+  const items = nodes.data?.items || [];
+  const onlineCount = items.filter((n) => n.status === 'online').length;
+  const avgCpu = items.length ? Math.round((items.reduce((s, n) => s + (n.cpu || 0), 0) / items.length) * 100) : 0;
+  const avgMem = items.length ? Math.round((items.reduce((s, n) => s + (n.mem || 0) / (n.maxmem || 1), 0) / items.length) * 100) : 0;
+  const baseUrl = status.data?.status?.baseUrl;
+
   return (
     <>
-      <PageHeader title="Infrastructure" sub={status.data?.status?.message} />
+      <PageHeader
+        title="Infrastructure"
+        sub={status.data?.status?.message}
+        actions={baseUrl && (
+          <a href={baseUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
+            <Icon name="externalLink" size={14} />Ouvrir Proxmox
+          </a>
+        )}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+        <KpiCard label="Nœuds en ligne" value={onlineCount} unit={`/ ${items.length}`} tint="#10B981" />
+        <KpiCard label="CPU moyen" value={avgCpu} unit="%" tint={avgCpu > 80 ? '#F43F5E' : '#3B82F6'} />
+        <KpiCard label="Mémoire moyenne" value={avgMem} unit="%" tint={avgMem > 80 ? '#F43F5E' : '#8B5CF6'} />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
-        <Panel title="Nœuds Proxmox" span={12}>
-          <DataTable
-            columns={['Nœud', 'Statut', 'CPU', 'Mémoire', 'Uptime', '']}
-            rows={nodes.data?.items}
-            emptyTitle="Aucun nœud"
-            renderRow={(n) => (
-              <tr key={n.node} onClick={() => setSelectedNode(n.node)} style={{ cursor: 'pointer' }}>
-                <td style={{ fontWeight: 500 }}>{n.node}</td>
-                <td><span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'}`}><span className="dot" />{n.status}</span></td>
-                <td className="mono">{Math.round((n.cpu || 0) * 100)}%</td>
-                <td className="mono">{Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100)}%</td>
-                <td className="mono faint">{Math.round((n.uptime || 0) / 3600)} h</td>
-                <td><span style={{ fontSize: 12, color: 'var(--primary)' }}>Voir les VM →</span></td>
-              </tr>
-            )}
-          />
+        <Panel title="Nœuds Proxmox" sub="Cliquez sur un nœud pour voir ses VM et conteneurs" span={12}>
+          {items.length === 0 ? (
+            <EmptyState title="Aucun nœud" />
+          ) : (
+            <div style={{ padding: 6 }}>
+              {items.map((n) => {
+                const cpuPct = Math.round((n.cpu || 0) * 100);
+                const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
+                return (
+                  <div
+                    key={n.node}
+                    onClick={() => setSelectedNode(n.node)}
+                    className="home-integration-row"
+                    style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '13px 16px', borderBottom: '1px solid var(--border-soft)', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 13.5, width: 120 }}>{n.node}</span>
+                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'}`} style={{ flex: 'none' }}><span className="dot" />{n.status}</span>
+                    <GaugeBar label="CPU" pct={cpuPct} />
+                    <GaugeBar label="RAM" pct={memPct} />
+                    <span className="mono faint" style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{Math.round((n.uptime || 0) / 3600)} h</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Panel>
 
         {selectedNode && (
@@ -82,6 +114,19 @@ export default function ProxmoxPage() {
         )}
       </div>
     </>
+  );
+}
+
+function GaugeBar({ label, pct }) {
+  const color = pct > 85 ? 'var(--tone-crit-dot)' : pct > 65 ? 'var(--tone-warn-dot)' : 'var(--tone-ok-dot)';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
+      <span className="faint" style={{ fontSize: 10.5, width: 26, flex: 'none' }}>{label}</span>
+      <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, transition: 'width .3s ease' }} />
+      </div>
+      <span className="mono" style={{ fontSize: 11, width: 32, flex: 'none', textAlign: 'right' }}>{pct}%</span>
+    </div>
   );
 }
 

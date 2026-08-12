@@ -12,7 +12,10 @@ export async function getStatus() {
   const c = client();
   if (!c) return notConfigured('Proxmox');
   const data = await request(c.http, { method: 'GET', url: '/api2/json/nodes' }, 'Proxmox');
-  return { configured: true, ok: true, message: `${data.data?.length ?? 0} nœud(s) détecté(s)` };
+  // baseUrl n'est pas un secret (contrairement au token) : exposé ici pour que
+  // le bouton "Ouvrir Proxmox" fonctionne pour tout utilisateur authentifié,
+  // pas seulement les admins (qui ont seuls accès à /settings).
+  return { configured: true, ok: true, message: `${data.data?.length ?? 0} nœud(s) détecté(s)`, baseUrl: c.cfg.baseUrl };
 }
 
 export async function listNodes() {
