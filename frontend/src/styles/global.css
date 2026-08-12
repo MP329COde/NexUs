@@ -213,3 +213,10 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
 
 @keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 .route-page { animation: pageIn .22s cubic-bezier(.16,1,.3,1) both; }
+
+/* Panel span={n} (grilles à 12 colonnes, utilisées par la plupart des pages
+   Paramètres/Accueil) : empile chaque panneau en pleine largeur sous 860px
+   plutôt que de le compresser dans une fraction de colonne illisible. */
+@media (max-width: 860px) {
+  .panel-span { grid-column: span 12 !important; }
+}
