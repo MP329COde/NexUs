@@ -8,7 +8,7 @@ export const DOMAINS = [
   { id: 'k8s', code: 'K8S', label: 'Kubernetes', sub: 'Cluster, charges et GitOps', path: '/kubernetes' },
   { id: 'net', code: 'NET', label: 'Réseaux', sub: 'Reverse proxy, domaines et certificats', path: '/network' },
   { id: 'mon', code: 'MON', label: 'Monitoring', sub: 'Métriques, alertes et logs', path: '/monitoring' },
-  { id: 'sec', code: 'SEC', label: 'Cybersécurité', sub: 'Vulnérabilités, accès et audit', path: '/security', stub: true },
-  { id: 'sto', code: 'STO', label: 'Stockage', sub: 'Volumes, NAS et sauvegardes', path: '/storage', stub: true },
+  { id: 'sec', code: 'SEC', label: 'Cybersécurité', sub: 'Vulnérabilités, accès et audit', path: '/security' },
+  { id: 'sto', code: 'STO', label: 'Stockage', sub: 'Volumes, NAS et sauvegardes', path: '/storage' },
   { id: 'adm', code: 'ADM', label: 'Paramètres', sub: 'Intégrations et console', path: '/settings', adminOnly: true }
 ];

@@ -22,7 +22,7 @@ import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
 import ManualPage from './pages/Manual/ManualPage.jsx';
 import ReportPage from './pages/Report/ReportPage.jsx';
-import StubPage from './components/ui/StubPage.jsx';
+import StoragePage from './pages/Storage/StoragePage.jsx';
 
 // createBrowserRouter (plutôt que <Routes>) est nécessaire ici car Shell utilise
 // useMatches() pour dériver le titre affiché dans le header depuis `handle`.
@@ -62,7 +62,7 @@ export const router = createBrowserRouter([
           },
           { path: 'monitoring', element: <MonitoringPage />, handle: { title: 'Monitoring' } },
           { path: 'security', element: <SecurityPage />, handle: { title: 'Cybersécurité' } },
-          { path: 'storage', element: <StubPage title="Stockage" sub="Volumes, NAS et sauvegardes" />, handle: { title: 'Stockage' } },
+          { path: 'storage', element: <StoragePage />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
           { path: 'report', element: <ReportPage />, handle: { title: 'Rapport de santé' } },
