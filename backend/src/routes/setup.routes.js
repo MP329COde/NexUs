@@ -3,7 +3,6 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { signSession, SESSION_COOKIE } from '../middleware/auth.js';
 import { hasAnyUser, createUser } from '../store/usersStore.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
-import { env } from '../config/env.js';
 import { logAudit } from '../services/auditService.js';
 
 // Non authentifié par nature : tant qu'aucun utilisateur n'existe, la console
@@ -27,7 +26,7 @@ router.post('/', asyncHandler(async (req, res) => {
   if (consoleName) writeStore('console', { ...readStore('console'), name: consoleName });
 
   const token = signSession(user);
-  res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: env.isProd, maxAge: 12 * 60 * 60 * 1000 });
+  res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 12 * 60 * 60 * 1000 });
   logAudit({ user: { id: user.id, email: user.email }, ip: req.ip }, 'setup.completed', {});
   res.status(201).json({ ok: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }));

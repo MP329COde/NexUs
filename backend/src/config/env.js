@@ -9,6 +9,5 @@ export const env = {
   // créé automatiquement et la console affiche l'assistant de première configuration
   // (voir routes/setup.routes.js) plutôt qu'un compte admin/mot de passe devinable.
   adminEmail: process.env.ADMIN_EMAIL || null,
-  adminPassword: process.env.ADMIN_PASSWORD || null,
-  isProd: process.env.NODE_ENV === 'production'
+  adminPassword: process.env.ADMIN_PASSWORD || null
 };

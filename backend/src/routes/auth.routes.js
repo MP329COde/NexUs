@@ -3,7 +3,6 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
 import { findUserByEmail, updateUser, updatePassword } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
-import { env } from '../config/env.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
@@ -20,7 +19,11 @@ router.post('/login', asyncHandler(async (req, res) => {
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.isProd,
+    // Reflète la connexion réelle (via X-Forwarded-Proto derrière nginx/Traefik,
+    // cf. trust proxy dans index.js) plutôt qu'un simple NODE_ENV : sur un LAN
+    // homelab sans TLS, un cookie "Secure" ne serait jamais renvoyé par le
+    // navigateur et la connexion échouerait silencieusement.
+    secure: req.secure,
     maxAge: 12 * 60 * 60 * 1000
   });
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login', {});
