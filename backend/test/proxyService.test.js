@@ -15,7 +15,33 @@ test('refuse la création sans champs requis', () => {
 test('refuse un domaine invalide', () => {
   assert.throws(
     () => proxyService.create({ name: 'x', domain: 'pas un domaine', targetService: 'svc', targetPort: 80 }),
-    /Domaine invalide/
+    /domaine/i
+  );
+});
+
+// Ces trois champs sont interpolés tels quels dans le YAML écrit pour Traefik
+// (voir traefikService.writeDynamicRoute) : sans validation de format, un
+// utilisateur authentifié non-admin pourrait injecter des clés YAML
+// arbitraires et détourner du routage. Régression : ils n'étaient auparavant
+// vérifiés que pour leur présence, pas leur contenu.
+test('refuse un service cible contenant des caractères YAML dangereux', () => {
+  assert.throws(
+    () => proxyService.create({ name: 'x', domain: 'app.homelab.local', targetService: 'svc"\n  routers:\n    evil:', targetPort: 80 }),
+    /service cible/i
+  );
+});
+
+test('refuse un port hors plage', () => {
+  assert.throws(
+    () => proxyService.create({ name: 'x', domain: 'app.homelab.local', targetService: 'svc', targetPort: 99999 }),
+    /port cible/i
+  );
+});
+
+test('refuse un certResolver contenant des caractères YAML dangereux', () => {
+  assert.throws(
+    () => proxyService.create({ name: 'x', domain: 'app.homelab.local', targetService: 'svc', targetPort: 80, certResolver: 'default\n  routers:' }),
+    /resolver de certificat/i
   );
 });
 

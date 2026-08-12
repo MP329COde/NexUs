@@ -36,9 +36,11 @@ app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/sta
 // sans limiter les endpoints de lecture appelés en polling par le dashboard.
 const strictLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
 app.use('/api/auth/login', strictLimiter);
+app.use('/api/auth/password', strictLimiter);
 app.use('/api/setup', strictLimiter);
 app.use('/api/settings', strictLimiter);
 app.use('/api/hosts', strictLimiter);
+app.use('/api/backups', strictLimiter);
 
 app.use('/api', router);
 
