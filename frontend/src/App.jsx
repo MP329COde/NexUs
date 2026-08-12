@@ -64,9 +64,9 @@ export const router = createBrowserRouter([
             element: <NetworkLayout />,
             handle: { title: 'Réseaux' },
             children: [
-              { index: true, element: <NetworkPage /> },
+              { index: true, element: <TopologyPage /> },
+              { path: 'proxies', element: <NetworkPage /> },
               { path: 'haproxy', element: <HAProxyPage /> },
-              { path: 'topology', element: <TopologyPage /> },
               { path: 'certificates', element: <CertificatesPage /> }
             ]
           },

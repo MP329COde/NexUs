@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as store from '../store/proxyStore.js';
 import { writeDynamicRoute, removeDynamicRoute } from './integrations/traefikService.js';
-import { applyProxyBackend } from './integrations/haproxyService.js';
+import { applyProxyBackend, attachProxyToFrontend } from './integrations/haproxyService.js';
 
 export function list() {
   return store.listProxies();
@@ -44,6 +44,16 @@ export async function apply(id) {
     store.setProxyState(id, { status: 'error', lastError: err.message });
     throw err;
   }
+}
+
+export async function attachToFrontend(id, frontendName) {
+  const proxy = store.getProxy(id);
+  if (!proxy) throw notFound(id);
+  if (proxy.engine !== 'haproxy') {
+    throw Object.assign(new Error('Le rattachement à un frontend ne concerne que les proxies gérés par HAProxy'), { status: 400 });
+  }
+  if (!frontendName) throw Object.assign(new Error('Frontend requis'), { status: 400 });
+  return attachProxyToFrontend(proxy, frontendName);
 }
 
 export async function testConnection(id) {

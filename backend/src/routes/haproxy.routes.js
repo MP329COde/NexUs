@@ -13,5 +13,6 @@ router.get('/backends/:backend/servers/runtime', asyncHandler(async (req, res) =
 router.post('/backends/:backend/servers/:server/state', asyncHandler(async (req, res) => {
   res.json({ ok: true, ...(await haproxy.setServerState(req.params.backend, req.params.server, req.body?.state)) });
 }));
+router.get('/frontends', asyncHandler(async (req, res) => res.json({ ok: true, items: await haproxy.listFrontends() })));
 
 export default router;

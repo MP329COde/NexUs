@@ -55,10 +55,57 @@ async function getConfigVersion(c) {
   return data;
 }
 
+export async function listFrontends() {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/configuration/frontends' }, 'HAProxy');
+  return (data.data || []).map((f) => ({ name: f.name, mode: f.mode }));
+}
+
+// Complète le rattachement documenté comme manuel dans applyProxyBackend() :
+// crée une ACL "Host: <domaine>" sur le frontend choisi, puis une règle de
+// commutation vers le backend du proxy. Idempotent au sens large (les index
+// sont recalculés à chaque appel), mais n'essaie pas de détecter un doublon
+// exact si la même règle a déjà été ajoutée manuellement.
+export async function attachProxyToFrontend(proxy, frontendName) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const backendName = `nexus_${proxy.id}`;
+  const aclName = `host_nexus_${proxy.id}`;
+
+  const existingAcls = await request(c.http, {
+    method: 'GET', url: '/v2/services/haproxy/configuration/acls', params: { parent_type: 'frontend', parent_name: frontendName }
+  }, 'HAProxy');
+  const aclIndex = (existingAcls.data || []).length;
+
+  const v1 = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'POST',
+    url: '/v2/services/haproxy/configuration/acls',
+    params: { parent_type: 'frontend', parent_name: frontendName, version: v1, force_reload: true },
+    data: { index: aclIndex, acl_name: aclName, criterion: 'hdr(host)', value: proxy.domain }
+  }, 'HAProxy');
+
+  const existingRules = await request(c.http, {
+    method: 'GET', url: '/v2/services/haproxy/configuration/backend_switching_rules', params: { parent_type: 'frontend', parent_name: frontendName }
+  }, 'HAProxy');
+  const ruleIndex = (existingRules.data || []).length;
+
+  const v2 = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'POST',
+    url: '/v2/services/haproxy/configuration/backend_switching_rules',
+    params: { parent_type: 'frontend', parent_name: frontendName, version: v2, force_reload: true },
+    data: { index: ruleIndex, cond: 'if', cond_test: aclName, name: backendName }
+  }, 'HAProxy');
+
+  return { ok: true, message: `${proxy.domain} → ${backendName} rattaché sur le frontend ${frontendName}` };
+}
+
 // Crée (ou remplace) un backend + un serveur pour un proxy géré par la console.
-// Limitation assumée du scaffold: le rattachement au frontend (ACL/use_backend)
-// n'est pas automatisé ici et doit être câblé manuellement ou dans une évolution
-// future — la création/mise à jour du backend applicatif l'est en revanche.
+// Le rattachement au frontend (ACL/use_backend) n'est volontairement pas fait
+// ici (on ne devine pas quel frontend/quelle priorité choisir) : voir
+// attachProxyToFrontend(), déclenché explicitement depuis l'interface.
 export async function applyProxyBackend(proxy) {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
@@ -79,5 +126,5 @@ export async function applyProxyBackend(proxy) {
     params: { backend: backendName, version: version2, force_reload: true },
     data: { name: 'srv1', address: proxy.targetService, port: Number(proxy.targetPort), check: 'enabled' }
   }, 'HAProxy');
-  return { ok: true, message: `Backend HAProxy ${backendName} appliqué (rattachement au frontend à finaliser manuellement)` };
+  return { ok: true, message: `Backend HAProxy ${backendName} appliqué — utilisez "Attacher à un frontend" pour finaliser le routage` };
 }

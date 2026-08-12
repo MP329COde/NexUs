@@ -37,7 +37,7 @@ export default function CommandPalette({ open, onClose }) {
       try {
         const res = await api.get('/proxies');
         for (const p of res.items || []) {
-          items.push({ label: `${p.domain} → ${p.targetHost}:${p.targetPort}`, group: 'Proxies', path: '/network', keywords: `proxy ${p.domain} ${p.targetHost}` });
+          items.push({ label: `${p.domain} → ${p.targetHost}:${p.targetPort}`, group: 'Proxies', path: '/network/proxies', keywords: `proxy ${p.domain} ${p.targetHost}` });
         }
       } catch { /* proxies non disponibles */ }
       if (user?.role === 'admin') {
