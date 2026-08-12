@@ -10,6 +10,9 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
   const [testResult, setTestResult] = useState(null);
   const [error, setError] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     const values = {};
@@ -28,11 +31,37 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
     try {
       await api.put(`/settings/${integrationKey}`, form);
       onSaved();
+      // La sauvegarde crée une nouvelle entrée d'audit : si l'historique est
+      // déjà ouvert, on le recharge pour l'afficher immédiatement.
+      if (historyOpen) loadHistory();
+      else setHistory(null);
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function loadHistory() {
+    setHistoryLoading(true);
+    try {
+      const res = await api.get(`/audit?integrationKey=${integrationKey}&limit=20`);
+      setHistory(res.items);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function toggleHistory() {
+    const next = !historyOpen;
+    setHistoryOpen(next);
+    if (next && !history) loadHistory();
+  }
+
+  function fieldLabel(key) {
+    return schema.fields.find((f) => f.key === key)?.label || key;
   }
 
   async function test() {
@@ -73,6 +102,40 @@ export default function IntegrationPanel({ integrationKey, schema, initial, onSa
           )}
         </div>
       )}
+
+      <div style={{ marginBottom: 14 }}>
+        <span
+          onClick={toggleHistory}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer' }}
+        >
+          <Icon name="refresh" size={13} />
+          Historique des modifications
+          <Icon name="chevronDown" size={12} style={{ transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }} />
+        </span>
+        {historyOpen && (
+          <div style={{ margin: '10px 0 0', padding: '4px 0', animation: 'riseIn .2s ease both' }}>
+            {historyLoading && <div className="faint" style={{ fontSize: 12 }}>Chargement…</div>}
+            {!historyLoading && history?.length === 0 && <div className="faint" style={{ fontSize: 12 }}>Aucune modification enregistrée.</div>}
+            {!historyLoading && history?.map((e) => {
+              const fields = Object.entries(e.meta?.changes || {});
+              return (
+                <div key={e.id} style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--border-soft)', marginBottom: 6, fontSize: 11.5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: fields.length ? 5 : 0 }}>
+                    <span>{e.actorEmail || 'Système'}</span>
+                    <span className="mono">{new Date(e.at).toLocaleString('fr-FR')}</span>
+                  </div>
+                  {fields.length === 0 && <span className="faint">Enregistré sans changement détecté.</span>}
+                  {fields.map(([key, change]) => (
+                    <div key={key} className="mono" style={{ color: 'var(--text-faint)' }}>
+                      {fieldLabel(key)} : {change.secret ? 'valeur secrète modifiée' : `« ${change.from || '—'} » → « ${change.to || '—'} »`}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {schema.fields.length > 0 && (
         <form onSubmit={save}>
