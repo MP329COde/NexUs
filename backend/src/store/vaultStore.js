@@ -3,12 +3,15 @@ import crypto from 'node:crypto';
 import { readStore, writeStore } from './jsonStore.js';
 import { encryptSecret, decryptSecret } from '../utils/crypto.js';
 
-// Gestionnaire de mots de passe à deux niveaux :
+// Gestionnaire de mots de passe à trois niveaux :
 // - 'dev' : accès des développeurs à des machines de test/dev partagées,
 //   lisible par tout utilisateur authentifié (voir vault.routes.js).
 // - 'prod' : générés automatiquement (plusieurs centaines de caractères),
 //   réservés aux admins et exigent de retaper son propre mot de passe pour
 //   être révélés (voir requireStepUp dans vault.routes.js).
+// - 'project' : coffre-fort propre à un projet (projectId), visible et
+//   gérable par les membres de ce projet uniquement — voir la vérification
+//   de visibilité dans projects.routes.js (mêmes règles que le backlog).
 // Le secret est toujours chiffré au repos (AES-256-GCM, même clé maître que
 // les autres intégrations) et n'est jamais renvoyé par la liste — seul un
 // appel explicite à reveal() le déchiffre.
@@ -25,16 +28,17 @@ function toMeta(entry) {
   return meta;
 }
 
-export function listVaultEntries(tier) {
+export function listVaultEntries(tier, projectId) {
   const entries = readStore('vault') || [];
-  return entries.filter((e) => e.tier === tier).map(toMeta);
+  return entries.filter((e) => e.tier === tier && (tier !== 'project' || e.projectId === projectId)).map(toMeta);
 }
 
-export function createVaultEntry({ tier, label, username, secret, notes, actor }) {
+export function createVaultEntry({ tier, label, username, secret, notes, actor, projectId }) {
   const entries = readStore('vault') || [];
   const entry = {
     id: uuid(),
     tier,
+    projectId: tier === 'project' ? projectId : null,
     label,
     username: username || '',
     notes: notes || '',
