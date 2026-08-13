@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Modal from '../../components/ui/Modal.jsx';
 import { api } from '../../lib/apiClient.js';
 
 export default function DeploymentFormDialog({ onClose, onSaved }) {
@@ -25,10 +26,19 @@ export default function DeploymentFormDialog({ onClose, onSaved }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onClose}>
-      <form className="card" style={{ width: 440, padding: 22 }} onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Lier une application</div>
-
+    <Modal
+      title="Lier une application"
+      sub="Rattache un dépôt Git, une application Argo CD et un déploiement Kubernetes"
+      onClose={onClose}
+      width={460}
+      actions={(
+        <>
+          <span className="btn-outline" onClick={onClose}>Annuler</span>
+          <button className="btn" type="submit" form="deployment-form" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
+        </>
+      )}
+    >
+      <form id="deployment-form" onSubmit={onSubmit}>
         <Field label="Nom de l'application"><input className="input" required value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
 
         <Field label="Fournisseur Git">
@@ -53,14 +63,9 @@ export default function DeploymentFormDialog({ onClose, onSaved }) {
           <div style={{ flex: 1 }}><Field label="Deployment K8s"><input className="input" value={form.k8sDeployment} onChange={(e) => set('k8sDeployment', e.target.value)} /></Field></div>
         </div>
 
-        {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)', margin: '8px 0' }}>{error}</div>}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-          <span className="btn-outline" onClick={onClose}>Annuler</span>
-          <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
-        </div>
+        {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)', margin: '8px 0 0' }}>{error}</div>}
       </form>
-    </div>
+    </Modal>
   );
 }
 
