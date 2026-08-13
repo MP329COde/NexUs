@@ -58,6 +58,12 @@ app.use('/api/vault', strictLimiter);
 const scanLimiter = rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/security/scans', scanLimiter);
 
+// Une installation d'outil déclenche une connexion SSH + un script potentiellement
+// long : même logique que scanLimiter, pour empêcher d'en déclencher en rafale
+// depuis l'écran d'installation de l'assistant de configuration initiale.
+const provisionLimiter = rateLimit({ windowMs: 10 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.use('/api/setup/provision', provisionLimiter);
+
 app.use('/api', router);
 
 app.use(notFoundHandler);

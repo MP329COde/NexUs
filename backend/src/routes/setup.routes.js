@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { signSession, SESSION_COOKIE, toPublicUser } from '../middleware/auth.js';
+import { signSession, SESSION_COOKIE, toPublicUser, requireAuth, requireRole } from '../middleware/auth.js';
 import { hasAnyUser, createUser } from '../store/usersStore.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
 import { save as saveIdentity, getSessionMinutes } from '../store/identityStore.js';
 import { saveIntegration } from '../store/settingsStore.js';
 import { logAudit } from '../services/auditService.js';
+import { startInstall, getJobs } from '../services/provisioningService.js';
+import { listInstallableIds } from '../services/serviceCatalog.js';
 
 // Non authentifié par nature : tant qu'aucun utilisateur n'existe, la console
 // n'a pas encore de secret à protéger. Chaque route revérifie hasAnyUser() pour
@@ -103,5 +105,34 @@ router.post('/', asyncHandler(async (req, res) => {
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'setup.completed', { forge, toolsCount: enabledTools.length });
   res.status(201).json({ ok: true, user: toPublicUser(user) });
 }));
+
+// Installation automatique des outils sélectionnés à l'étape 5 : n'est
+// accessible qu'une fois l'administrateur créé (cookie de session posé par
+// la route ci-dessus), donc protégée comme le reste de la console — voir
+// pages/Setup/InstallScreen.jsx pour l'écran qui déclenche puis suit ces jobs.
+router.get('/provision/catalog', requireAuth, requireRole('admin'), (req, res) => {
+  res.json({ ok: true, installable: listInstallableIds() });
+});
+
+router.post('/provision', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  const { tools = [] } = req.body || {};
+  if (!Array.isArray(tools) || tools.length === 0) {
+    return res.status(400).json({ ok: false, error: 'Aucun outil à installer' });
+  }
+  const startedJobs = tools.map(({ toolId, address, port, sshUser }) => {
+    try {
+      return startInstall({ toolId, address, port, sshUser });
+    } catch (err) {
+      return { id: null, toolId, status: 'error', message: err.message };
+    }
+  });
+  logAudit(req, 'setup.provision.start', { count: startedJobs.length, tools: startedJobs.map((j) => j.toolId) });
+  res.status(202).json({ ok: true, jobs: startedJobs });
+}));
+
+router.get('/provision/status', requireAuth, requireRole('admin'), (req, res) => {
+  const ids = typeof req.query.ids === 'string' ? req.query.ids.split(',').filter(Boolean) : undefined;
+  res.json({ ok: true, jobs: getJobs(ids) });
+});
 
 export default router;
