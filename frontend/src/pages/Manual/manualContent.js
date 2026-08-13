@@ -44,10 +44,60 @@ export const MANUAL_SECTIONS = [
     group: 'Démarrage',
     title: 'Vue générale (tableau de bord)',
     blocks: [
-      { type: 'p', text: "La page d'accueil affiche un score de santé global (moyenne pondérée des intégrations configurées) et la liste de toutes les intégrations avec leur statut. Cliquer sur une ligne ouvre directement le domaine correspondant." },
-      { type: 'p', text: "La carte « Résumé de l'infrastructure » détaille ce score par domaine (Infrastructure, Développement, Réseaux, Monitoring, Cybersécurité, Stockage, Intelligence artificielle, Gestion) avec, pour chacun, une barre de progression, le nombre de services opérationnels sur le total configuré, et la disponibilité sur les 30 derniers jours." },
-      { type: 'p', text: "Le widget « Disponibilité 24h » affiche 24 points, un par heure écoulée, colorés selon l'état constaté à cette heure-là (vert = sain, orange = dégradé, rouge = incident, gris = pas encore de donnée). Le bouton à côté ouvre une légende expliquant chaque couleur." },
-      { type: 'note', text: "Le relevé horodaté qui alimente la disponibilité 30 jours et le widget 24h démarre à l'installation de la console : juste après un déploiement, l'historique est donc encore vide et se remplit heure après heure — c'est normal, aucune donnée rétroactive n'est reconstituée." }
+      { type: 'p', text: "Quatre indicateurs en tête de page : score de santé pondéré, nombre de nœuds Proxmox en ligne, alertes ouvertes (Grafana + agents Wazuh déconnectés) et heure de dernière actualisation." },
+      { type: 'p', text: "« Charge de l'infrastructure » (badge LIVE) trace en direct le CPU et la RAM moyens de vos nœuds Proxmox en ligne, échantillonnés côté serveur toutes les 30 secondes ; « Répartition des charges » compte vos machines virtuelles et conteneurs LXC (Proxmox) et vos pods (Kubernetes) sous forme de donut. Ces deux cartes affichent « Non configuré » tant que Proxmox (et Kubernetes pour les pods) ne le sont pas — il n'existe pas d'intégration Docker dans la console, ce segment reste donc toujours vide." },
+      { type: 'p', text: "« Hôtes critiques » (réservé aux administrateurs) liste les hôtes cochés « Hôte critique » depuis Infrastructure → Hôtes & agents : rôle, joignabilité (sonde réseau réelle), et — quand l'hôte le permet (Linux, lecture via SSH) — CPU, RAM et uptime en direct. « Activité en direct » fusionne le journal d'audit et les sauvegardes créées, triés du plus récent au plus ancien." },
+      { type: 'p', text: "« Disponibilité 24h » affiche une ligne par service coché « Important » depuis Réseaux → Proxies & domaines (nom à gauche, 24 points à droite, un par heure), avec un bouton légende en haut à droite du panneau. « Alertes ouvertes » reprend les alertes Grafana et les agents Wazuh déconnectés, triées par sévérité (P1/P2/P3, déduite du label de sévérité Grafana)." },
+      { type: 'note', text: "Rien de tout cela n'est fabriqué : quand une donnée n'existe pas encore (aucun hôte/service marqué important, intégration non configurée), la carte l'indique explicitement plutôt que d'afficher un chiffre inventé. Les relevés horaires (disponibilité par service) démarrent à l'installation de la console et se remplissent heure après heure." },
+      { type: 'note', text: "Le statut détaillé de chaque intégration (Kubernetes, Argo CD, HAProxy, GitLab, GitHub, Proxmox, Traefik, Cert-Manager, Grafana, Wazuh) a été déplacé dans Paramètres → Intégrations & outils, juste au-dessus des formulaires de configuration — il n'apparaît plus sur la page d'accueil." }
+    ]
+  },
+  {
+    id: 'search',
+    group: 'Démarrage',
+    title: 'Recherche globale',
+    blocks: [
+      { type: 'p', text: "Le champ de recherche du bandeau (ou le raccourci ⌘K sur Mac, Ctrl K sur Windows/Linux) ouvre une palette de commandes pour atteindre n'importe quelle page, proxy, hôte ou dépôt Git sans naviguer dans les menus." },
+      { type: 'p', text: "La recherche tolère les fautes de frappe et d'orthographe courantes (un ou deux caractères manquants, inversés ou en trop) : elle reste utile même si vous ne vous souvenez plus exactement du nom d'un module. Les résultats les plus proches de votre saisie remontent en premier." },
+      { type: 'ul', items: [
+        'Pages : toutes les pages de la console, y compris les onglets de Paramètres pour les administrateurs.',
+        'Proxies et hôtes : chargés dynamiquement depuis vos données réelles (pas une liste figée), donc à jour dès que vous en ajoutez.',
+        'Dépôts : vos projets GitLab/GitHub accessibles, si ces intégrations sont configurées.',
+        'Mon compte / Paramètres → Plateforme : trouvables aussi en tapant votre propre nom, e-mail, ou le nom de votre organisation.'
+      ] },
+      { type: 'note', text: "Les entrées réservées aux administrateurs (Paramètres et ses onglets) n'apparaissent pas dans les résultats d'un compte Utilisateur." }
+    ]
+  },
+  {
+    id: 'notifications',
+    group: 'Démarrage',
+    title: 'Notifications',
+    blocks: [
+      { type: 'p', text: "L'icône cloche du bandeau affiche l'historique des notifications reçues pendant la session en cours (alertes, résultats d'actions, erreurs) : elle se vide au rechargement de la page, ce n'est pas un journal persistant — pour un historique durable des actions d'administration, voir Paramètres → Journal." },
+      { type: 'p', text: "Un point rouge sur la cloche signale qu'au moins une notification est en attente ; « Effacer » vide la liste sans rien supprimer côté serveur." }
+    ]
+  },
+  {
+    id: 'account',
+    group: 'Démarrage',
+    title: 'Mon compte',
+    blocks: [
+      { type: 'p', text: "Accessible depuis l'avatar en haut à droite, cette page regroupe trois blocs, pour tous les rôles :" },
+      { type: 'ul', items: [
+        'Profil : nom affiché et avatar (emoji ou initiales colorées).',
+        'Apparence : bascule entre thème clair et sombre (aussi accessible via l\'icône soleil/lune du bandeau), mémorisée par compte.',
+        'Sécurité : changement de votre propre mot de passe (ancien mot de passe requis).'
+      ] },
+      { type: 'note', text: "Un administrateur peut réinitialiser le mot de passe d'un autre compte depuis Paramètres → Utilisateurs, mais ne peut pas voir votre mot de passe actuel — les mots de passe ne sont jamais stockés en clair." }
+    ]
+  },
+  {
+    id: 'report',
+    group: 'Démarrage',
+    title: 'Rapport de santé',
+    blocks: [
+      { type: 'p', text: "Vue imprimable en une page, indépendante du thème clair/sombre pour rester lisible sur papier : score de santé global, statut de chaque intégration, alertes Grafana actives et résumé Wazuh au moment de l'ouverture de la page." },
+      { type: 'p', text: "Pour l'exporter en PDF : ouvrez Rapport, puis utilisez l'impression du navigateur (⌘P / Ctrl P) et choisissez « Enregistrer en PDF » comme destination. Aucune génération PDF ne se fait côté serveur." }
     ]
   },
   {
@@ -81,15 +131,17 @@ export const MANUAL_SECTIONS = [
     group: 'Modules opérationnels',
     title: 'Réseaux',
     blocks: [
-      { type: 'p', text: "Quatre onglets, Topologie en page d'arrivée :" },
+      { type: 'p', text: "Cinq onglets, Topologie en page d'arrivée :" },
       { type: 'ul', items: [
         'Topologie : schéma reconstitué automatiquement à partir de ce qui est réellement configuré (proxies, HAProxy, Traefik, Kubernetes, Proxmox) — rien n\'est illustré tant qu\'aucune donnée réelle n\'est disponible. Cliquez sur un nœud pour aller directement le gérer.',
-        'Proxies & domaines : créez un reverse proxy (domaine → service:port), Appliquez-le (écrit la configuration sur Traefik ou HAProxy selon le moteur choisi), Testez la connexion HTTP, ou Supprimez-le.',
+        'Proxies & domaines : créez un reverse proxy (domaine → service:port), Appliquez-le (écrit la configuration sur Traefik ou HAProxy selon le moteur choisi), Testez la connexion HTTP, ou Supprimez-le. Cochez Important pour qu\'il apparaisse dans la carte « Disponibilité 24h » de l\'accueil (relevé horaire réel de la même URL testée manuellement).',
         'HAProxy : liste des backends et bascule d\'état des serveurs en temps réel (ready / drain / maint).',
-        'Certificats : statut de renouvellement des certificats cert-manager (dépend de l\'intégration Kubernetes).'
+        'Certificats : statut de renouvellement des certificats cert-manager (dépend de l\'intégration Kubernetes).',
+        'Pare-feu : trafic API de la console en temps réel (rafraîchi toutes les 5 s) et détection des adresses qui accumulent des requêtes en échec (401/403/429). Réservé aux administrateurs pour la détection et le blocage ; le trafic récent reste visible par tous.'
       ] },
       { type: 'note', text: "Pour un proxy sur moteur HAProxy, Appliquer crée le backend/serveur mais pas le routage : cliquez ensuite sur Frontend (visible uniquement pour les proxies HAProxy) pour choisir un frontend HAProxy et compléter automatiquement le rattachement (ACL sur l'en-tête Host + règle de commutation). Sur Traefik, l'application écrit directement un fichier dans le dossier de configuration dynamique (voir Paramètres → Traefik), sans étape supplémentaire." },
-      { type: 'note', text: "Comme pour Kubernetes, créer/appliquer/supprimer un proxy ou basculer un serveur HAProxy (ready/drain/maint) n'est pas réservé aux administrateurs aujourd'hui : tout compte connecté peut le faire." }
+      { type: 'note', text: "Comme pour Kubernetes, créer/appliquer/supprimer un proxy ou basculer un serveur HAProxy (ready/drain/maint) n'est pas réservé aux administrateurs aujourd'hui : tout compte connecté peut le faire." },
+      { type: 'note', text: "Pare-feu : le blocage automatique (bouton en haut de la page) bannit une adresse dès qu'elle dépasse le seuil de requêtes suspectes, en s'appuyant sur la même liste que Cybersécurité → IPs bannies — les deux pages partagent le même banlist." }
     ]
   },
   {
@@ -103,6 +155,7 @@ export const MANUAL_SECTIONS = [
         'Hôtes & agents : installation d\'agents (Prometheus Node Exporter, agent Wazuh) sur vos serveurs via SSH — réservé aux administrateurs.'
       ] },
       { type: 'p', text: "Pour les hôtes & agents : copiez la clé publique affichée dans ~/.ssh/authorized_keys de l'utilisateur SSH de chaque hôte, ajoutez l'hôte (nom, adresse, port, utilisateur), puis Installer un agent." },
+      { type: 'p', text: "Chaque hôte peut aussi recevoir un Rôle (texte libre, ex. « Hyperviseur Proxmox ») et être coché Hôte critique : les hôtes critiques apparaissent alors dans la carte « Hôtes critiques » de la page d'accueil, avec un test de joignabilité réel et — sur un hôte Linux joignable en SSH — CPU/RAM/uptime lus en direct toutes les 30 secondes." },
       { type: 'note', text: "Sécurité : le catalogue d'agents est fermé — l'interface ne peut jamais soumettre de commande arbitraire. Le script exact est toujours affiché avant exécution, et il faut cliquer explicitement sur Confirmer l'installation." },
       { type: 'note', text: "Démarrer/arrêter/redémarrer une VM ou un conteneur Proxmox n'est, comme pour Kubernetes, pas limité aux administrateurs : tout compte connecté y a accès depuis cette page." }
     ]
@@ -118,6 +171,8 @@ export const MANUAL_SECTIONS = [
       { type: 'p', text: "Outils installés : détecte quels outils de développement courants (Git, Docker, kubectl, Node.js, Helm, Terraform...) sont présents sur la machine qui héberge le backend de la console — pas sur vos postes de développement individuels, que la console ne peut pas inspecter." },
       { type: 'p', text: "Générateur de mots de passe : génération 100% locale au navigateur (jamais envoyée au serveur), longueur et jeu de caractères réglables. Adapté à un mot de passe de dev ponctuel." },
       { type: 'note', text: "Pour des secrets de production, utilisez un vrai gestionnaire de secrets dédié (Vault, Bitwarden/Vaultwarden...) plutôt que ce générateur — volontairement simple, il ne remplace pas un coffre-fort avec contrôle d'accès et rotation." },
+      { type: 'p', text: "Mots de passe (en bas de la page Développement) : deux niveaux distincts. « Mots de passe dev » sont visibles par tout développeur connecté (accès aux machines de test partagées). « Mots de passe production » sont réservés aux administrateurs, générés automatiquement côté serveur (256 caractères aléatoires) et ne sont révélés qu'après avoir retapé votre propre mot de passe (ré-authentification)." },
+      { type: 'note', text: "Cette ré-authentification (« step-up ») protège contre une session laissée ouverte sur un poste partagé : même connecté, il faut reconfirmer son mot de passe pour voir un secret de production en clair." },
       { type: 'note', text: "Approuver une merge request GitLab ou une pull request GitHub directement depuis la console est également accessible à tout compte connecté, pas seulement aux administrateurs — seule la mise en miroir GitLab → GitHub (Paramètres → Services Git) est réservée aux administrateurs." }
     ]
   },
@@ -132,6 +187,17 @@ export const MANUAL_SECTIONS = [
         'IPs bannies : bloque une adresse IPv4 à l\'entrée de la console (toutes les routes, avant même l\'authentification). Impossible de bannir sa propre adresse — la console refuse pour éviter un verrouillage accidentel.',
         'Scans réseau : lance un vrai scan nmap (-sV) sur une IP ou un CIDR IPv4 de votre choix, pour découvrir les hôtes et services exposés sur votre réseau. Nécessite que nmap soit installé sur la machine qui héberge le backend ; sinon un message clair l\'indique. Limité à 5 scans toutes les 10 minutes (opération coûteuse en CPU/réseau).'
       ] }
+    ]
+  },
+  {
+    id: 'storage',
+    group: 'Modules opérationnels',
+    title: 'Stockage',
+    blocks: [
+      { type: 'p', text: "Suivi déclaratif de vos volumes, NAS, pools ZFS et partages : ce n'est pas une intégration qui interroge un outil de stockage en direct, mais une liste que vous tenez à jour manuellement (nom, type, hôte, capacité et espace utilisé en Go)." },
+      { type: 'p', text: "Chaque volume affiche une barre de progression colorée selon le taux de remplissage (vert en dessous de 65 %, orange entre 65 et 85 %, rouge au-delà de 85 %) et une icône d'alerte au-delà de 85 %." },
+      { type: 'p', text: "Le panneau « Sauvegardes de la console » (administrateurs uniquement) résume les sauvegardes de la base Nexus elle-même (nexus.db) — nombre conservé, taille totale, date de la plus récente — avec un lien direct vers Paramètres → Système pour les gérer." },
+      { type: 'note', text: "Rien n'est mesuré automatiquement ici : si la capacité ou l'utilisation affichée est fausse, c'est qu'elle n'a pas été mise à jour depuis le dernier changement réel sur le volume concerné." }
     ]
   },
   {
