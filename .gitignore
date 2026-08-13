@@ -29,3 +29,4 @@ frontend/playwright-report/
 *.log
 
 base-dev
+.playwright-mcp

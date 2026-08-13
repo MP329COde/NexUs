@@ -4,30 +4,17 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
+import { useClosablePopover } from '../../hooks/useClosablePopover.js';
 import { api } from '../../lib/apiClient.js';
-import { DOMAINS } from '../../config/domains.js';
 import Icon from '../ui/Icon.jsx';
 import BrandMark from '../ui/BrandMark.jsx';
+import { toneFromScore, toneLabel, buildDomainRows } from '../../lib/health.js';
 
 const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: 'info' };
 const DOMAIN_ICON = { k8s: 'k8s', dev: 'dev', net: 'net', inf: 'inf', mon: 'mon', sec: 'sec', sto: 'inf' };
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 const SEARCH_SHORTCUT = IS_MAC ? '⌘K' : 'Ctrl K';
-
-function toneFromScore(score) {
-  if (score === null) return 'mut';
-  if (score >= 90) return 'ok';
-  if (score >= 60) return 'warn';
-  return 'crit';
-}
-
-function toneLabel(score) {
-  if (score === null) return 'Aucune donnée';
-  if (score >= 90) return 'Optimal';
-  if (score >= 60) return 'Dégradation mineure';
-  return 'Dégradation critique';
-}
 
 export default function Header({ title, onOpenSearch, onOpenNav }) {
   const navigate = useNavigate();
@@ -37,19 +24,16 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
   const [userMenu, setUserMenu] = useState(false);
   const [notifMenu, setNotifMenu] = useState(false);
   const [healthMenu, setHealthMenu] = useState(false);
+  const health = useClosablePopover(healthMenu, setHealthMenu);
+  const notif = useClosablePopover(notifMenu, setNotifMenu);
+  const userP = useClosablePopover(userMenu, setUserMenu);
   const { data } = useApi(() => api.get('/status/overview'), [], { pollMs: 20000 });
   const { data: consoleData } = useApi(() => api.get('/console'), []);
   const score = data?.score ?? null;
   const tone = toneFromScore(score);
 
   const integrations = data?.integrations || [];
-  const domainRows = DOMAINS.filter((d) => !['home', 'adm'].includes(d.id)).map((d) => {
-    const entries = integrations.filter((e) => e.domain === d.id);
-    const configured = entries.filter((e) => e.configured);
-    const healthy = configured.filter((e) => e.ok);
-    const domainScore = configured.length ? Math.round((healthy.length / configured.length) * 100) : null;
-    return { ...d, entries, configured, healthy, score: domainScore, tone: toneFromScore(domainScore) };
-  });
+  const domainRows = buildDomainRows(integrations);
   const healthyDomains = domainRows.filter((d) => d.score !== null && d.score >= 90).length;
   const activeAlerts = integrations.filter((e) => e.configured && !e.ok).length;
 
@@ -72,7 +56,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={health.ref}>
           <div
             onClick={() => { setHealthMenu((v) => !v); setUserMenu(false); setNotifMenu(false); }}
             title="Santé globale de l'infrastructure"
@@ -84,8 +68,8 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
             <span className="mono">{score === null ? '—' : `${score} %`}</span>
           </div>
 
-          {healthMenu && (
-            <div className="card" style={{ position: 'absolute', top: 44, left: 0, width: 420, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: 'popIn .15s ease both' }}>
+          {health.visible && (
+            <div className="card" style={{ position: 'absolute', top: 44, left: 0, width: 420, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${health.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-soft)' }}>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>Résumé de l'infrastructure</div>
@@ -112,7 +96,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
                 {domainRows.map((d) => (
                   <div
                     key={d.id}
-                    onClick={() => { navigate(d.path); setHealthMenu(false); }}
+                    onClick={() => { navigate(d.path); health.close(); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: '1px solid var(--border-soft)', cursor: 'pointer' }}
                   >
                     <Icon name={DOMAIN_ICON[d.id] || 'info'} size={15} style={{ flex: 'none', color: 'var(--text-faint)' }} />
@@ -169,13 +153,13 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           <Icon name={resolved === 'dark' ? 'sun' : 'moon'} size={16} />
         </button>
 
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={notif.ref}>
           <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn" style={{ position: 'relative' }}>
             <Icon name="bell" size={16} />
             {history.length > 0 && <span style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: 'var(--tone-crit-dot)', border: '2px solid var(--surface)' }} />}
           </button>
-          {notifMenu && (
-            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 340, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: 'popIn .15s ease both' }}>
+          {notif.visible && (
+            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 340, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${notif.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', borderBottom: '1px solid var(--border-soft)' }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Notifications</span>
                 {history.length > 0 && <span onClick={clearHistory} style={{ fontSize: 11.5, color: 'var(--text-faint)', cursor: 'pointer' }}>Effacer</span>}
@@ -197,7 +181,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           )}
         </div>
 
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={userP.ref}>
           <div
             onClick={() => { setUserMenu((v) => !v); setNotifMenu(false); }}
             title={user?.name}
@@ -209,8 +193,8 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           >
             {user?.avatarEmoji || (user?.name || '??').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
           </div>
-          {userMenu && (
-            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 280, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: 'popIn .15s ease both' }}>
+          {userP.visible && (
+            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 280, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${userP.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 15px', borderBottom: '1px solid var(--border-soft)' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: user?.avatarEmoji ? 'var(--border-soft)' : (user?.avatarColor || '#0F172A'), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: user?.avatarEmoji ? 17 : 13, fontWeight: 600, flex: 'none' }}>
                   {user?.avatarEmoji || (user?.name || '??').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
