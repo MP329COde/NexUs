@@ -32,8 +32,28 @@ function Block({ block }) {
   return null;
 }
 
+const GROUP_ORDER = ['Démarrage', 'Modules opérationnels', 'Administration', 'Sécurité & déploiement'];
+const GROUP_DESCRIPTIONS = {
+  'Démarrage': "Ce qu'il faut savoir avant toute chose : ce que fait la console, le tout premier accès, les rôles, et comment lire la page d'accueil.",
+  'Modules opérationnels': "Le fonctionnement de chaque domaine métier au quotidien : intégrations, Kubernetes, réseaux, infrastructure, développement, monitoring et cybersécurité.",
+  'Administration': "Les pages réservées aux administrateurs, pour gérer les comptes, les groupes, l'inventaire, la plateforme, l'identité et le système.",
+  'Sécurité & déploiement': "Ce qui protège la console, comment la déployer en production, et quoi faire en cas de problème."
+};
+
+function groupSections(sections) {
+  const byGroup = new Map();
+  for (const s of sections) {
+    const g = s.group || 'Autres';
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(s);
+  }
+  const orderedKeys = [...GROUP_ORDER.filter((g) => byGroup.has(g)), ...[...byGroup.keys()].filter((g) => !GROUP_ORDER.includes(g))];
+  return orderedKeys.map((g) => ({ group: g, sections: byGroup.get(g) }));
+}
+
 export default function ManualPage() {
   const [active, setActive] = useState(MANUAL_SECTIONS[0].id);
+  const groups = groupSections(MANUAL_SECTIONS);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -52,28 +72,32 @@ export default function ManualPage() {
 
   return (
     <div className="manual-layout" style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
-      <nav className="manual-toc" style={{ flex: 'none', width: 220, position: 'sticky', top: 24 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: 10 }}>Sommaire</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {MANUAL_SECTIONS.map((s) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              style={{
-                fontSize: 12.5,
-                padding: '7px 10px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: active === s.id ? 600 : 500,
-                color: active === s.id ? 'var(--primary)' : 'var(--text-muted)',
-                background: active === s.id ? 'var(--primary-soft)' : 'transparent',
-                transition: 'all .12s ease'
-              }}
-            >
-              {s.title}
-            </a>
-          ))}
-        </div>
+      <nav className="manual-toc" style={{ flex: 'none', width: 220, position: 'sticky', top: 24, maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }}>
+        {groups.map((g, gi) => (
+          <div key={g.group} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: 10, marginTop: gi === 0 ? 0 : 4 }}>{g.group}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {g.sections.map((s) => (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  style={{
+                    fontSize: 12.5,
+                    padding: '7px 10px',
+                    borderRadius: 8,
+                    textDecoration: 'none',
+                    fontWeight: active === s.id ? 600 : 500,
+                    color: active === s.id ? 'var(--primary)' : 'var(--text-muted)',
+                    background: active === s.id ? 'var(--primary-soft)' : 'transparent',
+                    transition: 'all .12s ease'
+                  }}
+                >
+                  {s.title}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="manual-content" style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
@@ -88,11 +112,21 @@ export default function ManualPage() {
           </div>
         </div>
 
-        {MANUAL_SECTIONS.map((s) => (
-          <section key={s.id} id={s.id} className="card" style={{ padding: '18px 20px', marginBottom: 16, scrollMarginTop: 24 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 12px' }}>{s.title}</h2>
-            {s.blocks.map((b, i) => <Block key={i} block={b} />)}
-          </section>
+        {groups.map((g, gi) => (
+          <div key={g.group}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: gi === 0 ? '0 0 14px' : '30px 0 14px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--primary)' }}>{g.group}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 3, lineHeight: 1.5 }}>{GROUP_DESCRIPTIONS[g.group]}</div>
+              </div>
+            </div>
+            {g.sections.map((s) => (
+              <section key={s.id} id={s.id} className="card" style={{ padding: '18px 20px', marginBottom: 16, scrollMarginTop: 24 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 12px' }}>{s.title}</h2>
+                {s.blocks.map((b, i) => <Block key={i} block={b} />)}
+              </section>
+            ))}
+          </div>
         ))}
       </div>
     </div>
