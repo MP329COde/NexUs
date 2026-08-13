@@ -29,6 +29,10 @@ router.post('/:id/apply', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 router.post('/:id/test', asyncHandler(async (req, res) => res.json({ ok: true, result: await proxyService.testConnection(req.params.id) })));
+router.post('/:id/critical', asyncHandler(async (req, res) => {
+  const proxy = proxyService.setCritical(req.params.id, req.body?.critical);
+  res.json({ ok: true, proxy });
+}));
 router.post('/:id/attach-frontend', asyncHandler(async (req, res) => {
   const result = await proxyService.attachToFrontend(req.params.id, req.body?.frontendName);
   logAudit(req, 'proxy.attach_frontend', { proxyId: req.params.id, frontendName: req.body?.frontendName });

@@ -6,6 +6,7 @@ import { listCatalog, previewScript } from '../services/agentCatalog.js';
 import { runScript } from '../services/sshExecutor.js';
 import { getConsolePublicKey } from '../utils/sshKeypair.js';
 import { logAudit } from '../services/auditService.js';
+import { getCriticalHostsSnapshot } from '../services/hostMetricsService.js';
 
 // Gestion des hôtes et installation d'agents : réservée aux administrateurs.
 // L'exécution est toujours limitée au catalogue fermé (agentCatalog.js).
@@ -24,10 +25,17 @@ router.get('/', (req, res) => {
   res.json({ ok: true, items: store.listHosts() });
 });
 
+// Snapshot des hôtes marqués critiques (rôle, joignabilité TCP, CPU/RAM/uptime
+// si lisibles via SSH) : alimente la carte "Hôtes critiques" de la page
+// d'accueil. Voir services/hostMetricsService.js pour le rafraîchissement.
+router.get('/critical', (req, res) => {
+  res.json({ ok: true, ...getCriticalHostsSnapshot() });
+});
+
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, address, port, sshUser } = req.body || {};
+  const { name, address, port, sshUser, role, critical } = req.body || {};
   if (!name || !address) return res.status(400).json({ ok: false, error: 'Nom et adresse requis' });
-  const host = store.createHost({ name, address, port, sshUser });
+  const host = store.createHost({ name, address, port, sshUser, role, critical });
   logAudit(req, 'host.create', { hostId: host.id, address: host.address });
   res.status(201).json({ ok: true, host });
 }));

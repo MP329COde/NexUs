@@ -56,6 +56,12 @@ export async function attachToFrontend(id, frontendName) {
   return attachProxyToFrontend(proxy, frontendName);
 }
 
+export function setCritical(id, critical) {
+  const updated = store.setProxyState(id, { critical: Boolean(critical) });
+  if (!updated) throw notFound(id);
+  return updated;
+}
+
 export async function testConnection(id) {
   const proxy = store.getProxy(id);
   if (!proxy) throw notFound(id);

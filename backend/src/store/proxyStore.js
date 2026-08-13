@@ -21,6 +21,7 @@ export function createProxy(payload) {
     certResolver: payload.certResolver || 'default',
     engine: payload.engine || 'traefik', // traefik | haproxy
     status: 'draft', // draft | applied | error
+    critical: false, // marqué "important" : affiché dans la disponibilité 24h de l'accueil
     lastError: null,
     lastAppliedAt: null,
     createdAt: new Date().toISOString()

@@ -42,6 +42,11 @@ export default function NetworkPage() {
     domains.reload();
   }
 
+  async function toggleCritical(p) {
+    await api.post(`/proxies/${p.id}/critical`, { critical: !p.critical });
+    proxies.reload();
+  }
+
   return (
     <>
       <PageHeader
@@ -57,7 +62,7 @@ export default function NetworkPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
         <Panel title="Reverse proxies" sub="Gérés depuis la console (Traefik ou HAProxy)" span={12}>
           <DataTable
-            columns={['Nom', 'Domaine', 'Cible', 'Moteur', 'TLS', 'Statut', 'Actions']}
+            columns={['Nom', 'Domaine', 'Cible', 'Moteur', 'TLS', 'Statut', 'Important', 'Actions']}
             rows={proxies.data?.items}
             emptyTitle="Aucun proxy configuré"
             emptyHint="Créez votre premier proxy pour exposer un service derrière un domaine."
@@ -72,6 +77,11 @@ export default function NetworkPage() {
                   <span className={`badge badge-${p.status === 'applied' ? 'ok' : p.status === 'error' ? 'crit' : 'mut'}`}>
                     <span className="dot" />{p.status}
                   </span>
+                </td>
+                <td>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Affiché dans la disponibilité 24h de l'accueil">
+                    <input type="checkbox" checked={Boolean(p.critical)} onChange={() => toggleCritical(p)} />
+                  </label>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 6 }}>

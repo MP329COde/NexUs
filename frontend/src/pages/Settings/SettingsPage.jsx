@@ -4,6 +4,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
 import IntegrationPanel from './IntegrationPanel.jsx';
+import InfrastructureStatusPanel from './InfrastructureStatusPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
 import GroupsPanel from './GroupsPanel.jsx';
 import InventoryPanel from './InventoryPanel.jsx';
@@ -54,6 +55,7 @@ export default function SettingsPage() {
 
       {tab === 'integrations' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(360px,1fr))', gap: 16 }}>
+          <div style={{ gridColumn: '1 / -1' }}><InfrastructureStatusPanel /></div>
           {INTEGRATION_ORDER.map((key) => (
             <IntegrationPanel
               key={key}

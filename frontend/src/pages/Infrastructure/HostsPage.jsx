@@ -22,6 +22,17 @@ export default function HostsPage() {
     hosts.reload();
   }
 
+  async function toggleCritical(h) {
+    await api.put(`/hosts/${h.id}`, { critical: !h.critical });
+    hosts.reload();
+  }
+
+  async function saveRole(h, role) {
+    if (role === (h.role || '')) return;
+    await api.put(`/hosts/${h.id}`, { role });
+    hosts.reload();
+  }
+
   function copyKey() {
     navigator.clipboard.writeText(publicKey.data?.publicKey || '');
     notify('Clé publique copiée dans le presse-papiers', { type: 'ok' });
@@ -51,7 +62,7 @@ export default function HostsPage() {
 
         <Panel title="Hôtes gérés" span={12}>
           <DataTable
-            columns={['Nom', 'Adresse', 'Utilisateur SSH', 'Dernière installation', 'Actions']}
+            columns={['Nom', 'Adresse', 'Rôle', 'Critique', 'Dernière installation', 'Actions']}
             rows={hosts.data?.items}
             emptyTitle="Aucun hôte enregistré"
             emptyHint="Ajoutez un hôte pour pouvoir y installer un agent depuis le catalogue."
@@ -59,7 +70,20 @@ export default function HostsPage() {
               <tr key={h.id}>
                 <td style={{ fontWeight: 500 }}>{h.name}</td>
                 <td className="mono muted">{h.address}:{h.port}</td>
-                <td className="mono muted">{h.sshUser}</td>
+                <td>
+                  <input
+                    className="input"
+                    defaultValue={h.role || ''}
+                    onBlur={(e) => saveRole(h, e.target.value)}
+                    placeholder="Rôle"
+                    style={{ height: 26, fontSize: 11.5, padding: '0 8px', width: 150 }}
+                  />
+                </td>
+                <td>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={Boolean(h.critical)} onChange={() => toggleCritical(h)} />
+                  </label>
+                </td>
                 <td>
                   {h.lastInstall
                     ? <span className={`badge badge-${h.lastInstall.ok ? 'ok' : 'crit'}`}><span className="dot" />{h.lastInstall.agentId}</span>

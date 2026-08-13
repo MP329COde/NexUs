@@ -12,7 +12,7 @@ export function getHost(id) {
   return listHosts().find((h) => h.id === id);
 }
 
-export function createHost({ name, address, port, sshUser }) {
+export function createHost({ name, address, port, sshUser, role, critical }) {
   const hosts = listHosts();
   const host = {
     id: uuid(),
@@ -20,6 +20,8 @@ export function createHost({ name, address, port, sshUser }) {
     address,
     port: port ? Number(port) : 22,
     sshUser: sshUser || 'root',
+    role: role || '',
+    critical: Boolean(critical),
     lastInstall: null, // { agentId, ok, message, at }
     createdAt: new Date().toISOString()
   };

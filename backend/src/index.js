@@ -10,6 +10,8 @@ import { logger } from './utils/logger.js';
 import { ensureBootstrapAdmin } from './store/usersStore.js';
 import { scheduleDailyBackups } from './services/backupService.js';
 import { scheduleHourlyStatusSnapshot } from './services/statusHistoryService.js';
+import { scheduleCriticalHostsRefresh } from './services/hostMetricsService.js';
+import { scheduleInfraLoadSampling } from './services/infraLoadService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -18,6 +20,8 @@ import router from './routes/index.js';
 ensureBootstrapAdmin();
 scheduleDailyBackups();
 scheduleHourlyStatusSnapshot();
+scheduleCriticalHostsRefresh();
+scheduleInfraLoadSampling();
 
 const app = express();
 

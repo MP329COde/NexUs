@@ -25,7 +25,7 @@ const DEFAULTS = {
   volumes: [], // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
   firewall: {}, // réglages du pare-feu applicatif : blocage automatique (voir store/firewallStore.js)
   vault: [], // secrets dev/prod chiffrés au repos (voir store/vaultStore.js)
-  statusHistory: [] // relevés horaires de santé, alimente la disponibilité 24h/30j (voir services/statusHistoryService.js)
+  serviceHistory: [] // relevés horaires par service marqué important (voir services/statusHistoryService.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

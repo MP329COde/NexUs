@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 
 export default function HostFormDialog({ onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', address: '', port: 22, sshUser: 'root' });
+  const [form, setForm] = useState({ name: '', address: '', port: 22, sshUser: 'root', role: '', critical: false });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +35,15 @@ export default function HostFormDialog({ onClose, onSaved }) {
           <div style={{ flex: 1 }}><Field label="Port SSH"><input className="input" type="number" value={form.port} onChange={(e) => set('port', e.target.value)} /></Field></div>
           <div style={{ flex: 1 }}><Field label="Utilisateur SSH"><input className="input" value={form.sshUser} onChange={(e) => set('sshUser', e.target.value)} /></Field></div>
         </div>
+
+        <Field label="Rôle" hint="Affiché dans la carte « Hôtes critiques » de l'accueil, ex. « Hyperviseur Proxmox »">
+          <input className="input" value={form.role} onChange={(e) => set('role', e.target.value)} placeholder="Hyperviseur Proxmox" />
+        </Field>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.critical} onChange={(e) => set('critical', e.target.checked)} />
+          Hôte critique — affiché sur la page d'accueil pour tous les administrateurs
+        </label>
 
         <p className="faint" style={{ fontSize: 11.5, margin: '4px 0 12px' }}>
           Assurez-vous d'avoir copié la clé publique de la console dans le fichier authorized_keys de cet utilisateur avant d'installer un agent.
