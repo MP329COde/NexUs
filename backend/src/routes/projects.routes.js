@@ -133,9 +133,9 @@ router.get('/:id/vault', (req, res) => {
 router.post('/:id/vault', asyncHandler(async (req, res) => {
   const project = store.getProject(req.params.id);
   if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-  const { label, username, secret, notes } = req.body || {};
+  const { label, username, secret, notes, url } = req.body || {};
   if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et secret requis' });
-  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: project.id, label, username, secret, notes, actor: req.user });
+  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: project.id, label, username, secret, notes, url, actor: req.user });
   logAudit(req, 'vault.create', { id: entry.id, tier: 'project', projectId: project.id, label });
   res.status(201).json({ ok: true, entry });
 }));

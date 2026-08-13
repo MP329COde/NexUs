@@ -33,7 +33,7 @@ export function listVaultEntries(tier, projectId) {
   return entries.filter((e) => e.tier === tier && (tier !== 'project' || e.projectId === projectId)).map(toMeta);
 }
 
-export function createVaultEntry({ tier, label, username, secret, notes, actor, projectId }) {
+export function createVaultEntry({ tier, label, username, secret, notes, actor, projectId, url }) {
   const entries = readStore('vault') || [];
   const entry = {
     id: uuid(),
@@ -41,6 +41,7 @@ export function createVaultEntry({ tier, label, username, secret, notes, actor, 
     projectId: tier === 'project' ? projectId : null,
     label,
     username: username || '',
+    url: url || '',
     notes: notes || '',
     secretEncrypted: encryptSecret(secret),
     createdBy: actor?.email || null,
@@ -49,6 +50,25 @@ export function createVaultEntry({ tier, label, username, secret, notes, actor, 
   entries.push(entry);
   writeStore('vault', entries);
   return toMeta(entry);
+}
+
+// Modifie uniquement les métadonnées (label, utilisateur, URL d'accès,
+// notes) — jamais le secret lui-même, qui ne se change qu'en recréant
+// l'entrée (évite qu'une modification anodine ne finisse par exposer ou
+// écraser silencieusement un secret existant).
+export function updateVaultEntry(id, { label, username, url, notes }) {
+  const entries = readStore('vault') || [];
+  const idx = entries.findIndex((e) => e.id === id);
+  if (idx === -1) return null;
+  entries[idx] = {
+    ...entries[idx],
+    ...(label !== undefined ? { label } : {}),
+    ...(username !== undefined ? { username } : {}),
+    ...(url !== undefined ? { url } : {}),
+    ...(notes !== undefined ? { notes } : {})
+  };
+  writeStore('vault', entries);
+  return toMeta(entries[idx]);
 }
 
 export function deleteVaultEntry(id) {

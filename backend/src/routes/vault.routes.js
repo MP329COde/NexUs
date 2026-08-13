@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import {
-  listVaultEntries, createVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret
+  listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret
 } from '../store/vaultStore.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
@@ -31,17 +31,17 @@ router.get('/prod', requireRole('admin'), (req, res) => {
 });
 
 router.post('/dev', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { label, username, secret, notes } = req.body || {};
+  const { label, username, secret, notes, url } = req.body || {};
   if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et mot de passe requis' });
-  const entry = createVaultEntry({ tier: 'dev', label, username, secret, notes, actor: req.user });
+  const entry = createVaultEntry({ tier: 'dev', label, username, secret, notes, url, actor: req.user });
   logAudit(req, 'vault.create', { id: entry.id, tier: 'dev', label });
   res.status(201).json({ ok: true, entry });
 }));
 
 router.post('/prod', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { label, username, notes } = req.body || {};
+  const { label, username, notes, url } = req.body || {};
   if (!label) return res.status(400).json({ ok: false, error: 'Nom requis' });
-  const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, actor: req.user });
+  const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, url, actor: req.user });
   logAudit(req, 'vault.create', { id: entry.id, tier: 'prod', label });
   res.status(201).json({ ok: true, entry });
 }));
@@ -66,6 +66,18 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
   const secret = revealVaultEntry(entry.id);
   logAudit(req, 'vault.reveal', { id: entry.id, tier: entry.tier, label: entry.label });
   res.json({ ok: true, secret });
+}));
+
+router.put('/:id', asyncHandler(async (req, res) => {
+  const entry = findVaultEntry(req.params.id);
+  if (!entry || !canAccessProjectEntry(entry, req.user)) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  if (entry.tier !== 'project' && req.user.role !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+  }
+  const { label, username, url, notes } = req.body || {};
+  const updated = updateVaultEntry(entry.id, { label, username, url, notes });
+  logAudit(req, 'vault.update', { id: entry.id, tier: entry.tier, label: updated.label });
+  res.json({ ok: true, entry: updated });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
