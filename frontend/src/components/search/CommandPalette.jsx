@@ -3,17 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { api } from '../../lib/apiClient.js';
 import { STATIC_SEARCH_ITEMS } from '../../config/searchIndex.js';
+import { fuzzyScore, queryTerms } from '../../lib/fuzzyMatch.js';
 import Icon from '../ui/Icon.jsx';
-
-function normalize(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-function matches(item, q) {
-  if (!q) return true;
-  const haystack = normalize(`${item.label} ${item.keywords || ''}`);
-  return q.split(/\s+/).every((term) => haystack.includes(term));
-}
 
 export default function CommandPalette({ open, onClose }) {
   const { user } = useAuth();
@@ -48,20 +39,59 @@ export default function CommandPalette({ open, onClose }) {
           }
         } catch { /* hôtes non disponibles */ }
       }
+      // Dépôts Git (GitLab/GitHub) : mêmes endpoints que le panneau Projets de
+      // Développement, pour que la recherche globale couvre aussi les dépôts.
+      try {
+        const res = await api.get('/gitlab/projects');
+        for (const p of res.items || []) {
+          items.push({ label: p.name, group: 'Dépôts', path: '/deployments', keywords: `dépôt repo gitlab git ${p.path || ''}` });
+        }
+      } catch { /* gitlab non disponible */ }
+      try {
+        const res = await api.get('/github/repos');
+        for (const p of res.items || []) {
+          items.push({ label: p.fullName || p.name, group: 'Dépôts', path: '/deployments', keywords: `dépôt repo github git ${p.fullName || ''}` });
+        }
+      } catch { /* github non disponible */ }
+      // Données personnelles / plateforme : les entrées "Mon compte" et
+      // "Paramètres — Plateforme" existent déjà en statique, on enrichit juste
+      // leurs mots-clés avec les valeurs réelles (nom, e-mail, organisation)
+      // pour que taper son propre nom ou le nom de l'organisation les trouve.
+      if (user?.name || user?.email) {
+        items.push({ label: 'Mon compte', group: 'Pages', path: '/account', keywords: `profil compte personnel données personnelles ${user?.name || ''} ${user?.email || ''}`, __dedupeKey: 'account-enriched' });
+      }
+      try {
+        const res = await api.get('/console');
+        if (res?.name) {
+          items.push({ label: 'Paramètres — Plateforme', group: 'Administration', path: '/settings?tab=platform', keywords: `organisation plateforme fuseau horaire langue ${res.name}`, adminOnly: true, __dedupeKey: 'platform-enriched' });
+        }
+      } catch { /* console non disponible */ }
       if (!cancelled) setDynamicItems(items);
     }
     loadDynamic();
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [open, user?.role]);
+  }, [open, user?.role, user?.name, user?.email]);
 
-  const allItems = useMemo(
-    () => [...STATIC_SEARCH_ITEMS.filter((i) => !i.adminOnly || user?.role === 'admin'), ...dynamicItems],
-    [dynamicItems, user?.role]
-  );
+  const allItems = useMemo(() => {
+    const dedupeKeys = new Set(dynamicItems.filter((i) => i.__dedupeKey).map((i) => i.__dedupeKey));
+    const staticFiltered = STATIC_SEARCH_ITEMS.filter((i) => {
+      if (i.adminOnly && user?.role !== 'admin') return false;
+      if (i.path === '/account' && dedupeKeys.has('account-enriched')) return false;
+      if (i.path === '/settings?tab=platform' && dedupeKeys.has('platform-enriched')) return false;
+      return true;
+    });
+    return [...staticFiltered, ...dynamicItems.filter((i) => !i.adminOnly || user?.role === 'admin')];
+  }, [dynamicItems, user?.role]);
 
   const results = useMemo(() => {
-    const q = normalize(query.trim());
-    return allItems.filter((i) => matches(i, q)).slice(0, 40);
+    const terms = queryTerms(query);
+    if (terms.length === 0) return allItems.slice(0, 40);
+    return allItems
+      .map((item) => ({ item, score: fuzzyScore(`${item.label} ${item.keywords || ''}`, terms) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 40)
+      .map((r) => r.item);
   }, [allItems, query]);
 
   useEffect(() => setActiveIndex(0), [query]);
@@ -105,7 +135,7 @@ export default function CommandPalette({ open, onClose }) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher une page, un proxy, un hôte…"
+            placeholder="Rechercher une page, un proxy, un hôte, un dépôt…"
             style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)' }}
           />
           <span style={{ fontSize: 11, color: 'var(--text-faintest)', flex: 'none' }}>Échap</span>
