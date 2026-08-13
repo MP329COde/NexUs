@@ -19,7 +19,19 @@ import InfrastructureLayout from './pages/Infrastructure/InfrastructureLayout.js
 import ProxmoxPage from './pages/Infrastructure/ProxmoxPage.jsx';
 import HostsPage from './pages/Infrastructure/HostsPage.jsx';
 import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
-import DeploymentsPage from './pages/Deployments/DeploymentsPage.jsx';
+import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
+import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
+import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
+import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
+import GitReposPage from './pages/Deployments/GitReposPage.jsx';
+import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
+import PipelinesPage from './pages/Deployments/PipelinesPage.jsx';
+import EnvironmentsPage from './pages/Deployments/EnvironmentsPage.jsx';
+import ReleasesPage from './pages/Deployments/ReleasesPage.jsx';
+import TestsQualityPage from './pages/Deployments/TestsQualityPage.jsx';
+import ContainersPage from './pages/Deployments/ContainersPage.jsx';
+import ImagesRegistryPage from './pages/Deployments/ImagesRegistryPage.jsx';
+import SecretsPage from './pages/Deployments/SecretsPage.jsx';
 import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
@@ -41,7 +53,25 @@ export const router = createBrowserRouter([
         element: <RequireAuth><Shell /></RequireAuth>,
         children: [
           { index: true, element: <HomePage />, handle: { title: 'Vue générale' } },
-          { path: 'deployments', element: <DeploymentsPage />, handle: { title: 'Développement' } },
+          {
+            path: 'deployments',
+            element: <DeploymentsLayout />,
+            handle: { title: 'Développement' },
+            children: [
+              { index: true, element: <ToolsAccessPage /> },
+              { path: 'projects', element: <ProjectsPage /> },
+              { path: 'projects/:id', element: <ProjectDetailPage /> },
+              { path: 'repos', element: <GitReposPage /> },
+              { path: 'reviews', element: <CodeReviewsPage /> },
+              { path: 'pipelines', element: <PipelinesPage /> },
+              { path: 'environments', element: <EnvironmentsPage /> },
+              { path: 'releases', element: <ReleasesPage /> },
+              { path: 'tests', element: <TestsQualityPage /> },
+              { path: 'containers', element: <ContainersPage /> },
+              { path: 'images', element: <ImagesRegistryPage /> },
+              { path: 'secrets', element: <SecretsPage /> }
+            ]
+          },
           {
             path: 'infrastructure',
             element: <InfrastructureLayout />,

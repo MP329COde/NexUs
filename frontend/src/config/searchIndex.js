@@ -3,7 +3,17 @@
 // non-admin, comme le fait déjà DomainNav pour la navigation latérale.
 export const STATIC_SEARCH_ITEMS = [
   { label: 'Vue générale', group: 'Pages', path: '/', keywords: 'accueil dashboard tableau de bord santé' },
-  { label: 'Développement', group: 'Pages', path: '/deployments', keywords: 'dev gitlab github argocd ci cd pipeline' },
+  { label: 'Développement — Accès aux outils', group: 'Pages', path: '/deployments', keywords: 'dev outils raccourcis chaîne' },
+  { label: 'Développement — Projets', group: 'Pages', path: '/deployments/projects', keywords: 'projets équipe backlog tâches' },
+  { label: 'Développement — Dépôts Git', group: 'Pages', path: '/deployments/repos', keywords: 'gitlab github dépôt repo forge étiquette rôle' },
+  { label: 'Développement — Revue de code', group: 'Pages', path: '/deployments/reviews', keywords: 'merge request pull request relecture revue mr pr' },
+  { label: 'Développement — Pipelines CI/CD', group: 'Pages', path: '/deployments/pipelines', keywords: 'ci cd pipeline exécution build' },
+  { label: 'Développement — Environnements', group: 'Pages', path: '/deployments/environments', keywords: 'dev staging production intégration versions promotion' },
+  { label: 'Développement — Déploiements', group: 'Pages', path: '/deployments/releases', keywords: 'argocd kubernetes application déploiement' },
+  { label: 'Développement — Tests & qualité', group: 'Pages', path: '/deployments/tests', keywords: 'tests couverture qualité' },
+  { label: 'Développement — Conteneurs', group: 'Pages', path: '/deployments/containers', keywords: 'docker kubernetes pods conteneurs logs' },
+  { label: 'Développement — Images & registry', group: 'Pages', path: '/deployments/images', keywords: 'images registry cve signature' },
+  { label: 'Développement — Secrets & variables', group: 'Pages', path: '/deployments/secrets', keywords: 'vault secrets mots de passe variables' },
   { label: 'Infrastructure — Proxmox', group: 'Pages', path: '/infrastructure', keywords: 'vm lxc nœuds proxmox' },
   { label: 'Infrastructure — Hôtes & agents', group: 'Pages', path: '/infrastructure/hosts', keywords: 'ssh agent wazuh node exporter', adminOnly: true },
   { label: 'Kubernetes', group: 'Pages', path: '/kubernetes', keywords: 'k8s cluster pods namespaces deployments logs' },
