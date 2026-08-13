@@ -7,28 +7,38 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
-const EMPTY_DEV_FORM = { label: '', username: '', secret: '', notes: '' };
-const EMPTY_PROD_FORM = { label: '', username: '', notes: '' };
+const EMPTY_DEV_FORM = { label: '', username: '', secret: '', url: '', notes: '' };
+const EMPTY_PROD_FORM = { label: '', username: '', url: '', notes: '' };
+
+// Icône selon le schéma de l'URL d'accès (ssh://, rdp://, http(s)://...) —
+// purement indicative, aucune analyse de sécurité de l'URL n'est faite ici.
+function accessIcon(url) {
+  if (/^ssh:\/\//i.test(url)) return 'terminal';
+  if (/^rdp:\/\//i.test(url)) return 'server';
+  return 'externalLink';
+}
 
 // Gestionnaire de mots de passe à deux niveaux : mots de passe dev (machines
 // de test partagées, lisibles par tout développeur) et mots de passe prod
 // (générés automatiquement côté serveur, réservés aux admins, révélés
-// seulement après avoir retapé son propre mot de passe).
-export default function VaultPanel() {
+// seulement après avoir retapé son propre mot de passe). Chaque entrée peut
+// porter une URL d'accès (SSH, RDP, console web...) pour ouvrir directement
+// la machine concernée, sans jongler entre le coffre et un terminal.
+export default function VaultPanel({ refreshKey }) {
   const { user } = useAuth();
   return (
     <>
-      <VaultTier tier="dev" title="Mots de passe dev" sub="Accès aux machines de test/dev — visible par tous les développeurs" canManage={user?.role === 'admin'} />
+      <VaultTier tier="dev" title="Mots de passe dev" sub="Accès aux machines de test/dev — visible par tous les développeurs" canManage={user?.role === 'admin'} refreshKey={refreshKey} />
       {user?.role === 'admin' && (
-        <VaultTier tier="prod" title="Mots de passe production" sub="Générés automatiquement (256 caractères), révélés après triple vérification" canManage requireStepUp tripleVerify />
+        <VaultTier tier="prod" title="Mots de passe production" sub="Générés automatiquement (256 caractères), révélés après triple vérification" canManage requireStepUp tripleVerify refreshKey={refreshKey} />
       )}
     </>
   );
 }
 
-function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify }) {
+function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, refreshKey }) {
   const notify = useNotify();
-  const { data, reload } = useApi(() => api.get(`/vault/${tier}`), []);
+  const { data, reload } = useApi(() => api.get(`/vault/${tier}`), [refreshKey]);
   const [form, setForm] = useState(tier === 'dev' ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
   const [busy, setBusy] = useState(false);
   const [revealing, setRevealing] = useState(null); // { id, label } en attente de mot de passe
@@ -36,6 +46,7 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [stepUpPassword, setStepUpPassword] = useState('');
   const [revealed, setRevealed] = useState({}); // { [id]: secret }
+  const [editing, setEditing] = useState(null); // entrée en cours d'édition (métadonnées seulement)
 
   const items = data?.items || [];
 
@@ -46,6 +57,21 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
       await api.post(`/vault/${tier}`, form);
       notify(`${form.label} ajouté`, { type: 'ok' });
       setForm(tier === 'dev' ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.put(`/vault/${editing.id}`, { label: editing.label, username: editing.username, url: editing.url, notes: editing.notes });
+      notify('Entrée mise à jour', { type: 'ok' });
+      setEditing(null);
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
@@ -88,6 +114,10 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
     notify('Copié dans le presse-papiers', { type: 'ok' });
   }
 
+  function openAccess(entry) {
+    window.open(entry.url, '_blank', 'noreferrer');
+  }
+
   return (
     <Panel title={title} sub={sub} span={canManage ? 6 : 12}>
       <div style={{ padding: 6 }}>
@@ -98,7 +128,15 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: 13 }}>{entry.label}</div>
                 <div className="faint" style={{ fontSize: 11 }}>{entry.username || '—'}</div>
+                {entry.url && (
+                  <div className="mono" style={{ fontSize: 10.5, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{entry.url}</div>
+                )}
               </div>
+              {entry.url && (
+                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => openAccess(entry)} title="Ouvrir un accès direct">
+                  <Icon name={accessIcon(entry.url)} size={12} /> Ouvrir
+                </span>
+              )}
               {revealed[entry.id] === undefined ? (
                 <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => startReveal(entry)}>
                   <Icon name="shield" size={12} /> Révéler
@@ -109,9 +147,14 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
                 </span>
               )}
               {canManage && (
-                <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => remove(entry)}>
-                  <Icon name="trash" size={12} />
-                </span>
+                <>
+                  <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }} onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
+                    <Icon name="edit" size={12} />
+                  </span>
+                  <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => remove(entry)}>
+                    <Icon name="trash" size={12} />
+                  </span>
+                </>
               )}
             </div>
 
@@ -123,6 +166,29 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
           </div>
         ))}
       </div>
+
+      {editing && (
+        <Modal title={`Modifier « ${editing.label} »`} sub="Le secret lui-même ne peut pas être changé ici — supprimez puis recréez l'entrée." onClose={() => setEditing(null)} width={420}>
+          <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <input className="input" required value={editing.label} onChange={(e) => setEditing((s) => ({ ...s, label: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Utilisateur</label>
+              <input className="input" value={editing.username} onChange={(e) => setEditing((s) => ({ ...s, username: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès</label>
+              <input className="input" value={editing.url} onChange={(e) => setEditing((s) => ({ ...s, url: e.target.value }))} placeholder="ssh://user@10.0.0.12" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <span className="btn-outline" onClick={() => setEditing(null)}>Annuler</span>
+              <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {revealing && !tripleVerify && (
         <Modal title={`Révéler « ${revealing.label} »`} sub="Ré-authentification requise" onClose={() => { setRevealing(null); setStepUpPassword(''); }} width={380}>
@@ -185,6 +251,7 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify })
           {tier === 'dev' && (
             <input className="input" type="password" autoComplete="new-password" placeholder="Mot de passe" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} style={{ flex: '1 1 140px' }} />
           )}
+          <input className="input" autoComplete="off" placeholder="URL d'accès (optionnel) — ssh://…" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} style={{ flex: '1 1 200px' }} />
           <button className="btn" type="submit" disabled={busy} style={{ flex: 'none' }}>
             {busy ? 'Ajout…' : tier === 'prod' ? 'Générer & ajouter' : 'Ajouter'}
           </button>
