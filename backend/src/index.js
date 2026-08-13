@@ -9,6 +9,7 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { ensureBootstrapAdmin } from './store/usersStore.js';
 import { scheduleDailyBackups } from './services/backupService.js';
+import { scheduleHourlyStatusSnapshot } from './services/statusHistoryService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -16,6 +17,7 @@ import router from './routes/index.js';
 
 ensureBootstrapAdmin();
 scheduleDailyBackups();
+scheduleHourlyStatusSnapshot();
 
 const app = express();
 

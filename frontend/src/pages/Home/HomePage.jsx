@@ -5,9 +5,13 @@ import Panel from '../../components/ui/Panel.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import StatusBadge, { toneFromStatus } from '../../components/ui/StatusBadge.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import AvailabilityDots from '../../components/ui/AvailabilityDots.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { toneFromScore, toneLabel, buildDomainRows } from '../../lib/health.js';
+
+const DOMAIN_LABEL_ICON = { k8s: 'k8s', dev: 'dev', net: 'net', inf: 'inf', mon: 'mon', sec: 'sec', sto: 'inf' };
 
 const DOMAIN_PATH = { k8s: '/kubernetes', dev: '/deployments', net: '/network', inf: '/infrastructure', mon: '/monitoring', sec: '/security' };
 const DOMAIN_ICON = { k8s: 'k8s', dev: 'dev', net: 'net', inf: 'inf', mon: 'mon', sec: 'sec' };
@@ -21,6 +25,7 @@ const ACTION_LABELS = {
 export default function HomePage() {
   const { user } = useAuth();
   const { data, loading, error, reload } = useApi(() => api.get('/status/overview'), [], { pollMs: 15000 });
+  const { data: history } = useApi(() => api.get('/status/history'), [], { pollMs: 60000 });
   const [spinning, setSpinning] = useState(false);
   const [alerts, setAlerts] = useState(null);
   const audit = useApi(() => (user?.role === 'admin' ? api.get('/audit?limit=6') : Promise.resolve(null)), [user?.role]);
@@ -29,6 +34,10 @@ export default function HomePage() {
   const okCount = data?.integrations.filter((i) => i.ok).length ?? 0;
   const warnCount = data?.integrations.filter((i) => i.configured && !i.ok).length ?? 0;
   const notConfiguredCount = (data?.integrations.length ?? 0) - configuredCount;
+
+  const domainRows = buildDomainRows(data?.integrations || []);
+  const healthyDomains = domainRows.filter((d) => d.score !== null && d.score >= 90).length;
+  const globalTone = toneFromScore(data?.score ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +86,60 @@ export default function HomePage() {
       </div>
 
       {error && <div className="card" style={{ padding: 14, marginBottom: 16, color: 'var(--tone-crit-fg)', fontSize: 13 }}>{error}</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <Panel title="Résumé de l'infrastructure" sub={`Moyenne pondérée des ${domainRows.length} domaines supervisés`} span={8}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)' }}>
+            <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-soft)' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Domaines sains</div>
+              <div className="mono" style={{ fontSize: 17, fontWeight: 700, marginTop: 3 }}>{healthyDomains} / {domainRows.length}</div>
+            </div>
+            <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-soft)' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Alertes actives</div>
+              <div className="mono" style={{ fontSize: 17, fontWeight: 700, marginTop: 3, color: warnCount > 0 ? 'var(--tone-crit-fg)' : 'inherit' }}>{warnCount}</div>
+            </div>
+            <div style={{ flex: 1, padding: '12px 16px' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Disponibilité 30 j</div>
+              <div className="mono" style={{ fontSize: 17, fontWeight: 700, marginTop: 3 }}>{history?.daily30?.global === null || history?.daily30?.global === undefined ? '—' : `${history.daily30.global} %`}</div>
+            </div>
+            <div style={{ flex: 'none', padding: '12px 16px', textAlign: 'right', borderLeft: '1px solid var(--border-soft)' }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: `var(--tone-${globalTone}-fg)`, lineHeight: 1.1 }}>{data ? `${data.score} %` : '—'}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>{toneLabel(data?.score ?? null)}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {domainRows.map((d) => (
+              <Link
+                key={d.id}
+                to={d.path}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)', textDecoration: 'none', color: 'inherit' }}
+              >
+                <Icon name={DOMAIN_LABEL_ICON[d.id] || 'info'} size={15} style={{ flex: 'none', color: 'var(--text-faint)' }} />
+                <span style={{ fontSize: 12.5, fontWeight: 500, width: 130, flex: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
+                  {d.score !== null && <div style={{ width: `${d.score}%`, height: '100%', borderRadius: 999, background: `var(--tone-${d.tone}-dot)` }} />}
+                </div>
+                <span className="mono" style={{ fontSize: 12, fontWeight: 600, width: 34, flex: 'none', textAlign: 'right', color: d.score === null ? 'var(--text-faint)' : `var(--tone-${d.tone}-fg)` }}>
+                  {d.score === null ? '—' : `${d.score}%`}
+                </span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', width: 60, flex: 'none', textAlign: 'right' }}>
+                  {history?.daily30?.byDomain?.[d.id] !== undefined && history?.daily30?.byDomain?.[d.id] !== null ? `${history.daily30.byDomain[d.id]}% 30j` : '—'}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-faint)', width: 110, flex: 'none', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {d.entries.length === 0 ? 'Aucune intégration' : `${d.healthy.length} / ${d.configured.length} services`}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Disponibilité 24h" sub="Un point par heure écoulée" span={4}>
+          <div style={{ padding: 16 }}>
+            <AvailabilityDots hourly={history?.hourly} />
+          </div>
+        </Panel>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <Panel title="Répartition des intégrations" sub="Par état actuel" span={4}>
