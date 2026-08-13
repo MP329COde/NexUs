@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 import BrandMark from '../../components/ui/BrandMark.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import InstallScreen from './InstallScreen.jsx';
 
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
 const LANGUAGES = [['fr', 'Français'], ['en', 'English']];
@@ -21,32 +22,41 @@ const LIGHT_VARS = {
   '--tone-crit-fg': '#BE123C', '--tone-crit-bg': '#FFF1F2', '--tone-crit-br': '#FECDD3'
 };
 
+// `installable: true` doit rester synchronisé avec le catalogue fermé de
+// scripts d'installation côté backend (services/serviceCatalog.js) : seuls
+// les outils qui s'installent via une image Docker officielle en conteneur
+// unique y figurent. Les autres (plusieurs conteneurs liés, ou service SaaS
+// comme GitHub) n'ont pas d'installation automatisée depuis cet assistant —
+// la carte reste sélectionnable pour la configuration ultérieure côté
+// Paramètres, mais sans le formulaire machine/SSH.
 const TOOL_CATALOG = [
-  { id: 'wazuh', label: 'Wazuh', category: 'Sécurité · SIEM & XDR' },
-  { id: 'prometheus', label: 'Prometheus', category: 'Supervision · métriques' },
-  { id: 'grafana', label: 'Grafana', category: 'Supervision · tableaux de bord' },
-  { id: 'loki', label: 'Loki', category: 'Supervision · journaux' },
-  { id: 'alertmanager', label: 'Alertmanager', category: 'Supervision · routage d’alertes' },
-  { id: 'zabbix', label: 'Zabbix', category: 'Supervision · agents SNMP' },
-  { id: 'uptime-kuma', label: 'Uptime Kuma', category: 'Supervision · sondes externes' },
-  { id: 'netdata', label: 'Netdata', category: 'Supervision · temps réel hôte' },
-  { id: 'influxdb', label: 'InfluxDB', category: 'Supervision · séries temporelles' },
-  { id: 'suricata', label: 'Suricata', category: 'Sécurité · IDS/IPS' },
-  { id: 'crowdsec', label: 'CrowdSec', category: 'Sécurité · réputation & bans' },
-  { id: 'openvas', label: 'OpenVAS', category: 'Sécurité · scan de vulnérabilités' },
-  { id: 'trivy', label: 'Trivy', category: 'Sécurité · analyse d’images' },
-  { id: 'vault', label: 'HashiCorp Vault', category: 'Sécurité · coffre de secrets' },
-  { id: 'step-ca', label: 'step-ca', category: 'Sécurité · autorité de certification' },
-  { id: 'authentik', label: 'Authentik', category: 'Identité · OIDC & SAML' },
-  { id: 'keycloak', label: 'Keycloak', category: 'Identité · OIDC' },
-  { id: 'gitea', label: 'Gitea', category: 'Git · forge auto-hébergée' },
-  { id: 'gitlab', label: 'GitLab', category: 'Git · forge & CI' },
-  { id: 'github', label: 'GitHub', category: 'Git · miroirs & actions' },
-  { id: 'woodpecker', label: 'Woodpecker CI', category: 'Livraison · pipelines' },
-  { id: 'jenkins', label: 'Jenkins', category: 'Livraison · pipelines' },
-  { id: 'sonarqube', label: 'SonarQube', category: 'Livraison · qualité de code' },
-  { id: 'harbor', label: 'Harbor', category: 'Livraison · registre d’images' }
+  { id: 'wazuh', label: 'Wazuh', category: 'Sécurité · SIEM & XDR', url: 'https://wazuh.com', installable: false },
+  { id: 'prometheus', label: 'Prometheus', category: 'Supervision · métriques', url: 'https://prometheus.io', installable: true },
+  { id: 'grafana', label: 'Grafana', category: 'Supervision · tableaux de bord', url: 'https://grafana.com', installable: true },
+  { id: 'loki', label: 'Loki', category: 'Supervision · journaux', url: 'https://grafana.com/oss/loki/', installable: true },
+  { id: 'alertmanager', label: 'Alertmanager', category: 'Supervision · routage d’alertes', url: 'https://prometheus.io/docs/alerting/latest/alertmanager/', installable: true },
+  { id: 'zabbix', label: 'Zabbix', category: 'Supervision · agents SNMP', url: 'https://www.zabbix.com', installable: false },
+  { id: 'uptime-kuma', label: 'Uptime Kuma', category: 'Supervision · sondes externes', url: 'https://github.com/louislam/uptime-kuma', installable: true },
+  { id: 'netdata', label: 'Netdata', category: 'Supervision · temps réel hôte', url: 'https://www.netdata.cloud', installable: true },
+  { id: 'influxdb', label: 'InfluxDB', category: 'Supervision · séries temporelles', url: 'https://www.influxdata.com', installable: true },
+  { id: 'suricata', label: 'Suricata', category: 'Sécurité · IDS/IPS', url: 'https://suricata.io', installable: false },
+  { id: 'crowdsec', label: 'CrowdSec', category: 'Sécurité · réputation & bans', url: 'https://www.crowdsec.net', installable: true },
+  { id: 'openvas', label: 'OpenVAS', category: 'Sécurité · scan de vulnérabilités', url: 'https://www.greenbone.net/en/community-edition/', installable: false },
+  { id: 'trivy', label: 'Trivy', category: 'Sécurité · analyse d’images', url: 'https://trivy.dev', installable: true },
+  { id: 'vault', label: 'HashiCorp Vault', category: 'Sécurité · coffre de secrets', url: 'https://www.vaultproject.io', installable: true },
+  { id: 'step-ca', label: 'step-ca', category: 'Sécurité · autorité de certification', url: 'https://smallstep.com/docs/step-ca/', installable: true },
+  { id: 'authentik', label: 'Authentik', category: 'Identité · OIDC & SAML', url: 'https://goauthentik.io', installable: false },
+  { id: 'keycloak', label: 'Keycloak', category: 'Identité · OIDC', url: 'https://www.keycloak.org', installable: true },
+  { id: 'gitea', label: 'Gitea', category: 'Git · forge auto-hébergée', url: 'https://about.gitea.com', installable: true },
+  { id: 'gitlab', label: 'GitLab', category: 'Git · forge & CI', url: 'https://about.gitlab.com', installable: true },
+  { id: 'github', label: 'GitHub', category: 'Git · miroirs & actions', url: 'https://github.com', installable: false },
+  { id: 'woodpecker', label: 'Woodpecker CI', category: 'Livraison · pipelines', url: 'https://woodpecker-ci.org', installable: true },
+  { id: 'jenkins', label: 'Jenkins', category: 'Livraison · pipelines', url: 'https://www.jenkins.io', installable: true },
+  { id: 'sonarqube', label: 'SonarQube', category: 'Livraison · qualité de code', url: 'https://www.sonarsource.com/products/sonarqube/', installable: true },
+  { id: 'harbor', label: 'Harbor', category: 'Livraison · registre d’images', url: 'https://goharbor.io', installable: false }
 ];
+
+const DEFAULT_TOOL_CONFIG = { address: '', port: 22, sshUser: 'root', autoInstall: false };
 
 const STEPS = [
   { key: 'organisation', label: 'Organisation', title: 'Organisation', sub: "Identité de l'instance, langue et fuseau horaire." },
@@ -62,7 +72,8 @@ const DEFAULT_FORM = {
   admin: { name: '', username: '', email: '', password: '', confirm: '', mfaRequired: true, backupCodes: true },
   identity: { provider: 'authentik-oidc', mfaRequired: true, sessionMinutes: 480, minPasswordLength: 14, allowedNetworks: '', logoutOnInactivity: true },
   git: { forge: 'gitea', baseUrl: '', org: '', token: '', defaultBranch: 'main', autoWebhooks: true, outboundMirrors: false, requireSignedCommits: false },
-  tools: ['wazuh', 'prometheus', 'grafana', 'gitea']
+  tools: ['wazuh', 'prometheus', 'grafana', 'gitea'],
+  toolsConfig: {}
 };
 
 export default function SetupPage() {
@@ -70,6 +81,7 @@ export default function SetupPage() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   function setSection(section, patch) {
     setForm((f) => ({ ...f, [section]: { ...f[section], ...patch } }));
@@ -79,6 +91,13 @@ export default function SetupPage() {
     setForm((f) => ({
       ...f,
       tools: f.tools.includes(id) ? f.tools.filter((t) => t !== id) : [...f.tools, id]
+    }));
+  }
+
+  function setToolConfig(id, patch) {
+    setForm((f) => ({
+      ...f,
+      toolsConfig: { ...f.toolsConfig, [id]: { ...DEFAULT_TOOL_CONFIG, ...f.toolsConfig[id], ...patch } }
     }));
   }
 
@@ -131,10 +150,20 @@ export default function SetupPage() {
     setBusy(true);
     try {
       await api.post('/setup', form);
-      // Rechargement complet plutôt qu'une navigation client : SetupGate ne
-      // revérifie needsSetup qu'au montage, ce qui provoquerait sinon une
-      // redirection immédiate vers /setup juste après sa propre résolution.
-      window.location.href = '/';
+      // La session est posée par /api/setup lui-même : les appels suivants
+      // (installation automatique) sont donc déjà authentifiés.
+      const toInstall = form.tools
+        .map((id) => ({ id, cfg: form.toolsConfig[id] }))
+        .filter(({ id, cfg }) => TOOL_CATALOG.find((t) => t.id === id)?.installable && cfg?.autoInstall && cfg?.address?.trim());
+
+      if (toInstall.length === 0) {
+        // Rechargement complet plutôt qu'une navigation client : SetupGate ne
+        // revérifie needsSetup qu'au montage, ce qui provoquerait sinon une
+        // redirection immédiate vers /setup juste après sa propre résolution.
+        window.location.href = '/';
+        return;
+      }
+      setInstalling(true);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -143,6 +172,13 @@ export default function SetupPage() {
   }
 
   const current = STEPS[step];
+
+  if (installing) {
+    const jobsToStart = form.tools
+      .map((id) => ({ id, label: TOOL_CATALOG.find((t) => t.id === id)?.label || id, ...form.toolsConfig[id] }))
+      .filter((t) => TOOL_CATALOG.find((cat) => cat.id === t.id)?.installable && t.autoInstall && t.address?.trim());
+    return <InstallScreen tools={jobsToStart} onFinish={() => { window.location.href = '/'; }} />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#0B1120' }}>
@@ -213,12 +249,14 @@ export default function SetupPage() {
         </div>
 
         <div style={{ flex: 1, padding: '28px 40px', overflowY: 'auto' }}>
-          <div style={{ maxWidth: 620 }}>
+          <div style={{ maxWidth: current.key === 'tools' ? 900 : 620 }}>
             {current.key === 'organisation' && <StepOrganisation form={form.organisation} set={(p) => setSection('organisation', p)} />}
             {current.key === 'admin' && <StepAdmin form={form.admin} set={(p) => setSection('admin', p)} />}
             {current.key === 'identity' && <StepIdentity form={form.identity} set={(p) => setSection('identity', p)} />}
             {current.key === 'git' && <StepGit form={form.git} set={(p) => setSection('git', p)} />}
-            {current.key === 'tools' && <StepTools selected={form.tools} onToggle={toggleTool} />}
+            {current.key === 'tools' && (
+              <StepTools selected={form.tools} onToggle={toggleTool} toolsConfig={form.toolsConfig} setToolConfig={setToolConfig} />
+            )}
             {current.key === 'ready' && <StepReady form={form} />}
 
             {error && (
@@ -361,29 +399,110 @@ function StepGit({ form, set }) {
   );
 }
 
-function StepTools({ selected, onToggle }) {
+function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
+  const selectedTools = TOOL_CATALOG.filter((t) => selected.includes(t.id));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-      {TOOL_CATALOG.map((tool) => {
-        const checked = selected.includes(tool.id);
-        return (
-          <label
-            key={tool.id}
-            className="card"
-            style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, cursor: 'pointer',
-              borderColor: checked ? 'var(--primary)' : 'var(--border)',
-              background: checked ? 'var(--primary-soft)' : 'var(--surface)'
-            }}
-          >
-            <input type="checkbox" checked={checked} onChange={() => onToggle(tool.id)} style={{ marginTop: 2 }} />
-            <span>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{tool.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.category}</div>
-            </span>
-          </label>
-        );
-      })}
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+        {TOOL_CATALOG.map((tool) => {
+          const checked = selected.includes(tool.id);
+          return (
+            <label
+              key={tool.id}
+              className="card"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, cursor: 'pointer', position: 'relative',
+                borderColor: checked ? 'var(--primary)' : 'var(--border)',
+                background: checked ? 'var(--primary-soft)' : 'var(--surface)'
+              }}
+            >
+              <input type="checkbox" checked={checked} onChange={() => onToggle(tool.id)} style={{ marginTop: 2 }} />
+              <span style={{ flex: 1, paddingRight: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{tool.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.category}</div>
+              </span>
+              <button
+                type="button"
+                title={`Ouvrir le site officiel de ${tool.label}`}
+                aria-label={`Ouvrir le site officiel de ${tool.label}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(tool.url, '_blank', 'noopener,noreferrer'); }}
+                style={{
+                  position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-faint)', padding: 2, display: 'flex'
+                }}
+              >
+                <Icon name="externalLink" size={14} />
+              </button>
+            </label>
+          );
+        })}
+      </div>
+
+      {selectedTools.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Configuration des outils sélectionnés</div>
+          <p className="faint" style={{ fontSize: 11.5, margin: '0 0 12px' }}>
+            Renseignez la machine cible pour installer automatiquement un outil à l'ouverture de la
+            console, ou laissez « Installer automatiquement » désactivé pour le configurer plus tard
+            manuellement depuis Paramètres.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {selectedTools.map((tool) => (
+              <ToolConfigRow
+                key={tool.id}
+                tool={tool}
+                cfg={{ ...DEFAULT_TOOL_CONFIG, ...toolsConfig[tool.id] }}
+                setCfg={(patch) => setToolConfig(tool.id, patch)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolConfigRow({ tool, cfg, setCfg }) {
+  if (!tool.installable) {
+    return (
+      <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tool.label}</div>
+          <div className="faint" style={{ fontSize: 11 }}>
+            Installation automatique indisponible pour cet outil (déploiement multi-conteneurs ou
+            service en ligne) — à configurer manuellement depuis Paramètres une fois la console ouverte.
+          </div>
+        </div>
+        <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, whiteSpace: 'nowrap', flex: 'none' }}>
+          Documentation officielle
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="card" style={{ padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: cfg.autoInstall ? 12 : 0 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tool.label}</div>
+        <Toggle
+          label="Installer automatiquement"
+          hint="Déploie l'image Docker officielle sur la machine indiquée via la clé SSH de la console"
+          checked={cfg.autoInstall}
+          onChange={(v) => setCfg({ autoInstall: v })}
+        />
+      </div>
+      {cfg.autoInstall && (
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10 }}>
+          <Field label="Adresse IP / hôte" hint="Machine cible, doit accepter la clé SSH de la console">
+            <input className="input" placeholder="10.0.0.42" value={cfg.address} onChange={(e) => setCfg({ address: e.target.value })} />
+          </Field>
+          <Field label="Port SSH">
+            <input className="input" type="number" min={1} max={65535} value={cfg.port} onChange={(e) => setCfg({ port: Number(e.target.value) })} />
+          </Field>
+          <Field label="Utilisateur SSH">
+            <input className="input" value={cfg.sshUser} onChange={(e) => setCfg({ sshUser: e.target.value })} />
+          </Field>
+        </div>
+      )}
     </div>
   );
 }
