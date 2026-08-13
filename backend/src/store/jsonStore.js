@@ -25,7 +25,12 @@ const DEFAULTS = {
   volumes: [], // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
   firewall: {}, // réglages du pare-feu applicatif : blocage automatique (voir store/firewallStore.js)
   vault: [], // secrets dev/prod chiffrés au repos (voir store/vaultStore.js)
-  serviceHistory: [] // relevés horaires par service marqué important (voir services/statusHistoryService.js)
+  serviceHistory: [], // relevés horaires par service marqué important (voir services/statusHistoryService.js)
+  projects: [], // projets de développement + membres (voir store/projectsStore.js)
+  tasks: [], // tâches/backlog par projet (voir store/projectsStore.js)
+  repoMeta: [], // étiquettes/rôle attachés à un dépôt Git réel (voir store/repoMetaStore.js)
+  reviewAssignments: [], // relecteurs auto-assignés sur une MR/PR (voir store/reviewStore.js)
+  shortcuts: [] // raccourcis ajoutés manuellement vers des outils externes (voir store/shortcutsStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

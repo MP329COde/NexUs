@@ -11,28 +11,28 @@ export async function getStatus() {
   const c = client();
   if (!c) return notConfigured('GitLab');
   const user = await request(c.http, { method: 'GET', url: '/user' }, 'GitLab');
-  return { configured: true, ok: true, message: `Connecté en tant que ${user.username}` };
+  return { configured: true, ok: true, message: `Connecté en tant que ${user.username}`, baseUrl: c.cfg.baseUrl };
 }
 
 export async function listProjects() {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: '/projects', params: { membership: true, per_page: 50, order_by: 'last_activity_at' } }, 'GitLab');
-  return data.map((p) => ({ id: p.id, name: p.name, path: p.path_with_namespace, defaultBranch: p.default_branch, webUrl: p.web_url, lastActivity: p.last_activity_at }));
+  return data.map((p) => ({ id: p.id, name: p.name, path: p.path_with_namespace, defaultBranch: p.default_branch, webUrl: p.web_url, lastActivity: p.last_activity_at, visibility: p.visibility }));
 }
 
 export async function listPipelines(projectId) {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/pipelines`, params: { per_page: 20 } }, 'GitLab');
-  return data.map((p) => ({ id: p.id, ref: p.ref, status: p.status, sha: p.sha?.slice(0, 8), createdAt: p.created_at, webUrl: p.web_url }));
+  return data.map((p) => ({ id: p.id, ref: p.ref, status: p.status, sha: p.sha?.slice(0, 8), createdAt: p.created_at, updatedAt: p.updated_at, duration: p.duration ?? null, webUrl: p.web_url }));
 }
 
 export async function listMergeRequests(projectId) {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/merge_requests`, params: { state: 'opened', per_page: 20 } }, 'GitLab');
-  return data.map((m) => ({ iid: m.iid, title: m.title, sourceBranch: m.source_branch, targetBranch: m.target_branch, author: m.author?.username, webUrl: m.web_url }));
+  return data.map((m) => ({ iid: m.iid, title: m.title, sourceBranch: m.source_branch, targetBranch: m.target_branch, author: m.author?.username, webUrl: m.web_url, createdAt: m.created_at }));
 }
 
 // Revue de code approuvée directement depuis la console — équivaut à

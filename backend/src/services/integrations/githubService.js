@@ -61,6 +61,7 @@ export async function listWorkflowRuns(owner, repo) {
     branch: r.head_branch,
     sha: r.head_sha?.slice(0, 8),
     createdAt: r.created_at,
+    updatedAt: r.updated_at,
     webUrl: r.html_url
   }));
 }
@@ -69,7 +70,7 @@ export async function listPullRequests(owner, repo) {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/pulls`, params: { state: 'open', per_page: 20 } }, 'GitHub');
-  return data.map((p) => ({ number: p.number, title: p.title, sourceBranch: p.head?.ref, targetBranch: p.base?.ref, author: p.user?.login, webUrl: p.html_url }));
+  return data.map((p) => ({ number: p.number, title: p.title, sourceBranch: p.head?.ref, targetBranch: p.base?.ref, author: p.user?.login, webUrl: p.html_url, createdAt: p.created_at }));
 }
 
 // Revue de code approuvée directement depuis la console, sans quitter

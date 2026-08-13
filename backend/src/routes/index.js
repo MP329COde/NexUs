@@ -30,6 +30,11 @@ import securityRoutes from './security.routes.js';
 import volumesRoutes from './volumes.routes.js';
 import devtoolsRoutes from './devtools.routes.js';
 import vaultRoutes from './vault.routes.js';
+import projectsRoutes from './projects.routes.js';
+import reposRoutes from './repos.routes.js';
+import reviewsRoutes from './reviews.routes.js';
+import pipelinesRoutes from './pipelines.routes.js';
+import shortcutsRoutes from './shortcuts.routes.js';
 
 const router = Router();
 
@@ -64,5 +69,10 @@ router.use('/security', securityRoutes);
 router.use('/volumes', volumesRoutes);
 router.use('/devtools', devtoolsRoutes);
 router.use('/vault', vaultRoutes);
+router.use('/projects', projectsRoutes);
+router.use('/repos', reposRoutes);
+router.use('/reviews', reviewsRoutes);
+router.use('/pipelines', pipelinesRoutes);
+router.use('/shortcuts', shortcutsRoutes);
 
 export default router;

@@ -11,7 +11,7 @@ export async function getStatus() {
   const c = client();
   if (!c) return notConfigured('Argo CD');
   const data = await request(c.http, { method: 'GET', url: '/api/v1/applications' }, 'Argo CD');
-  return { configured: true, ok: true, message: `${data.items?.length ?? 0} applications suivies` };
+  return { configured: true, ok: true, message: `${data.items?.length ?? 0} applications suivies`, baseUrl: c.cfg.baseUrl };
 }
 
 export async function listApplications() {
