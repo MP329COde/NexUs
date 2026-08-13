@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import { useApi } from '../../hooks/useApi.js';
@@ -10,12 +11,15 @@ import PasswordGeneratorPanel from './PasswordGeneratorPanel.jsx';
 // services/vaultService.js), chiffré au repos. Les secrets dev sont visibles
 // par tout compte connecté, avec le nom du projet ; les secrets production
 // exigent une triple vérification (avertissement, mot de passe, confirmation
-// explicite) avant d'être révélés en clair.
+// explicite) avant d'être révélés en clair. `refreshKey` relie le générateur
+// (qui peut enregistrer directement dans un coffre) à la liste du dessus,
+// qui sinon resterait affichée telle quelle jusqu'au prochain rechargement.
 export default function SecretsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const dev = useApi(() => api.get('/vault/dev'), []);
-  const prod = useApi(() => (isAdmin ? api.get('/vault/prod') : Promise.resolve(null)), [isAdmin]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const dev = useApi(() => api.get('/vault/dev'), [refreshKey]);
+  const prod = useApi(() => (isAdmin ? api.get('/vault/prod') : Promise.resolve(null)), [isAdmin, refreshKey]);
 
   const devCount = dev.data?.items.length ?? 0;
   const prodCount = prod.data?.items.length ?? 0;
@@ -33,8 +37,8 @@ export default function SecretsPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
-        <VaultPanel />
-        <PasswordGeneratorPanel />
+        <VaultPanel refreshKey={refreshKey} />
+        <PasswordGeneratorPanel onSaved={() => setRefreshKey((k) => k + 1)} />
       </div>
     </>
   );
