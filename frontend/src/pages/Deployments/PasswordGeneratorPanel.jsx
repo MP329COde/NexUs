@@ -48,7 +48,7 @@ export default function PasswordGeneratorPanel() {
       <div style={{ padding: 16 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <input className="input mono" readOnly value={value} style={{ flex: 1, fontSize: 13 }} />
-          <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }} onClick={copy}><Icon name="edit" size={13} />Copier</span>
+          <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }} onClick={copy}><Icon name="copy" size={13} />Copier</span>
           <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }} onClick={() => regenerate()}><Icon name="refresh" size={13} />Régénérer</span>
         </div>
 
