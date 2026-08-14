@@ -16,6 +16,7 @@ import { syncApplication, rollbackApplication, getApplicationHistory } from '../
 import * as jobService from '../services/jobService.js';
 import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
+import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -461,6 +462,19 @@ router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler
   if (!link) return;
   if (!link.argocdAppName) return res.json({ ok: true, items: [] });
   res.json({ ok: true, items: await getApplicationHistory(link.argocdAppName) });
+}));
+
+// Chemin réseau/déploiement complet d'une application : Git → Argo CD →
+// Kubernetes → reverse proxy (voir deploymentService.getPipeline, qui
+// existait déjà côté global sans portée projet — routes/deployments.routes.js
+// GET /:id/pipeline, conservée telle quelle pour compatibilité). Répond au
+// besoin explicite du brief de partir d'un déploiement et comprendre son
+// exposition réseau jusqu'au service, dans le contexte du projet plutôt que
+// par un id de lien deviné.
+router.get('/:id/deployments/:linkId/pipeline', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  res.json({ ok: true, ...(await getDeploymentPipeline(link.id)) });
 }));
 
 // --- Tâches : lecture/écriture ouverte à tout membre du projet (travail
