@@ -8,6 +8,9 @@ import { getFirewallSettings, setAutoBlockEnabled } from '../store/firewallStore
 import { logAudit } from '../services/auditService.js';
 import * as jobService from '../services/jobService.js';
 import { pool } from '../db/pool.js';
+import { listCertificates } from '../services/integrations/certManagerService.js';
+import { getAgentSummary } from '../services/integrations/wazuhService.js';
+import { listGlobal as listIncidents } from '../store/incidentStore.js';
 
 // IPs bannies + scans réseau : réservé aux administrateurs.
 const router = Router();
@@ -63,6 +66,54 @@ router.post('/scans', asyncHandler(async (req, res) => {
   const scan = await runScan(target);
   logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
   res.status(201).json({ ok: true, scan });
+}));
+
+// Tableau de sécurité global : agrège ce qui est réellement disponible
+// aujourd'hui — certificats cert-manager proches de l'expiration (30 jours),
+// incidents ouverts groupés par gravité (tous projets confondus), agents
+// Wazuh déconnectés, dernier scan réseau. Chaque source est interrogée
+// indépendamment (Promise.allSettled) : l'échec d'une intégration
+// n'empêche jamais d'afficher les autres. Une section reste vide/absente
+// plutôt que d'inventer une donnée quand l'intégration correspondante n'est
+// pas configurée.
+router.get('/overview', asyncHandler(async (req, res) => {
+  const [certsResult, wazuhResult] = await Promise.allSettled([
+    listCertificates(),
+    getAgentSummary()
+  ]);
+
+  let expiringCertificates = [];
+  if (certsResult.status === 'fulfilled') {
+    const in30Days = Date.now() + 30 * 24 * 3600_000;
+    expiringCertificates = certsResult.value
+      .filter((c) => c.notAfter && new Date(c.notAfter).getTime() < in30Days)
+      .map((c) => ({ ...c, expiresInDays: Math.round((new Date(c.notAfter).getTime() - Date.now()) / 86_400_000) }))
+      .sort((a, b) => a.expiresInDays - b.expiresInDays);
+  }
+
+  const wazuhDisconnected = wazuhResult.status === 'fulfilled' ? (wazuhResult.value.summary?.disconnected || 0) : 0;
+
+  const incidentsBySeverity = pool
+    ? await (async () => {
+        const [critical, high, medium, low] = await Promise.all([
+          listIncidents({ severity: 'critical', status: 'open', limit: 50 }),
+          listIncidents({ severity: 'high', status: 'open', limit: 50 }),
+          listIncidents({ severity: 'medium', status: 'open', limit: 50 }),
+          listIncidents({ severity: 'low', status: 'open', limit: 50 })
+        ]);
+        return { critical, high, medium, low };
+      })()
+    : { critical: [], high: [], medium: [], low: [] };
+
+  res.json({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    expiringCertificates,
+    wazuhDisconnected,
+    incidentsBySeverity,
+    lastScan: getLastScan(),
+    relationalCoreConfigured: Boolean(pool)
+  });
 }));
 
 router.get('/traffic', (req, res) => {

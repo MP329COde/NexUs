@@ -375,7 +375,8 @@ export async function listCertManagerCertificates(namespace) {
       secretName: item.spec?.secretName,
       dnsNames: item.spec?.dnsNames || [],
       ready: (item.status?.conditions || []).find((c2) => c2.type === 'Ready')?.status === 'True',
-      renewalTime: item.status?.renewalTime
+      renewalTime: item.status?.renewalTime,
+      notAfter: item.status?.notAfter
     }));
   });
 }
