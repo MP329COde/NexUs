@@ -43,7 +43,10 @@ const GROUPS = [
   },
   {
     label: 'Sécurité',
-    items: [{ to: '/deployments/secrets', label: 'Secrets & variables', icon: 'lock' }]
+    items: [
+      { to: '/deployments/secrets', label: 'Secrets & variables', icon: 'lock' },
+      { to: '/deployments/supply-chain', label: 'Supply Chain Security', icon: 'shield' }
+    ]
   }
 ];
 

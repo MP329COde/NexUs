@@ -33,6 +33,7 @@ import TestsQualityPage from './pages/Deployments/TestsQualityPage.jsx';
 import ContainersPage from './pages/Deployments/ContainersPage.jsx';
 import ImagesRegistryPage from './pages/Deployments/ImagesRegistryPage.jsx';
 import SecretsPage from './pages/Deployments/SecretsPage.jsx';
+import SupplyChainPage from './pages/Deployments/SupplyChainPage.jsx';
 import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
@@ -70,7 +71,8 @@ export const router = createBrowserRouter([
               { path: 'tests', element: <TestsQualityPage /> },
               { path: 'containers', element: <ContainersPage /> },
               { path: 'images', element: <ImagesRegistryPage /> },
-              { path: 'secrets', element: <SecretsPage /> }
+              { path: 'secrets', element: <SecretsPage /> },
+              { path: 'supply-chain', element: <SupplyChainPage /> }
             ]
           },
           {

@@ -14,6 +14,8 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Développement — Conteneurs', group: 'Pages', path: '/deployments/containers', keywords: 'docker kubernetes pods conteneurs logs' },
   { label: 'Développement — Images & registry', group: 'Pages', path: '/deployments/images', keywords: 'images registry cve signature' },
   { label: 'Développement — Secrets & variables', group: 'Pages', path: '/deployments/secrets', keywords: 'vault secrets mots de passe variables' },
+  { label: 'Développement — Supply Chain Security', group: 'Pages', path: '/deployments/supply-chain', keywords: 'sast scan secrets dependances conteneur sbom signature security gate' },
+  { label: 'Kubernetes — Terminal sécurisé', group: 'Pages', path: '/kubernetes/terminal', keywords: 'terminal kubectl shell exec rbac' },
   { label: 'Infrastructure — Proxmox', group: 'Pages', path: '/infrastructure', keywords: 'vm lxc nœuds proxmox' },
   { label: 'Infrastructure — Hôtes & agents', group: 'Pages', path: '/infrastructure/hosts', keywords: 'ssh agent wazuh node exporter', adminOnly: true },
   { label: 'Kubernetes', group: 'Pages', path: '/kubernetes', keywords: 'k8s cluster pods namespaces deployments logs' },
