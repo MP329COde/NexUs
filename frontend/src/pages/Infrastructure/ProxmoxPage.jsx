@@ -5,9 +5,16 @@ import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+
+const ACTION_IMPACT = {
+  start: { tone: 'warn', label: 'Démarrer', impact: (v) => [`${v.type === 'qemu' ? 'La VM' : 'Le conteneur'} ${v.name} va démarrer.`, 'Les services qu\'il héberge redeviennent joignables dès le démarrage terminé.'] },
+  shutdown: { tone: 'crit', label: 'Arrêter', impact: (v) => [`Arrêt propre (ACPI) ${v.type === 'qemu' ? 'de la VM' : 'du conteneur'} ${v.name}.`, 'Tous les services qu\'il héberge deviennent indisponibles.', 'Les connexions actives sont coupées.'] },
+  reboot: { tone: 'warn', label: 'Redémarrer', impact: (v) => [`Redémarrage ${v.type === 'qemu' ? 'de la VM' : 'du conteneur'} ${v.name}.`, 'Coupure de service le temps du redémarrage.'] }
+};
 
 export default function ProxmoxPage() {
   const status = useApi(() => api.get('/proxmox/status'), []);
@@ -15,6 +22,7 @@ export default function ProxmoxPage() {
   const [selectedNode, setSelectedNode] = useState(null);
   const vms = useApi(() => (selectedNode ? api.get(`/proxmox/nodes/${selectedNode}/vms`) : Promise.resolve(null)), [selectedNode], { pollMs: 15000 });
   const notify = useNotify();
+  const [pending, setPending] = useState(null);
 
   if (status.data && !status.data.status.configured) {
     return (
@@ -25,15 +33,20 @@ export default function ProxmoxPage() {
     );
   }
 
-  async function action(node, type, vmid, act) {
-    if (!confirm(`${act} sur ${type}/${vmid} (${node}) ?`)) return;
-    try {
-      const res = await api.post(`/proxmox/nodes/${node}/${type}/${vmid}/${act}`, {});
-      notify(res.message, { type: 'ok' });
-      vms.reload();
-    } catch (err) {
-      notify(err.message, { type: 'crit', title: 'Action Proxmox échouée' });
-    }
+  function askAction(node, v, act) {
+    const cfg = ACTION_IMPACT[act];
+    setPending({
+      title: `${cfg.label} — ${v.name}`,
+      sub: `${node} · ${v.type}/${v.vmid}`,
+      tone: cfg.tone,
+      confirmLabel: cfg.label,
+      impact: cfg.impact(v),
+      run: async () => {
+        const res = await api.post(`/proxmox/nodes/${node}/${v.type}/${v.vmid}/${act}`, {});
+        notify(res.message, { type: 'ok' });
+        vms.reload();
+      }
+    });
   }
 
   const items = nodes.data?.items || [];
@@ -102,9 +115,9 @@ export default function ProxmoxPage() {
                   <td><span className={`badge badge-${v.status === 'running' ? 'ok' : 'mut'}`}><span className="dot" />{v.status}</span></td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <span className="btn-outline" style={btnMini} onClick={() => action(selectedNode, v.type, v.vmid, 'start')}>Démarrer</span>
-                      <span className="btn-outline" style={btnMini} onClick={() => action(selectedNode, v.type, v.vmid, 'shutdown')}>Arrêter</span>
-                      <span className="btn-outline" style={btnMini} onClick={() => action(selectedNode, v.type, v.vmid, 'reboot')}>Redémarrer</span>
+                      <span className="btn-outline" style={btnMini} onClick={() => askAction(selectedNode, v, 'start')}>Démarrer</span>
+                      <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => askAction(selectedNode, v, 'shutdown')}>Arrêter</span>
+                      <span className="btn-outline" style={btnMini} onClick={() => askAction(selectedNode, v, 'reboot')}>Redémarrer</span>
                     </div>
                   </td>
                 </tr>
@@ -113,6 +126,18 @@ export default function ProxmoxPage() {
           </Panel>
         )}
       </div>
+
+      {pending && (
+        <ActionConfirmModal
+          title={pending.title}
+          sub={pending.sub}
+          tone={pending.tone}
+          impact={pending.impact}
+          confirmLabel={pending.confirmLabel}
+          onClose={() => setPending(null)}
+          onConfirm={pending.run}
+        />
+      )}
     </>
   );
 }

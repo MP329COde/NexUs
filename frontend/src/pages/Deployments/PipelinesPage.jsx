@@ -5,8 +5,10 @@ import KpiCard from '../../components/ui/KpiCard.jsx';
 import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
 import MiniDonut from '../../components/ui/MiniDonut.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 const STATUS_TONE = { success: 'ok', failed: 'crit', running: 'info', cancelled: 'mut', other: 'mut' };
 const STATUS_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cours', cancelled: 'Annulé', other: '—' };
@@ -24,8 +26,10 @@ function formatDuration(seconds) {
 // Aucune exécution n'est simulée — liste et graphes vides si ni GitLab ni
 // GitHub ne sont configurés.
 export default function PipelinesPage() {
-  const { data } = useApi(() => api.get('/pipelines/runs'), [], { pollMs: 15000 });
+  const { data, reload } = useApi(() => api.get('/pipelines/runs'), [], { pollMs: 15000 });
   const [filter, setFilter] = useState('');
+  const [pending, setPending] = useState(null);
+  const notify = useNotify();
 
   const runs = data?.items || [];
   const now = Date.now();
@@ -54,6 +58,24 @@ export default function PipelinesPage() {
 
   const q = filter.trim().toLowerCase();
   const filtered = q ? runs.filter((r) => r.repo.toLowerCase().includes(q) || r.branch?.toLowerCase().includes(q)) : runs;
+
+  function askRetry(r) {
+    setPending({
+      title: `Relancer l'exécution — ${r.repo}`,
+      sub: `${r.branch || 'branche inconnue'} · ${r.provider}`,
+      tone: 'warn',
+      confirmLabel: 'Relancer',
+      impact: [
+        `Déclenche une nouvelle exécution du pipeline sur ${r.provider === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'}, avec le même commit/branche.`,
+        'Consomme à nouveau des minutes CI/CD sur la forge.'
+      ],
+      run: async () => {
+        await api.post(`/pipelines/runs/${encodeURIComponent(r.id)}/retry`, {});
+        notify('Exécution relancée', { type: 'ok' });
+        reload();
+      }
+    });
+  }
 
   return (
     <>
@@ -103,7 +125,7 @@ export default function PipelinesPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr>
-                  {['Dépôt', 'Branche', 'Fournisseur', 'État', 'Durée', 'Déclenché'].map((c) => (
+                  {['Dépôt', 'Branche', 'Fournisseur', 'État', 'Durée', 'Déclenché', ''].map((c) => (
                     <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
                   ))}
                 </tr>
@@ -129,6 +151,13 @@ export default function PipelinesPage() {
                     </td>
                     <td style={{ padding: '9px 16px' }} className="mono">{formatDuration(r.durationSeconds)}</td>
                     <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
+                    <td style={{ padding: '9px 16px' }}>
+                      {r.retryable && (
+                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => askRetry(r)}>
+                          <Icon name="refresh" size={11} />Relancer
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -136,6 +165,18 @@ export default function PipelinesPage() {
           </div>
         )}
       </Panel>
+
+      {pending && (
+        <ActionConfirmModal
+          title={pending.title}
+          sub={pending.sub}
+          tone={pending.tone}
+          impact={pending.impact}
+          confirmLabel={pending.confirmLabel}
+          onClose={() => setPending(null)}
+          onConfirm={pending.run}
+        />
+      )}
     </>
   );
 }
