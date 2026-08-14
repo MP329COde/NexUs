@@ -10,6 +10,26 @@ import { getProjectRole, getProjectByLegacyId, projectRoleAtLeast } from '../sto
 // booléenne (isMember → rôle 'maintainer' complet), pour ne jamais casser un
 // projet existant. Une fois migré, le rôle réel de l'utilisateur s'applique.
 //
+// Résolution de rôle réutilisable, indépendante d'Express : c'est la SEULE
+// implémentation de "quel rôle a cet utilisateur sur ce projet legacy ?" de
+// toute la plateforme. loadProjectAccess() (ci-dessous) l'utilise pour les
+// routes /projects/:id/*, et routes/vault.routes.js l'utilise pour les
+// entrées de coffre-fort de portée "project" (reveal/update/delete par id
+// direct, hors du préfixe /projects/:id/*) — sans cette factorisation, ces
+// deux chemins auraient pu diverger silencieusement (ce qui s'est produit
+// avant cette refactorisation : le coffre-fort ignorait encore les rôles
+// granulaires et ne vérifiait que l'ancienne appartenance plate).
+export async function resolveProjectRole(legacyProject, user) {
+  if (!legacyProject) return null;
+  if (user.role === 'admin') return 'owner';
+  if (pool) {
+    const pgProject = await getProjectByLegacyId(legacyProject.id);
+    if (pgProject) return getProjectRole(pgProject.id, user.id);
+  }
+  // Projet pas encore migré : ancien comportement (membre = accès complet).
+  return legacyStore.isMember(legacyProject, user.id) ? 'maintainer' : null;
+}
+
 // req.legacyProject : objet du store JSON (name, description, tags, memberIds,
 //   repoKeys...) — reste la source de vérité du contenu du projet.
 // req.projectRole   : 'viewer' | 'developer' | 'maintainer' | 'owner' | null
@@ -24,23 +44,9 @@ export function loadProjectAccess() {
         req.pgProject = await getProjectByLegacyId(project.id);
       }
 
-      if (req.user.role === 'admin') {
-        req.projectRole = 'owner';
-        return next();
-      }
-
-      if (req.pgProject) {
-        req.projectRole = await getProjectRole(req.pgProject.id, req.user.id);
-        if (!req.projectRole) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-        return next();
-      }
-
-      // Projet pas encore migré : ancien comportement (membre = accès complet).
-      if (legacyStore.isMember(project, req.user.id)) {
-        req.projectRole = 'maintainer';
-        return next();
-      }
-      return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+      req.projectRole = await resolveProjectRole(project, req.user);
+      if (!req.projectRole) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+      next();
     } catch (err) {
       next(err);
     }

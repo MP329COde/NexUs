@@ -7,12 +7,20 @@ import {
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
-import { getProject, isMember } from '../store/projectsStore.js';
+import { getProject } from '../store/projectsStore.js';
+import { resolveProjectRole } from '../middleware/projectAccess.js';
+import { projectRoleAtLeast } from '../store/orgStore.js';
 
-function canAccessProjectEntry(entry, user) {
-  if (entry.tier !== 'project') return true;
+// Résout le rôle réel (viewer/developer/maintainer/owner, ou null) via la
+// même logique que /projects/:id/* (middleware/projectAccess.js) — aupara-
+// vant ces routes ne vérifiaient que l'ancienne appartenance plate
+// (memberIds), ce qui laissait un accès complet (reveal/update/delete) à un
+// utilisateur explicitement rétrogradé en "viewer" via le socle relationnel.
+async function projectEntryRole(entry, user) {
+  if (!entry) return null;
+  if (entry.tier !== 'project') return 'owner'; // dev/prod : logique existante ci-dessous, inchangée
   const project = getProject(entry.projectId);
-  return Boolean(project) && (user.role === 'admin' || isMember(project, user.id));
+  return resolveProjectRole(project, user);
 }
 
 // Mots de passe dev : visibles par tout utilisateur authentifié (aide les
@@ -49,8 +57,12 @@ router.post('/prod', requireRole('admin'), asyncHandler(async (req, res) => {
 router.post('/:id/reveal', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
   // 404 générique (pas 403) pour ne pas confirmer l'existence d'une entrée
-  // hors de portée — même logique que projects.routes.js.
-  if (!entry || !canAccessProjectEntry(entry, req.user)) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  // hors de portée — même logique que projects.routes.js. Révéler un secret
+  // exige au moins developer (même seuil que la création — voir
+  // projects.routes.js POST /:id/vault) : un viewer voit les métadonnées
+  // (label, notes...) mais jamais la valeur en clair.
+  const role = await projectEntryRole(entry, req.user);
+  if (!entry || !projectRoleAtLeast(role, 'developer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
 
   if (entry.tier === 'prod' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
@@ -70,7 +82,8 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
-  if (!entry || !canAccessProjectEntry(entry, req.user)) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  const role = await projectEntryRole(entry, req.user);
+  if (!entry || !projectRoleAtLeast(role, 'developer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
   if (entry.tier !== 'project' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
   }
@@ -82,7 +95,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 router.delete('/:id', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
-  if (!entry || !canAccessProjectEntry(entry, req.user)) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  // Suppression = action destructrice : seuil plus élevé que la simple
+  // modification de métadonnées (maintainer, pas developer).
+  const role = await projectEntryRole(entry, req.user);
+  if (!entry || !projectRoleAtLeast(role, 'maintainer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
   if (entry.tier !== 'project' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
   }
