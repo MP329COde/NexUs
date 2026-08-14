@@ -281,4 +281,31 @@ test.describe('Isolation inter-projets (API)', () => {
     const res = await bobApi.post(`/api/projects/${projectAliceId}/workspace/pipelines/gitlab:42:1/retry`);
     expect(res.status()).toBe(404);
   });
+
+  // Incidents (voir store/incidentStore.js) : cette suite tourne sans
+  // DATABASE_URL, donc un projet legacy n'est jamais migré vers le socle
+  // relationnel — la liste reste honnêtement vide (pas d'erreur) et la
+  // création échoue explicitement (409), plutôt que de simuler un incident
+  // qui ne serait persisté nulle part. Le cycle de vie complet (création,
+  // 403 sur résolution par un rôle insuffisant, 400 sans résolution
+  // documentée, commentaire) est vérifié manuellement avec un vrai Postgres
+  // — voir le message du commit associé.
+  test("les incidents d'un projet non migré restent une liste vide honnête", async () => {
+    const res = await aliceApi.get(`/api/projects/${projectAliceId}/incidents`);
+    expect(res.ok()).toBeTruthy();
+    const { items } = await res.json();
+    expect(items).toEqual([]);
+  });
+
+  test('créer un incident sur un projet non migré échoue explicitement (409), pas un faux succès', async () => {
+    const res = await aliceApi.post(`/api/projects/${projectAliceId}/incidents`, {
+      data: { title: 'Test', severity: 'low' }
+    });
+    expect(res.status()).toBe(409);
+  });
+
+  test('la vue globale des incidents est réservée aux administrateurs', async () => {
+    const res = await aliceApi.get('/api/incidents');
+    expect(res.status()).toBe(403);
+  });
 });

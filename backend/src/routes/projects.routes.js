@@ -14,6 +14,7 @@ import * as github from '../services/integrations/githubService.js';
 import * as deploymentStore from '../store/deploymentStore.js';
 import { syncApplication, rollbackApplication, getApplicationHistory } from '../services/integrations/argocdService.js';
 import * as jobService from '../services/jobService.js';
+import * as incidentStore from '../store/incidentStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -296,6 +297,77 @@ router.get('/:id/jobs/:jobId', loadProjectAccess(), asyncHandler(async (req, res
     return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
   }
   res.json({ ok: true, job });
+}));
+
+// --- Incidents : suivi opérationnel (gravité, état, ressource affectée,
+// résolution) — voir store/incidentStore.js. Un incident peut référencer un
+// job en échec (jobId) pour garder le lien entre la cause technique et
+// l'incident qui en a résulté, sans dupliquer l'information. Lecture
+// ouverte à tout membre (viewer+), création à partir de developer (signaler
+// un problème n'est pas une action sensible), mise à jour/résolution à
+// partir de maintainer (documenter une résolution engage la fiabilité de
+// l'historique).
+router.get('/:id/incidents', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.json({ ok: true, items: [] });
+  const status = ['open', 'investigating', 'resolved'].includes(req.query.status) ? req.query.status : undefined;
+  res.json({ ok: true, items: await incidentStore.listForProject(req.pgProject.id, { status }) });
+}));
+
+router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { title, description, severity, resourceType, resourceRef, jobId } = req.body || {};
+  if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
+  if (!['low', 'medium', 'high', 'critical'].includes(severity)) {
+    return res.status(400).json({ ok: false, error: 'Gravité invalide (low, medium, high, critical)' });
+  }
+  if (jobId) {
+    const job = await jobService.getJob(jobId);
+    if (!job || job.project_id !== req.pgProject.id) return res.status(400).json({ ok: false, error: 'Job introuvable pour ce projet' });
+  }
+  const incident = await incidentStore.create({
+    projectId: req.pgProject.id, jobId, title, description, severity, resourceType, resourceRef, createdBy: req.user.id
+  });
+  logAudit(req, 'incident.create', { projectId: req.legacyProject.id, incidentId: incident.id, severity });
+  res.status(201).json({ ok: true, incident });
+}));
+
+async function loadIncident(req, res) {
+  const incident = await incidentStore.getById(req.params.incidentId);
+  if (!incident || !req.pgProject || incident.project_id !== req.pgProject.id) {
+    res.status(404).json({ ok: false, error: 'Incident introuvable pour ce projet' });
+    return null;
+  }
+  return incident;
+}
+
+router.get('/:id/incidents/:incidentId', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const incident = await loadIncident(req, res);
+  if (!incident) return;
+  res.json({ ok: true, incident, comments: await incidentStore.listComments(incident.id) });
+}));
+
+router.put('/:id/incidents/:incidentId', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const incident = await loadIncident(req, res);
+  if (!incident) return;
+  const { status, assignedTo, resolution } = req.body || {};
+  if (status && !['open', 'investigating', 'resolved'].includes(status)) {
+    return res.status(400).json({ ok: false, error: 'État invalide' });
+  }
+  if (status === 'resolved' && !resolution && !incident.resolution) {
+    return res.status(400).json({ ok: false, error: 'Une résolution doit être documentée pour clore un incident' });
+  }
+  const updated = await incidentStore.update(incident.id, { status, assignedTo, resolution });
+  logAudit(req, 'incident.update', { projectId: req.legacyProject.id, incidentId: incident.id, status });
+  res.json({ ok: true, incident: updated });
+}));
+
+router.post('/:id/incidents/:incidentId/comments', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  const incident = await loadIncident(req, res);
+  if (!incident) return;
+  const { body } = req.body || {};
+  if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
+  const comment = await incidentStore.addComment(incident.id, req.user.id, body.trim());
+  res.status(201).json({ ok: true, comment });
 }));
 
 router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler(async (req, res) => {

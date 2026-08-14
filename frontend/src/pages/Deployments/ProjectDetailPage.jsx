@@ -25,6 +25,7 @@ export default function ProjectDetailPage() {
   const workspace = useApi(() => api.get(`/projects/${id}/workspace`), [id]);
   const environments = useApi(() => api.get(`/projects/${id}/environments`), [id]);
   const deployments = useApi(() => api.get(`/projects/${id}/deployments`), [id]);
+  const incidents = useApi(() => api.get(`/projects/${id}/incidents`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
 
@@ -167,6 +168,15 @@ export default function ProjectDetailPage() {
         />
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <IncidentsPanel
+          incidents={incidents.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={incidents.reload}
+        />
+      </div>
+
       {(() => {
         const isMember = user?.role === 'admin' || p.memberIds.includes(user?.id);
         return (
@@ -179,6 +189,134 @@ export default function ProjectDetailPage() {
 
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
     </>
+  );
+}
+
+const SEVERITY_TONE = { low: 'mut', medium: 'warn', high: 'crit', critical: 'crit' };
+const SEVERITY_LABEL = { low: 'Faible', medium: 'Moyenne', high: 'Élevée', critical: 'Critique' };
+const STATUS_TONE = { open: 'crit', investigating: 'warn', resolved: 'ok' };
+const STATUS_LABEL = { open: 'Ouvert', investigating: 'En cours', resolved: 'Résolu' };
+
+// Suivi opérationnel des incidents du projet (voir store/incidentStore.js) :
+// gravité, état, résolution documentée. Résoudre un incident exige de
+// documenter la résolution (le backend le revérifie — voir
+// routes/projects.routes.js PUT /:id/incidents/:incidentId), jamais une
+// simple bascule d'état silencieuse.
+function IncidentsPanel({ incidents, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [open, setOpen] = useState(false);
+  const [resolving, setResolving] = useState(null);
+  const canCreate = roleAtLeast(role, 'developer');
+  const canResolve = roleAtLeast(role, 'maintainer');
+  const openCount = incidents.filter((i) => i.status !== 'resolved').length;
+
+  return (
+    <Panel
+      title="Incidents"
+      sub={openCount > 0 ? `${openCount} incident(s) ouvert(s)` : 'Aucun incident ouvert'}
+      span={12}
+      actions={canCreate && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setOpen(true)}>Déclarer</span>}
+    >
+      {incidents.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun incident déclaré sur ce projet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {incidents.map((inc) => (
+            <div key={inc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+              <span className={`badge badge-${SEVERITY_TONE[inc.severity]}`}>{SEVERITY_LABEL[inc.severity]}</span>
+              <span className={`badge badge-${STATUS_TONE[inc.status]}`}><span className="dot" />{STATUS_LABEL[inc.status]}</span>
+              <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{inc.title}</span>
+              <span className="faint" style={{ fontSize: 11 }}>{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
+              {inc.status !== 'resolved' && canResolve && (
+                <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setResolving(inc)}>Résoudre</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <DeclareIncidentModal
+          onClose={() => setOpen(false)}
+          onCreated={() => { setOpen(false); onChanged(); }}
+          projectId={projectId}
+          notify={notify}
+        />
+      )}
+      {resolving && (
+        <ResolveIncidentModal
+          incident={resolving}
+          onClose={() => setResolving(null)}
+          onResolved={() => { setResolving(null); onChanged(); }}
+          projectId={projectId}
+          notify={notify}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function DeclareIncidentModal({ onClose, onCreated, projectId, notify }) {
+  const [title, setTitle] = useState('');
+  const [severity, setSeverity] = useState('medium');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setBusy(true);
+    try {
+      await api.post(`/projects/${projectId}/incidents`, { title: title.trim(), severity, description });
+      notify('Incident déclaré', { type: 'ok' });
+      onCreated();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Déclarer un incident" onClose={onClose} width={420}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value)}>
+          {Object.entries(SEVERITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <textarea className="input" placeholder="Description (optionnel)" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Déclarer'}</button>
+      </form>
+    </Modal>
+  );
+}
+
+function ResolveIncidentModal({ incident, onClose, onResolved, projectId, notify }) {
+  const [resolution, setResolution] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!resolution.trim()) return;
+    setBusy(true);
+    try {
+      await api.put(`/projects/${projectId}/incidents/${incident.id}`, { status: 'resolved', resolution: resolution.trim() });
+      notify('Incident résolu', { type: 'ok' });
+      onResolved();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title={`Résoudre : ${incident.title}`} sub="La résolution doit être documentée avant de clore l'incident" onClose={onClose} width={420}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <textarea className="input" placeholder="Résolution (cause, correctif appliqué...)" required rows={4} value={resolution} onChange={(e) => setResolution(e.target.value)} autoFocus />
+        <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Clore l\'incident'}</button>
+      </form>
+    </Modal>
   );
 }
 
