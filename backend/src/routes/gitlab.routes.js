@@ -12,14 +12,13 @@ router.get('/status', asyncHandler(async (req, res) => res.json({ ok: true, stat
 router.get('/projects', asyncHandler(async (req, res) => res.json({ ok: true, items: await gitlab.listProjects() })));
 router.get('/projects/:id/pipelines', asyncHandler(async (req, res) => res.json({ ok: true, items: await gitlab.listPipelines(req.params.id) })));
 router.get('/projects/:id/merge-requests', asyncHandler(async (req, res) => res.json({ ok: true, items: await gitlab.listMergeRequests(req.params.id) })));
-router.post('/projects/:id/pipelines/:pipelineId/retry', asyncHandler(async (req, res) => {
-  res.json({ ok: true, ...(await gitlab.retryPipeline(req.params.id, req.params.pipelineId)) });
-}));
-router.post('/projects/:id/merge-requests/:iid/approve', asyncHandler(async (req, res) => {
-  const result = await gitlab.approveMergeRequest(req.params.id, req.params.iid);
-  logAudit(req, 'git.review.approved', { provider: 'gitlab', projectId: req.params.id, iid: req.params.iid });
-  res.json({ ok: true, ...result });
-}));
+// La relance de pipeline et l'approbation de MR ne vivent plus ici : elles
+// dupliquaient, sans aucune vérification de portée, ce que fournissent déjà
+// routes/pipelines.routes.js (vue globale) et routes/projects.routes.js
+// (POST /:id/workspace/pipelines/:runKey/retry et .../reviews/:reviewKey/approve,
+// scopés au projet et au rôle). Ces deux routes n'étaient plus appelées par
+// le frontend — retirées plutôt que protégées, pour ne pas garder deux
+// chemins concurrents vers la même action.
 
 router.get('/projects/:id/mirrors', requireRole('admin'), asyncHandler(async (req, res) => {
   res.json({ ok: true, items: await listMirrors(req.params.id) });

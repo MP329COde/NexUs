@@ -1,11 +1,21 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as k8s from '../services/integrations/kubernetesService.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 router.use(requireAuth);
+
+// Kubernetes est un cluster partagé par toute la plateforme, pas une
+// ressource par projet (contrairement aux dépôts/pipelines/déploiements
+// Argo CD déjà scopés — voir routes/projects.routes.js). Les lectures
+// (pods, logs, métriques, événements...) restent ouvertes à tout utilisateur
+// authentifié : observer l'état du cluster aide au diagnostic sans risque.
+// Toute action qui modifie un workload en cluster (redémarrage, scaling,
+// rollback, purge, suppression de pod) exige en revanche le rôle admin —
+// même politique que Proxmox, HAProxy et les reverse proxies (voir les
+// fichiers de routes correspondants).
 
 router.get('/status', asyncHandler(async (req, res) => res.json({ ok: true, status: await k8s.getStatus() })));
 router.get('/namespaces', asyncHandler(async (req, res) => res.json({ ok: true, items: await k8s.listNamespaces() })));
@@ -32,6 +42,8 @@ router.get('/events', asyncHandler(async (req, res) => {
   if (!req.query.namespace) return res.status(400).json({ ok: false, error: 'namespace requis' });
   res.json({ ok: true, items: await k8s.listEvents(req.query.namespace, req.query.involvedObject) });
 }));
+router.use(requireRole('admin'));
+
 router.post('/deployments/:namespace/:name/restart', asyncHandler(async (req, res) => {
   const result = await k8s.restartDeployment(req.params.namespace, req.params.name);
   logAudit(req, 'kubernetes.deployment.restarted', { namespace: req.params.namespace, name: req.params.name });

@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as github from '../services/integrations/githubService.js';
-import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -11,13 +10,10 @@ router.get('/status', asyncHandler(async (req, res) => res.json({ ok: true, stat
 router.get('/repos', asyncHandler(async (req, res) => res.json({ ok: true, items: await github.listRepos() })));
 router.get('/repos/:owner/:repo/runs', asyncHandler(async (req, res) => res.json({ ok: true, items: await github.listWorkflowRuns(req.params.owner, req.params.repo) })));
 router.get('/repos/:owner/:repo/pulls', asyncHandler(async (req, res) => res.json({ ok: true, items: await github.listPullRequests(req.params.owner, req.params.repo) })));
-router.post('/repos/:owner/:repo/runs/:runId/rerun', asyncHandler(async (req, res) => {
-  res.json({ ok: true, ...(await github.rerunWorkflow(req.params.owner, req.params.repo, req.params.runId)) });
-}));
-router.post('/repos/:owner/:repo/pulls/:number/approve', asyncHandler(async (req, res) => {
-  const result = await github.approvePullRequest(req.params.owner, req.params.repo, req.params.number, req.body?.body);
-  logAudit(req, 'git.review.approved', { provider: 'github', repo: `${req.params.owner}/${req.params.repo}`, number: req.params.number });
-  res.json({ ok: true, ...result });
-}));
+// Le rerun de workflow et l'approbation de PR ne vivent plus ici : voir
+// gitlab.routes.js (équivalent GitLab) pour la même raison — dupliqués sans
+// aucune vérification de portée par routes/pipelines.routes.js,
+// routes/reviews.routes.js et leurs équivalents scopés au projet dans
+// routes/projects.routes.js, et non appelés par le frontend.
 
 export default router;

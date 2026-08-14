@@ -4,8 +4,11 @@ import { requireAuth } from '../middleware/auth.js';
 import { listVolumes, createVolume, updateVolume, deleteVolume, VOLUME_TYPES } from '../store/volumeStore.js';
 import { logAudit } from '../services/auditService.js';
 
-// Suivi des volumes : ouvert à tout utilisateur authentifié, comme les
-// proxies réseau (pas réservé aux admins).
+// Suivi déclaratif des volumes (métadonnées seules : aucun appel à un
+// système de stockage réel, contrairement aux proxies réseau ou à
+// Kubernetes/Proxmox/HAProxy) : reste ouvert à tout utilisateur authentifié,
+// cohérent avec le reste de la gestion opérationnelle non critique de la
+// console (tâches, raccourcis...).
 const router = Router();
 router.use(requireAuth);
 
