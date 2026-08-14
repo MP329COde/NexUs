@@ -9,6 +9,7 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { ensureBootstrapAdmin } from './store/usersStore.js';
 import { runMigrations } from './db/migrate.js';
+import { recoverInterruptedJobs } from './services/jobService.js';
 import { scheduleDailyBackups } from './services/backupService.js';
 import { scheduleHourlyStatusSnapshot } from './services/statusHistoryService.js';
 import { scheduleCriticalHostsRefresh } from './services/hostMetricsService.js';
@@ -19,6 +20,7 @@ import { trafficLogger } from './middleware/trafficLogger.js';
 import router from './routes/index.js';
 
 await runMigrations();
+await recoverInterruptedJobs();
 ensureBootstrapAdmin();
 scheduleDailyBackups();
 scheduleHourlyStatusSnapshot();

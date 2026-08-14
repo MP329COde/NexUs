@@ -182,6 +182,21 @@ export default function ProjectDetailPage() {
   );
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Interroge GET /projects/:id/jobs/:jobId jusqu'à ce qu'il quitte
+// pending/running — 90 tentatives à 1,5 s (~2 min 15) avant d'abandonner
+// pour ne jamais bloquer indéfiniment l'utilisateur devant un bouton figé
+// si le job reste anormalement bloqué côté serveur.
+async function pollJob(projectId, jobId, maxAttempts = 90) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { job } = await api.get(`/projects/${projectId}/jobs/${jobId}`);
+    if (job.status === 'succeeded' || job.status === 'failed') return job;
+    await sleep(1500);
+  }
+  throw new Error('Le job met anormalement longtemps à se terminer — vérifiez son état dans quelques instants.');
+}
+
 const ROLE_RANK = { viewer: 1, developer: 2, maintainer: 3, owner: 4 };
 const roleAtLeast = (role, min) => (ROLE_RANK[role] || 0) >= (ROLE_RANK[min] || 0);
 
@@ -196,11 +211,21 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
   const notify = useNotify();
   const [busyId, setBusyId] = useState(null);
 
+  // La synchronisation peut prendre plusieurs secondes à plusieurs minutes
+  // (voir services/jobService.js côté backend) : la requête POST renvoie
+  // immédiatement un job en attente (202), on interroge ensuite son état
+  // jusqu'à ce qu'il se termine plutôt que de prétendre que "Synchronisation
+  // lancée" équivaut à "Synchronisation réussie".
   async function sync(link) {
     setBusyId(link.id);
     try {
-      await api.post(`/projects/${projectId}/deployments/${link.id}/sync`);
-      notify(`Synchronisation lancée pour ${link.name}`, { type: 'ok' });
+      const { job } = await api.post(`/projects/${projectId}/deployments/${link.id}/sync`);
+      const finalJob = await pollJob(projectId, job.id);
+      if (finalJob.status === 'succeeded') {
+        notify(`Synchronisation réussie pour ${link.name}`, { type: 'ok' });
+      } else {
+        notify(finalJob.error || 'Échec de la synchronisation', { type: 'crit' });
+      }
       onChanged();
     } catch (err) {
       notify(err.message, { type: 'crit' });

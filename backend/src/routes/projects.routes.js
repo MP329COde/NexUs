@@ -13,6 +13,7 @@ import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
 import * as deploymentStore from '../store/deploymentStore.js';
 import { syncApplication, rollbackApplication, getApplicationHistory } from '../services/integrations/argocdService.js';
+import * as jobService from '../services/jobService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -227,13 +228,34 @@ async function guardProductionEnvironment(req, link) {
   }
 }
 
+// Synchronisation et rollback ArgoCD peuvent prendre plusieurs secondes à
+// plusieurs minutes selon la taille de l'application — jamais bloquer la
+// requête HTTP dessus (voir services/jobService.js). Quand le projet est
+// migré vers le socle relationnel (req.pgProject), l'action est déléguée à
+// un job persisté et suivi via GET /:id/jobs/:jobId ; sinon (projet pas
+// encore migré, pas de table jobs disponible), on retombe sur l'ancien
+// comportement synchrone pour ne jamais bloquer un projet legacy.
 router.post('/:id/deployments/:linkId/sync', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   const link = await loadDeploymentLink(req, res);
   if (!link) return;
   if (!link.argocdAppName) return res.status(409).json({ ok: false, error: 'Aucune application Argo CD associée' });
   await guardProductionEnvironment(req, link);
-  const result = await syncApplication(link.argocdAppName, req.body?.revision);
-  logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, revision: req.body?.revision || null });
+  const revision = req.body?.revision || null;
+
+  if (req.pgProject) {
+    const job = await jobService.enqueue(
+      { type: 'deployment.sync', projectId: req.pgProject.id, userId: req.user.id, payload: { linkId: link.id, appName: link.argocdAppName, revision } },
+      async () => {
+        const result = await syncApplication(link.argocdAppName, revision);
+        logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, revision });
+        return result;
+      }
+    );
+    return res.status(202).json({ ok: true, job });
+  }
+
+  const result = await syncApplication(link.argocdAppName, revision);
+  logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, revision });
   res.json({ ok: true, ...result });
 }));
 
@@ -243,9 +265,37 @@ router.post('/:id/deployments/:linkId/rollback', loadProjectAccess(), requireMin
   if (!link.argocdAppName) return res.status(409).json({ ok: false, error: 'Aucune application Argo CD associée' });
   const { historyId } = req.body || {};
   if (historyId === undefined) return res.status(400).json({ ok: false, error: 'historyId requis' });
+
+  if (req.pgProject) {
+    const job = await jobService.enqueue(
+      { type: 'deployment.rollback', projectId: req.pgProject.id, userId: req.user.id, payload: { linkId: link.id, appName: link.argocdAppName, historyId } },
+      async () => {
+        const result = await rollbackApplication(link.argocdAppName, historyId);
+        logAudit(req, 'argocd.application.rolledback', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, historyId });
+        return result;
+      }
+    );
+    return res.status(202).json({ ok: true, job });
+  }
+
   const result = await rollbackApplication(link.argocdAppName, historyId);
   logAudit(req, 'argocd.application.rolledback', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, historyId });
   res.json({ ok: true, ...result });
+}));
+
+// Suivi des jobs du projet (voir services/jobService.js) : historique et
+// polling de progression côté frontend pour les actions ci-dessus.
+router.get('/:id/jobs', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await jobService.listJobsForProject(req.pgProject.id) });
+}));
+
+router.get('/:id/jobs/:jobId', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const job = await jobService.getJob(req.params.jobId);
+  if (!job || !req.pgProject || job.project_id !== req.pgProject.id) {
+    return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
+  }
+  res.json({ ok: true, job });
 }));
 
 router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler(async (req, res) => {
