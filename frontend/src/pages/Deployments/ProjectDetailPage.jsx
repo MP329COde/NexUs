@@ -26,6 +26,7 @@ export default function ProjectDetailPage() {
   const environments = useApi(() => api.get(`/projects/${id}/environments`), [id]);
   const deployments = useApi(() => api.get(`/projects/${id}/deployments`), [id]);
   const incidents = useApi(() => api.get(`/projects/${id}/incidents`), [id]);
+  const changes = useApi(() => api.get(`/projects/${id}/changes`), [id]);
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
@@ -180,6 +181,16 @@ export default function ProjectDetailPage() {
         />
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <ChangesPanel
+          changes={changes.data?.items || []}
+          environments={environments.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={changes.reload}
+        />
+      </div>
+
       {(() => {
         const isMember = user?.role === 'admin' || p.memberIds.includes(user?.id);
         return (
@@ -329,6 +340,140 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
         />
       )}
     </Panel>
+  );
+}
+
+const CHANGE_STATUS_TONE = { pending: 'warn', approved: 'ok', rejected: 'crit', executed: 'mut', cancelled: 'mut' };
+const CHANGE_STATUS_LABEL = { pending: 'En attente', approved: 'Approuvé', rejected: 'Rejeté', executed: 'Exécuté', cancelled: 'Annulé' };
+
+// Changement contrôlé (voir store/changeStore.js) : distinct d'un incident
+// (qui documente un problème déjà survenu) — ici, une modification
+// planifiée avec impact attendu, décision et exécution séparées. Proposer
+// est ouvert à developer+, décider (approuver/rejeter) à maintainer+, avec
+// une garde supplémentaire côté backend si l'environnement visé est en
+// production (owner requis pour approuver, pas pour rejeter) — jamais
+// contournable depuis cette UI, uniquement revérifiée par le serveur.
+function ChangesPanel({ changes, environments, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [proposing, setProposing] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const canPropose = roleAtLeast(role, 'developer');
+  const canDecide = roleAtLeast(role, 'maintainer');
+  const pendingCount = changes.filter((c) => c.status === 'pending').length;
+
+  async function decide(change, status) {
+    setBusyId(change.id);
+    try {
+      await api.put(`/projects/${projectId}/changes/${change.id}/decide`, { status });
+      notify(status === 'approved' ? 'Changement approuvé' : 'Changement rejeté', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function execute(change) {
+    setBusyId(change.id);
+    try {
+      await api.post(`/projects/${projectId}/changes/${change.id}/execute`);
+      notify('Changement marqué comme exécuté', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const envName = (envId) => environments.find((e) => e.id === envId)?.name;
+
+  return (
+    <Panel
+      title="Changements"
+      sub={pendingCount > 0 ? `${pendingCount} en attente d'approbation` : 'Aucun changement en attente'}
+      span={12}
+      actions={canPropose && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setProposing(true)}>Proposer</span>}
+    >
+      {changes.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun changement proposé sur ce projet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {changes.map((c) => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+              <span className={`badge badge-${CHANGE_STATUS_TONE[c.status]}`}><span className="dot" />{CHANGE_STATUS_LABEL[c.status]}</span>
+              {c.environment_id && <span className="badge badge-mut">{envName(c.environment_id) || 'environnement'}</span>}
+              <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{c.title}</span>
+              {c.impact && <span className="faint" style={{ fontSize: 11 }}>{c.impact}</span>}
+              {c.status === 'pending' && canDecide && (
+                <>
+                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => decide(c, 'approved')}>
+                    {busyId === c.id ? '…' : 'Approuver'}
+                  </span>
+                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer', color: 'var(--tone-crit-fg)' }} onClick={() => decide(c, 'rejected')}>
+                    Rejeter
+                  </span>
+                </>
+              )}
+              {c.status === 'approved' && canDecide && (
+                <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => execute(c)}>
+                  {busyId === c.id ? '…' : 'Marquer exécuté'}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {proposing && (
+        <ProposeChangeModal
+          projectId={projectId}
+          environments={environments}
+          onClose={() => setProposing(false)}
+          onCreated={() => { setProposing(false); onChanged(); }}
+          notify={notify}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function ProposeChangeModal({ projectId, environments, onClose, onCreated, notify }) {
+  const [title, setTitle] = useState('');
+  const [impact, setImpact] = useState('');
+  const [description, setDescription] = useState('');
+  const [environmentId, setEnvironmentId] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setBusy(true);
+    try {
+      await api.post(`/projects/${projectId}/changes`, { title: title.trim(), impact, description, environmentId: environmentId || undefined });
+      notify('Changement proposé', { type: 'ok' });
+      onCreated();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Proposer un changement" onClose={onClose} width={420}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        <select className="input" value={environmentId} onChange={(e) => setEnvironmentId(e.target.value)}>
+          <option value="">Aucun environnement précis</option>
+          {environments.map((env) => <option key={env.id} value={env.id}>{env.name}{env.is_production ? ' (production)' : ''}</option>)}
+        </select>
+        <input className="input" placeholder="Impact attendu (ex. indisponibilité 5 min)" value={impact} onChange={(e) => setImpact(e.target.value)} />
+        <textarea className="input" placeholder="Description (optionnel)" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Proposer'}</button>
+      </form>
+    </Modal>
   );
 }
 
