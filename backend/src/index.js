@@ -46,7 +46,12 @@ app.use(trafficLogger);
 // SQLite (POST /api/backups/import) sans avoir à relever la limite par route
 // (un express.json() déclaré après celui-ci sur une route donnée est un
 // no-op : le corps est déjà consommé par ce middleware global).
-app.use(express.json({ limit: '10mb' }));
+// { verify } capture le corps brut avant parsing JSON, sur toutes les
+// routes — nécessaire pour vérifier la signature HMAC-SHA256 des webhooks
+// GitHub (X-Hub-Signature-256, voir routes/webhooks.routes.js), qui porte
+// sur les octets exacts envoyés et non sur une reconstruction JSON.stringify
+// potentiellement différente (ordre des clés, espaces...).
+app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(cookieParser());
 app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/status/health' } }));
 
@@ -67,6 +72,14 @@ app.use('/api/vault', strictLimiter);
 // plus stricte que le reste pour empêcher d'en déclencher en rafale.
 const scanLimiter = rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/security/scans', scanLimiter);
+
+// Point d'entrée public (pas de session, pas de compte derrière la requête
+// pour appliquer les limites globales par utilisateur) : limite par IP pour
+// empêcher un tiers de bombarder l'endpoint en tentant de deviner un secret
+// de webhook par force brute (timingSafeEqual empêche la fuite par timing,
+// pas le volume de tentatives).
+const webhookLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.use('/api/webhooks', webhookLimiter);
 
 // Une installation d'outil déclenche une connexion SSH + un script potentiellement
 // long : même logique que scanLimiter, pour empêcher d'en déclencher en rafale

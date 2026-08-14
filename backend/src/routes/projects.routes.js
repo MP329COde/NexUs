@@ -203,6 +203,28 @@ router.post('/:id/workspace/reviews/:reviewKey/approve', loadProjectAccess(), re
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
 }));
 
+// --- Webhook : URL + secret à renseigner côté GitLab/GitHub pour que Nexus
+// réagisse aux événements du dépôt (voir routes/webhooks.routes.js). Le
+// secret n'est exposé qu'à maintainer+ (au même titre que le coffre-fort
+// projet) : quiconque le connaît peut faire croire à Nexus qu'un pipeline a
+// échoué et ouvrir des incidents en son nom.
+router.get('/:id/webhook', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  res.json({
+    ok: true,
+    gitlabUrl: `/api/webhooks/gitlab/${req.legacyProject.id}`,
+    githubUrl: `/api/webhooks/github/${req.legacyProject.id}`,
+    secret: req.pgProject.webhook_secret
+  });
+}));
+
+router.post('/:id/webhook/rotate', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const secret = await orgStore.rotateWebhookSecret(req.pgProject.id);
+  logAudit(req, 'project.webhook.rotated', { projectId: req.legacyProject.id });
+  res.json({ ok: true, secret });
+}));
+
 // --- Déploiements (rattachement optionnel via deploymentStore.projectId) :
 // équivalent scopé au projet de routes/deployments.routes.js (vue globale,
 // non protégée par projet — conservée telle quelle pour la compatibilité de

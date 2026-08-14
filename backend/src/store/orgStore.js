@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { query } from '../db/pool.js';
 
 // Couche d'accès au socle relationnel (organisations, équipes, projets,
@@ -125,14 +126,25 @@ export async function deleteProjectByLegacyId(legacyId) {
   await query('DELETE FROM projects WHERE legacy_id = $1', [legacyId]);
 }
 
+// Régénère le secret de webhook d'un projet (révoque implicitement
+// l'ancienne URL/jeton — voir routes/projects.routes.js POST
+// /:id/webhook/rotate). Un projet créé avant cette migration (webhook_secret
+// NULL) reçoit son premier secret via cette même fonction, appelée à la
+// demande plutôt que rétroactivement pour tous les projets existants.
+export async function rotateWebhookSecret(projectId) {
+  const secret = crypto.randomBytes(24).toString('hex');
+  const { rows } = await query('UPDATE projects SET webhook_secret = $1 WHERE id = $2 RETURNING webhook_secret', [secret, projectId]);
+  return rows[0]?.webhook_secret || null;
+}
+
 export async function createProject({ orgId, name, slug, description, tags, repoKeys, ownerUserId, legacyId }) {
   const client = await (await import('../db/pool.js')).requirePool().connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO projects (org_id, name, slug, description, tags, repo_keys, legacy_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [orgId, name, slug, description || '', JSON.stringify(tags || []), JSON.stringify(repoKeys || []), legacyId || null]
+      `INSERT INTO projects (org_id, name, slug, description, tags, repo_keys, legacy_id, webhook_secret)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [orgId, name, slug, description || '', JSON.stringify(tags || []), JSON.stringify(repoKeys || []), legacyId || null, crypto.randomBytes(24).toString('hex')]
     );
     const project = rows[0];
     if (ownerUserId) {
