@@ -308,4 +308,43 @@ test.describe('Isolation inter-projets (API)', () => {
     const res = await aliceApi.get('/api/incidents');
     expect(res.status()).toBe(403);
   });
+
+  // Webhooks (voir routes/webhooks.routes.js) : cette suite tourne sans
+  // DATABASE_URL, donc le socle relationnel est indisponible et la route
+  // répond honnêtement 503 plutôt que de prétendre traiter l'événement.
+  // La vérification de signature réelle (GitLab/GitHub, HMAC-SHA256) est
+  // vérifiée manuellement avec un vrai Postgres — voir le message du commit
+  // associé. Ici, on vérifie surtout que la route est bien publique
+  // (accessible sans session, comme doivent l'être GitLab/GitHub) mais
+  // jamais permissive en l'absence de socle.
+  test('un webhook GitLab sans session fonctionne (route publique) mais échoue proprement sans Postgres (503)', async ({ playwright }) => {
+    const anon = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const res = await anon.post('/api/webhooks/gitlab/some-project-id', {
+      headers: { 'X-Gitlab-Token': 'whatever' },
+      data: { object_kind: 'pipeline', object_attributes: { status: 'failed' } }
+    });
+    expect(res.status()).toBe(503);
+    await anon.dispose();
+  });
+
+  test('un webhook GitHub sans session fonctionne (route publique) mais échoue proprement sans Postgres (503)', async ({ playwright }) => {
+    const anon = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const res = await anon.post('/api/webhooks/github/some-project-id', {
+      headers: { 'X-Hub-Signature-256': 'sha256=whatever', 'X-GitHub-Event': 'workflow_run' },
+      data: { action: 'completed', workflow_run: { conclusion: 'failure' } }
+    });
+    expect(res.status()).toBe(503);
+    await anon.dispose();
+  });
+
+  test('lire le secret de webhook sur un projet non migré échoue explicitement (409), pas un faux succès', async () => {
+    // Alice a un accès legacy complet (memberIds, équivalent maintainer —
+    // voir middleware/projectAccess.js), donc passe la garde de rôle ; mais
+    // le projet n'a pas de webhook_secret tant qu'il n'est pas migré vers
+    // le socle relationnel. Le vrai test "maintainer requis" (403 pour un
+    // rôle inférieur, avec Postgres) est vérifié manuellement — voir le
+    // message du commit associé.
+    const res = await aliceApi.get(`/api/projects/${projectAliceId}/webhook`);
+    expect(res.status()).toBe(409);
+  });
 });
