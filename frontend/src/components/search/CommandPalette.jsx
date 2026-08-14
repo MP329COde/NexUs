@@ -46,6 +46,15 @@ export default function CommandPalette({ open, onClose, context }) {
           }
         } catch { /* hôtes non disponibles */ }
       }
+      // Projets Nexus : liste déjà filtrée côté backend selon l'appartenance
+      // de l'utilisateur (voir routes/projects.routes.js) — pas de risque de
+      // faire apparaître dans la recherche un projet auquel il n'a pas accès.
+      try {
+        const res = await api.get('/projects');
+        for (const p of res.items || []) {
+          items.push({ label: p.name, group: 'Projets', path: `/deployments/projects/${p.id}`, keywords: `projet ${p.name} ${p.description || ''}`, icon: 'folder' });
+        }
+      } catch { /* projets non disponibles */ }
       // Dépôts Git (GitLab/GitHub) : mêmes endpoints que le panneau Projets de
       // Développement, pour que la recherche globale couvre aussi les dépôts.
       try {
