@@ -16,6 +16,19 @@ router.get('/pods/:namespace/:pod/logs', asyncHandler(async (req, res) => {
   const logs = await k8s.getPodLogs(req.params.namespace, req.params.pod, req.query.container, Number(req.query.tail) || 200);
   res.json({ ok: true, logs });
 }));
+router.get('/pods/:namespace/:pod/describe', asyncHandler(async (req, res) => {
+  res.json({ ok: true, pod: await k8s.describePod(req.params.namespace, req.params.pod) });
+}));
+router.get('/pods/:namespace/:pod/metrics', asyncHandler(async (req, res) => {
+  res.json({ ok: true, metrics: await k8s.getPodMetrics(req.params.namespace, req.params.pod) });
+}));
+router.get('/pods/:namespace/:pod/owners', asyncHandler(async (req, res) => {
+  res.json({ ok: true, ...(await k8s.getPodOwners(req.params.namespace, req.params.pod)) });
+}));
+router.get('/events', asyncHandler(async (req, res) => {
+  if (!req.query.namespace) return res.status(400).json({ ok: false, error: 'namespace requis' });
+  res.json({ ok: true, items: await k8s.listEvents(req.query.namespace, req.query.involvedObject) });
+}));
 router.post('/deployments/:namespace/:name/restart', asyncHandler(async (req, res) => {
   const result = await k8s.restartDeployment(req.params.namespace, req.params.name);
   logAudit(req, 'kubernetes.deployment.restarted', { namespace: req.params.namespace, name: req.params.name });

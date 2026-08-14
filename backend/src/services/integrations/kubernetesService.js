@@ -73,6 +73,101 @@ export async function listPods(namespace) {
   });
 }
 
+// "Décrire" : équivalent réduit de `kubectl describe pod`, reconstruit à
+// partir de l'objet Pod complet (pas seulement les champs déjà retenus par
+// listPods) — conteneurs, conditions, événements liés au pod.
+export async function describePod(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('describe pod', async () => {
+    const pod = await c.core.readNamespacedPod({ name, namespace });
+    return {
+      name: pod.metadata.name,
+      namespace: pod.metadata.namespace,
+      labels: pod.metadata.labels || {},
+      annotations: pod.metadata.annotations || {},
+      node: pod.spec.nodeName,
+      phase: pod.status.phase,
+      podIP: pod.status.podIP,
+      startedAt: pod.status.startTime,
+      conditions: (pod.status.conditions || []).map((c2) => ({ type: c2.type, status: c2.status, reason: c2.reason, message: c2.message })),
+      containers: (pod.spec.containers || []).map((c2) => {
+        const cs = (pod.status.containerStatuses || []).find((s) => s.name === c2.name);
+        return {
+          name: c2.name, image: c2.image,
+          resources: c2.resources,
+          ready: cs?.ready ?? null, restartCount: cs?.restartCount ?? 0,
+          state: cs?.state ? Object.keys(cs.state)[0] : null
+        };
+      })
+    };
+  });
+}
+
+// Résout le Deployment propriétaire d'un pod (via la chaîne d'ownerReferences
+// Pod → ReplicaSet → Deployment) et les Services qui le ciblent (dont le
+// selector est un sous-ensemble des labels du pod) — c'est ce qui permet aux
+// actions contextuelles "Voir Deployment"/"Voir Service" du Command Center
+// de pointer vers la bonne ressource plutôt que de deviner à partir du nom.
+export async function getPodOwners(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('pod owners', async () => {
+    const pod = await c.core.readNamespacedPod({ name, namespace });
+    let deploymentName = null;
+    const rsRef = (pod.metadata.ownerReferences || []).find((o) => o.kind === 'ReplicaSet');
+    if (rsRef) {
+      try {
+        const rs = await c.apps.readNamespacedReplicaSet({ name: rsRef.name, namespace });
+        deploymentName = (rs.metadata.ownerReferences || []).find((o) => o.kind === 'Deployment')?.name || null;
+      } catch { /* ReplicaSet déjà supprimé */ }
+    }
+    const podLabels = pod.metadata.labels || {};
+    const services = await c.core.listNamespacedService({ namespace });
+    const serviceNames = services.items
+      .filter((s) => {
+        const sel = s.spec.selector || {};
+        const keys = Object.keys(sel);
+        return keys.length > 0 && keys.every((k) => podLabels[k] === sel[k]);
+      })
+      .map((s) => s.metadata.name);
+    return { deploymentName, serviceNames };
+  });
+}
+
+// Événements Kubernetes liés à un objet précis (pod, deployment...) — utiles
+// pour diagnostiquer un CrashLoopBackOff, un échec de scheduling, une image
+// introuvable, etc. sans avoir besoin des logs applicatifs.
+export async function listEvents(namespace, involvedObjectName) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('events', async () => {
+    const fieldSelector = involvedObjectName ? `involvedObject.name=${involvedObjectName}` : undefined;
+    const res = await c.core.listNamespacedEvent({ namespace, fieldSelector });
+    return res.items
+      .map((e) => ({
+        type: e.type, reason: e.reason, message: e.message, count: e.count || 1,
+        lastTimestamp: e.lastTimestamp || e.eventTime, object: e.involvedObject?.name
+      }))
+      .sort((a, b) => new Date(b.lastTimestamp || 0) - new Date(a.lastTimestamp || 0));
+  });
+}
+
+// Métriques instantanées (metrics-server, API metrics.k8s.io) — absentes si
+// metrics-server n'est pas installé sur le cluster : erreur propre remontée
+// telle quelle plutôt qu'une valeur inventée.
+export async function getPodMetrics(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('pod metrics', async () => {
+    const res = await c.custom.getNamespacedCustomObject({ group: 'metrics.k8s.io', version: 'v1beta1', namespace, plural: 'pods', name });
+    return {
+      timestamp: res.timestamp,
+      containers: (res.containers || []).map((ct) => ({ name: ct.name, cpu: ct.usage?.cpu, memory: ct.usage?.memory }))
+    };
+  });
+}
+
 export async function listDeployments(namespace) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
