@@ -65,12 +65,19 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   avant de clore, commentaires. Vue globale réservée aux administrateurs (`GET /api/incidents`),
   agrégée avec les intégrations en erreur et les jobs en échec dans `GET /api/system/overview`
   (affiché sur la page d'accueil pour les administrateurs).
+- Webhooks entrants (`src/routes/webhooks.routes.js`) : `POST /api/webhooks/gitlab/:projectId` et
+  `.../github/:projectId`, publics par nécessité mais jamais permissifs — chaque projet migré reçoit
+  un secret aléatoire à sa création, vérifié par comparaison à temps constant (GitLab, en-tête
+  `X-Gitlab-Token`) ou par signature HMAC-SHA256 du corps exact reçu (GitHub, `X-Hub-Signature-256`,
+  voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
+  incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
+  /api/projects/:id/webhook{,/rotate}`.
 - **Ce qui reste en Phase 1b** (documenté explicitement plutôt que masqué) : migration des collections
   restantes du store JSON (intégrations, coffre-fort, audit, hôtes...) vers Postgres, UI de gestion des
-  organisations/équipes/rôles (l'API existe : `/api/organizations`, `/api/teams`,
-  `/api/projects/:id/members`, `/api/projects/:id/environments`), généralisation de l'architecture de
-  jobs aux opérations restées synchrones (provisioning SSH — a son propre suivi en mémoire volontaire,
-  voir `provisioningService.js`).
+  organisations (l'API existe : `/api/organizations`), généralisation de l'architecture de jobs aux
+  opérations restées synchrones (provisioning SSH — a son propre suivi en mémoire volontaire, voir
+  `provisioningService.js`), autres types d'événements webhook (push, merge request — seuls les
+  pipelines/workflows en échec déclenchent une action pour l'instant).
 
 ### Frontend (`frontend/`)
 
