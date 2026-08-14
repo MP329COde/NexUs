@@ -3,32 +3,11 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
+import { normalizePipelineRun } from '../services/pipelineNormalizer.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 router.use(requireAuth);
-
-const GITLAB_STATUS = { success: 'success', failed: 'failed', running: 'running', pending: 'running', canceled: 'cancelled', skipped: 'cancelled' };
-function normalizeGitlab(p, repoName, projectId) {
-  const durationSeconds = p.duration ?? (p.updatedAt && p.createdAt && ['success', 'failed', 'canceled'].includes(p.status) ? Math.max(0, Math.round((new Date(p.updatedAt) - new Date(p.createdAt)) / 1000)) : null);
-  return {
-    id: `gitlab:${projectId}:${p.id}`, provider: 'gitlab', repo: repoName, branch: p.ref,
-    status: GITLAB_STATUS[p.status] || 'other', durationSeconds,
-    createdAt: p.createdAt, webUrl: p.webUrl, trigger: 'push',
-    retryable: ['failed', 'cancelled'].includes(GITLAB_STATUS[p.status])
-  };
-}
-function normalizeGithub(r, repoName, owner, repo) {
-  const status = r.status === 'completed'
-    ? (r.conclusion === 'success' ? 'success' : r.conclusion === 'cancelled' ? 'cancelled' : 'failed')
-    : 'running';
-  const durationSeconds = r.updatedAt && r.createdAt && status !== 'running' ? Math.max(0, Math.round((new Date(r.updatedAt) - new Date(r.createdAt)) / 1000)) : null;
-  return {
-    id: `github:${owner}/${repo}:${r.id}`, provider: 'github', repo: repoName, branch: r.branch,
-    status, durationSeconds, createdAt: r.createdAt, webUrl: r.webUrl, trigger: 'push',
-    retryable: status === 'failed'
-  };
-}
 
 // Agrège les exécutions récentes GitLab (pipelines) et GitHub (workflow runs)
 // de tous les dépôts accessibles, normalisées dans un format commun. Aucune
@@ -40,7 +19,7 @@ router.get('/runs', asyncHandler(async (req, res) => {
     const projects = (await gitlab.listProjects()).slice(0, 12);
     const perProject = await Promise.allSettled(projects.map((p) => gitlab.listPipelines(p.id)));
     perProject.forEach((r, i) => {
-      if (r.status === 'fulfilled') runs.push(...r.value.map((p) => normalizeGitlab(p, projects[i].path, projects[i].id)));
+      if (r.status === 'fulfilled') runs.push(...r.value.map((p) => normalizePipelineRun('gitlab', p, projects[i].path, projects[i].id)));
     });
   } catch { /* GitLab non configuré */ }
 
@@ -49,7 +28,7 @@ router.get('/runs', asyncHandler(async (req, res) => {
     const perRepo = await Promise.allSettled(repos.map((r) => github.listWorkflowRuns(r.fullName.split('/')[0], r.name)));
     perRepo.forEach((res_, i) => {
       const [owner, repo] = repos[i].fullName.split('/');
-      if (res_.status === 'fulfilled') runs.push(...res_.value.map((r) => normalizeGithub(r, repos[i].fullName, owner, repo)));
+      if (res_.status === 'fulfilled') runs.push(...res_.value.map((r) => normalizePipelineRun('github', r, repos[i].fullName, owner, repo)));
     });
   } catch { /* GitHub non configuré */ }
 

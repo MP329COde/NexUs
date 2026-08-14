@@ -8,6 +8,7 @@ import * as vaultStore from '../store/vaultStore.js';
 import * as orgStore from '../store/orgStore.js';
 import { pool } from '../db/pool.js';
 import { logAudit } from '../services/auditService.js';
+import { buildProjectWorkspace } from '../services/projectWorkspaceService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -115,6 +116,16 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction });
   logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
   res.status(201).json({ ok: true, environment });
+}));
+
+// --- Espace de travail : agrège l'état réel des dépôts liés au projet
+// (branches, derniers commits, MR/PR ouvertes, dernières exécutions CI) —
+// voir services/projectWorkspaceService.js. C'est le point d'entrée unique
+// pour "ouvrir" un projet dans Nexus : plus besoin de recouper soi-même
+// Développement, Pipelines et Revues pour un dépôt donné.
+router.get('/:id/workspace', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const repos = await buildProjectWorkspace(req.legacyProject.repoKeys);
+  res.json({ ok: true, project: req.legacyProject, role: req.projectRole, repos });
 }));
 
 // --- Tâches : lecture/écriture ouverte à tout membre du projet (travail

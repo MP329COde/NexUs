@@ -21,11 +21,35 @@ export async function listProjects() {
   return data.map((p) => ({ id: p.id, name: p.name, path: p.path_with_namespace, defaultBranch: p.default_branch, webUrl: p.web_url, lastActivity: p.last_activity_at, visibility: p.visibility }));
 }
 
+// Lecture directe d'un projet par id, sans balayer listProjects() en entier —
+// utilisé par l'espace de travail projet (routes/projects.routes.js) qui ne
+// connaît que les repoKeys attachés au projet Nexus, pas la liste complète.
+export async function getProject(projectId) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const p = await request(c.http, { method: 'GET', url: `/projects/${projectId}` }, 'GitLab');
+  return { id: p.id, name: p.name, path: p.path_with_namespace, defaultBranch: p.default_branch, webUrl: p.web_url, lastActivity: p.last_activity_at };
+}
+
 export async function listPipelines(projectId) {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/pipelines`, params: { per_page: 20 } }, 'GitLab');
   return data.map((p) => ({ id: p.id, ref: p.ref, status: p.status, sha: p.sha?.slice(0, 8), createdAt: p.created_at, updatedAt: p.updated_at, duration: p.duration ?? null, webUrl: p.web_url }));
+}
+
+export async function listBranches(projectId) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/repository/branches`, params: { per_page: 50 } }, 'GitLab');
+  return data.map((b) => ({ name: b.name, default: b.default, protected: b.protected, commitSha: b.commit?.short_id, commitDate: b.commit?.committed_date, webUrl: b.web_url }));
+}
+
+export async function listCommits(projectId, ref) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/repository/commits`, params: { ref_name: ref, per_page: 20 } }, 'GitLab');
+  return data.map((cm) => ({ sha: cm.short_id, message: cm.title, author: cm.author_name, date: cm.committed_date, webUrl: cm.web_url }));
 }
 
 export async function listMergeRequests(projectId) {

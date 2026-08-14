@@ -22,6 +22,7 @@ export default function ProjectDetailPage() {
   const tasks = useApi(() => api.get(`/projects/${id}/tasks`), [id]);
   const repos = useApi(() => api.get('/repos'), []);
   const reviews = useApi(() => api.get('/reviews'), []);
+  const workspace = useApi(() => api.get(`/projects/${id}/workspace`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
 
@@ -148,6 +149,10 @@ export default function ProjectDetailPage() {
         </Panel>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} />
+      </div>
+
       {(() => {
         const isMember = user?.role === 'admin' || p.memberIds.includes(user?.id);
         return (
@@ -160,6 +165,61 @@ export default function ProjectDetailPage() {
 
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
     </>
+  );
+}
+
+const PIPELINE_TONE = { success: 'ok', failed: 'crit', running: 'info', cancelled: 'mut', other: 'mut' };
+const PIPELINE_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cours', cancelled: 'Annulé', other: '—' };
+
+// État réel des dépôts liés au projet (branches, dernier commit, MR/PR
+// ouvertes, dernier pipeline) — voir GET /projects/:id/workspace et
+// services/projectWorkspaceService.js côté backend. Un dépôt inaccessible
+// (forge non configurée, token invalide, dépôt supprimé) affiche son
+// message d'erreur exact plutôt que d'être masqué ou de faire planter tout
+// le panneau — jamais de donnée inventée à sa place.
+function RepoActivityPanel({ repos, loading }) {
+  return (
+    <Panel title="Activité des dépôts" sub="Commits, branches, revues et pipelines — par dépôt rattaché" span={12}>
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+      ) : repos.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun dépôt rattaché à ce projet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {repos.map((r) => (
+            <div key={r.key} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+              {r.error ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="gitBranch" size={13} style={{ color: 'var(--text-faint)' }} />
+                  <span className="mono" style={{ fontSize: 12, flex: 1 }}>{r.key}</span>
+                  <span className="badge badge-crit" title={r.error}>Indisponible</span>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <a href={r.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, textDecoration: 'none', color: 'inherit', flex: 1 }}>{r.name}</a>
+                    <span className="badge badge-mut">{r.branches?.length ?? 0} branche(s)</span>
+                    <span className="badge badge-mut">{r.mergeRequests?.length ?? 0} revue(s) ouverte(s)</span>
+                    {r.pipelines?.[0] && (
+                      <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]}`} style={{ textDecoration: 'none' }}>
+                        <span className="dot" />{PIPELINE_LABEL[r.pipelines[0].status]}
+                      </a>
+                    )}
+                  </div>
+                  {r.commits?.[0] && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                      <span className="mono">{r.commits[0].sha}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.commits[0].message}</span>
+                      <span className="faint">{r.commits[0].author}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
   );
 }
 

@@ -49,6 +49,15 @@ export async function listRepos() {
   return data.map((r) => ({ id: r.id, name: r.name, fullName: r.full_name, defaultBranch: r.default_branch, private: r.private, webUrl: r.html_url, pushedAt: r.pushed_at }));
 }
 
+// Lecture directe d'un dépôt, sans balayer listRepos() en entier — utilisé
+// par l'espace de travail projet (routes/projects.routes.js).
+export async function getRepo(owner, repo) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const r = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}` }, 'GitHub');
+  return { id: r.id, name: r.name, fullName: r.full_name, defaultBranch: r.default_branch, private: r.private, webUrl: r.html_url, pushedAt: r.pushed_at };
+}
+
 export async function listWorkflowRuns(owner, repo) {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
@@ -64,6 +73,20 @@ export async function listWorkflowRuns(owner, repo) {
     updatedAt: r.updated_at,
     webUrl: r.html_url
   }));
+}
+
+export async function listBranches(owner, repo) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/branches`, params: { per_page: 50 } }, 'GitHub');
+  return data.map((b) => ({ name: b.name, protected: b.protected, commitSha: b.commit?.sha?.slice(0, 8) }));
+}
+
+export async function listCommits(owner, repo, sha) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/commits`, params: { sha, per_page: 20 } }, 'GitHub');
+  return data.map((cm) => ({ sha: cm.sha?.slice(0, 8), message: cm.commit?.message?.split('\n')[0], author: cm.commit?.author?.name, date: cm.commit?.author?.date, webUrl: cm.html_url }));
 }
 
 export async function listPullRequests(owner, repo) {

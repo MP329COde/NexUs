@@ -214,4 +214,34 @@ test.describe('Isolation inter-projets (API)', () => {
     expect(res.status()).toBe(401);
     await anon.dispose();
   });
+
+  // Espace de travail projet (voir services/projectWorkspaceService.js) :
+  // agrège les dépôts liés au projet sans jamais planter ni exposer de
+  // données inventées quand la forge n'est pas configurée ou le dépôt
+  // inaccessible — chaque entrée porte alors son propre champ `error`.
+  test('le workspace d’un projet sans dépôt lié renvoie une liste vide honnête', async () => {
+    const res = await aliceApi.get(`/api/projects/${projectAliceId}/workspace`);
+    expect(res.ok()).toBeTruthy();
+    const { repos } = await res.json();
+    expect(repos).toEqual([]);
+  });
+
+  test('le workspace isole aussi les projets : Bob ne peut pas lire celui d’Alice', async () => {
+    const res = await bobApi.get(`/api/projects/${projectAliceId}/workspace`);
+    expect(res.status()).toBe(404);
+  });
+
+  test('un dépôt lié mais inaccessible (forge non configurée) remonte une erreur par entrée, sans faire échouer tout le workspace', async () => {
+    const withRepo = await adminApi.post('/api/projects', {
+      data: { name: 'Projet avec dépôt E2E', memberIds: [], repoKeys: ['gitlab:999999'] }
+    });
+    expect(withRepo.ok()).toBeTruthy();
+    const { project } = await withRepo.json();
+    const res = await adminApi.get(`/api/projects/${project.id}/workspace`);
+    expect(res.ok()).toBeTruthy();
+    const { repos } = await res.json();
+    expect(repos).toHaveLength(1);
+    expect(repos[0].key).toBe('gitlab:999999');
+    expect(repos[0].error).toBeTruthy();
+  });
 });
