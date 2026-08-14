@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole, toPublicUser } from '../middleware/auth.js';
-import { listUsers, createUser, setUserAdminFields, deleteUser } from '../store/usersStore.js';
+import { listUsers, createUser, setUserAdminFields, setTerminalTier, deleteUser } from '../store/usersStore.js';
 import { logAudit } from '../services/auditService.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
 
@@ -30,6 +30,14 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const updated = setUserAdminFields(req.params.id, { role, active });
   if (!updated) return res.status(404).json({ ok: false, error: 'Utilisateur introuvable' });
   logAudit(req, 'user.update', { userId: updated.id, email: updated.email, role, active });
+  res.json({ ok: true, user: toPublicUser(updated) });
+}));
+
+router.put('/:id/terminal-tier', asyncHandler(async (req, res) => {
+  const { tier } = req.body || {};
+  const updated = setTerminalTier(req.params.id, tier ?? null);
+  if (!updated) return res.status(404).json({ ok: false, error: 'Utilisateur introuvable' });
+  logAudit(req, 'user.terminal_tier.update', { userId: updated.id, email: updated.email, tier: tier ?? null });
   res.json({ ok: true, user: toPublicUser(updated) });
 }));
 

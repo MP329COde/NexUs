@@ -35,6 +35,7 @@ import reposRoutes from './repos.routes.js';
 import reviewsRoutes from './reviews.routes.js';
 import pipelinesRoutes from './pipelines.routes.js';
 import shortcutsRoutes from './shortcuts.routes.js';
+import terminalRoutes from './terminal.routes.js';
 
 const router = Router();
 
@@ -74,5 +75,6 @@ router.use('/repos', reposRoutes);
 router.use('/reviews', reviewsRoutes);
 router.use('/pipelines', pipelinesRoutes);
 router.use('/shortcuts', shortcutsRoutes);
+router.use('/terminal', terminalRoutes);
 
 export default router;

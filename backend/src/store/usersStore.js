@@ -53,6 +53,12 @@ export function createUser({ email, password, name, username, role = 'user', mus
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
     theme: null,
     mustOnboard,
+    // Palier du Terminal sécurisé — indépendant du rôle admin/user : null
+    // (par défaut) = aucun accès au terminal, même pour un compte "user".
+    // Un admin de plateforme a toujours le palier 'admin' (accès complet),
+    // implicitement, sans avoir besoin d'être positionné ici — cf.
+    // resolveTerminalTier() dans terminalService.js.
+    terminalTier: null,
     createdAt: new Date().toISOString()
   };
   users.push(user);
@@ -105,6 +111,19 @@ export function setUserAdminFields(id, { role, active }) {
   }
   if (role) users[idx].role = role;
   if (active !== undefined) users[idx].active = active;
+  writeStore('users', users);
+  return users[idx];
+}
+
+const TERMINAL_TIERS = ['developer', 'maintainer', 'admin', null];
+export function setTerminalTier(id, tier) {
+  if (!TERMINAL_TIERS.includes(tier)) {
+    throw Object.assign(new Error('Palier de terminal invalide'), { status: 400 });
+  }
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].terminalTier = tier;
   writeStore('users', users);
   return users[idx];
 }

@@ -13,7 +13,12 @@ export function signSession(user) {
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
 export function toPublicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, username: user.username || null, role: user.role, active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor, theme: user.theme || 'system', mustOnboard: user.mustOnboard === true };
+  return {
+    id: user.id, email: user.email, name: user.name, username: user.username || null, role: user.role,
+    active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor,
+    theme: user.theme || 'system', mustOnboard: user.mustOnboard === true,
+    terminalTier: user.role === 'admin' ? 'admin' : (user.terminalTier || null)
+  };
 }
 
 export function requireAuth(req, res, next) {

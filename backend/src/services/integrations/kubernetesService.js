@@ -1,4 +1,5 @@
 import * as k8s from '@kubernetes/client-node';
+import { Writable } from 'node:stream';
 import { getRawIntegration } from '../../store/settingsStore.js';
 import { IntegrationError, notConfigured } from './httpClient.js';
 
@@ -19,6 +20,7 @@ function clients() {
   const kc = buildKubeConfig();
   if (!kc) return null;
   return {
+    kc,
     core: kc.makeApiClient(k8s.CoreV1Api),
     apps: kc.makeApiClient(k8s.AppsV1Api),
     custom: kc.makeApiClient(k8s.CustomObjectsApi)
@@ -375,5 +377,59 @@ export async function listCertManagerCertificates(namespace) {
       ready: (item.status?.conditions || []).find((c2) => c2.type === 'Ready')?.status === 'True',
       renewalTime: item.status?.renewalTime
     }));
+  });
+}
+
+// --- Terminal sécurisé (voir terminalService.js pour les permissions par
+// palier) : exécution non-interactive d'une commande dans un conteneur
+// (pas de session shell ouverte — une commande, un résultat, auditable), et
+// "apply" équivalent server-side apply de kubectl, tous deux au travers de
+// l'API Kubernetes officielle, jamais d'un vrai shell côté serveur.
+const EXEC_TIMEOUT_MS = 10_000;
+const EXEC_OUTPUT_LIMIT = 20_000;
+
+class CappedWritable extends Writable {
+  constructor() {
+    super();
+    this.chunks = [];
+    this.length = 0;
+  }
+  _write(chunk, enc, cb) {
+    if (this.length < EXEC_OUTPUT_LIMIT) { this.chunks.push(chunk); this.length += chunk.length; }
+    cb();
+  }
+  text() { return Buffer.concat(this.chunks).toString('utf8').slice(0, EXEC_OUTPUT_LIMIT); }
+}
+
+export async function execInPod(namespace, pod, container, command) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  const exec = new k8s.Exec(c.kc);
+  const stdout = new CappedWritable();
+  const stderr = new CappedWritable();
+  let exitStatus = null;
+
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new IntegrationError(`Commande interrompue après ${EXEC_TIMEOUT_MS / 1000}s (pas de session interactive)`, { status: 504 })), EXEC_TIMEOUT_MS);
+    exec.exec(namespace, pod, container || undefined, command, stdout, stderr, null, false, (status) => {
+      exitStatus = status;
+      clearTimeout(timer);
+      resolve();
+    }).catch((err) => { clearTimeout(timer); reject(new IntegrationError(`Kubernetes · exec: ${err.message}`, { status: 502, cause: err })); });
+  });
+
+  return { stdout: stdout.text(), stderr: stderr.text(), status: exitStatus?.status || 'Unknown', message: exitStatus?.message };
+}
+
+export async function applyManifest(manifest) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  if (!manifest?.apiVersion || !manifest?.kind || !manifest?.metadata?.name) {
+    throw new IntegrationError('Manifest invalide : apiVersion, kind et metadata.name sont requis', { status: 400 });
+  }
+  return wrap('apply', async () => {
+    const objectApi = k8s.KubernetesObjectApi.makeApiClient(c.kc);
+    const result = await objectApi.patch(manifest, undefined, undefined, 'nexus-console', true, k8s.PatchStrategy.ServerSideApply);
+    return { kind: result.kind, name: result.metadata.name, namespace: result.metadata.namespace, resourceVersion: result.metadata.resourceVersion };
   });
 }
