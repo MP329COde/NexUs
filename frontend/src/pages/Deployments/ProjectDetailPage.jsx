@@ -190,8 +190,81 @@ export default function ProjectDetailPage() {
         );
       })()}
 
+      {roleAtLeast(projectRole, 'maintainer') && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+          <WebhookPanel projectId={id} />
+        </div>
+      )}
+
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
     </>
+  );
+}
+
+// Le secret n'est chargé qu'à la demande (clic sur "Afficher"), jamais au
+// chargement de la page : cohérent avec la politique du coffre-fort projet
+// (ProjectVaultPanel) — un secret capable d'ouvrir des incidents au nom du
+// projet ne doit pas transiter par le réseau tant que personne n'en a
+// explicitement besoin.
+function WebhookPanel({ projectId }) {
+  const notify = useNotify();
+  const [webhook, setWebhook] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [rotating, setRotating] = useState(false);
+
+  async function reveal() {
+    setLoading(true);
+    try {
+      setWebhook(await api.get(`/projects/${projectId}/webhook`));
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function rotate() {
+    if (!confirm("Régénérer le secret ? L'ancienne configuration GitLab/GitHub cessera immédiatement de fonctionner.")) return;
+    setRotating(true);
+    try {
+      const res = await api.post(`/projects/${projectId}/webhook/rotate`);
+      setWebhook((w) => ({ ...w, secret: res.secret }));
+      notify('Secret régénéré', { type: 'ok' });
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  return (
+    <Panel title="Webhook" sub="Réagit automatiquement aux pipelines/workflows en échec (ouvre un incident)" span={12}>
+      <div style={{ padding: 16 }}>
+        {!webhook ? (
+          <button className="btn-outline" onClick={reveal} disabled={loading}>{loading ? 'Chargement…' : 'Afficher la configuration'}</button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>URL GitLab (Project Hooks → URL, activer "Pipeline events")</div>
+              <code className="mono" style={{ fontSize: 12 }}>{webhook.gitlabUrl}</code>
+            </div>
+            <div>
+              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>URL GitHub (Settings → Webhooks → Payload URL, événement "Workflow runs")</div>
+              <code className="mono" style={{ fontSize: 12 }}>{webhook.githubUrl}</code>
+            </div>
+            <div>
+              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>Secret (GitLab : "Secret Token" — GitHub : "Secret")</div>
+              <code className="mono" style={{ fontSize: 12 }}>{webhook.secret}</code>
+            </div>
+            <div>
+              <button className="btn-outline" style={{ color: 'var(--tone-crit-fg)' }} onClick={rotate} disabled={rotating}>
+                {rotating ? 'Régénération…' : 'Régénérer le secret'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }
 
