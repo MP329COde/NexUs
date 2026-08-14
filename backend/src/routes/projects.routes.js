@@ -9,6 +9,8 @@ import * as orgStore from '../store/orgStore.js';
 import { pool } from '../db/pool.js';
 import { logAudit } from '../services/auditService.js';
 import { buildProjectWorkspace } from '../services/projectWorkspaceService.js';
+import * as gitlab from '../services/integrations/gitlabService.js';
+import * as github from '../services/integrations/githubService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -126,6 +128,70 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
 router.get('/:id/workspace', loadProjectAccess(), asyncHandler(async (req, res) => {
   const repos = await buildProjectWorkspace(req.legacyProject.repoKeys);
   res.json({ ok: true, project: req.legacyProject, role: req.projectRole, repos });
+}));
+
+// repoKey (ex. "gitlab:42", "github:org/repo") tel que stocké dans
+// project.repoKeys. Les actions ci-dessous exigent que le dépôt ciblé y
+// figure explicitement : sans ce garde-fou, un développeur du projet A
+// pourrait relancer un pipeline ou approuver une revue sur un dépôt du
+// projet B simplement en devinant sa clé — le rôle projet ne suffit pas à
+// lui seul, la portée (quel dépôt appartient à quel projet) doit aussi être
+// vérifiée à chaque action d'écriture.
+function assertRepoInProject(project, repoKey) {
+  if (!project.repoKeys.includes(repoKey)) {
+    throw Object.assign(new Error("Ce dépôt n'est pas rattaché à ce projet"), { status: 403 });
+  }
+}
+
+// Relance un pipeline/workflow en échec directement depuis l'espace de
+// travail du projet, plutôt que depuis la vue globale Pipelines CI/CD
+// (réservée aux admins pour l'usage transverse). Un développeur du projet
+// suffit : relancer une exécution CI n'est pas une action destructrice.
+router.post('/:id/workspace/pipelines/:runKey/retry', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  const runKey = decodeURIComponent(req.params.runKey);
+  const [provider, ...rest] = runKey.split(':');
+  if (provider === 'gitlab') {
+    const [projectId, pipelineId] = rest;
+    assertRepoInProject(req.legacyProject, `gitlab:${projectId}`);
+    const result = await gitlab.retryPipeline(projectId, pipelineId);
+    logAudit(req, 'pipeline.retried', { projectId: req.legacyProject.id, provider, repo: projectId, pipelineId });
+    return res.json({ ok: true, result });
+  }
+  if (provider === 'github') {
+    const repoFull = rest.slice(0, -1).join(':');
+    const runId = rest[rest.length - 1];
+    const [owner, repo] = repoFull.split('/');
+    assertRepoInProject(req.legacyProject, `github:${repoFull}`);
+    const result = await github.rerunWorkflow(owner, repo, runId);
+    logAudit(req, 'pipeline.retried', { projectId: req.legacyProject.id, provider, owner, repo, runId });
+    return res.json({ ok: true, result });
+  }
+  res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+// Approbation de revue de code : exige maintainer+ (pas developer), car
+// approuver une MR/PR conditionne un merge en production — plus proche d'une
+// action de gouvernance que d'une action de développement courante.
+router.post('/:id/workspace/reviews/:reviewKey/approve', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const reviewKey = decodeURIComponent(req.params.reviewKey);
+  const [provider, ...rest] = reviewKey.split(':');
+  if (provider === 'gitlab') {
+    const [projectId, iid] = rest;
+    assertRepoInProject(req.legacyProject, `gitlab:${projectId}`);
+    const result = await gitlab.approveMergeRequest(projectId, iid);
+    logAudit(req, 'review.approved', { projectId: req.legacyProject.id, provider, repo: projectId, iid });
+    return res.json({ ok: true, result });
+  }
+  if (provider === 'github') {
+    const repoFull = rest.slice(0, -1).join(':');
+    const number = rest[rest.length - 1];
+    const [owner, repo] = repoFull.split('/');
+    assertRepoInProject(req.legacyProject, `github:${repoFull}`);
+    const result = await github.approvePullRequest(owner, repo, number);
+    logAudit(req, 'review.approved', { projectId: req.legacyProject.id, provider, owner, repo, number });
+    return res.json({ ok: true, result });
+  }
+  res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
 }));
 
 // --- Tâches : lecture/écriture ouverte à tout membre du projet (travail

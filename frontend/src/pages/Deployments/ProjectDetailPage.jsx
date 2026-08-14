@@ -150,7 +150,7 @@ export default function ProjectDetailPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
-        <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} />
+        <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} projectId={id} onChanged={workspace.reload} />
       </div>
 
       {(() => {
@@ -177,7 +177,41 @@ const PIPELINE_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cour
 // (forge non configurée, token invalide, dépôt supprimé) affiche son
 // message d'erreur exact plutôt que d'être masqué ou de faire planter tout
 // le panneau — jamais de donnée inventée à sa place.
-function RepoActivityPanel({ repos, loading }) {
+function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
+  const notify = useNotify();
+  const [busyKey, setBusyKey] = useState(null);
+
+  // Les deux actions ci-dessous appellent les routes scopées au projet
+  // (POST /projects/:id/workspace/pipelines/:runKey/retry et
+  // .../reviews/:reviewKey/approve — voir routes/projects.routes.js) : le
+  // backend revérifie systématiquement le rôle projet ET que le dépôt ciblé
+  // fait bien partie de ce projet, donc un 403 ici est un refus réel, pas
+  // seulement un bouton masqué côté UI.
+  async function retryPipeline(runId) {
+    setBusyKey(runId);
+    try {
+      await api.post(`/projects/${projectId}/workspace/pipelines/${encodeURIComponent(runId)}/retry`);
+      notify('Pipeline relancé', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyKey(null);
+    }
+  }
+  async function approveReview(reviewKey) {
+    setBusyKey(reviewKey);
+    try {
+      await api.post(`/projects/${projectId}/workspace/reviews/${encodeURIComponent(reviewKey)}/approve`);
+      notify('Revue approuvée', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   return (
     <Panel title="Activité des dépôts" sub="Commits, branches, revues et pipelines — par dépôt rattaché" span={12}>
       {loading ? (
@@ -199,20 +233,39 @@ function RepoActivityPanel({ repos, loading }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <a href={r.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, textDecoration: 'none', color: 'inherit', flex: 1 }}>{r.name}</a>
                     <span className="badge badge-mut">{r.branches?.length ?? 0} branche(s)</span>
-                    <span className="badge badge-mut">{r.mergeRequests?.length ?? 0} revue(s) ouverte(s)</span>
                     {r.pipelines?.[0] && (
-                      <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]}`} style={{ textDecoration: 'none' }}>
-                        <span className="dot" />{PIPELINE_LABEL[r.pipelines[0].status]}
-                      </a>
+                      <>
+                        <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]}`} style={{ textDecoration: 'none' }}>
+                          <span className="dot" />{PIPELINE_LABEL[r.pipelines[0].status]}
+                        </a>
+                        {r.pipelines[0].retryable && (
+                          <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyKey === r.pipelines[0].id} onClick={() => retryPipeline(r.pipelines[0].id)}>
+                            {busyKey === r.pipelines[0].id ? '…' : 'Relancer'}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                   {r.commits?.[0] && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: r.mergeRequests?.length ? 8 : 0 }}>
                       <span className="mono">{r.commits[0].sha}</span>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.commits[0].message}</span>
                       <span className="faint">{r.commits[0].author}</span>
                     </div>
                   )}
+                  {r.mergeRequests?.map((mr) => {
+                    const reviewKey = `${r.provider}:${r.id}:${mr.id}`;
+                    return (
+                      <div key={mr.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12 }}>
+                        <Icon name="gitBranch" size={12} style={{ color: 'var(--text-faint)' }} />
+                        <a href={mr.webUrl} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'inherit' }}>{mr.title}</a>
+                        <span className="faint mono" style={{ fontSize: 11 }}>{mr.sourceBranch} → {mr.targetBranch}</span>
+                        <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyKey === reviewKey} onClick={() => approveReview(reviewKey)}>
+                          {busyKey === reviewKey ? '…' : 'Approuver'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </div>

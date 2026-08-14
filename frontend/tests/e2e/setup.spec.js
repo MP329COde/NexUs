@@ -244,4 +244,41 @@ test.describe('Isolation inter-projets (API)', () => {
     expect(repos[0].key).toBe('gitlab:999999');
     expect(repos[0].error).toBeTruthy();
   });
+
+  // Actions d'écriture depuis l'espace de travail (relance de pipeline,
+  // approbation de revue) : le rôle projet ET l'appartenance du dépôt ciblé
+  // au projet doivent être vérifiées — voir routes/projects.routes.js
+  // assertRepoInProject(). Cette suite tourne sans DATABASE_URL (voir
+  // playwright.config.js) : les projets restent donc sur le modèle legacy
+  // (memberIds plat, tout membre a un accès complet équivalent à
+  // "maintainer" — voir middleware/projectAccess.js). La distinction fine
+  // developer/maintainer (le rôle maintainer+ requis pour approve) n'est
+  // donc pas observable ici : elle est vérifiée manuellement avec un vrai
+  // Postgres (voir le message du commit associé), pas par cette suite.
+  test('Alice peut relancer un pipeline sur un dépôt de son projet (échoue proprement, GitLab non configuré)', async () => {
+    const withRepo = await adminApi.put(`/api/projects/${projectAliceId}`, { data: { repoKeys: ['gitlab:42'] } });
+    expect(withRepo.ok()).toBeTruthy();
+    const res = await aliceApi.post(`/api/projects/${projectAliceId}/workspace/pipelines/gitlab:42:1/retry`);
+    // Passe la garde RBAC + portée (dépôt bien rattaché) : l'échec vient
+    // uniquement de GitLab non configuré dans cet environnement de test,
+    // jamais d'un refus de droits.
+    expect(res.status()).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/GitLab non configuré/);
+  });
+
+  test('Alice ne peut pas relancer un pipeline sur un dépôt non rattaché à son projet (403, pas de fuite inter-projet)', async () => {
+    const res = await aliceApi.post(`/api/projects/${projectAliceId}/workspace/pipelines/gitlab:999888:1/retry`);
+    expect(res.status()).toBe(403);
+  });
+
+  test('Alice ne peut pas approuver de revue sur un dépôt non rattaché à son projet (403, pas de fuite inter-projet)', async () => {
+    const res = await aliceApi.post(`/api/projects/${projectAliceId}/workspace/reviews/gitlab:999888:1/approve`);
+    expect(res.status()).toBe(403);
+  });
+
+  test("Bob ne peut déclencher aucune action d'écriture sur le projet d'Alice", async () => {
+    const res = await bobApi.post(`/api/projects/${projectAliceId}/workspace/pipelines/gitlab:42:1/retry`);
+    expect(res.status()).toBe(404);
+  });
 });
