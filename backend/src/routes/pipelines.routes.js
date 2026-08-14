@@ -3,27 +3,30 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
+import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const GITLAB_STATUS = { success: 'success', failed: 'failed', running: 'running', pending: 'running', canceled: 'cancelled', skipped: 'cancelled' };
-function normalizeGitlab(p, repoName) {
+function normalizeGitlab(p, repoName, projectId) {
   const durationSeconds = p.duration ?? (p.updatedAt && p.createdAt && ['success', 'failed', 'canceled'].includes(p.status) ? Math.max(0, Math.round((new Date(p.updatedAt) - new Date(p.createdAt)) / 1000)) : null);
   return {
-    id: `gitlab-${p.id}`, provider: 'gitlab', repo: repoName, branch: p.ref,
+    id: `gitlab:${projectId}:${p.id}`, provider: 'gitlab', repo: repoName, branch: p.ref,
     status: GITLAB_STATUS[p.status] || 'other', durationSeconds,
-    createdAt: p.createdAt, webUrl: p.webUrl, trigger: 'push'
+    createdAt: p.createdAt, webUrl: p.webUrl, trigger: 'push',
+    retryable: ['failed', 'cancelled'].includes(GITLAB_STATUS[p.status])
   };
 }
-function normalizeGithub(r, repoName) {
+function normalizeGithub(r, repoName, owner, repo) {
   const status = r.status === 'completed'
     ? (r.conclusion === 'success' ? 'success' : r.conclusion === 'cancelled' ? 'cancelled' : 'failed')
     : 'running';
   const durationSeconds = r.updatedAt && r.createdAt && status !== 'running' ? Math.max(0, Math.round((new Date(r.updatedAt) - new Date(r.createdAt)) / 1000)) : null;
   return {
-    id: `github-${r.id}`, provider: 'github', repo: repoName, branch: r.branch,
-    status, durationSeconds, createdAt: r.createdAt, webUrl: r.webUrl, trigger: 'push'
+    id: `github:${owner}/${repo}:${r.id}`, provider: 'github', repo: repoName, branch: r.branch,
+    status, durationSeconds, createdAt: r.createdAt, webUrl: r.webUrl, trigger: 'push',
+    retryable: status === 'failed'
   };
 }
 
@@ -37,7 +40,7 @@ router.get('/runs', asyncHandler(async (req, res) => {
     const projects = (await gitlab.listProjects()).slice(0, 12);
     const perProject = await Promise.allSettled(projects.map((p) => gitlab.listPipelines(p.id)));
     perProject.forEach((r, i) => {
-      if (r.status === 'fulfilled') runs.push(...r.value.map((p) => normalizeGitlab(p, projects[i].path)));
+      if (r.status === 'fulfilled') runs.push(...r.value.map((p) => normalizeGitlab(p, projects[i].path, projects[i].id)));
     });
   } catch { /* GitLab non configuré */ }
 
@@ -45,12 +48,35 @@ router.get('/runs', asyncHandler(async (req, res) => {
     const repos = (await github.listRepos()).slice(0, 12);
     const perRepo = await Promise.allSettled(repos.map((r) => github.listWorkflowRuns(r.fullName.split('/')[0], r.name)));
     perRepo.forEach((res_, i) => {
-      if (res_.status === 'fulfilled') runs.push(...res_.value.map((r) => normalizeGithub(r, repos[i].fullName)));
+      const [owner, repo] = repos[i].fullName.split('/');
+      if (res_.status === 'fulfilled') runs.push(...res_.value.map((r) => normalizeGithub(r, repos[i].fullName, owner, repo)));
     });
   } catch { /* GitHub non configuré */ }
 
   runs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json({ ok: true, items: runs });
+}));
+
+// Relance une exécution en échec/annulée directement sur la forge d'origine
+// (proxy vers l'API réelle GitLab/GitHub, pas de réexécution simulée).
+router.post('/runs/:id/retry', asyncHandler(async (req, res) => {
+  const key = decodeURIComponent(req.params.id);
+  const [provider, ...rest] = key.split(':');
+  if (provider === 'gitlab') {
+    const [projectId, pipelineId] = rest;
+    const result = await gitlab.retryPipeline(projectId, pipelineId);
+    logAudit(req, 'pipeline.retried', { provider, projectId, pipelineId });
+    return res.json({ ok: true, result });
+  }
+  if (provider === 'github') {
+    const repoFull = rest.slice(0, -1).join(':');
+    const runId = rest[rest.length - 1];
+    const [owner, repo] = repoFull.split('/');
+    const result = await github.rerunWorkflow(owner, repo, runId);
+    logAudit(req, 'pipeline.retried', { provider, owner, repo, runId });
+    return res.json({ ok: true, result });
+  }
+  res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
 }));
 
 export default router;

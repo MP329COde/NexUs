@@ -37,9 +37,30 @@ export async function getApplication(name) {
   return request(c.http, { method: 'GET', url: `/api/v1/applications/${encodeURIComponent(name)}` }, 'Argo CD');
 }
 
-export async function syncApplication(name) {
+export async function syncApplication(name, revision) {
   const c = client();
   if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });
-  await request(c.http, { method: 'POST', url: `/api/v1/applications/${encodeURIComponent(name)}/sync`, data: {} }, 'Argo CD');
-  return { ok: true, message: `Synchronisation déclenchée pour ${name}` };
+  const data = revision ? { revision } : {};
+  await request(c.http, { method: 'POST', url: `/api/v1/applications/${encodeURIComponent(name)}/sync`, data }, 'Argo CD');
+  return { ok: true, message: revision ? `Synchronisation vers ${revision.slice(0, 7)} déclenchée pour ${name}` : `Synchronisation déclenchée pour ${name}` };
+}
+
+// L'historique de déploiement (status.history) est ce que syncApplication a
+// déjà appliqué avec succès par le passé — utilisé pour proposer un retour
+// arrière réel (pas une simple resynchronisation de l'état courant).
+export async function getApplicationHistory(name) {
+  const app = await getApplication(name);
+  return (app.status?.history || []).map((h) => ({
+    id: h.id,
+    revision: h.revision,
+    deployedAt: h.deployedAt,
+    source: h.source
+  })).reverse();
+}
+
+export async function rollbackApplication(name, historyId) {
+  const c = client();
+  if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });
+  await request(c.http, { method: 'POST', url: `/api/v1/applications/${encodeURIComponent(name)}/rollback`, data: { id: historyId } }, 'Argo CD');
+  return { ok: true, message: `Retour arrière déclenché pour ${name}` };
 }

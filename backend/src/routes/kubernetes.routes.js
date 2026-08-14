@@ -17,7 +17,9 @@ router.get('/pods/:namespace/:pod/logs', asyncHandler(async (req, res) => {
   res.json({ ok: true, logs });
 }));
 router.post('/deployments/:namespace/:name/restart', asyncHandler(async (req, res) => {
-  res.json({ ok: true, ...(await k8s.restartDeployment(req.params.namespace, req.params.name)) });
+  const result = await k8s.restartDeployment(req.params.namespace, req.params.name);
+  logAudit(req, 'kubernetes.deployment.restarted', { namespace: req.params.namespace, name: req.params.name });
+  res.json({ ok: true, ...result });
 }));
 router.post('/deployments/:namespace/:name/scale', asyncHandler(async (req, res) => {
   const replicas = Number(req.body?.replicas);
@@ -26,6 +28,16 @@ router.post('/deployments/:namespace/:name/scale', asyncHandler(async (req, res)
   }
   const result = await k8s.scaleDeployment(req.params.namespace, req.params.name, replicas);
   logAudit(req, 'kubernetes.deployment.scaled', { namespace: req.params.namespace, name: req.params.name, replicas });
+  res.json({ ok: true, ...result });
+}));
+router.post('/deployments/:namespace/:name/rollback', asyncHandler(async (req, res) => {
+  const result = await k8s.rollbackDeployment(req.params.namespace, req.params.name);
+  logAudit(req, 'kubernetes.deployment.rolledback', { namespace: req.params.namespace, name: req.params.name, revision: result.revision });
+  res.json({ ok: true, ...result });
+}));
+router.post('/deployments/:namespace/:name/purge', asyncHandler(async (req, res) => {
+  const result = await k8s.purgeDeploymentPods(req.params.namespace, req.params.name);
+  logAudit(req, 'kubernetes.deployment.purged', { namespace: req.params.namespace, name: req.params.name, count: result.count });
   res.json({ ok: true, ...result });
 }));
 router.delete('/pods/:namespace/:pod', asyncHandler(async (req, res) => {

@@ -123,6 +123,51 @@ export async function restartDeployment(namespace, name) {
   });
 }
 
+// "Rollback" au sens kubectl rollout undo : le ReplicaSet précédent (celui
+// juste avant l'actuel par numéro de révision) porte encore le pod template
+// d'avant le dernier déploiement — on le recopie dans le Deployment. Kubernetes
+// ne conserve que les ReplicaSets gardés par `revisionHistoryLimit` (10 par
+// défaut) : au-delà, il n'y a plus rien à restaurer.
+export async function rollbackDeployment(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('rollback deployment', async () => {
+    const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
+    const selector = Object.entries(deployment.spec.selector.matchLabels || {}).map(([k, v]) => `${k}=${v}`).join(',');
+    const rsList = await c.apps.listNamespacedReplicaSet({ namespace, labelSelector: selector });
+    const owned = rsList.items
+      .filter((rs) => (rs.metadata.ownerReferences || []).some((o) => o.kind === 'Deployment' && o.name === name))
+      .map((rs) => ({ rs, revision: Number(rs.metadata.annotations?.['deployment.kubernetes.io/revision'] || 0) }))
+      .sort((a, b) => b.revision - a.revision);
+    if (owned.length < 2) {
+      throw new IntegrationError(`Aucune révision précédente disponible pour ${namespace}/${name}`, { status: 409 });
+    }
+    const previous = owned[1].rs;
+    await c.apps.patchNamespacedDeployment({
+      name,
+      namespace,
+      body: [{ op: 'replace', path: '/spec/template', value: previous.spec.template }]
+    });
+    return { ok: true, message: `${namespace}/${name} restauré à la révision ${owned[1].revision}`, revision: owned[1].revision };
+  });
+}
+
+// Purge : supprime immédiatement tous les pods du deployment (contrairement
+// au redémarrage progressif de restartDeployment). Coupe la disponibilité
+// le temps que le contrôleur recrée les pods — action volontairement plus
+// radicale, à réserver aux cas où un rolling restart ne suffit pas.
+export async function purgeDeploymentPods(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('purge deployment pods', async () => {
+    const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
+    const selector = Object.entries(deployment.spec.selector.matchLabels || {}).map(([k, v]) => `${k}=${v}`).join(',');
+    const podList = await c.core.listNamespacedPod({ namespace, labelSelector: selector });
+    await Promise.all(podList.items.map((p) => c.core.deleteNamespacedPod({ name: p.metadata.name, namespace })));
+    return { ok: true, message: `${podList.items.length} pod(s) purgé(s) pour ${namespace}/${name}`, count: podList.items.length };
+  });
+}
+
 export async function getPodLogs(namespace, pod, container, tailLines = 200) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
@@ -151,6 +196,23 @@ export async function deletePod(namespace, name) {
   return wrap('delete pod', async () => {
     await c.core.deleteNamespacedPod({ name, namespace });
     return { ok: true, message: `Pod ${namespace}/${name} supprimé` };
+  });
+}
+
+// Renouvellement forcé : cert-manager n'expose pas d'endpoint "renew" via
+// l'API Kubernetes standard (contrairement à la CLI kubectl cert-manager,
+// qui patche un sous-objet interne). Le mécanisme réel et supporté est de
+// supprimer le Secret TLS associé : cert-manager le détecte manquant et
+// réémet immédiatement un certificat.
+export async function renewCertificate(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('renew certificate', async () => {
+    const cert = await c.custom.getNamespacedCustomObject({ group: 'cert-manager.io', version: 'v1', namespace, plural: 'certificates', name });
+    const secretName = cert.spec?.secretName;
+    if (!secretName) throw new IntegrationError(`Certificat ${namespace}/${name} sans secretName`, { status: 409 });
+    await c.core.deleteNamespacedSecret({ name: secretName, namespace });
+    return { ok: true, message: `Renouvellement déclenché pour ${namespace}/${name} (secret ${secretName} recréé par cert-manager)` };
   });
 }
 
