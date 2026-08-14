@@ -76,6 +76,7 @@ router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandl
 
 router.delete('/:id', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
   store.deleteProject(req.params.id);
+  if (req.pgProject) await orgStore.deleteProjectByLegacyId(req.params.id);
   logAudit(req, 'project.delete', { projectId: req.params.id });
   res.json({ ok: true });
 }));

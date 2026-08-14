@@ -97,6 +97,17 @@ export async function getProjectByLegacyId(legacyId) {
   return rows[0] || null;
 }
 
+// Supprime le projet relationnel (et tout ce qui en dépend en cascade :
+// project_members, environments, jobs, incidents — voir les FK ON DELETE
+// CASCADE des migrations) quand un projet legacy migré est supprimé. Sans
+// cet appel, la suppression via DELETE /api/projects/:id (routes/projects.routes.js)
+// ne touchait que le store JSON et laissait le projet Postgres orphelin
+// indéfiniment, avec tous ses membres/jobs/incidents pointant vers un
+// legacy_id qui n'existe plus.
+export async function deleteProjectByLegacyId(legacyId) {
+  await query('DELETE FROM projects WHERE legacy_id = $1', [legacyId]);
+}
+
 export async function createProject({ orgId, name, slug, description, tags, repoKeys, ownerUserId, legacyId }) {
   const client = await (await import('../db/pool.js')).requirePool().connect();
   try {
