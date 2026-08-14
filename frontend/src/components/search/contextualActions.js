@@ -33,6 +33,7 @@ export function contextualActions(context, navigate, closePalette) {
   if (context.type === 'deployment') {
     const base = `/kubernetes?ns=${encodeURIComponent(context.namespace)}&deploy=${encodeURIComponent(context.name)}`;
     return [
+      { label: 'Diagnostiquer', icon: 'gauge', run: go(`${base}&open=diagnose`) },
       { label: 'Redémarrer (rolling restart)', icon: 'refresh', run: go(`${base}&open=restart`) },
       { label: 'Mettre à l\'échelle', icon: 'layers', run: go(`${base}&open=scale`) },
       { label: 'Revenir à la révision précédente', icon: 'refresh', tone: 'crit', run: go(`${base}&open=rollback`) },

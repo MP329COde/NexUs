@@ -12,11 +12,13 @@ import { useNotify } from '../../context/NotificationContext.jsx';
 import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
 import PodLogsDialog from './PodLogsDialog.jsx';
 import PodDetailDialog from './PodDetailDialog.jsx';
+import DiagnosticsModal from './DiagnosticsModal.jsx';
 
 export default function KubernetesPage() {
   const [namespace, setNamespace] = useState('');
   const [logsPod, setLogsPod] = useState(null);
   const [detailPod, setDetailPod] = useState(null); // { pod, tab }
+  const [diagnosing, setDiagnosing] = useState(null); // { namespace, name }
   const [scaling, setScaling] = useState(null); // "ns/name" en cours d'édition
   const [scaleValue, setScaleValue] = useState('');
   const [pending, setPending] = useState(null); // action en attente de confirmation
@@ -159,6 +161,7 @@ export default function KubernetesPage() {
       if (open === 'restart') askRestart(ns, deployName, d?.replicas);
       else if (open === 'rollback') askRollback(ns, deployName);
       else if (open === 'purge') askPurge(ns, deployName, d?.replicas);
+      else if (open === 'diagnose') setDiagnosing({ namespace: ns, name: deployName });
       else if (open === 'scale') { setNamespace(ns); setScaling(`${ns}/${deployName}`); setScaleValue(String(d?.replicas ?? '')); }
     }
     setSearchParams({}, { replace: true });
@@ -218,6 +221,9 @@ export default function KubernetesPage() {
                         <span className="btn-outline" style={btnMini} onClick={() => { setScaling(key); setScaleValue(String(d.replicas)); }}>Scale</span>
                         <span className="btn-outline" style={btnMini} onClick={() => askRollback(d.namespace, d.name)}>Rollback</span>
                         <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => askPurge(d.namespace, d.name, d.replicas)}>Purger</span>
+                        <span className="btn-outline" style={btnMini} onClick={() => setDiagnosing({ namespace: d.namespace, name: d.name })}>
+                          <Icon name="gauge" size={11} />Diagnostiquer
+                        </span>
                         <span className="btn-outline" style={btnMini} title="Command Center" onClick={() => openPalette({ type: 'deployment', namespace: d.namespace, name: d.name })}>
                           <Icon name="more" size={13} />
                         </span>
@@ -259,6 +265,7 @@ export default function KubernetesPage() {
 
       {logsPod && <PodLogsDialog pod={logsPod} onClose={() => setLogsPod(null)} />}
       {detailPod && <PodDetailDialog pod={detailPod.pod} initialTab={detailPod.tab} onClose={() => setDetailPod(null)} />}
+      {diagnosing && <DiagnosticsModal namespace={diagnosing.namespace} name={diagnosing.name} onClose={() => setDiagnosing(null)} />}
 
       {pending && (
         <ActionConfirmModal
