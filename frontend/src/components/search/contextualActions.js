@@ -22,6 +22,7 @@ export function contextualActions(context, navigate, closePalette) {
     const base = `/kubernetes?ns=${encodeURIComponent(context.namespace)}&pod=${encodeURIComponent(context.name)}`;
     return [
       { label: 'Voir les logs', icon: 'terminal', run: go(`${base}&open=logs`) },
+      { label: 'Exécuter une commande (Terminal sécurisé)', icon: 'terminal', run: go(`/kubernetes/terminal?prefill=${encodeURIComponent(`exec ${context.name} -n ${context.namespace} -- `)}`) },
       { label: 'Redémarrer (supprimer le pod)', icon: 'refresh', tone: 'warn', run: go(`${base}&open=restart`) },
       { label: 'Décrire', icon: 'terminal', run: go(`${base}&open=describe`) },
       { label: 'Voir le Deployment et les Services', icon: 'box', run: go(`${base}&open=owners`) },

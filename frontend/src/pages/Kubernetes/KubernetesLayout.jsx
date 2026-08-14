@@ -5,7 +5,8 @@ import Icon from '../../components/ui/Icon.jsx';
 // être mutualisée avec les autres domaines, chacun définit la sienne.
 const ITEMS = [
   { to: '/kubernetes', label: 'Charges de travail', icon: 'box', end: true },
-  { to: '/kubernetes/services', label: 'Services', icon: 'net' }
+  { to: '/kubernetes/services', label: 'Services', icon: 'net' },
+  { to: '/kubernetes/terminal', label: 'Terminal sécurisé', icon: 'terminal' }
 ];
 
 export default function KubernetesLayout() {

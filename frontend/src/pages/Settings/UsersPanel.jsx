@@ -47,6 +47,15 @@ export default function UsersPanel() {
     }
   }
 
+  async function setTier(u, tier) {
+    try {
+      await api.put(`/users/${u.id}/terminal-tier`, { tier: tier || null });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
   async function remove(u) {
     if (!confirm(`Supprimer le compte ${u.email} ?`)) return;
     try {
@@ -62,7 +71,7 @@ export default function UsersPanel() {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
       <Panel title="Utilisateurs de la console" sub="Les administrateurs accèdent aux intégrations ; les autres comptes ne voient que la console et leurs propres réglages" span={8}>
         <DataTable
-          columns={['Utilisateur', 'Rôle', 'Statut', 'Actions']}
+          columns={['Utilisateur', 'Rôle', 'Terminal', 'Statut', 'Actions']}
           rows={data?.items}
           emptyTitle="Aucun utilisateur"
           renderRow={(u) => (
@@ -72,6 +81,18 @@ export default function UsersPanel() {
                 <div className="faint" style={{ fontSize: 11.5 }}>{u.email}</div>
               </td>
               <td><span className={`badge badge-${u.role === 'admin' ? 'vio' : 'mut'}`}><span className="dot" />{u.role === 'admin' ? 'Administrateur' : 'Utilisateur'}</span></td>
+              <td>
+                {u.role === 'admin' ? (
+                  <span className="faint" style={{ fontSize: 11.5 }}>Admin (complet)</span>
+                ) : (
+                  <select className="input" value={u.terminalTier || ''} onChange={(e) => setTier(u, e.target.value)} style={{ height: 28, fontSize: 11.5, width: 130 }}>
+                    <option value="">Aucun accès</option>
+                    <option value="developer">Developer</option>
+                    <option value="maintainer">Maintainer</option>
+                    <option value="admin">Admin (complet)</option>
+                  </select>
+                )}
+              </td>
               <td><span className={`badge badge-${u.active ? 'ok' : 'mut'}`}><span className="dot" />{u.active ? 'Actif' : 'Désactivé'}</span></td>
               <td>
                 <div style={{ display: 'flex', gap: 6 }}>

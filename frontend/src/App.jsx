@@ -9,6 +9,7 @@ import HomePage from './pages/Home/HomePage.jsx';
 import KubernetesLayout from './pages/Kubernetes/KubernetesLayout.jsx';
 import KubernetesPage from './pages/Kubernetes/KubernetesPage.jsx';
 import ServicesPage from './pages/Kubernetes/ServicesPage.jsx';
+import TerminalPage from './pages/Kubernetes/TerminalPage.jsx';
 import NetworkLayout from './pages/Network/NetworkLayout.jsx';
 import NetworkPage from './pages/Network/NetworkPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
@@ -87,7 +88,8 @@ export const router = createBrowserRouter([
             handle: { title: 'Kubernetes' },
             children: [
               { index: true, element: <KubernetesPage /> },
-              { path: 'services', element: <ServicesPage /> }
+              { path: 'services', element: <ServicesPage /> },
+              { path: 'terminal', element: <TerminalPage /> }
             ]
           },
           {

@@ -55,7 +55,9 @@ const ACTION_LABELS = {
   'proxmox.vm.action': 'Action VM/LXC',
   'certmanager.certificate.renewed': 'Certificat renouvelé',
   'pipeline.retried': 'Pipeline relancé',
-  'manifest.change.proposed': 'Modification de manifest proposée (MR/PR)'
+  'manifest.change.proposed': 'Modification de manifest proposée (MR/PR)',
+  'terminal.command': 'Commande Terminal sécurisé',
+  'user.terminal_tier.update': 'Palier Terminal modifié'
 };
 
 const ACTION_ICON = [
@@ -65,6 +67,7 @@ const ACTION_ICON = [
   [/^certmanager\./, 'certificate'],
   [/^pipeline\./, 'refresh'],
   [/^manifest\./, 'gitBranch'],
+  [/^terminal\./, 'terminal'],
   [/^vault\./, 'lock'],
   [/^security\./, 'shield'],
   [/^backup\./, 'server'],
