@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as deploymentService from '../services/deploymentService.js';
-import { syncApplication, getApplicationHistory, rollbackApplication } from '../services/integrations/argocdService.js';
+import { syncApplication, getApplicationHistory, rollbackApplication, getManagedResourcesDiff } from '../services/integrations/argocdService.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
@@ -28,6 +28,11 @@ router.post('/:id/sync', asyncHandler(async (req, res) => {
   const result = await syncApplication(link.argocdAppName, req.body?.revision);
   logAudit(req, 'argocd.application.synced', { linkId: link.id, appName: link.argocdAppName, revision: req.body?.revision || null });
   res.json({ ok: true, ...result });
+}));
+router.get('/:id/gitops-diff', asyncHandler(async (req, res) => {
+  const link = requireArgocdApp(req, res);
+  if (!link) return;
+  res.json({ ok: true, items: await getManagedResourcesDiff(link.argocdAppName) });
 }));
 router.get('/:id/history', asyncHandler(async (req, res) => {
   const link = requireArgocdApp(req, res);

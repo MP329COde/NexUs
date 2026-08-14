@@ -92,3 +92,47 @@ export async function rerunWorkflow(owner, repo, runId) {
   await request(c.http, { method: 'POST', url: `/repos/${owner}/${repo}/actions/runs/${runId}/rerun` }, 'GitHub');
   return { ok: true, message: `Workflow ${runId} relancé` };
 }
+
+// --- Explorateur de manifests (mêmes fonctions que gitlabService.js, API
+// GitHub Contents/Git) pour le workflow GitOps éditer → valider → diff →
+// committer → MR → CI → Argo CD.
+
+export async function listTree(owner, repo, path = '', ref) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/contents/${path}`, params: ref ? { ref } : {} }, 'GitHub');
+  const items = Array.isArray(data) ? data : [data];
+  return items.map((f) => ({ path: f.path, name: f.name, type: f.type === 'dir' ? 'dir' : 'file' }));
+}
+
+export async function getFileContent(owner, repo, path, ref) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/contents/${path}`, params: ref ? { ref } : {} }, 'GitHub');
+  return { content: Buffer.from(data.content, 'base64').toString('utf8'), sha: data.sha, ref: ref || null };
+}
+
+export async function createBranch(owner, repo, branch, fromRef) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const base = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/git/ref/heads/${fromRef}` }, 'GitHub');
+  await request(c.http, { method: 'POST', url: `/repos/${owner}/${repo}/git/refs`, data: { ref: `refs/heads/${branch}`, sha: base.object.sha } }, 'GitHub');
+  return { ok: true };
+}
+
+export async function commitFile(owner, repo, branch, path, content, message, sha) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  await request(c.http, {
+    method: 'PUT', url: `/repos/${owner}/${repo}/contents/${path}`,
+    data: { message, content: Buffer.from(content, 'utf8').toString('base64'), branch, sha }
+  }, 'GitHub');
+  return { ok: true };
+}
+
+export async function createPullRequest(owner, repo, sourceBranch, targetBranch, title) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const pr = await request(c.http, { method: 'POST', url: `/repos/${owner}/${repo}/pulls`, data: { head: sourceBranch, base: targetBranch, title } }, 'GitHub');
+  return { number: pr.number, webUrl: pr.html_url };
+}

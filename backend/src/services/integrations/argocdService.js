@@ -58,6 +58,22 @@ export async function getApplicationHistory(name) {
   })).reverse();
 }
 
+// Argo CD calcule déjà lui-même l'écart entre l'état voulu (Git) et l'état
+// réel (cluster) pour chaque ressource qu'il gère — managed-resources expose
+// ce calcul directement, on n'a pas besoin de le refaire. targetState = ce
+// que Git déclare ; liveState = ce qui tourne réellement.
+export async function getManagedResourcesDiff(name) {
+  const c = client();
+  if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/api/v1/applications/${encodeURIComponent(name)}/managed-resources` }, 'Argo CD');
+  return (data.items || []).map((r) => ({
+    kind: r.kind, name: r.name, namespace: r.namespace,
+    outOfSync: Boolean(r.diff) || r.hook === false && r.targetState !== r.normalizedLiveState,
+    targetState: r.targetState ? JSON.parse(r.targetState) : null,
+    liveState: r.normalizedLiveState ? JSON.parse(r.normalizedLiveState) : null
+  }));
+}
+
 export async function rollbackApplication(name, historyId) {
   const c = client();
   if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });
