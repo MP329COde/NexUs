@@ -10,6 +10,21 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Interroge GET /api/jobs/:id (job sans portée projet) jusqu'à ce qu'il
+// quitte pending/running. nmap peut aller jusqu'à 120s (--host-timeout côté
+// backend) : 90 tentatives à 2s (~3 min) laisse une marge raisonnable avant
+// d'abandonner le suivi côté UI.
+async function pollJob(jobId, maxAttempts = 90) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { job } = await api.get(`/jobs/${jobId}`);
+    if (job.status === 'succeeded' || job.status === 'failed') return job;
+    await sleep(2000);
+  }
+  throw new Error('Le scan met anormalement longtemps à se terminer — vérifiez son état dans quelques instants.');
+}
+
 export default function SecurityPage() {
   const { user } = useAuth();
   const status = useApi(() => api.get('/wazuh/status'), [], { pollMs: 30000 });
@@ -122,11 +137,20 @@ function NetworkScanPanel() {
   const [target, setTarget] = useState('');
   const [scanning, setScanning] = useState(false);
 
+  // Un scan nmap peut prendre jusqu'à 2 minutes (voir networkScanService.js
+  // côté backend) : quand le socle relationnel est disponible, la requête
+  // renvoie un job (202) suivi par polling jusqu'à sa fin réelle, plutôt que
+  // de garder la requête HTTP ouverte tout ce temps. Repli sur l'ancien
+  // comportement (réponse directe) si Postgres n'est pas configuré.
   async function scan(e) {
     e.preventDefault();
     setScanning(true);
     try {
-      await api.post('/security/scans', { target });
+      const res = await api.post('/security/scans', { target });
+      if (res.job) {
+        const job = await pollJob(res.job.id);
+        if (job.status !== 'succeeded') throw new Error(job.error || 'Échec du scan');
+      }
       notify('Scan terminé', { type: 'ok' });
       reload();
     } catch (err) {

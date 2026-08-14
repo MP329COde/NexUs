@@ -6,6 +6,8 @@ import { listScans, getLastScan, runScan } from '../services/networkScanService.
 import { getRecentTraffic, getSuspiciousIps } from '../services/trafficMonitorService.js';
 import { getFirewallSettings, setAutoBlockEnabled } from '../store/firewallStore.js';
 import { logAudit } from '../services/auditService.js';
+import * as jobService from '../services/jobService.js';
+import { pool } from '../db/pool.js';
 
 // IPs bannies + scans réseau : réservé aux administrateurs.
 const router = Router();
@@ -36,9 +38,28 @@ router.get('/scans', (req, res) => {
   res.json({ ok: true, items: listScans(), last: getLastScan() });
 });
 
+// Un scan nmap peut prendre jusqu'à 2 minutes (voir networkScanService.js,
+// timeout 120s, et le rate-limiter dédié dans index.js) : ne bloque plus la
+// requête HTTP dessus quand le socle relationnel est disponible (jobs
+// persistés, voir services/jobService.js) — le job est global (pas rattaché
+// à un projet), suivi via GET /api/jobs/:jobId. Repli sur l'ancien
+// comportement synchrone si Postgres n'est pas configuré.
 router.post('/scans', asyncHandler(async (req, res) => {
   const { target } = req.body || {};
   if (!target) return res.status(400).json({ ok: false, error: 'Cible requise (IP ou CIDR)' });
+
+  if (pool) {
+    const job = await jobService.enqueue(
+      { type: 'security.scan', projectId: null, userId: req.user.id, payload: { target } },
+      async () => {
+        const scan = await runScan(target);
+        logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
+        return scan;
+      }
+    );
+    return res.status(202).json({ ok: true, job });
+  }
+
   const scan = await runScan(target);
   logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
   res.status(201).json({ ok: true, scan });
