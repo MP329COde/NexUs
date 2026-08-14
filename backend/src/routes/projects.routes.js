@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { loadProjectAccess, requireMinRole } from '../middleware/projectAccess.js';
 import * as store from '../store/projectsStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
+import * as orgStore from '../store/orgStore.js';
+import { pool } from '../db/pool.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
@@ -11,75 +14,130 @@ router.use(requireAuth);
 
 // Visibilité : un administrateur voit tous les projets. Un compte Utilisateur
 // ne voit que les projets dont il est membre — c'est la restriction demandée
-// ("une personne qui ne travaille que sur un projet ne doit voir que celui-ci").
-// Appliquée ici, pas seulement côté frontend : /projects/:id refuse (404,
-// volontairement pas 403 pour ne pas confirmer l'existence du projet) l'accès
-// à un projet dont on n'est pas membre.
-function visible(project, user) {
-  return user.role === 'admin' || store.isMember(project, user.id);
-}
-
+// ("une personne qui ne travaille que sur un projet ne doit voir que
+// celui-ci"). Appliquée ici, pas seulement côté frontend : /projects/:id
+// refuse (404, volontairement pas 403 pour ne pas confirmer l'existence du
+// projet) l'accès à un projet dont on n'est pas membre. Le rôle exact
+// (viewer/developer/maintainer/owner) n'est disponible que pour les projets
+// déjà migrés vers le socle relationnel (voir middleware/projectAccess.js) ;
+// pour les autres, la liste utilise encore memberIds.
 router.get('/', (req, res) => {
-  const items = store.listProjects().filter((p) => visible(p, req.user));
+  const items = store.listProjects().filter((p) => req.user.role === 'admin' || store.isMember(p, req.user.id));
   res.json({ ok: true, items });
 });
 
-router.get('/:id', (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-  res.json({ ok: true, project });
+router.get('/:id', loadProjectAccess(), (req, res) => {
+  res.json({ ok: true, project: req.legacyProject, role: req.projectRole });
 });
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { name, description, tags, memberIds, repoKeys } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
   const project = store.createProject({ name, description, tags, memberIds, repoKeys });
+  // Provisionne aussi le projet dans le socle relationnel quand Postgres est
+  // disponible, avec les mêmes membres en rôle "maintainer" par défaut
+  // (ajustable ensuite via PUT /:id/members/:userId) et deux environnements
+  // (production, staging) créés automatiquement.
+  if (pool) {
+    try {
+      const orgs = await orgStore.listOrganizationsForUser(req.user.id);
+      let org = orgs[0];
+      if (!org) org = await orgStore.createOrganization({ name: 'Organisation par défaut', slug: 'default', ownerUserId: req.user.id });
+      const pgProject = await orgStore.createProject({
+        orgId: org.id, name, slug: slugify(name), description, tags, repoKeys,
+        ownerUserId: req.user.id, legacyId: project.id
+      });
+      for (const memberId of (memberIds || [])) {
+        if (memberId === req.user.id) continue;
+        await orgStore.setMemberRole(pgProject.id, memberId, 'developer');
+      }
+    } catch (err) {
+      // Le projet legacy reste valide même si le provisioning relationnel échoue
+      // (ex. slug déjà pris) : on log sans bloquer la création côté produit.
+      req.log?.warn({ err }, 'Provisioning Postgres du projet échoué (projet legacy conservé)');
+    }
+  }
   logAudit(req, 'project.create', { projectId: project.id, name: project.name });
   res.status(201).json({ ok: true, project });
 }));
 
-router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   const project = store.updateProject(req.params.id, req.body || {});
-  if (!project) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
   logAudit(req, 'project.update', { projectId: project.id });
   res.json({ ok: true, project });
 }));
 
-router.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
-  if (!store.deleteProject(req.params.id)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.delete('/:id', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  store.deleteProject(req.params.id);
   logAudit(req, 'project.delete', { projectId: req.params.id });
   res.json({ ok: true });
+}));
+
+// --- Membres et rôles (socle relationnel uniquement) ---
+router.get('/:id/members', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
+  res.json({ ok: true, items: await orgStore.listMembers(req.pgProject.id), migrated: true });
+}));
+
+router.put('/:id/members/:userId', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { role } = req.body || {};
+  if (!['viewer', 'developer', 'maintainer', 'owner'].includes(role)) {
+    return res.status(400).json({ ok: false, error: 'Rôle invalide' });
+  }
+  // Promouvoir quelqu'un au rôle owner exige soi-même d'être owner (un
+  // maintainer ne peut pas créer un pair au-dessus de son propre niveau).
+  if (role === 'owner' && req.projectRole !== 'owner') {
+    return res.status(403).json({ ok: false, error: 'Seul un propriétaire du projet peut attribuer ce rôle' });
+  }
+  const member = await orgStore.setMemberRole(req.pgProject.id, req.params.userId, role);
+  logAudit(req, 'project.member.role', { projectId: req.legacyProject.id, userId: req.params.userId, role });
+  res.json({ ok: true, member });
+}));
+
+router.delete('/:id/members/:userId', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  await orgStore.removeMember(req.pgProject.id, req.params.userId);
+  logAudit(req, 'project.member.remove', { projectId: req.legacyProject.id, userId: req.params.userId });
+  res.json({ ok: true });
+}));
+
+// --- Environnements (socle relationnel uniquement) ---
+router.get('/:id/environments', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
+  res.json({ ok: true, items: await orgStore.listEnvironments(req.pgProject.id), migrated: true });
+}));
+
+router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { name, kind, isProduction } = req.body || {};
+  if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
+  const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction });
+  logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
+  res.status(201).json({ ok: true, environment });
 }));
 
 // --- Tâches : lecture/écriture ouverte à tout membre du projet (travail
 // d'équipe), pas seulement aux administrateurs — cohérent avec le reste de la
 // console où la gestion opérationnelle n'est pas réservée aux admins.
-router.get('/:id/tasks', (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-  res.json({ ok: true, items: store.listTasks(project.id) });
+router.get('/:id/tasks', loadProjectAccess(), (req, res) => {
+  res.json({ ok: true, items: store.listTasks(req.legacyProject.id) });
 });
 
-router.post('/:id/tasks', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.post('/:id/tasks', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   const { title, priority, assigneeId } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
-  const task = store.createTask({ projectId: project.id, title, priority, assigneeId });
+  const task = store.createTask({ projectId: req.legacyProject.id, title, priority, assigneeId });
   res.status(201).json({ ok: true, task });
 }));
 
-router.put('/:id/tasks/:taskId', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.put('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   const task = store.updateTask(req.params.taskId, req.body || {});
   if (!task) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   res.json({ ok: true, task });
 }));
 
-router.delete('/:id/tasks/:taskId', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.delete('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   store.deleteTask(req.params.taskId);
   res.json({ ok: true });
 }));
@@ -87,35 +145,27 @@ router.delete('/:id/tasks/:taskId', asyncHandler(async (req, res) => {
 // --- Redirections du projet : raccourcis vers des services externes créés
 // à la main pour ce projet précis (staging perso, tableau de bord, wiki de
 // l'équipe...), distincts des raccourcis globaux d'Accès aux outils.
-router.get('/:id/shortcuts', (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-  res.json({ ok: true, items: shortcutsStore.listShortcuts({ projectId: project.id }) });
+router.get('/:id/shortcuts', loadProjectAccess(), (req, res) => {
+  res.json({ ok: true, items: shortcutsStore.listShortcuts({ projectId: req.legacyProject.id }) });
 });
 
-router.post('/:id/shortcuts', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.post('/:id/shortcuts', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   const { label, url, category } = req.body || {};
   if (!label || !url) return res.status(400).json({ ok: false, error: 'Nom et URL requis' });
-  const shortcut = shortcutsStore.createShortcut({ label, url, category, projectId: project.id });
+  const shortcut = shortcutsStore.createShortcut({ label, url, category, projectId: req.legacyProject.id });
   res.status(201).json({ ok: true, shortcut });
 }));
 
-router.delete('/:id/shortcuts/:shortcutId', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.delete('/:id/shortcuts/:shortcutId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   const shortcut = shortcutsStore.findShortcut(req.params.shortcutId);
-  if (!shortcut || shortcut.projectId !== project.id) return res.status(404).json({ ok: false, error: 'Raccourci introuvable' });
+  if (!shortcut || shortcut.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Raccourci introuvable' });
   shortcutsStore.deleteShortcut(shortcut.id);
   res.json({ ok: true });
 }));
 
-router.post('/:id/shortcuts/:shortcutId/open', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.post('/:id/shortcuts/:shortcutId/open', loadProjectAccess(), asyncHandler(async (req, res) => {
   const shortcut = shortcutsStore.findShortcut(req.params.shortcutId);
-  if (!shortcut || shortcut.projectId !== project.id) return res.status(404).json({ ok: false, error: 'Raccourci introuvable' });
+  if (!shortcut || shortcut.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Raccourci introuvable' });
   res.json({ ok: true, shortcut: shortcutsStore.recordOpen(shortcut.id) });
 }));
 
@@ -124,20 +174,22 @@ router.post('/:id/shortcuts/:shortcutId/open', asyncHandler(async (req, res) => 
 // (ou un admin) — pas de triple vérification ici (ce n'est pas la production
 // globale), mais la révélation exige quand même de retaper son mot de passe,
 // voir vault.routes.js.
-router.get('/:id/vault', (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-  res.json({ ok: true, items: vaultStore.listVaultEntries('project', project.id) });
+router.get('/:id/vault', loadProjectAccess(), (req, res) => {
+  res.json({ ok: true, items: vaultStore.listVaultEntries('project', req.legacyProject.id) });
 });
 
-router.post('/:id/vault', asyncHandler(async (req, res) => {
-  const project = store.getProject(req.params.id);
-  if (!project || !visible(project, req.user)) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
+router.post('/:id/vault', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   const { label, username, secret, notes, url } = req.body || {};
   if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et secret requis' });
-  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: project.id, label, username, secret, notes, url, actor: req.user });
-  logAudit(req, 'vault.create', { id: entry.id, tier: 'project', projectId: project.id, label });
+  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: req.legacyProject.id, label, username, secret, notes, url, actor: req.user });
+  logAudit(req, 'vault.create', { id: entry.id, tier: 'project', projectId: req.legacyProject.id, label });
   res.status(201).json({ ok: true, entry });
 }));
+
+function slugify(name) {
+  return String(name).toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'projet';
+}
 
 export default router;

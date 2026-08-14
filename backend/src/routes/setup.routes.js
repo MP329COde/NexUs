@@ -7,6 +7,7 @@ import { getSessionMinutes } from '../store/identityStore.js';
 import { logAudit } from '../services/auditService.js';
 import { startInstall, getJobs } from '../services/provisioningService.js';
 import { listInstallableIds } from '../services/serviceCatalog.js';
+import { pool } from '../db/pool.js';
 
 // Non authentifié par nature : tant qu'aucun utilisateur n'existe, la console
 // n'a pas encore de secret à protéger. Chaque route revérifie hasAnyUser() pour
@@ -14,7 +15,13 @@ import { listInstallableIds } from '../services/serviceCatalog.js';
 const router = Router();
 
 router.get('/status', (req, res) => {
-  res.json({ ok: true, needsSetup: !hasAnyUser() });
+  // postgresConfigured : reflète honnêtement si le socle organisations /
+  // projets / environnements à rôles granulaires (voir db/, store/orgStore.js)
+  // est disponible. false n'empêche jamais l'installation ni l'usage du
+  // reste de la console — seule cette brique reste dégradée en mode legacy
+  // (isolation par appartenance simple, sans rôle fin) tant que DATABASE_URL
+  // n'est pas défini.
+  res.json({ ok: true, needsSetup: !hasAnyUser(), postgresConfigured: Boolean(pool) });
 });
 
 // Ne crée plus que l'organisation + le compte administrateur : c'est la

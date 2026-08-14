@@ -25,9 +25,39 @@ passent par l'API `backend`, qui détient les secrets (chiffrés au repos) et ap
 - `src/store/*` : persistance JSON locale (`backend/data/`, ignorée par git). Les secrets (tokens,
   mots de passe) sont chiffrés en AES-256-GCM avant écriture (`src/utils/crypto.js`) et ne sont
   jamais renvoyés en clair au frontend (`settingsStore.getRedactedIntegration`).
-- `src/middleware/auth.js` : sessions JWT en cookie httpOnly.
+- `src/middleware/auth.js` : sessions JWT en cookie httpOnly (authentification, rôle global admin/user).
+- `src/db/` + `src/store/orgStore.js` : socle relationnel PostgreSQL (organisations, projets, membres à
+  rôle granulaire `viewer < developer < maintainer < owner`, environnements). Coexiste délibérément
+  avec le store JSON/SQLite historique (stratégie "strangler" — voir section dédiée ci-dessous) : les
+  deux couches de persistance sont actives en parallèle pendant la migration progressive.
+- `src/middleware/projectAccess.js` : applique le rôle projet à chaque route `/api/projects/:id/*`,
+  avec repli automatique sur l'ancien modèle (`memberIds` plat) pour un projet pas encore migré vers
+  Postgres — jamais de régression silencieuse d'accès.
 - Ajouter une intégration future = un fichier dans `services/integrations/`, une entrée dans
   `settingsStore.SECRET_FIELDS`, une route — sans toucher au reste.
+
+### Socle relationnel (organisations, projets, environnements)
+
+Le modèle métier central (organisations → équipes → projets → environnements, avec permissions
+appliquées au backend et jamais seulement côté frontend) vit dans PostgreSQL, distinct du store
+JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fort, terminal, audit...).
+
+- `DATABASE_URL` (variable d'environnement) active cette couche. Absente : la console fonctionne
+  normalement, mais reste en isolation "legacy" (appartenance simple à un projet, sans rôle fin) —
+  `GET /api/setup/status` expose `postgresConfigured` pour le signaler honnêtement.
+- Migrations SQL versionnées dans `src/db/migrations/`, appliquées automatiquement au démarrage
+  (`src/db/migrate.js`, idempotent, transactionnel par fichier).
+- `npm run migrate:postgres` (backend) importe les utilisateurs et projets existants du store JSON
+  historique vers Postgres, sans les supprimer ni les modifier — rejouable sans effet de bord.
+- Rôles projet, du moins au plus privilégié : `viewer` (lecture) < `developer` (tâches, raccourcis,
+  coffre-fort projet) < `maintainer` (édition du projet, gestion des membres) < `owner` (suppression,
+  promotion d'autres membres owner). Un administrateur de plateforme (rôle global historique) garde un
+  accès `owner` implicite à tous les projets.
+- **Ce qui reste en Phase 1b** (non fait dans ce socle initial, documenté explicitement plutôt que
+  masqué) : équipes comme regroupement d'utilisateurs distinct des projets (table `teams` créée mais
+  sans routes/UI), migration des collections restantes du store JSON (intégrations, coffre-fort, audit,
+  hôtes...) vers Postgres, UI de gestion des organisations/rôles (l'API existe : `/api/organizations`,
+  `/api/projects/:id/members`, `/api/projects/:id/environments`).
 
 ### Frontend (`frontend/`)
 
@@ -43,11 +73,17 @@ passent par l'API `backend`, qui détient les secrets (chiffrés au repos) et ap
 ## Démarrage local
 
 ```bash
+# Base relationnelle (organisations/projets/environnements — optionnelle, voir
+# section "Socle relationnel" ci-dessus ; sans elle la console fonctionne en
+# isolation legacy)
+docker run -d --name nexus-postgres -e POSTGRES_DB=nexus -e POSTGRES_USER=nexus \
+  -e POSTGRES_PASSWORD=changeme -p 5432:5432 postgres:16-alpine
+
 # Backend
 cd backend
 cp .env.example .env   # définir au minimum ADMIN_EMAIL / ADMIN_PASSWORD / JWT_SECRET
 npm install
-npm run dev             # http://localhost:4000
+DATABASE_URL=postgres://nexus:changeme@localhost:5432/nexus npm run dev   # http://localhost:4000
 
 # Frontend
 cd frontend
@@ -56,10 +92,12 @@ npm run dev              # http://localhost:5173 (proxy /api vers le backend)
 ```
 
 Au premier démarrage, le backend crée automatiquement un compte administrateur à partir de
-`ADMIN_EMAIL` / `ADMIN_PASSWORD`. Connectez-vous puis renseignez vos intégrations depuis
-**Paramètres** : chaque page (Kubernetes, Réseaux, Infrastructure, Monitoring...) reste vide et
-affiche "non configuré" tant que l'intégration correspondante n'a pas d'URL/token valides — aucun
-service externe n'est requis pour explorer la console.
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`, et applique les migrations Postgres si `DATABASE_URL` est défini.
+Connectez-vous puis renseignez vos intégrations depuis **Paramètres** : chaque page (Kubernetes,
+Réseaux, Infrastructure, Monitoring...) reste vide et affiche "non configuré" tant que l'intégration
+correspondante n'a pas d'URL/token valides — aucun service externe n'est requis pour explorer la
+console. Si vous aviez déjà des projets créés avant d'activer `DATABASE_URL`, importez-les avec
+`npm run migrate:postgres` (rejouable, ne supprime rien).
 
 ## Sécurité
 

@@ -111,3 +111,107 @@ test.describe("Assistant de configuration initiale", () => {
     await expect(page).toHaveURL(/\/(login)?$/);
   });
 });
+
+// Isolation inter-projets au niveau API (pas seulement l'UI) : un
+// collaborateur affecté à un seul projet ne doit jamais pouvoir lire ou
+// modifier les ressources d'un autre projet, même en devinant son id. Placé
+// dans ce fichier (plutôt qu'un fichier séparé) pour garantir qu'il s'exécute
+// après la création de l'administrateur ci-dessus, dans le même groupe serial
+// et le même backend jetable — l'ordre d'exécution entre fichiers de test
+// n'est pas une garantie sur laquelle s'appuyer (mode serial déjà configuré
+// pour tout le fichier en haut).
+test.describe('Isolation inter-projets (API)', () => {
+  let adminApi;
+  let aliceApi;
+  let bobApi;
+  let projectAliceId;
+  let projectBobId;
+
+  test.beforeAll(async ({ playwright }) => {
+    adminApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const login = await adminApi.post('/api/auth/login', { data: { email: 'alex@nexus.lan', password: 'SuperSecurePass123!' } });
+    expect(login.ok()).toBeTruthy();
+  });
+
+  test.afterAll(async () => {
+    await adminApi?.dispose();
+    await aliceApi?.dispose();
+    await bobApi?.dispose();
+  });
+
+  test("l'administrateur crée deux collaborateurs et un projet chacun", async () => {
+    const alice = await adminApi.post('/api/users', {
+      data: { email: 'alice@nexus.lan', password: 'AlicePassword1', name: 'Alice', role: 'user' }
+    });
+    expect(alice.ok()).toBeTruthy();
+    const { user: aliceUser } = await alice.json();
+
+    const bob = await adminApi.post('/api/users', {
+      data: { email: 'bob@nexus.lan', password: 'BobPassword123', name: 'Bob', role: 'user' }
+    });
+    expect(bob.ok()).toBeTruthy();
+    const { user: bobUser } = await bob.json();
+
+    const projAlice = await adminApi.post('/api/projects', { data: { name: 'Projet Alice E2E', memberIds: [aliceUser.id] } });
+    expect(projAlice.ok()).toBeTruthy();
+    projectAliceId = (await projAlice.json()).project.id;
+
+    const projBob = await adminApi.post('/api/projects', { data: { name: 'Projet Bob E2E', memberIds: [bobUser.id] } });
+    expect(projBob.ok()).toBeTruthy();
+    projectBobId = (await projBob.json()).project.id;
+  });
+
+  test('Alice ne voit que son propre projet dans la liste', async ({ playwright }) => {
+    aliceApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const login = await aliceApi.post('/api/auth/login', { data: { email: 'alice@nexus.lan', password: 'AlicePassword1' } });
+    expect(login.ok()).toBeTruthy();
+    const res = await aliceApi.get('/api/projects');
+    const { items } = await res.json();
+    const ids = items.map((p) => p.id);
+    expect(ids).toContain(projectAliceId);
+    expect(ids).not.toContain(projectBobId);
+  });
+
+  test('Alice ne peut pas lire le projet de Bob par son id (404)', async () => {
+    const res = await aliceApi.get(`/api/projects/${projectBobId}`);
+    expect(res.status()).toBe(404);
+  });
+
+  test("Alice ne peut pas lire le coffre-fort du projet de Bob (404)", async () => {
+    const res = await aliceApi.get(`/api/projects/${projectBobId}/vault`);
+    expect(res.status()).toBe(404);
+  });
+
+  test('Alice ne peut pas créer de tâche dans le projet de Bob (404, pas de fuite d’existence)', async () => {
+    const res = await aliceApi.post(`/api/projects/${projectBobId}/tasks`, { data: { title: 'intrusion' } });
+    expect(res.status()).toBe(404);
+  });
+
+  test('Alice ne peut pas supprimer le projet de Bob (404)', async () => {
+    const res = await aliceApi.delete(`/api/projects/${projectBobId}`);
+    expect(res.status()).toBe(404);
+  });
+
+  test('Bob, symétriquement, ne peut pas accéder au projet d’Alice', async ({ playwright }) => {
+    bobApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const login = await bobApi.post('/api/auth/login', { data: { email: 'bob@nexus.lan', password: 'BobPassword123' } });
+    expect(login.ok()).toBeTruthy();
+    const res = await bobApi.get(`/api/projects/${projectAliceId}`);
+    expect(res.status()).toBe(404);
+  });
+
+  test('Alice peut travailler normalement sur son propre projet (tâches)', async () => {
+    const create = await aliceApi.post(`/api/projects/${projectAliceId}/tasks`, { data: { title: 'Ma tâche' } });
+    expect(create.ok()).toBeTruthy();
+    const list = await aliceApi.get(`/api/projects/${projectAliceId}/tasks`);
+    const { items } = await list.json();
+    expect(items.some((t) => t.title === 'Ma tâche')).toBe(true);
+  });
+
+  test('un utilisateur non authentifié ne peut lire aucun projet (401)', async ({ playwright }) => {
+    const anon = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const res = await anon.get('/api/projects');
+    expect(res.status()).toBe(401);
+    await anon.dispose();
+  });
+});
