@@ -652,6 +652,7 @@ const roleAtLeast = (role, min) => (ROLE_RANK[role] || 0) >= (ROLE_RANK[min] || 
 function EnvironmentsPanel({ environments, migrated, deployments, projectId, role, onChanged }) {
   const notify = useNotify();
   const [busyId, setBusyId] = useState(null);
+  const [pipelineLink, setPipelineLink] = useState(null);
 
   // La synchronisation peut prendre plusieurs secondes à plusieurs minutes
   // (voir services/jobService.js côté backend) : la requête POST renvoie
@@ -706,6 +707,7 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
                   <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 4px 8px', fontSize: 12 }}>
                     <Icon name="box" size={12} style={{ color: 'var(--text-faint)' }} />
                     <span style={{ flex: 1 }}>{link.name}</span>
+                    <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setPipelineLink(link)}>Chemin réseau</span>
                     {link.argocdAppName ? (
                       canSync ? (
                         <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyId === link.id} onClick={() => sync(link)}>
@@ -724,7 +726,69 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
           })}
         </div>
       )}
+      {pipelineLink && <PipelineModal link={pipelineLink} projectId={projectId} onClose={() => setPipelineLink(null)} />}
     </Panel>
+  );
+}
+
+// Chemin réseau complet d'un déploiement (Git → Argo CD → Kubernetes →
+// reverse proxy) — voir GET /projects/:id/deployments/:linkId/pipeline,
+// qui reconstitue chaque étape indépendamment côté backend
+// (deploymentService.getPipeline). Chaque étape affiche son état exact,
+// y compris "non configuré", plutôt qu'une icône générique.
+function PipelineModal({ link, projectId, onClose }) {
+  const { data, loading, error } = useApi(() => api.get(`/projects/${projectId}/deployments/${link.id}/pipeline`), [link.id]);
+  const stages = data?.stages;
+
+  return (
+    <Modal title={`Chemin réseau — ${link.name}`} onClose={onClose} width={480}>
+      {loading && <div style={{ padding: 10, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>}
+      {error && <div style={{ padding: 10, fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {stages && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <PipelineStageRow
+            label="Git"
+            configured={stages.git.configured}
+            detail={stages.git.latestPipeline ? `Dernier pipeline : ${stages.git.latestPipeline.status || '—'}` : null}
+            error={stages.git.error}
+          />
+          <PipelineStageRow
+            label="Argo CD"
+            configured={stages.argocd.configured}
+            detail={stages.argocd.syncStatus ? `Sync : ${stages.argocd.syncStatus} · Santé : ${stages.argocd.healthStatus || '—'}` : null}
+            webUrl={stages.argocd.webUrl}
+            error={stages.argocd.error}
+          />
+          <PipelineStageRow
+            label="Kubernetes"
+            configured={stages.kubernetes.configured}
+            detail={stages.kubernetes.deployment ? `${stages.kubernetes.deployment.replicas ?? '?'} réplique(s)` : null}
+            error={stages.kubernetes.error}
+          />
+          <PipelineStageRow
+            label="Reverse proxy"
+            configured={stages.proxy.configured}
+            detail={stages.proxy.proxy ? stages.proxy.proxy.domain : null}
+            error={stages.proxy.error}
+          />
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function PipelineStageRow({ label, configured, detail, webUrl, error }) {
+  const tone = error ? 'crit' : configured ? 'ok' : 'mut';
+  const status = error ? 'Erreur' : configured ? 'Configuré' : 'Non configuré';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-soft)' }}>
+      <span style={{ width: 110, fontSize: 12.5, fontWeight: 600 }}>{label}</span>
+      <span className={`badge badge-${tone}`}><span className="dot" />{status}</span>
+      <span className="faint" style={{ flex: 1, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={error || detail || ''}>
+        {error || detail || ''}
+      </span>
+      {webUrl && <a href={webUrl} target="_blank" rel="noreferrer"><Icon name="externalLink" size={13} /></a>}
+    </div>
   );
 }
 
