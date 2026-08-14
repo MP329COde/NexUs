@@ -7,6 +7,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import ManifestExplorerModal from './ManifestExplorerModal.jsx';
 
 const ROLE_LABELS = {
   framework: 'Framework de base', service: 'Service applicatif', library: 'Bibliothèque',
@@ -46,6 +47,7 @@ export default function GitReposPage() {
   const [filter, setFilter] = useState('');
   const [editing, setEditing] = useState(null);
   const [scriptFor, setScriptFor] = useState(null);
+  const [exploring, setExploring] = useState(null);
 
   const items = data?.items || [];
   const q = filter.trim().toLowerCase();
@@ -123,6 +125,9 @@ export default function GitReposPage() {
                             <Icon name="terminal" size={12} />Script
                           </span>
                         )}
+                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setExploring(r)}>
+                          <Icon name="folder" size={12} />Manifests
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -157,6 +162,10 @@ export default function GitReposPage() {
 
       {scriptFor && (
         <ScriptModal repo={scriptFor} onClose={() => setScriptFor(null)} />
+      )}
+
+      {exploring && (
+        <ManifestExplorerModal repo={exploring} onClose={() => setExploring(null)} />
       )}
     </>
   );

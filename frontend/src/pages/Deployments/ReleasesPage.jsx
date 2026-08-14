@@ -10,6 +10,7 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import DeploymentFormDialog from './DeploymentFormDialog.jsx';
 import PipelineView from './PipelineView.jsx';
+import GitOpsDiffPanel from './GitOpsDiffPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
 
 // Panneau démonstration : la console n'a pas encore de détection statique de
@@ -76,7 +77,12 @@ export default function ReleasesPage() {
         />
       </Panel>
 
-      {selected && <div style={{ marginBottom: 16 }}><PipelineView linkId={selected} span={12} /></div>}
+      {selected && (
+        <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <PipelineView linkId={selected} span={12} />
+          <GitOpsDiffPanel linkId={selected} span={12} />
+        </div>
+      )}
 
       {!isAdmin && (
         <div className="card" style={{ padding: 14, marginBottom: 16, fontSize: 12.5, color: 'var(--text-faint)' }}>

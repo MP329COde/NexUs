@@ -54,7 +54,8 @@ const ACTION_LABELS = {
   'argocd.application.rolledback': 'Application restaurée (rollback)',
   'proxmox.vm.action': 'Action VM/LXC',
   'certmanager.certificate.renewed': 'Certificat renouvelé',
-  'pipeline.retried': 'Pipeline relancé'
+  'pipeline.retried': 'Pipeline relancé',
+  'manifest.change.proposed': 'Modification de manifest proposée (MR/PR)'
 };
 
 const ACTION_ICON = [
@@ -63,6 +64,7 @@ const ACTION_ICON = [
   [/^proxmox\./, 'inf'],
   [/^certmanager\./, 'certificate'],
   [/^pipeline\./, 'refresh'],
+  [/^manifest\./, 'gitBranch'],
   [/^vault\./, 'lock'],
   [/^security\./, 'shield'],
   [/^backup\./, 'server'],
