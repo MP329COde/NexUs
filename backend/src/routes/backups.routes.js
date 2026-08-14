@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', asyncHandler(async (req, res) => {
-  const backup = createBackup();
+  const backup = await createBackup();
   logAudit(req, 'backup.create', { file: backup.file });
   res.status(201).json({ ok: true, backup });
 }));
@@ -45,7 +45,7 @@ router.post('/:file/restore', asyncHandler(async (req, res) => {
   if (!password || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ ok: false, error: 'Mot de passe incorrect' });
   }
-  const result = restoreBackup(req.params.file);
+  const result = await restoreBackup(req.params.file);
   logAudit(req, 'backup.restore', { file: req.params.file, safetyBackup: result.safetyBackup?.file });
   res.json({ ok: true, ...result });
 }));

@@ -10,8 +10,8 @@ process.env.NEXUS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-test-b
 await import('../src/store/jsonStore.js');
 const { createBackup, listBackups, importBackup, restoreBackup } = await import('../src/services/backupService.js');
 
-test('createBackup crée un fichier listé ensuite', () => {
-  const backup = createBackup();
+test('createBackup crée un fichier listé ensuite', async () => {
+  const backup = await createBackup();
   assert.ok(backup.file.endsWith('.db'));
   assert.ok(listBackups().some((b) => b.file === backup.file));
 });
@@ -28,14 +28,19 @@ test('importBackup accepte un fichier avec le bon en-tête SQLite', () => {
   assert.equal(imported.file.includes('/'), false);
 });
 
-test('restoreBackup refuse un fichier de sauvegarde introuvable', () => {
-  assert.throws(() => restoreBackup('fichier-qui-n-existe-pas.db'), /introuvable/);
+test('restoreBackup refuse un fichier de sauvegarde introuvable', async () => {
+  await assert.rejects(() => restoreBackup('fichier-qui-n-existe-pas.db'), /introuvable/);
 });
 
-test('restoreBackup crée une sauvegarde de sécurité avant de restaurer', () => {
-  const backup = createBackup();
+test('restoreBackup crée une sauvegarde de sécurité avant de restaurer', async () => {
+  const backup = await createBackup();
   const countBefore = listBackups().length;
-  const result = restoreBackup(backup.file);
+  const result = await restoreBackup(backup.file);
   assert.ok(result.safetyBackup);
   assert.ok(listBackups().length >= countBefore); // au moins la sauvegarde de sécurité en plus
+});
+
+test('createBackup sans Postgres configuré ne produit pas de dump relationnel', async () => {
+  const backup = await createBackup();
+  assert.equal(backup.hasRelationalDump, false);
 });

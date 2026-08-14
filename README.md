@@ -77,6 +77,15 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Sauvegarde/restauration (`src/services/backupService.js`, `src/services/pgDumpService.js`) : chaque
+  sauvegarde copie le store JSON/SQLite historique **et**, si `DATABASE_URL` est configuré, exporte le
+  contenu du socle relationnel (organisations, projets, RBAC, environnements, jobs, incidents,
+  changements) en JSON dans un fichier compagnon `<sauvegarde>.pg.json` — sans lui, restaurer une
+  sauvegarde plus ancienne effacerait silencieusement tout ce qui vit dans Postgres. La restauration
+  réimporte les deux dans une seule transaction côté relationnel (tout ou rien), après avoir créé une
+  sauvegarde de sécurité de l'état courant. `GET /api/backups` expose `hasRelationalDump` par entrée,
+  affiché dans Paramètres → Système pour ne jamais laisser croire qu'une sauvegarde est complète
+  quand elle ne l'est pas.
 - **Ce qui reste en Phase 1b** (documenté explicitement plutôt que masqué) : migration des collections
   restantes du store JSON (intégrations, coffre-fort, audit, hôtes...) vers Postgres, UI de gestion des
   organisations (l'API existe : `/api/organizations`), généralisation de l'architecture de jobs aux

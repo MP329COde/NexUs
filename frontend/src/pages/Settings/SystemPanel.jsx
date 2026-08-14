@@ -126,13 +126,18 @@ export default function SystemPanel() {
         )}
       >
         <DataTable
-          columns={['Fichier', 'Taille', 'Créée le', '']}
+          columns={['Fichier', 'Taille', 'Socle relationnel', 'Créée le', '']}
           rows={backups.data?.items}
           emptyTitle="Aucune sauvegarde"
           renderRow={(b) => (
             <tr key={b.file}>
               <td className="mono" style={{ fontSize: 12 }}>{b.file}</td>
               <td className="mono muted">{formatSize(b.sizeBytes)}</td>
+              <td>
+                {b.hasRelationalDump
+                  ? <span className="badge" style={{ color: 'var(--tone-ok-fg)' }}>Inclus</span>
+                  : <span className="badge faint" title="Organisations, projets, RBAC, incidents et changements ne sont pas dans cette sauvegarde">Non inclus</span>}
+              </td>
               <td className="mono faint">{new Date(b.createdAt).toLocaleString('fr-FR')}</td>
               <td>
                 <div style={{ display: 'flex', gap: 6 }}>

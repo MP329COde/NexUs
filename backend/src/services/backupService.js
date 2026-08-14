@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DB_FILE } from '../store/jsonStore.js';
 import { logger } from '../utils/logger.js';
 import { dataDir } from '../config/paths.js';
+import { dumpRelationalCore, restoreRelationalCore, relationalCoreConfigured } from './pgDumpService.js';
 
 const backupDir = path.join(dataDir, 'backups');
 fs.mkdirSync(backupDir, { recursive: true });
@@ -15,15 +16,28 @@ function timestampSlug() {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
+function pgDumpPath(file) {
+  return path.join(backupDir, `${file}.pg.json`);
+}
+
 // Copie fichier simple du .db : suffisant pour un outil mono-instance à
 // cadence de sauvegarde quotidienne/manuelle (pas de sauvegarde à chaud
-// garantie pendant une écriture concurrente, acceptable ici).
-export function createBackup(prefix = 'nexus') {
+// garantie pendant une écriture concurrente, acceptable ici). Si le socle
+// relationnel (Postgres) est configuré, son contenu est exporté en JSON
+// dans un fichier compagnon `<file>.pg.json` — sans lui, une sauvegarde ne
+// couvrirait que l'ancien store (utilisateurs, intégrations) et perdrait
+// silencieusement organisations/projets/RBAC/incidents/changements/jobs à
+// la restauration.
+export async function createBackup(prefix = 'nexus') {
   if (!fs.existsSync(DB_FILE)) {
     throw Object.assign(new Error('Aucune base à sauvegarder pour le moment'), { status: 409 });
   }
   const file = `${prefix}-${timestampSlug()}.db`;
   fs.copyFileSync(DB_FILE, path.join(backupDir, file));
+  if (relationalCoreConfigured()) {
+    const dump = await dumpRelationalCore();
+    fs.writeFileSync(pgDumpPath(file), JSON.stringify(dump));
+  }
   pruneBackups();
   logger.info(`Sauvegarde créée: ${file}`);
   return describeBackup(file);
@@ -47,6 +61,8 @@ export function deleteBackup(file) {
   const full = getBackupPath(file);
   if (!full) return false;
   fs.unlinkSync(full);
+  const pgDump = pgDumpPath(path.basename(file));
+  if (fs.existsSync(pgDump)) fs.unlinkSync(pgDump);
   return true;
 }
 
@@ -75,33 +91,46 @@ export function importBackup(buffer, originalName) {
 // Remplace la base active par le contenu d'une sauvegarde. Une sauvegarde de
 // sécurité de l'état actuel est créée juste avant, au cas où la restauration
 // serait déclenchée par erreur. L'appelant (route) exige la ré-authentification
-// par mot de passe avant d'invoquer cette fonction.
-export function restoreBackup(file) {
+// par mot de passe avant d'invoquer cette fonction. Si la sauvegarde a un
+// dump relationnel compagnon (`<file>.pg.json`) et que Postgres est
+// configuré, il est restauré aussi — sinon organisations/projets/RBAC
+// resteraient sur leur état d'avant restauration, incohérent avec le reste
+// des données qui vient d'être remplacé.
+export async function restoreBackup(file) {
   const source = getBackupPath(file);
   if (!source) throw Object.assign(new Error('Sauvegarde introuvable'), { status: 404 });
   const buffer = fs.readFileSync(source);
   assertSqliteFile(buffer);
   let safetyBackup = null;
   try {
-    safetyBackup = createBackup('pre-restore');
+    safetyBackup = await createBackup('pre-restore');
   } catch {
     // pas de base existante à sauvegarder avant restauration (premier import) : ignoré
   }
   fs.copyFileSync(source, DB_FILE);
-  logger.warn(`Base restaurée depuis ${file}`);
-  return { restoredFrom: file, safetyBackup };
+  let relationalCoreRestored = false;
+  const pgDump = pgDumpPath(path.basename(file));
+  if (fs.existsSync(pgDump) && relationalCoreConfigured()) {
+    const dump = JSON.parse(fs.readFileSync(pgDump, 'utf8'));
+    await restoreRelationalCore(dump);
+    relationalCoreRestored = true;
+  }
+  logger.warn(`Base restaurée depuis ${file}${relationalCoreRestored ? ' (socle relationnel inclus)' : ''}`);
+  return { restoredFrom: file, safetyBackup, relationalCoreRestored };
 }
 
 function pruneBackups() {
   const backups = listBackups();
   for (const b of backups.slice(RETENTION)) {
     fs.unlinkSync(path.join(backupDir, b.file));
+    const pgDump = pgDumpPath(b.file);
+    if (fs.existsSync(pgDump)) fs.unlinkSync(pgDump);
   }
 }
 
 function describeBackup(file) {
   const stat = fs.statSync(path.join(backupDir, file));
-  return { file, sizeBytes: stat.size, createdAt: stat.mtime.toISOString() };
+  return { file, sizeBytes: stat.size, createdAt: stat.mtime.toISOString(), hasRelationalDump: fs.existsSync(pgDumpPath(file)) };
 }
 
 // Planifie une sauvegarde quotidienne (03h00 locale), sans dépendance externe.
@@ -112,8 +141,8 @@ export function scheduleDailyBackups() {
     if (next <= now) next.setDate(next.getDate() + 1);
     return next.getTime() - now.getTime();
   };
-  const run = () => {
-    try { createBackup(); } catch (err) { logger.error({ err }, 'Échec de la sauvegarde planifiée'); }
+  const run = async () => {
+    try { await createBackup(); } catch (err) { logger.error({ err }, 'Échec de la sauvegarde planifiée'); }
     setTimeout(run, 24 * 60 * 60 * 1000);
   };
   setTimeout(run, msUntilNext3am());
