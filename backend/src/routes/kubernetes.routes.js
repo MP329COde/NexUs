@@ -25,6 +25,9 @@ router.get('/pods/:namespace/:pod/metrics', asyncHandler(async (req, res) => {
 router.get('/pods/:namespace/:pod/owners', asyncHandler(async (req, res) => {
   res.json({ ok: true, ...(await k8s.getPodOwners(req.params.namespace, req.params.pod)) });
 }));
+router.get('/deployments/:namespace/:name/diagnostics', asyncHandler(async (req, res) => {
+  res.json({ ok: true, ...(await k8s.getDeploymentDiagnostics(req.params.namespace, req.params.name)) });
+}));
 router.get('/events', asyncHandler(async (req, res) => {
   if (!req.query.namespace) return res.status(400).json({ ok: false, error: 'namespace requis' });
   res.json({ ok: true, items: await k8s.listEvents(req.query.namespace, req.query.involvedObject) });

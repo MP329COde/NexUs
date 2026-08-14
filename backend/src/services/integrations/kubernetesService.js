@@ -184,6 +184,55 @@ export async function listDeployments(namespace) {
   });
 }
 
+// Rassemble les signaux réels nécessaires au diagnostic automatique d'un
+// deployment : disponibilité, redémarrages par pod, limites de ressources
+// déclarées, et usage réel (metrics-server) si disponible. Ne calcule aucune
+// cause ici — c'est lib/diagnostics.js (frontend) qui applique les règles,
+// pour que la logique de diagnostic reste testable et visible indépendamment
+// de la collecte de données.
+export async function getDeploymentDiagnostics(namespace, name) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('deployment diagnostics', async () => {
+    const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
+    const selector = Object.entries(deployment.spec.selector.matchLabels || {}).map(([k, v]) => `${k}=${v}`).join(',');
+    const podList = await c.core.listNamespacedPod({ namespace, labelSelector: selector });
+
+    const limits = (deployment.spec.template.spec.containers || []).map((ct) => ({
+      name: ct.name,
+      cpu: ct.resources?.limits?.cpu || null,
+      memory: ct.resources?.limits?.memory || null
+    }));
+
+    const pods = podList.items.map((p) => ({
+      name: p.metadata.name,
+      phase: p.status.phase,
+      restarts: (p.status.containerStatuses || []).reduce((s, cs) => s + (cs.restartCount || 0), 0),
+      startedAt: p.status.startTime
+    }));
+
+    let metrics = null;
+    try {
+      const metricsRes = await c.custom.listNamespacedCustomObject({ group: 'metrics.k8s.io', version: 'v1beta1', namespace, plural: 'pods' });
+      const podNames = new Set(pods.map((p) => p.name));
+      metrics = (metricsRes.items || [])
+        .filter((m) => podNames.has(m.metadata.name))
+        .map((m) => ({
+          pod: m.metadata.name,
+          containers: (m.containers || []).map((ct) => ({ name: ct.name, cpu: ct.usage?.cpu, memory: ct.usage?.memory }))
+        }));
+    } catch { /* metrics-server absent — pas de données d'usage, diagnostic dégradé mais pas d'erreur bloquante */ }
+
+    return {
+      replicas: deployment.status.replicas || 0,
+      ready: deployment.status.readyReplicas || 0,
+      limits,
+      pods,
+      metrics
+    };
+  });
+}
+
 export async function listServices(namespace) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
