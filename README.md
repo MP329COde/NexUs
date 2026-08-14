@@ -65,6 +65,11 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   avant de clore, commentaires. Vue globale réservée aux administrateurs (`GET /api/incidents`),
   agrégée avec les intégrations en erreur et les jobs en échec dans `GET /api/system/overview`
   (affiché sur la page d'accueil pour les administrateurs).
+- Changements contrôlés (`src/store/changeStore.js`) : une modification planifiée (pas un problème
+  survenu, contrairement à un incident), avec description, impact attendu, auteur, décision et
+  exécution distinctes. Proposer est ouvert à `developer+` ; approuver/rejeter exige `maintainer+`, et
+  `owner` si l'environnement visé est marqué production. L'exécution reste bloquée tant que le
+  changement n'est pas approuvé.
 - Webhooks entrants (`src/routes/webhooks.routes.js`) : `POST /api/webhooks/gitlab/:projectId` et
   `.../github/:projectId`, publics par nécessité mais jamais permissifs — chaque projet migré reçoit
   un secret aléatoire à sa création, vérifié par comparaison à temps constant (GitLab, en-tête
