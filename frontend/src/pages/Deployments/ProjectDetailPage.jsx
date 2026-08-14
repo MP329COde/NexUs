@@ -23,6 +23,8 @@ export default function ProjectDetailPage() {
   const repos = useApi(() => api.get('/repos'), []);
   const reviews = useApi(() => api.get('/reviews'), []);
   const workspace = useApi(() => api.get(`/projects/${id}/workspace`), [id]);
+  const environments = useApi(() => api.get(`/projects/${id}/environments`), [id]);
+  const deployments = useApi(() => api.get(`/projects/${id}/deployments`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
 
@@ -30,6 +32,7 @@ export default function ProjectDetailPage() {
     return <div className="card" style={{ padding: 30, textAlign: 'center' }}>Projet introuvable ou non accessible.</div>;
   }
   const p = project.data?.project;
+  const projectRole = project.data?.role || (user?.role === 'admin' ? 'owner' : null);
   if (!p) return <div style={{ padding: 30, fontSize: 13, color: 'var(--text-faint)' }}>Chargement…</div>;
 
   const allUsers = users.data?.items || [];
@@ -153,6 +156,17 @@ export default function ProjectDetailPage() {
         <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} projectId={id} onChanged={workspace.reload} />
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <EnvironmentsPanel
+          environments={environments.data?.items || []}
+          migrated={environments.data?.migrated}
+          deployments={deployments.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={deployments.reload}
+        />
+      </div>
+
       {(() => {
         const isMember = user?.role === 'admin' || p.memberIds.includes(user?.id);
         return (
@@ -165,6 +179,85 @@ export default function ProjectDetailPage() {
 
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
     </>
+  );
+}
+
+const ROLE_RANK = { viewer: 1, developer: 2, maintainer: 3, owner: 4 };
+const roleAtLeast = (role, min) => (ROLE_RANK[role] || 0) >= (ROLE_RANK[min] || 0);
+
+// Environnements + déploiements Argo CD rattachés au projet (socle
+// relationnel — voir store/orgStore.js#listEnvironments et
+// store/deploymentStore.js). N'affiche les boutons Synchroniser/Rollback que
+// si le rôle local le permettrait — purement indicatif : le backend revérifie
+// systématiquement le rôle ET l'appartenance du déploiement au projet à
+// chaque appel (routes/projects.routes.js), donc masquer un bouton ici
+// n'accorde jamais un droit que l'API refuserait.
+function EnvironmentsPanel({ environments, migrated, deployments, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [busyId, setBusyId] = useState(null);
+
+  async function sync(link) {
+    setBusyId(link.id);
+    try {
+      await api.post(`/projects/${projectId}/deployments/${link.id}/sync`);
+      notify(`Synchronisation lancée pour ${link.name}`, { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!migrated) {
+    return (
+      <Panel title="Environnements & déploiements" span={12}>
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          Ce projet n'est pas encore rattaché au socle relationnel (organisations/environnements). Voir <code>npm run migrate:postgres</code> côté backend.
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title="Environnements & déploiements" sub="Un environnement de production exige le rôle propriétaire pour toute action" span={12}>
+      {environments.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun environnement.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {environments.map((env) => {
+            const links = deployments.filter((l) => l.environmentId === env.id);
+            const canSync = env.is_production ? roleAtLeast(role, 'owner') : roleAtLeast(role, 'maintainer');
+            return (
+              <div key={env.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: links.length ? 6 : 0 }}>
+                  <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'}`}>{env.is_production ? 'Production' : env.kind}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{env.name}</span>
+                  <span className="faint" style={{ fontSize: 11.5, flex: 1 }}>{links.length} déploiement(s) rattaché(s)</span>
+                </div>
+                {links.map((link) => (
+                  <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 4px 8px', fontSize: 12 }}>
+                    <Icon name="box" size={12} style={{ color: 'var(--text-faint)' }} />
+                    <span style={{ flex: 1 }}>{link.name}</span>
+                    {link.argocdAppName ? (
+                      canSync ? (
+                        <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyId === link.id} onClick={() => sync(link)}>
+                          {busyId === link.id ? '…' : 'Synchroniser'}
+                        </button>
+                      ) : (
+                        <span className="faint" style={{ fontSize: 11 }} title="Rôle insuffisant pour cette action">Synchronisation réservée</span>
+                      )
+                    ) : (
+                      <span className="faint" style={{ fontSize: 11 }}>Aucune app Argo CD associée</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
   );
 }
 
