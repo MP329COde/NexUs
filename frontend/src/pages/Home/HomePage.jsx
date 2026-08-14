@@ -8,6 +8,7 @@ import CriticalHostsPanel from './CriticalHostsPanel.jsx';
 import LiveActivityPanel from './LiveActivityPanel.jsx';
 import ServiceAvailabilityPanel from './ServiceAvailabilityPanel.jsx';
 import OpenAlertsPanel from './OpenAlertsPanel.jsx';
+import AdminOverviewPanel from './AdminOverviewPanel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 
@@ -74,6 +75,10 @@ export default function HomePage() {
 
       {error && <div className="card" style={{ padding: 14, marginBottom: 16, color: 'var(--tone-crit-fg)', fontSize: 13 }}>{error}</div>}
       {loading && !data && <div className="card" style={{ padding: 14, marginBottom: 16, fontSize: 13, color: 'var(--text-faint)' }}>Chargement…</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <AdminOverviewPanel />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <InfraLoadPanel />
