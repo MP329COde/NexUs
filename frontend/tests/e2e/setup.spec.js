@@ -2,10 +2,14 @@ import { test, expect } from '@playwright/test';
 
 // La console de test démarre sans aucun utilisateur (voir playwright.config.js,
 // NEXUS_DATA_DIR jetable + ADMIN_EMAIL vide). Les tests s'exécutent en série
-// (fullyParallel: false) et partagent le même backend jetable : la soumission
-// complète, qui crée le premier administrateur, doit donc rester le DERNIER
-// test — une fois l'administrateur créé, /setup redirige vers /login pour
-// tout le reste de l'exécution.
+// (fullyParallel: false) et partagent le même backend jetable. Le compte
+// administrateur est désormais créé dès la fin de l'étape "Compte
+// administrateur" (pas seulement à la soumission finale — voir SetupPage.jsx,
+// next()) pour permettre de tester une vraie connexion de service pendant
+// l'assistant : le test qui va au-delà de cette étape doit donc rester le
+// DERNIER, tous les autres devant échouer la validation AVANT de la
+// dépasser — une fois l'administrateur créé, /setup redirige vers /login
+// pour tout le reste de l'exécution.
 
 test.describe.configure({ mode: 'serial' });
 
@@ -40,20 +44,7 @@ test.describe("Assistant de configuration initiale", () => {
     await expect(page.getByRole('button', { name: 'Configurer plus tard' })).toHaveCount(0);
   });
 
-  test('permet de passer une étape optionnelle via "Configurer plus tard"', async ({ page }) => {
-    await page.goto('/setup');
-    await page.getByRole('button', { name: 'Continuer' }).click(); // 1 -> 2
-    await page.getByLabel('Nom complet').fill('Alex');
-    await page.getByLabel('Adresse électronique').fill('skip@nexus.lan');
-    await page.getByLabel('Mot de passe initial').fill('SuperSecurePass123!');
-    await page.getByLabel('Confirmation').fill('SuperSecurePass123!');
-    await page.getByRole('button', { name: 'Continuer' }).click(); // 2 -> 3
-    await expect(page.getByRole('heading', { name: 'Connexion & identité' })).toBeVisible();
-    await page.getByRole('button', { name: 'Configurer plus tard' }).click(); // 3 -> 4 sans validation
-    await expect(page.getByRole('heading', { name: 'Services Git' })).toBeVisible();
-  });
-
-  test('parcourt les six étapes et ouvre la console', async ({ page }) => {
+  test('parcourt les sept étapes et ouvre la console', async ({ page }) => {
     await page.goto('/setup');
 
     // Étape 1 — Organisation
@@ -72,20 +63,41 @@ test.describe("Assistant de configuration initiale", () => {
     await page.getByLabel('Confirmation').fill('SuperSecurePass123!');
     await page.getByRole('button', { name: 'Continuer' }).click();
 
-    // Étape 3 — Connexion & identité (valeurs par défaut acceptées)
+    // Étape 3 — Connexion & identité : passée via "Configurer plus tard"
+    // (étape optionnelle, sans validation), plutôt que "Continuer".
     await expect(page.getByRole('heading', { name: 'Connexion & identité' })).toBeVisible();
-    await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByRole('button', { name: 'Configurer plus tard' }).click();
 
     // Étape 4 — Services Git
     await expect(page.getByRole('heading', { name: 'Services Git' })).toBeVisible();
     await page.getByRole('button', { name: 'Continuer' }).click();
 
-    // Étape 5 — Outils à connecter (Wazuh/Prometheus/Grafana/Gitea préselectionnés)
-    await expect(page.getByRole('heading', { name: 'Outils à connecter' })).toBeVisible();
+    // Étape 5 — Services à connecter : le compte admin existe déjà à ce stade
+    // (créé en fin d'étape 2), donc les panneaux d'intégration réels
+    // (Kubernetes, GitLab, Proxmox...) sont utilisables et testables ici.
+    await expect(page.getByRole('heading', { name: 'Services à connecter' })).toBeVisible();
+    // Cert-Manager mentionne aussi "Kubernetes" dans son texte d'aide : on
+    // cible la carte par son titre exact plutôt que par un texte substring.
+    const k8sPanel = page.locator('.card').filter({ has: page.getByText('Kubernetes', { exact: true }) });
+    await expect(k8sPanel).toBeVisible();
+    // ".invalid" est réservé par la RFC 2606 : la résolution DNS échoue tout
+    // de suite (rapide, déterministe), contrairement à une IP muette qui
+    // expirerait au bout de longues secondes. Ceci vérifie qu'un VRAI appel
+    // réseau est fait (échec attendu), pas un succès simulé — voir
+    // kubernetesService.getStatus().
+    await k8sPanel.getByLabel("URL du serveur API").fill('https://cluster.nexus-e2e.invalid:6443');
+    await k8sPanel.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(k8sPanel.getByText('Configuré', { exact: true })).toBeVisible();
+    await k8sPanel.getByText('Tester la connexion').click();
+    await expect(k8sPanel.locator('text=/ENOTFOUND|EAI_AGAIN|getaddrinfo|injoignable|ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|certificat|fetch failed/i')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Continuer' }).click();
+
+    // Étape 6 — Outils à installer (Wazuh/Prometheus/Grafana/Gitea préselectionnés)
+    await expect(page.getByRole('heading', { name: 'Outils à installer' })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: /Wazuh/ })).toBeChecked();
     await page.getByRole('button', { name: 'Continuer' }).click();
 
-    // Étape 6 — Prêt : récapitulatif puis ouverture
+    // Étape 7 — Prêt : récapitulatif puis ouverture
     await expect(page.getByRole('heading', { name: 'Prêt' })).toBeVisible();
     await expect(page.getByText('Alexandre Lambert · alex@nexus.lan')).toBeVisible();
     await page.getByRole('button', { name: 'Ouvrir la console' }).click();

@@ -3,8 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { signSession, SESSION_COOKIE, toPublicUser, requireAuth, requireRole } from '../middleware/auth.js';
 import { hasAnyUser, createUser } from '../store/usersStore.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
-import { save as saveIdentity, getSessionMinutes } from '../store/identityStore.js';
-import { saveIntegration } from '../store/settingsStore.js';
+import { getSessionMinutes } from '../store/identityStore.js';
 import { logAudit } from '../services/auditService.js';
 import { startInstall, getJobs } from '../services/provisioningService.js';
 import { listInstallableIds } from '../services/serviceCatalog.js';
@@ -14,27 +13,24 @@ import { listInstallableIds } from '../services/serviceCatalog.js';
 // qu'un compte admin ne puisse jamais être recréé une fois la console initialisée.
 const router = Router();
 
-const GIT_FORGES = ['gitea', 'gitlab', 'github'];
-// Catalogue des identifiants d'outils proposés à l'étape 5 — tenu en phase
-// avec la liste statique côté frontend (pages/Setup/SetupPage.jsx). Toute
-// entrée hors de cette liste envoyée par le client est silencieusement ignorée.
-const TOOL_IDS = [
-  'wazuh', 'prometheus', 'grafana', 'loki', 'alertmanager', 'zabbix',
-  'uptime-kuma', 'netdata', 'influxdb', 'suricata', 'crowdsec', 'openvas',
-  'trivy', 'vault', 'step-ca', 'authentik', 'keycloak', 'gitea', 'gitlab',
-  'github', 'woodpecker', 'jenkins', 'sonarqube', 'harbor'
-];
-
 router.get('/status', (req, res) => {
   res.json({ ok: true, needsSetup: !hasAnyUser() });
 });
 
+// Ne crée plus que l'organisation + le compte administrateur : c'est la
+// seule étape qui doit précéder l'ouverture d'une session, car toute la
+// suite de l'assistant (identité, forge Git, services réels) réutilise
+// ensuite les routes authentifiées standard (PUT /identity, PUT/POST
+// /settings/:key) exactement comme le fait Paramètres après coup — plutôt
+// que de dupliquer leur logique ici. Cela permet aussi de tester une vraie
+// connexion (Kubernetes, GitLab, Proxmox...) DURANT l'assistant, avant
+// d'ouvrir la console, ce qu'un unique appel final ne permettait pas.
 router.post('/', asyncHandler(async (req, res) => {
   if (hasAnyUser()) {
     return res.status(409).json({ ok: false, error: 'La console est déjà configurée' });
   }
 
-  const { organisation = {}, admin = {}, identity = {}, git = {}, tools = [] } = req.body || {};
+  const { organisation = {}, admin = {} } = req.body || {};
 
   const { email, password, confirm, name, username } = admin;
   if (!email || !password || password.length < 8) {
@@ -46,7 +42,6 @@ router.post('/', asyncHandler(async (req, res) => {
 
   // Organisation : fusionnée avec les valeurs par défaut du store plutôt que
   // remplacée, pour ne jamais perdre baseDomain (utilisé ailleurs dans la console).
-  const enabledTools = Array.isArray(tools) ? tools.filter((id) => TOOL_IDS.includes(id)) : [];
   writeStore('console', {
     ...readStore('console'),
     name: organisation.consoleName || 'Nexus Console',
@@ -54,55 +49,14 @@ router.post('/', asyncHandler(async (req, res) => {
     timezone: organisation.timezone || 'Europe/Paris',
     language: organisation.language || 'fr',
     dateFormat: organisation.dateFormat || 'dd/MM/yyyy',
-    contactEmail: organisation.contactEmail || '',
-    enabledTools
+    contactEmail: organisation.contactEmail || ''
   });
-
-  // Politique de connexion + fournisseur d'identité : mêmes clés que
-  // PUT /api/identity (voir store/identityStore.js), enregistrées telles
-  // quelles même si certaines (MFA, réseaux autorisés) ne sont pas encore
-  // appliquées côté authentification — cf. le commentaire de identityStore.js.
-  if (identity.sessionMinutes !== undefined) {
-    const m = Number(identity.sessionMinutes);
-    if (!Number.isInteger(m) || m < 5 || m > 10080) {
-      return res.status(400).json({ ok: false, error: 'Durée de session invalide (5 à 10080 minutes)' });
-    }
-  }
-  if (identity.minPasswordLength !== undefined) {
-    const l = Number(identity.minPasswordLength);
-    if (!Number.isInteger(l) || l < 8 || l > 128) {
-      return res.status(400).json({ ok: false, error: 'Longueur de mot de passe invalide (8 à 128)' });
-    }
-  }
-  saveIdentity({
-    provider: identity.provider || 'none',
-    sessionMinutes: identity.sessionMinutes,
-    minPasswordLength: identity.minPasswordLength,
-    mfaRequired: Boolean(identity.mfaRequired),
-    allowedNetworks: identity.allowedNetworks || '',
-    logoutOnInactivity: identity.logoutOnInactivity !== false
-  });
-
-  // Services Git : n'enregistre l'intégration que si une forge a été choisie
-  // et qu'au moins l'URL est renseignée (évite de créer une entrée vide).
-  const forge = GIT_FORGES.includes(git.forge) ? git.forge : null;
-  if (forge && git.baseUrl) {
-    saveIntegration(forge, {
-      baseUrl: git.baseUrl,
-      org: git.org || '',
-      token: git.token || '',
-      defaultBranch: git.defaultBranch || 'main',
-      autoWebhooks: Boolean(git.autoWebhooks),
-      outboundMirrors: Boolean(git.outboundMirrors),
-      requireSignedCommits: Boolean(git.requireSignedCommits)
-    });
-  }
 
   const user = createUser({ email, password, name, username, role: 'admin' });
 
   const token = signSession(user);
   res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: getSessionMinutes() * 60 * 1000 });
-  logAudit({ user: toPublicUser(user), ip: req.ip }, 'setup.completed', { forge, toolsCount: enabledTools.length });
+  logAudit({ user: toPublicUser(user), ip: req.ip }, 'setup.completed', {});
   res.status(201).json({ ok: true, user: toPublicUser(user) });
 }));
 

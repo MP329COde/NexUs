@@ -54,6 +54,9 @@ router.put('/:key', asyncHandler(async (req, res) => {
 router.post('/:key/test', asyncHandler(async (req, res) => {
   assertKey(req.params.key);
   const entry = integrations[req.params.key];
+  if (!entry) {
+    return res.status(400).json({ ok: false, error: 'Test de connexion non disponible pour cette intégration' });
+  }
   const status = await entry.service.getStatus();
   res.json({ ok: true, status });
 }));

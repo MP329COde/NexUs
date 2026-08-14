@@ -152,22 +152,27 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
         <form onSubmit={save}>
           {schema.fields.map((f) => (
             <div key={f.key} style={{ marginBottom: 10 }}>
+              {/* Contrôle imbriqué dans <label> (association implicite), pas relié par un id
+                  généré : reste accessible (lecteurs d'écran, clic sur le libellé) sans risque
+                  de collision d'id entre les dix intégrations rendues côte à côte. */}
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>
                 {f.label}
                 {f.secret && initial?.[`${f.key}Set`] && <span className="faint"> (déjà renseigné — laisser vide pour conserver)</span>}
+                <div style={{ marginTop: 5, fontWeight: 400 }}>
+                  {f.type === 'checkbox' ? (
+                    <input type="checkbox" checked={Boolean(form[f.key])} onChange={(e) => set(f.key, e.target.checked)} />
+                  ) : (
+                    <input
+                      className="input"
+                      type={f.type === 'password' ? 'password' : 'text'}
+                      placeholder={f.placeholder}
+                      value={form[f.key] ?? ''}
+                      onChange={(e) => set(f.key, e.target.value)}
+                      onBlur={f.placeholder?.startsWith('http') ? (e) => normalizeUrlOnBlur(f.key, e.target.value) : undefined}
+                    />
+                  )}
+                </div>
               </label>
-              {f.type === 'checkbox' ? (
-                <input type="checkbox" checked={Boolean(form[f.key])} onChange={(e) => set(f.key, e.target.checked)} />
-              ) : (
-                <input
-                  className="input"
-                  type={f.type === 'password' ? 'password' : 'text'}
-                  placeholder={f.placeholder}
-                  value={form[f.key] ?? ''}
-                  onChange={(e) => set(f.key, e.target.value)}
-                  onBlur={f.placeholder?.startsWith('http') ? (e) => normalizeUrlOnBlur(f.key, e.target.value) : undefined}
-                />
-              )}
               {f.hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{f.hint}</div>}
               {schema.hostSuggestion?.field === f.key && suggestion && (
                 <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-faint)' }}>

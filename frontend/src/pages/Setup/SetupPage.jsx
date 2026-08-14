@@ -3,6 +3,8 @@ import { api } from '../../lib/apiClient.js';
 import BrandMark from '../../components/ui/BrandMark.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import InstallScreen from './InstallScreen.jsx';
+import IntegrationPanel from '../Settings/IntegrationPanel.jsx';
+import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
 
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
 const LANGUAGES = [['fr', 'Français'], ['en', 'English']];
@@ -63,7 +65,8 @@ const STEPS = [
   { key: 'admin', label: 'Compte administrateur', title: 'Compte administrateur', sub: 'Premier compte de la plateforme : le seul autorisé à modifier la configuration globale.' },
   { key: 'identity', label: 'Connexion & identité', title: 'Connexion & identité', sub: "Fournisseur d'identité et politique d'accès. Tout reste modifiable ensuite." },
   { key: 'git', label: 'Services Git', title: 'Services Git', sub: 'Forge principale utilisée pour le code, les pipelines et le GitOps.' },
-  { key: 'tools', label: 'Outils à connecter', title: 'Outils à connecter', sub: 'Sélectionnez les outils à interroger dès le premier démarrage. Les autres se connectent plus tard depuis le catalogue.' },
+  { key: 'services', label: 'Services à connecter', title: 'Services à connecter', sub: "Connectez et testez dès maintenant les outils déjà installés sur votre infrastructure. Entièrement facultatif — chaque service reste configurable et testable plus tard depuis Paramètres." },
+  { key: 'tools', label: 'Outils à installer', title: 'Outils à installer', sub: "Sélectionnez les outils à déployer automatiquement au premier démarrage. Les autres s'installent plus tard depuis le catalogue." },
   { key: 'ready', label: 'Prêt', title: 'Prêt', sub: "Récapitulatif avant l'ouverture de la console." }
 ];
 
@@ -82,6 +85,23 @@ export default function SetupPage() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [installing, setInstalling] = useState(false);
+  // L'assistant crée le compte administrateur dès la fin de l'étape 2
+  // (plutôt qu'à la toute fin) : une session existe alors déjà, ce qui permet
+  // aux étapes suivantes de réutiliser les vraies routes authentifiées
+  // (PUT /identity, PUT et POST /settings/:key) et donc de tester une
+  // connexion réelle (Kubernetes, GitLab, Proxmox...) pendant l'assistant.
+  const [accountCreated, setAccountCreated] = useState(false);
+  const [settingsData, setSettingsData] = useState(null);
+
+  async function reloadSettings() {
+    try {
+      const res = await api.get('/settings');
+      setSettingsData(res);
+    } catch {
+      // Le rechargement échoue silencieusement : chaque IntegrationPanel
+      // affiche déjà sa propre erreur de sauvegarde/test le cas échéant.
+    }
+  }
 
   function setSection(section, patch) {
     setForm((f) => ({ ...f, [section]: { ...f[section], ...patch } }));
@@ -117,12 +137,45 @@ export default function SetupPage() {
     setStep(Math.max(0, Math.min(STEPS.length - 1, index)));
   }
 
-  function next() {
+  async function next() {
     const err = validateStep(step);
     if (err) {
       setError(err);
       return;
     }
+    const key = STEPS[step].key;
+    setError(null);
+    setBusy(true);
+    try {
+      if (key === 'admin') {
+        if (!accountCreated) {
+          await api.post('/setup', { organisation: form.organisation, admin: form.admin });
+          setAccountCreated(true);
+          reloadSettings();
+        }
+      } else if (key === 'identity') {
+        await api.put('/identity', form.identity);
+      } else if (key === 'git') {
+        const forge = form.git.forge;
+        if (forge && form.git.baseUrl.trim()) {
+          await api.put(`/settings/${forge}`, {
+            baseUrl: form.git.baseUrl,
+            org: form.git.org,
+            token: form.git.token,
+            defaultBranch: form.git.defaultBranch,
+            autoWebhooks: form.git.autoWebhooks,
+            outboundMirrors: form.git.outboundMirrors,
+            requireSignedCommits: form.git.requireSignedCommits
+          });
+          reloadSettings();
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
     if (step === STEPS.length - 1) {
       submit();
       return;
@@ -136,39 +189,27 @@ export default function SetupPage() {
   }
 
   function skipAll() {
-    goTo(STEPS.length - 1);
+    // Le compte administrateur reste requis même en passant tout le reste :
+    // sans lui, aucune session n'existe et /setup redirigerait indéfiniment ici.
+    goTo(accountCreated ? STEPS.length - 1 : 1);
   }
 
-  async function submit() {
-    const adminErr = validateStep(STEPS.findIndex((s) => s.key === 'admin'));
-    if (adminErr) {
-      setError(adminErr);
-      goTo(STEPS.findIndex((s) => s.key === 'admin'));
+  function submit() {
+    // Le compte, l'identité, la forge Git et les services réels sont déjà
+    // enregistrés au fil de l'assistant (voir next()) : il ne reste plus qu'à
+    // lancer l'installation automatique des outils sélectionnés, s'il y en a.
+    const toInstall = form.tools
+      .map((id) => ({ id, cfg: form.toolsConfig[id] }))
+      .filter(({ id, cfg }) => TOOL_CATALOG.find((t) => t.id === id)?.installable && cfg?.autoInstall && cfg?.address?.trim());
+
+    if (toInstall.length === 0) {
+      // Rechargement complet plutôt qu'une navigation client : SetupGate ne
+      // revérifie needsSetup qu'au montage, ce qui provoquerait sinon une
+      // redirection immédiate vers /setup juste après sa propre résolution.
+      window.location.href = '/';
       return;
     }
-    setError(null);
-    setBusy(true);
-    try {
-      await api.post('/setup', form);
-      // La session est posée par /api/setup lui-même : les appels suivants
-      // (installation automatique) sont donc déjà authentifiés.
-      const toInstall = form.tools
-        .map((id) => ({ id, cfg: form.toolsConfig[id] }))
-        .filter(({ id, cfg }) => TOOL_CATALOG.find((t) => t.id === id)?.installable && cfg?.autoInstall && cfg?.address?.trim());
-
-      if (toInstall.length === 0) {
-        // Rechargement complet plutôt qu'une navigation client : SetupGate ne
-        // revérifie needsSetup qu'au montage, ce qui provoquerait sinon une
-        // redirection immédiate vers /setup juste après sa propre résolution.
-        window.location.href = '/';
-        return;
-      }
-      setInstalling(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    setInstalling(true);
   }
 
   const current = STEPS[step];
@@ -191,7 +232,7 @@ export default function SetupPage() {
         <div style={{ padding: '0 4px', marginBottom: 18 }}>
           <div style={{ fontWeight: 700, fontSize: 17 }}>Configuration initiale</div>
           <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.5, color: '#6B7A9C' }}>
-            Six étapes pour ouvrir la console : organisation, administrateur, identité, Git et outils.
+            Sept étapes pour ouvrir la console : organisation, administrateur, identité, Git, services à connecter et outils.
           </p>
         </div>
 
@@ -249,15 +290,20 @@ export default function SetupPage() {
         </div>
 
         <div style={{ flex: 1, padding: '28px 40px', overflowY: 'auto' }}>
-          <div style={{ maxWidth: current.key === 'tools' ? 900 : 620 }}>
+          <div style={{ maxWidth: current.key === 'tools' || current.key === 'services' ? 1100 : 620 }}>
             {current.key === 'organisation' && <StepOrganisation form={form.organisation} set={(p) => setSection('organisation', p)} />}
             {current.key === 'admin' && <StepAdmin form={form.admin} set={(p) => setSection('admin', p)} />}
             {current.key === 'identity' && <StepIdentity form={form.identity} set={(p) => setSection('identity', p)} />}
             {current.key === 'git' && <StepGit form={form.git} set={(p) => setSection('git', p)} />}
+            {current.key === 'services' && (
+              accountCreated
+                ? <StepServices settingsData={settingsData} reloadSettings={reloadSettings} />
+                : <Card><p className="faint" style={{ margin: 0, fontSize: 12.5 }}>Le compte administrateur doit être créé avant de pouvoir connecter un service (retournez à l'étape précédente).</p></Card>
+            )}
             {current.key === 'tools' && (
               <StepTools selected={form.tools} onToggle={toggleTool} toolsConfig={form.toolsConfig} setToolConfig={setToolConfig} />
             )}
-            {current.key === 'ready' && <StepReady form={form} />}
+            {current.key === 'ready' && <StepReady form={form} settingsData={settingsData} />}
 
             {error && (
               <div style={{ marginTop: 16, fontSize: 12.5, color: 'var(--tone-crit-fg)', background: 'var(--tone-crit-bg)', border: '1px solid var(--tone-crit-br)', borderRadius: 8, padding: '10px 12px' }}>
@@ -507,15 +553,44 @@ function ToolConfigRow({ tool, cfg, setCfg }) {
   );
 }
 
-function StepReady({ form }) {
+// Un service compte comme "connecté" dès que settingsStore.isConfigured() le
+// juge configuré (voir backend/src/store/settingsStore.js) — même critère
+// que le badge "Configuré"/"Non configuré" affiché par IntegrationPanel.
+function StepServices({ settingsData, reloadSettings }) {
+  return (
+    <div>
+      <p className="faint" style={{ fontSize: 12.5, margin: '0 0 14px', lineHeight: 1.5 }}>
+        Connectez dès maintenant les outils déjà installés sur votre infrastructure, et testez chaque
+        connexion avant d'ouvrir la console. Rien n'est obligatoire ici : chaque service reste
+        configurable et testable plus tard depuis Paramètres → Intégrations &amp; outils.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
+        {INTEGRATION_ORDER.map((key) => (
+          <IntegrationPanel
+            key={key}
+            integrationKey={key}
+            schema={INTEGRATION_FORMS[key]}
+            initial={settingsData?.integrations?.[key]}
+            allIntegrations={settingsData?.integrations}
+            onSaved={reloadSettings}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StepReady({ form, settingsData }) {
   const forgeLabel = GIT_FORGES.find(([v]) => v === form.git.forge)?.[1] || form.git.forge;
   const idpLabel = IDENTITY_PROVIDERS.find(([v]) => v === form.identity.provider)?.[1] || form.identity.provider;
+  const connectedServices = INTEGRATION_ORDER.filter((key) => settingsData?.integrations?.[key]?.configured).length;
   const rows = [
     ['Organisation', form.organisation.consoleName],
     ['Administrateur', `${form.admin.name || '—'} · ${form.admin.email || '—'}`],
     ['Identité', `${idpLabel} · ${form.identity.mfaRequired ? 'MFA obligatoire' : 'MFA facultatif'}`],
     ['Forge Git', form.git.baseUrl ? `${forgeLabel} · ${form.git.baseUrl}` : `${forgeLabel} · non renseignée`],
-    ['Outils sélectionnés', `${form.tools.length} sur ${TOOL_CATALOG.length}`],
+    ['Services connectés', `${connectedServices} sur ${INTEGRATION_ORDER.length}`],
+    ['Outils à installer', `${form.tools.length} sur ${TOOL_CATALOG.length}`],
     ['Rétention audit', '365 jours']
   ];
   return (
