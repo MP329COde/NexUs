@@ -21,6 +21,14 @@ export function createLink(payload) {
     k8sNamespace: payload.k8sNamespace || null,
     k8sDeployment: payload.k8sDeployment || null,
     proxyId: payload.proxyId || null,
+    // Rattachement optionnel à un projet Nexus (id legacy du store JSON — voir
+    // store/projectsStore.js) et à l'un de ses environnements relationnels
+    // (id Postgres — voir store/orgStore.js#listEnvironments). Permet aux
+    // routes scopées /projects/:id/deployments/* (routes/projects.routes.js)
+    // de vérifier l'appartenance avant toute action de synchronisation ou de
+    // rollback, et d'exiger le rôle owner sur un environnement de production.
+    projectId: payload.projectId || null,
+    environmentId: payload.environmentId || null,
     createdAt: new Date().toISOString()
   };
   links.push(link);

@@ -11,6 +11,8 @@ import { logAudit } from '../services/auditService.js';
 import { buildProjectWorkspace } from '../services/projectWorkspaceService.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
+import * as deploymentStore from '../store/deploymentStore.js';
+import { syncApplication, rollbackApplication, getApplicationHistory } from '../services/integrations/argocdService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -192,6 +194,65 @@ router.post('/:id/workspace/reviews/:reviewKey/approve', loadProjectAccess(), re
     return res.json({ ok: true, result });
   }
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+// --- Déploiements (rattachement optionnel via deploymentStore.projectId) :
+// équivalent scopé au projet de routes/deployments.routes.js (vue globale,
+// non protégée par projet — conservée telle quelle pour la compatibilité de
+// l'UI existante, voir README). Ici, la synchronisation Argo CD exige
+// maintainer+, et si le lien référence un environnement de production
+// (via environmentId, résolu dans le socle relationnel), owner est requis même
+// pour une simple synchronisation. Le rollback, toujours plus risqué qu'une
+// synchronisation normale, exige systématiquement owner, production ou non.
+router.get('/:id/deployments', loadProjectAccess(), (req, res) => {
+  const items = deploymentStore.listLinks().filter((l) => l.projectId === req.legacyProject.id);
+  res.json({ ok: true, items });
+});
+
+async function loadDeploymentLink(req, res) {
+  const link = deploymentStore.getLink(req.params.linkId);
+  if (!link || link.projectId !== req.legacyProject.id) {
+    res.status(404).json({ ok: false, error: 'Déploiement introuvable pour ce projet' });
+    return null;
+  }
+  return link;
+}
+
+async function guardProductionEnvironment(req, link) {
+  if (!link.environmentId || !req.pgProject) return;
+  const environments = await orgStore.listEnvironments(req.pgProject.id);
+  const env = environments.find((e) => e.id === link.environmentId);
+  if (env?.is_production && req.projectRole !== 'owner') {
+    throw Object.assign(new Error("Cette action sur un environnement de production requiert le rôle propriétaire du projet"), { status: 403 });
+  }
+}
+
+router.post('/:id/deployments/:linkId/sync', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  if (!link.argocdAppName) return res.status(409).json({ ok: false, error: 'Aucune application Argo CD associée' });
+  await guardProductionEnvironment(req, link);
+  const result = await syncApplication(link.argocdAppName, req.body?.revision);
+  logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, revision: req.body?.revision || null });
+  res.json({ ok: true, ...result });
+}));
+
+router.post('/:id/deployments/:linkId/rollback', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  if (!link.argocdAppName) return res.status(409).json({ ok: false, error: 'Aucune application Argo CD associée' });
+  const { historyId } = req.body || {};
+  if (historyId === undefined) return res.status(400).json({ ok: false, error: 'historyId requis' });
+  const result = await rollbackApplication(link.argocdAppName, historyId);
+  logAudit(req, 'argocd.application.rolledback', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, historyId });
+  res.json({ ok: true, ...result });
+}));
+
+router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  if (!link.argocdAppName) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await getApplicationHistory(link.argocdAppName) });
 }));
 
 // --- Tâches : lecture/écriture ouverte à tout membre du projet (travail
