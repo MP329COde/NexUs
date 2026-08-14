@@ -121,7 +121,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
 
         <button
           onClick={onOpenSearch}
-          title={`Recherche globale (${SEARCH_SHORTCUT})`}
+          title={`Command Center — recherche et actions (${SEARCH_SHORTCUT} ou ${IS_MAC ? '⌘⇧F' : 'Ctrl Shift F'})`}
           className="header-search-bar"
           style={{
             display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px 0 10px',
@@ -131,7 +131,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
         >
           <Icon name="search" size={14} style={{ flex: 'none' }} />
           <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Rechercher hôtes, VM, services...
+            Command Center...
           </span>
           <span
             className="header-search-label mono"

@@ -4,9 +4,16 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { api } from '../../lib/apiClient.js';
 import { STATIC_SEARCH_ITEMS } from '../../config/searchIndex.js';
 import { fuzzyScore, queryTerms } from '../../lib/fuzzyMatch.js';
+import { contextualActions, contextLabel } from './contextualActions.js';
 import Icon from '../ui/Icon.jsx';
 
-export default function CommandPalette({ open, onClose }) {
+// Command Center : ⌘K / ⌘⇧F ouvrent la même palette. Sans contexte, c'est une
+// recherche plate sur les pages et données de la plateforme (proxies, hôtes,
+// dépôts...). Ouverte depuis l'icône "⋯" d'une ressource précise (pod,
+// deployment...), elle affiche en plus, épinglées en tête, les actions qui
+// n'ont de sens que pour cette ressource — pas de liste statique unique :
+// `contextualActions()` construit la liste selon context.type.
+export default function CommandPalette({ open, onClose, context }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -94,10 +101,14 @@ export default function CommandPalette({ open, onClose }) {
       .map((r) => r.item);
   }, [allItems, query]);
 
+  const actions = useMemo(() => (query.trim() ? [] : contextualActions(context, navigate, onClose)), [context, query, navigate, onClose]);
+  const combined = useMemo(() => [...actions.map((a) => ({ ...a, __action: true, group: contextLabel(context) })), ...results], [actions, results, context]);
+
   useEffect(() => setActiveIndex(0), [query]);
 
   function go(item) {
     if (!item) return;
+    if (item.__action) { item.run(); return; }
     onClose();
     navigate(item.path);
   }
@@ -106,14 +117,14 @@ export default function CommandPalette({ open, onClose }) {
     if (!open) return undefined;
     function onKeyDown(e) {
       if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, results.length - 1)); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, combined.length - 1)); }
       if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
-      if (e.key === 'Enter') { e.preventDefault(); go(results[activeIndex]); }
+      if (e.key === 'Enter') { e.preventDefault(); go(combined[activeIndex]); }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, results, activeIndex]);
+  }, [open, combined, activeIndex]);
 
   if (!open) return null;
 
@@ -135,17 +146,17 @@ export default function CommandPalette({ open, onClose }) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher une page, un proxy, un hôte, un dépôt…"
+            placeholder={context ? `Actions sur ${contextLabel(context)}, ou rechercher…` : 'Rechercher une page, une action, un proxy, un hôte, un dépôt…'}
             style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)' }}
           />
           <span style={{ fontSize: 11, color: 'var(--text-faintest)', flex: 'none' }}>Échap</span>
         </div>
 
         <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: 6 }}>
-          {results.length === 0 && (
+          {combined.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun résultat</div>
           )}
-          {results.map((item, idx) => {
+          {combined.map((item, idx) => {
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
             return (
@@ -159,15 +170,17 @@ export default function CommandPalette({ open, onClose }) {
                   onMouseEnter={() => setActiveIndex(idx)}
                   onClick={() => go(item)}
                   style={{
+                    display: 'flex', alignItems: 'center', gap: 9,
                     padding: '9px 10px',
                     borderRadius: 8,
                     fontSize: 13,
                     fontWeight: idx === activeIndex ? 600 : 500,
-                    color: idx === activeIndex ? 'var(--primary)' : 'var(--text)',
+                    color: idx === activeIndex ? 'var(--primary)' : (item.tone === 'crit' ? 'var(--tone-crit-fg)' : 'var(--text)'),
                     background: idx === activeIndex ? 'var(--primary-soft)' : 'transparent',
                     cursor: 'pointer'
                   }}
                 >
+                  {item.icon && <Icon name={item.icon} size={14} style={{ flex: 'none', opacity: .8 }} />}
                   {item.label}
                 </div>
               </div>

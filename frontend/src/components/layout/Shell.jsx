@@ -3,6 +3,7 @@ import { Outlet, useLocation, useMatches } from 'react-router-dom';
 import Header from './Header.jsx';
 import DomainNav from './DomainNav.jsx';
 import CommandPalette from '../search/CommandPalette.jsx';
+import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
 
 const COLLAPSE_KEY = 'nexus-nav-collapsed';
 
@@ -10,20 +11,25 @@ export default function Shell() {
   const matches = useMatches();
   const location = useLocation();
   const title = [...matches].reverse().find((m) => m.handle?.title)?.handle?.title ?? 'Nexus Console';
-  const [searchOpen, setSearchOpen] = useState(false);
+  const { open: searchOpen, context: searchContext, openPalette, closePalette } = useCommandCenter();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     function onKeyDown(e) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      // ⌘K / Ctrl+K (historique) et ⌘⇧F / Ctrl+Shift+F (Command Center) ouvrent
+      // la même palette, sans contexte particulier — seules les icônes "..."
+      // posées sur une ressource (pod, deployment...) l'ouvrent avec un contexte.
+      const isCmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
+      const isCmdShiftF = (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f';
+      if (isCmdK || isCmdShiftF) {
         e.preventDefault();
-        setSearchOpen(true);
+        openPalette();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [openPalette]);
 
   // Referme le tiroir mobile à chaque navigation, pour ne pas avoir à le
   // fermer manuellement après avoir choisi une destination.
@@ -39,7 +45,7 @@ export default function Shell() {
   return (
     <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <div className="no-print">
-        <Header title={title} onOpenSearch={() => setSearchOpen(true)} onOpenNav={() => setMobileNavOpen(true)} />
+        <Header title={title} onOpenSearch={() => openPalette()} onOpenNav={() => setMobileNavOpen(true)} />
       </div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div className="no-print" style={{ height: '100%' }}>
@@ -56,7 +62,7 @@ export default function Shell() {
           </div>
         </main>
       </div>
-      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <CommandPalette open={searchOpen} onClose={closePalette} context={searchContext} />
     </div>
   );
 }
