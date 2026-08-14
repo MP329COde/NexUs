@@ -70,6 +70,10 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
 
 router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   const project = store.updateProject(req.params.id, req.body || {});
+  if (req.pgProject) {
+    const { name, description, tags, repoKeys } = req.body || {};
+    await orgStore.updateProjectByLegacyId(req.params.id, { name, description, tags, repoKeys });
+  }
   logAudit(req, 'project.update', { projectId: project.id });
   res.json({ ok: true, project });
 }));

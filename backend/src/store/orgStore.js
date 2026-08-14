@@ -97,6 +97,23 @@ export async function getProjectByLegacyId(legacyId) {
   return rows[0] || null;
 }
 
+// Répercute les champs partagés (name/description/tags/repoKeys) sur le
+// projet relationnel après une modification côté store JSON legacy — sans
+// cet appel, GET /api/organizations/:id/projects (routes/organizations.routes.js)
+// aurait continué à afficher le nom/description d'origine indéfiniment,
+// même après un renommage via PUT /api/projects/:id.
+export async function updateProjectByLegacyId(legacyId, { name, description, tags, repoKeys }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  if (name !== undefined) { params.push(name); sets.push(`name = $${params.length}`); }
+  if (description !== undefined) { params.push(description); sets.push(`description = $${params.length}`); }
+  if (tags !== undefined) { params.push(JSON.stringify(tags)); sets.push(`tags = $${params.length}`); }
+  if (repoKeys !== undefined) { params.push(JSON.stringify(repoKeys)); sets.push(`repo_keys = $${params.length}`); }
+  if (params.length === 0) return;
+  params.push(legacyId);
+  await query(`UPDATE projects SET ${sets.join(', ')} WHERE legacy_id = $${params.length}`, params);
+}
+
 // Supprime le projet relationnel (et tout ce qui en dépend en cascade :
 // project_members, environments, jobs, incidents — voir les FK ON DELETE
 // CASCADE des migrations) quand un projet legacy migré est supprimé. Sans
