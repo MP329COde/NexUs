@@ -38,6 +38,12 @@ export default function SecurityPage() {
     <>
       <PageHeader title="Cybersécurité" sub={status.data?.status?.message || 'Agents, IPs bannies, scans réseau et conformité'} />
 
+      {user?.role === 'admin' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+          <SecurityOverviewPanel />
+        </div>
+      )}
+
       {wazuhConfigured && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
           <KpiCard label="Agents actifs" value={s.active ?? '—'} tint="#10B981" />
@@ -187,6 +193,86 @@ function NetworkScanPanel() {
             ))}
           </>
         )}
+      </div>
+    </Panel>
+  );
+}
+
+const SEVERITY_ROWS = [
+  { key: 'critical', label: 'Critique', tint: '#F43F5E' },
+  { key: 'high', label: 'Élevée', tint: '#F97316' },
+  { key: 'medium', label: 'Moyenne', tint: '#F59E0B' },
+  { key: 'low', label: 'Faible', tint: '#94A3B8' }
+];
+
+// Tableau de sécurité global (GET /api/security/overview) : certificats
+// proches expiration, incidents ouverts par gravité, agents Wazuh
+// déconnectés — signaux réels agrégés, jamais de donnée inventée quand une
+// intégration sous-jacente n'est pas configurée (sections vides).
+function SecurityOverviewPanel() {
+  const { data, loading } = useApi(() => api.get('/security/overview'), []);
+
+  if (loading && !data) {
+    return (
+      <Panel title="Tableau de sécurité" span={12}>
+        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+      </Panel>
+    );
+  }
+  if (!data) return null;
+
+  const totalOpenIncidents = SEVERITY_ROWS.reduce((sum, r) => sum + (data.incidentsBySeverity[r.key]?.length || 0), 0);
+
+  return (
+    <Panel title="Tableau de sécurité" sub="Certificats, incidents ouverts par gravité, agents déconnectés" span={12}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, padding: 16 }}>
+        <div>
+          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Incidents ouverts par gravité</div>
+          {totalOpenIncidents === 0 ? (
+            <div className="faint" style={{ fontSize: 12.5 }}>Aucun incident ouvert</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {SEVERITY_ROWS.map((r) => {
+                const count = data.incidentsBySeverity[r.key]?.length || 0;
+                if (count === 0) return null;
+                return (
+                  <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="dot" style={{ background: r.tint }} />
+                    <span style={{ fontSize: 12.5, flex: 1 }}>{r.label}</span>
+                    <span className="mono" style={{ fontSize: 12.5, fontWeight: 700 }}>{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Certificats expirant sous 30 jours</div>
+          {data.expiringCertificates.length === 0 ? (
+            <div className="faint" style={{ fontSize: 12.5 }}>Aucun certificat proche de l'expiration</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {data.expiringCertificates.slice(0, 5).map((c) => (
+                <div key={`${c.namespace}/${c.name}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                  <span className={`badge badge-${c.expiresInDays <= 7 ? 'crit' : 'warn'}`}>{c.expiresInDays} j</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Wazuh</div>
+          <div style={{ fontSize: 12.5 }}>
+            {data.wazuhDisconnected > 0 ? (
+              <span style={{ color: 'var(--tone-crit-fg)' }}>{data.wazuhDisconnected} agent(s) déconnecté(s)</span>
+            ) : (
+              <span className="faint">Aucun agent déconnecté</span>
+            )}
+          </div>
+        </div>
       </div>
     </Panel>
   );
