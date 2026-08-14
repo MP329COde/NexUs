@@ -57,6 +57,22 @@ export async function listJobsForProject(projectId, limit = 50) {
   return rows;
 }
 
+// Vue globale (tous projets confondus) réservée aux administrateurs — voir
+// routes/jobs.routes.js GET /. Permet de répondre à "qu'est-ce qui est en
+// cours / a échoué sur toute la plateforme en ce moment", explicitement
+// demandé pour le tableau de bord d'un responsable système.
+export async function listRecentJobs({ status, limit = 100 } = {}) {
+  if (status) {
+    const { rows } = await query(
+      'SELECT * FROM jobs WHERE status = $1 ORDER BY created_at DESC LIMIT $2',
+      [status, limit]
+    );
+    return rows;
+  }
+  const { rows } = await query('SELECT * FROM jobs ORDER BY created_at DESC LIMIT $1', [limit]);
+  return rows;
+}
+
 // Un job resté 'running' au démarrage du process ne peut être que le
 // résidu d'un redémarrage/crash pendant son exécution (ce process est le
 // seul à en écrire le statut) : on ne prétend jamais le reprendre

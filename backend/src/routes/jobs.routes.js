@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
-import { getJob } from '../services/jobService.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+import { getJob, listRecentJobs } from '../services/jobService.js';
 
 // Suivi des jobs sans portée projet (ex. scan réseau — voir
 // routes/security.routes.js). Les jobs rattachés à un projet se consultent
@@ -11,6 +11,14 @@ import { getJob } from '../services/jobService.js';
 // devinerait l'id.
 const router = Router();
 router.use(requireAuth);
+
+// Vue globale tous projets confondus (jobs en cours, échoués récemment...) :
+// réservée aux administrateurs, cohérent avec le reste de la supervision
+// transverse de la plateforme (audit, hôtes, sauvegardes...).
+router.get('/', requireRole('admin'), asyncHandler(async (req, res) => {
+  const status = ['pending', 'running', 'succeeded', 'failed'].includes(req.query.status) ? req.query.status : undefined;
+  res.json({ ok: true, items: await listRecentJobs({ status }) });
+}));
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const job = await getJob(req.params.id);
