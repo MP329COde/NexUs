@@ -53,11 +53,24 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   coffre-fort projet) < `maintainer` (édition du projet, gestion des membres) < `owner` (suppression,
   promotion d'autres membres owner). Un administrateur de plateforme (rôle global historique) garde un
   accès `owner` implicite à tous les projets.
-- **Ce qui reste en Phase 1b** (non fait dans ce socle initial, documenté explicitement plutôt que
-  masqué) : équipes comme regroupement d'utilisateurs distinct des projets (table `teams` créée mais
-  sans routes/UI), migration des collections restantes du store JSON (intégrations, coffre-fort, audit,
-  hôtes...) vers Postgres, UI de gestion des organisations/rôles (l'API existe : `/api/organizations`,
-  `/api/projects/:id/members`, `/api/projects/:id/environments`).
+- Équipes (`teams`/`team_members`) : regroupement d'utilisateurs à l'échelle d'une organisation,
+  distinct des projets — `src/routes/teams.routes.js`. Lecture réservée aux membres de l'organisation
+  (l'org reste la frontière englobante), gestion des membres réservée au lead de l'équipe.
+- Jobs asynchrones (`src/services/jobService.js`) : les opérations longues (synchronisation/rollback
+  Argo CD, scan réseau nmap) sont persistées en base et exécutées en tâche de fond au lieu de bloquer
+  la requête HTTP — suivi via `GET /api/projects/:id/jobs/:jobId` ou `GET /api/jobs/:id` (portée
+  globale). Un job resté `running` au redémarrage du process est explicitement marqué en échec
+  (jamais de statut fantôme).
+- Incidents (`src/store/incidentStore.js`) : gravité, état, résolution obligatoirement documentée
+  avant de clore, commentaires. Vue globale réservée aux administrateurs (`GET /api/incidents`),
+  agrégée avec les intégrations en erreur et les jobs en échec dans `GET /api/system/overview`
+  (affiché sur la page d'accueil pour les administrateurs).
+- **Ce qui reste en Phase 1b** (documenté explicitement plutôt que masqué) : migration des collections
+  restantes du store JSON (intégrations, coffre-fort, audit, hôtes...) vers Postgres, UI de gestion des
+  organisations/équipes/rôles (l'API existe : `/api/organizations`, `/api/teams`,
+  `/api/projects/:id/members`, `/api/projects/:id/environments`), généralisation de l'architecture de
+  jobs aux opérations restées synchrones (provisioning SSH — a son propre suivi en mémoire volontaire,
+  voir `provisioningService.js`).
 
 ### Frontend (`frontend/`)
 
