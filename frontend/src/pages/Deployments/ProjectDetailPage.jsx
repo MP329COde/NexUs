@@ -26,6 +26,7 @@ export default function ProjectDetailPage() {
   const environments = useApi(() => api.get(`/projects/${id}/environments`), [id]);
   const deployments = useApi(() => api.get(`/projects/${id}/deployments`), [id]);
   const incidents = useApi(() => api.get(`/projects/${id}/incidents`), [id]);
+  const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
 
@@ -111,13 +112,7 @@ export default function ProjectDetailPage() {
           )}
         </Panel>
 
-        <Panel title="Équipe" sub={`${p.memberIds.length} membre(s)`} span={4}>
-          <div style={{ padding: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {p.memberIds.length === 0
-              ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
-              : p.memberIds.map((mid) => <span key={mid} className="badge badge-vio"><span className="dot" />{userName(mid)}</span>)}
-          </div>
-        </Panel>
+        <TeamPanel members={members.data} legacyMemberIds={p.memberIds} userName={userName} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
@@ -317,6 +312,40 @@ function ResolveIncidentModal({ incident, onClose, onResolved, projectId, notify
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Clore l\'incident'}</button>
       </form>
     </Modal>
+  );
+}
+
+const TEAM_ROLE_LABEL = { viewer: 'Lecture', developer: 'Développeur', maintainer: 'Mainteneur', owner: 'Propriétaire' };
+
+// Affiche l'appartenance réelle au projet. Une fois le projet migré vers le
+// socle relationnel (GET /projects/:id/members renvoie migrated: true), la
+// source de vérité est project_members (avec rôle granulaire) — pas
+// project.memberIds, qui n'a alors plus aucun effet sur l'accès réel (voir
+// middleware/projectAccess.js) et ne doit donc plus être présenté comme
+// "l'équipe" du projet pour éviter de faire croire qu'il reflète l'accès
+// effectif.
+function TeamPanel({ members, legacyMemberIds, userName }) {
+  const migrated = members?.migrated;
+  const items = migrated ? members.items : null;
+
+  return (
+    <Panel title="Équipe" sub={migrated ? `${items.length} membre(s) — rôles granulaires` : `${legacyMemberIds.length} membre(s)`} span={4}>
+      <div style={{ padding: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {migrated ? (
+          items.length === 0
+            ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
+            : items.map((m) => (
+                <span key={m.user_id} className="badge badge-vio">
+                  <span className="dot" />{userName(m.user_id)} · {TEAM_ROLE_LABEL[m.role] || m.role}
+                </span>
+              ))
+        ) : (
+          legacyMemberIds.length === 0
+            ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
+            : legacyMemberIds.map((mid) => <span key={mid} className="badge badge-vio"><span className="dot" />{userName(mid)}</span>)
+        )}
+      </div>
+    </Panel>
   );
 }
 
