@@ -23,6 +23,7 @@ import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
 import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
 import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
 import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
+import OrganizationsPage from './pages/Deployments/OrganizationsPage.jsx';
 import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
 import GitReposPage from './pages/Deployments/GitReposPage.jsx';
 import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <ToolsAccessPage /> },
               { path: 'projects', element: <ProjectsPage /> },
+              { path: 'organizations', element: <OrganizationsPage /> },
               { path: 'projects/:id', element: <ProjectDetailPage /> },
               { path: 'repos', element: <GitReposPage /> },
               { path: 'reviews', element: <CodeReviewsPage /> },

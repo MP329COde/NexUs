@@ -13,7 +13,10 @@ const GROUPS = [
   },
   {
     label: 'Gestion',
-    items: [{ to: '/deployments/projects', label: 'Projets', icon: 'layers' }]
+    items: [
+      { to: '/deployments/projects', label: 'Projets', icon: 'layers' },
+      { to: '/deployments/organizations', label: 'Organisations', icon: 'users' }
+    ]
   },
   {
     label: 'Code',
