@@ -15,6 +15,7 @@ import * as deploymentStore from '../store/deploymentStore.js';
 import { syncApplication, rollbackApplication, getApplicationHistory } from '../services/integrations/argocdService.js';
 import * as jobService from '../services/jobService.js';
 import * as incidentStore from '../store/incidentStore.js';
+import * as changeStore from '../store/changeStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -247,10 +248,10 @@ async function loadDeploymentLink(req, res) {
   return link;
 }
 
-async function guardProductionEnvironment(req, link) {
-  if (!link.environmentId || !req.pgProject) return;
+async function guardProductionEnvironment(req, environmentId) {
+  if (!environmentId || !req.pgProject) return;
   const environments = await orgStore.listEnvironments(req.pgProject.id);
-  const env = environments.find((e) => e.id === link.environmentId);
+  const env = environments.find((e) => e.id === environmentId);
   if (env?.is_production && req.projectRole !== 'owner') {
     throw Object.assign(new Error("Cette action sur un environnement de production requiert le rôle propriétaire du projet"), { status: 403 });
   }
@@ -267,7 +268,7 @@ router.post('/:id/deployments/:linkId/sync', loadProjectAccess(), requireMinRole
   const link = await loadDeploymentLink(req, res);
   if (!link) return;
   if (!link.argocdAppName) return res.status(409).json({ ok: false, error: 'Aucune application Argo CD associée' });
-  await guardProductionEnvironment(req, link);
+  await guardProductionEnvironment(req, link.environmentId);
   const revision = req.body?.revision || null;
 
   if (req.pgProject) {
@@ -395,6 +396,64 @@ router.post('/:id/incidents/:incidentId/comments', loadProjectAccess(), requireM
   if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
   const comment = await incidentStore.addComment(incident.id, req.user.id, body.trim());
   res.status(201).json({ ok: true, comment });
+}));
+
+// --- Changements contrôlés : une modification planifiée, avec description,
+// impact attendu, auteur, validation éventuelle et état d'exécution — voir
+// store/changeStore.js. Distinct d'un incident (qui documente un problème
+// déjà survenu, pas une action à venir). Proposer un changement est ouvert
+// à developer+ ; l'approuver/le rejeter exige maintainer+, et owner si
+// l'environnement ciblé est marqué production (même politique que la
+// synchronisation de déploiement — voir guardProductionEnvironment).
+router.get('/:id/changes', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.json({ ok: true, items: [] });
+  const status = ['pending', 'approved', 'rejected', 'executed', 'cancelled'].includes(req.query.status) ? req.query.status : undefined;
+  res.json({ ok: true, items: await changeStore.listForProject(req.pgProject.id, { status }) });
+}));
+
+router.post('/:id/changes', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { title, description, impact, environmentId } = req.body || {};
+  if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
+  if (environmentId) {
+    const environments = await orgStore.listEnvironments(req.pgProject.id);
+    if (!environments.some((e) => e.id === environmentId)) return res.status(400).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  }
+  const change = await changeStore.create({ projectId: req.pgProject.id, environmentId, title, description, impact, requestedBy: req.user.id });
+  logAudit(req, 'change.create', { projectId: req.legacyProject.id, changeId: change.id, environmentId: environmentId || null });
+  res.status(201).json({ ok: true, change });
+}));
+
+async function loadChange(req, res) {
+  const change = await changeStore.getById(req.params.changeId);
+  if (!change || !req.pgProject || change.project_id !== req.pgProject.id) {
+    res.status(404).json({ ok: false, error: 'Changement introuvable pour ce projet' });
+    return null;
+  }
+  return change;
+}
+
+router.put('/:id/changes/:changeId/decide', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const change = await loadChange(req, res);
+  if (!change) return;
+  if (change.status !== 'pending') return res.status(409).json({ ok: false, error: 'Ce changement a déjà été décidé' });
+  const { status, note } = req.body || {};
+  if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ ok: false, error: 'Décision invalide (approved ou rejected)' });
+  // Rejeter ne nécessite pas de protection supplémentaire (action sûre) ;
+  // seule une approbation en production exige le rôle owner.
+  if (status === 'approved') await guardProductionEnvironment(req, change.environment_id);
+  const updated = await changeStore.decide(change.id, { status, decidedBy: req.user.id, decisionNote: note });
+  logAudit(req, 'change.decided', { projectId: req.legacyProject.id, changeId: change.id, status });
+  res.json({ ok: true, change: updated });
+}));
+
+router.post('/:id/changes/:changeId/execute', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const change = await loadChange(req, res);
+  if (!change) return;
+  if (change.status !== 'approved') return res.status(409).json({ ok: false, error: "Ce changement doit être approuvé avant d'être exécuté" });
+  const updated = await changeStore.markExecuted(change.id);
+  logAudit(req, 'change.executed', { projectId: req.legacyProject.id, changeId: change.id });
+  res.json({ ok: true, change: updated });
 }));
 
 router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler(async (req, res) => {
