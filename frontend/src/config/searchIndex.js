@@ -5,6 +5,7 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Vue générale', group: 'Pages', path: '/', keywords: 'accueil dashboard tableau de bord santé' },
   { label: 'Développement — Accès aux outils', group: 'Pages', path: '/deployments', keywords: 'dev outils raccourcis chaîne' },
   { label: 'Développement — Projets', group: 'Pages', path: '/deployments/projects', keywords: 'projets équipe backlog tâches' },
+  { label: 'Organisations', group: 'Pages', path: '/deployments/organizations', keywords: 'organisation équipe team membre rôle rbac' },
   { label: 'Développement — Dépôts Git', group: 'Pages', path: '/deployments/repos', keywords: 'gitlab github dépôt repo forge étiquette rôle' },
   { label: 'Développement — Revue de code', group: 'Pages', path: '/deployments/reviews', keywords: 'merge request pull request relecture revue mr pr' },
   { label: 'Développement — Pipelines CI/CD', group: 'Pages', path: '/deployments/pipelines', keywords: 'ci cd pipeline exécution build' },
