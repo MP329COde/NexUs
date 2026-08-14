@@ -793,6 +793,11 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <a href={r.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, textDecoration: 'none', color: 'inherit', flex: 1 }}>{r.name}</a>
                     <span className="badge badge-mut">{r.branches?.length ?? 0} branche(s)</span>
+                    {r.dependencyAlerts?.length > 0 && (
+                      <span className={`badge badge-${r.dependencyAlerts.some((a) => a.severity === 'critical' || a.severity === 'high') ? 'crit' : 'warn'}`} title="Dépendances vulnérables (Dependabot)">
+                        {r.dependencyAlerts.length} dépendance(s) vulnérable(s)
+                      </span>
+                    )}
                     {r.pipelines?.[0] && (
                       <>
                         <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]}`} style={{ textDecoration: 'none' }}>

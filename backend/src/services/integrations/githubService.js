@@ -75,6 +75,38 @@ export async function listWorkflowRuns(owner, repo) {
   }));
 }
 
+// Alertes de dépendances vulnérables : lit Dependabot (déjà activé/exécuté
+// par GitHub lui-même sur le dépôt), plutôt que de cloner le dépôt et
+// lancer un scan localement — plus fiable (base de vulnérabilités GitHub
+// Advisory tenue à jour) et sans empreinte disque/réseau côté Nexus. 404
+// silencieux si Dependabot n'est pas activé sur ce dépôt (pas une erreur :
+// c'est un état légitime, pas un dysfonctionnement).
+export async function listDependencyAlerts(owner, repo) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, {
+    method: 'GET', url: `/repos/${owner}/${repo}/dependabot/alerts`, params: { state: 'open', per_page: 50 }
+  }, 'GitHub').catch((err) => {
+    // httpClient.request() reporte tout code >= 400 (hors 401/403) en 502 —
+    // voir services/integrations/httpClient.js — donc un vrai 404 GitHub
+    // (Dependabot non activé, état légitime) se reconnaît au message, pas
+    // au status HTTP réexposé.
+    if (/\b404\b/.test(err.message)) return [];
+    throw err;
+  });
+  return (Array.isArray(data) ? data : []).map((a) => ({
+    number: a.number,
+    package: a.dependency?.package?.name,
+    ecosystem: a.dependency?.package?.ecosystem,
+    severity: a.security_advisory?.severity,
+    summary: a.security_advisory?.summary,
+    vulnerableRange: a.security_vulnerability?.vulnerable_version_range,
+    fixedIn: a.security_vulnerability?.first_patched_version?.identifier || null,
+    webUrl: a.html_url,
+    createdAt: a.created_at
+  }));
+}
+
 export async function listBranches(owner, repo) {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });

@@ -32,24 +32,31 @@ async function loadRepoWorkspace(key) {
       key, provider, id, name: project.path, defaultBranch: project.defaultBranch, webUrl: project.webUrl,
       branches, commits,
       mergeRequests: mergeRequests.map((m) => ({ id: m.iid, title: m.title, sourceBranch: m.sourceBranch, targetBranch: m.targetBranch, author: m.author, webUrl: m.webUrl, createdAt: m.createdAt })),
-      pipelines: pipelines.slice(0, 10).map((p) => normalizePipelineRun('gitlab', p, project.path, id))
+      pipelines: pipelines.slice(0, 10).map((p) => normalizePipelineRun('gitlab', p, project.path, id)),
+      // Dependency Scanning GitLab exige la licence Ultimate (API distincte,
+      // non couverte ici) : champ toujours présent mais vide plutôt
+      // qu'absent, pour que le frontend n'ait pas à distinguer les deux
+      // fournisseurs.
+      dependencyAlerts: []
     };
   }
 
   if (provider === 'github') {
     const [owner, repo] = id.split('/');
     const project = await github.getRepo(owner, repo);
-    const [branches, commits, pullRequests, runs] = await Promise.all([
+    const [branches, commits, pullRequests, runs, dependencyAlerts] = await Promise.all([
       github.listBranches(owner, repo).catch(() => []),
       github.listCommits(owner, repo, project.defaultBranch).catch(() => []),
       github.listPullRequests(owner, repo).catch(() => []),
-      github.listWorkflowRuns(owner, repo).catch(() => [])
+      github.listWorkflowRuns(owner, repo).catch(() => []),
+      github.listDependencyAlerts(owner, repo).catch(() => [])
     ]);
     return {
       key, provider, id, name: project.fullName, defaultBranch: project.defaultBranch, webUrl: project.webUrl,
       branches, commits,
       mergeRequests: pullRequests.map((p) => ({ id: p.number, title: p.title, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch, author: p.author, webUrl: p.webUrl, createdAt: p.createdAt })),
-      pipelines: runs.slice(0, 10).map((r) => normalizePipelineRun('github', r, project.fullName, owner, repo))
+      pipelines: runs.slice(0, 10).map((r) => normalizePipelineRun('github', r, project.fullName, owner, repo)),
+      dependencyAlerts
     };
   }
 
