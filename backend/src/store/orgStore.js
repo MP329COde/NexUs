@@ -166,3 +166,89 @@ export async function createEnvironment(projectId, { name, kind, isProduction })
   );
   return rows[0];
 }
+
+// --- Équipes : regroupement d'utilisateurs distinct des projets (une
+// équipe peut travailler sur plusieurs projets, un projet peut impliquer
+// plusieurs équipes — contrairement à project_members qui reste la source
+// de vérité pour l'accès effectif à un projet donné). Portée à
+// l'organisation, comme les projets.
+
+export async function listTeamsForOrg(orgId, userId) {
+  // userId sert uniquement à exposer my_role (rôle de CET utilisateur dans
+  // l'équipe, null s'il n'en est pas membre) — la liste elle-même n'est pas
+  // filtrée par appartenance : voir teams.routes.js pour la vérification
+  // d'accès (membre de l'organisation).
+  const { rows } = await query(
+    `SELECT t.*, tm.role AS my_role, COUNT(tm2.user_id) OVER (PARTITION BY t.id) AS member_count
+     FROM teams t
+     LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = $2
+     LEFT JOIN team_members tm2 ON tm2.team_id = t.id
+     WHERE t.org_id = $1
+     GROUP BY t.id, tm.role
+     ORDER BY t.name`,
+    [orgId, userId]
+  );
+  return rows;
+}
+
+export async function getTeam(id) {
+  const { rows } = await query('SELECT * FROM teams WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createTeam({ orgId, name, slug, ownerUserId }) {
+  const client = await (await import('../db/pool.js')).requirePool().connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      'INSERT INTO teams (org_id, name, slug) VALUES ($1, $2, $3) RETURNING *',
+      [orgId, name, slug]
+    );
+    const team = rows[0];
+    if (ownerUserId) {
+      await client.query(
+        'INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3)',
+        [team.id, ownerUserId, 'lead']
+      );
+    }
+    await client.query('COMMIT');
+    return team;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listTeamMembers(teamId) {
+  const { rows } = await query(
+    'SELECT user_id, role, created_at FROM team_members WHERE team_id = $1 ORDER BY created_at',
+    [teamId]
+  );
+  return rows;
+}
+
+export async function getTeamRole(teamId, userId) {
+  const { rows } = await query('SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2', [teamId, userId]);
+  return rows[0]?.role || null;
+}
+
+export async function addTeamMember(teamId, userId, role = 'member') {
+  const { rows } = await query(
+    `INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3)
+     ON CONFLICT (team_id, user_id) DO UPDATE SET role = excluded.role
+     RETURNING *`,
+    [teamId, userId, role]
+  );
+  return rows[0];
+}
+
+export async function removeTeamMember(teamId, userId) {
+  await query('DELETE FROM team_members WHERE team_id = $1 AND user_id = $2', [teamId, userId]);
+}
+
+export async function deleteTeam(id) {
+  const { rowCount } = await query('DELETE FROM teams WHERE id = $1', [id]);
+  return rowCount > 0;
+}
