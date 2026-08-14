@@ -112,7 +112,15 @@ export default function ProjectDetailPage() {
           )}
         </Panel>
 
-        <TeamPanel members={members.data} legacyMemberIds={p.memberIds} userName={userName} />
+        <TeamPanel
+          members={members.data}
+          legacyMemberIds={p.memberIds}
+          userName={userName}
+          allUsers={allUsers}
+          projectId={id}
+          canManage={user?.role === 'admin'}
+          onChanged={members.reload}
+        />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
@@ -324,20 +332,50 @@ const TEAM_ROLE_LABEL = { viewer: 'Lecture', developer: 'Développeur', maintain
 // middleware/projectAccess.js) et ne doit donc plus être présenté comme
 // "l'équipe" du projet pour éviter de faire croire qu'il reflète l'accès
 // effectif.
-function TeamPanel({ members, legacyMemberIds, userName }) {
+function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, canManage, onChanged }) {
+  const notify = useNotify();
+  const [adding, setAdding] = useState(false);
   const migrated = members?.migrated;
   const items = migrated ? members.items : null;
 
+  async function setRole(userId, role) {
+    try {
+      await api.put(`/projects/${projectId}/members/${userId}`, { role });
+      notify('Rôle mis à jour', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
   return (
-    <Panel title="Équipe" sub={migrated ? `${items.length} membre(s) — rôles granulaires` : `${legacyMemberIds.length} membre(s)`} span={4}>
+    <Panel
+      title="Équipe"
+      sub={migrated ? `${items.length} membre(s) — rôles granulaires` : `${legacyMemberIds.length} membre(s)`}
+      span={4}
+      actions={migrated && canManage && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setAdding(true)}>Ajouter</span>}
+    >
       <div style={{ padding: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {migrated ? (
           items.length === 0
             ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
             : items.map((m) => (
-                <span key={m.user_id} className="badge badge-vio">
-                  <span className="dot" />{userName(m.user_id)} · {TEAM_ROLE_LABEL[m.role] || m.role}
-                </span>
+                canManage ? (
+                  <label key={m.user_id} className="badge badge-vio" style={{ gap: 4 }}>
+                    <span className="dot" />{userName(m.user_id)}
+                    <select
+                      value={m.role}
+                      onChange={(e) => setRole(m.user_id, e.target.value)}
+                      style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                    >
+                      {Object.entries(TEAM_ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </label>
+                ) : (
+                  <span key={m.user_id} className="badge badge-vio">
+                    <span className="dot" />{userName(m.user_id)} · {TEAM_ROLE_LABEL[m.role] || m.role}
+                  </span>
+                )
               ))
         ) : (
           legacyMemberIds.length === 0
@@ -345,6 +383,25 @@ function TeamPanel({ members, legacyMemberIds, userName }) {
             : legacyMemberIds.map((mid) => <span key={mid} className="badge badge-vio"><span className="dot" />{userName(mid)}</span>)
         )}
       </div>
+
+      {adding && (
+        <Modal title="Ajouter un membre" onClose={() => setAdding(false)} width={360}>
+          {allUsers.filter((u) => !items.some((m) => m.user_id === u.id)).length === 0 ? (
+            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 10 }}>Tous les utilisateurs sont déjà membres.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {allUsers.filter((u) => !items.some((m) => m.user_id === u.id)).map((u) => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12.5 }}>
+                  <span style={{ flex: 1 }}>{u.name}</span>
+                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={async () => { await setRole(u.id, 'developer'); setAdding(false); }}>
+                    Ajouter (Développeur)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
     </Panel>
   );
 }
