@@ -147,6 +147,12 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   un membre ajouté via `PUT /:id/members/:userId` pouvait accéder au projet par son id mais
   n'apparaissait jamais dans sa propre liste "Projets". Les deux sources sont désormais fusionnées
   (`listMyProjects()` dans `routes/projects.routes.js`).
+- Suite e2e Postgres (`frontend/playwright.postgres.config.js`, `tests/e2e-postgres/rbac.spec.js`) :
+  couvre en HTTP réel (vrai backend + vraie base, pas des tests unitaires isolés) le RBAC relationnel
+  que `tests/e2e/setup.spec.js` ne peut pas exercer (DATABASE_URL y est volontairement absent) —
+  notamment les 4 failles d'autorisation corrigées sur les déploiements/pipelines/revues globaux.
+  Ignorée proprement (`test.skip`) si `DATABASE_URL` n'est pas défini au lancement ; jamais exécutée
+  par la suite par défaut. Voir l'en-tête du fichier de config pour la commande complète.
 - Fenêtres de maintenance (`src/store/maintenanceStore.js`) : période annoncée sur un projet
   (optionnellement scopée à un environnement), purement déclarative — n'a aucun effet sur les autres
   gardes, notamment n'accorde jamais de dispense d'approbation owner sur un changement production
