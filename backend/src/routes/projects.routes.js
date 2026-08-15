@@ -459,7 +459,7 @@ router.get('/:id/incidents', loadProjectAccess(), asyncHandler(async (req, res) 
 
 router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
-  const { title, description, severity, resourceType, resourceRef, jobId } = req.body || {};
+  const { title, description, severity, resourceType, resourceRef, jobId, runbookUrl } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
   if (!['low', 'medium', 'high', 'critical'].includes(severity)) {
     return res.status(400).json({ ok: false, error: 'Gravité invalide (low, medium, high, critical)' });
@@ -469,7 +469,7 @@ router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), 
     if (!job || job.project_id !== req.pgProject.id) return res.status(400).json({ ok: false, error: 'Job introuvable pour ce projet' });
   }
   const incident = await incidentStore.create({
-    projectId: req.pgProject.id, jobId, title, description, severity, resourceType, resourceRef, createdBy: req.user.id
+    projectId: req.pgProject.id, jobId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy: req.user.id
   });
   logAudit(req, 'incident.create', { projectId: req.legacyProject.id, incidentId: incident.id, severity });
   res.status(201).json({ ok: true, incident });
@@ -493,14 +493,14 @@ router.get('/:id/incidents/:incidentId', loadProjectAccess(), asyncHandler(async
 router.put('/:id/incidents/:incidentId', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   const incident = await loadIncident(req, res);
   if (!incident) return;
-  const { status, assignedTo, resolution } = req.body || {};
+  const { status, assignedTo, resolution, runbookUrl } = req.body || {};
   if (status && !['open', 'investigating', 'resolved'].includes(status)) {
     return res.status(400).json({ ok: false, error: 'État invalide' });
   }
   if (status === 'resolved' && !resolution && !incident.resolution) {
     return res.status(400).json({ ok: false, error: 'Une résolution doit être documentée pour clore un incident' });
   }
-  const updated = await incidentStore.update(incident.id, { status, assignedTo, resolution });
+  const updated = await incidentStore.update(incident.id, { status, assignedTo, resolution, runbookUrl });
   logAudit(req, 'incident.update', { projectId: req.legacyProject.id, incidentId: incident.id, status });
   res.json({ ok: true, incident: updated });
 }));

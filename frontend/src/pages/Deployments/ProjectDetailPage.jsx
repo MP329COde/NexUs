@@ -334,6 +334,11 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
               <span className={`badge badge-${SEVERITY_TONE[inc.severity]}`}>{SEVERITY_LABEL[inc.severity]}</span>
               <span className={`badge badge-${STATUS_TONE[inc.status]}`}><span className="dot" />{STATUS_LABEL[inc.status]}</span>
               <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{inc.title}</span>
+              {inc.runbook_url && (
+                <a href={inc.runbook_url} target="_blank" rel="noreferrer" title="Ouvrir le runbook" style={{ display: 'flex', color: 'var(--text-faint)' }}>
+                  <Icon name="externalLink" size={13} />
+                </a>
+              )}
               <span className="faint" style={{ fontSize: 11 }}>{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
               {inc.status !== 'resolved' && canResolve && (
                 <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setResolving(inc)}>Résoudre</span>
@@ -703,6 +708,7 @@ function DeclareIncidentModal({ onClose, onCreated, projectId, notify }) {
   const [title, setTitle] = useState('');
   const [severity, setSeverity] = useState('medium');
   const [description, setDescription] = useState('');
+  const [runbookUrl, setRunbookUrl] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
@@ -710,7 +716,7 @@ function DeclareIncidentModal({ onClose, onCreated, projectId, notify }) {
     if (!title.trim()) return;
     setBusy(true);
     try {
-      await api.post(`/projects/${projectId}/incidents`, { title: title.trim(), severity, description });
+      await api.post(`/projects/${projectId}/incidents`, { title: title.trim(), severity, description, runbookUrl: runbookUrl.trim() || undefined });
       notify('Incident déclaré', { type: 'ok' });
       onCreated();
     } catch (err) {
@@ -728,6 +734,7 @@ function DeclareIncidentModal({ onClose, onCreated, projectId, notify }) {
           {Object.entries(SEVERITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <textarea className="input" placeholder="Description (optionnel)" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <input className="input" type="url" placeholder="Lien vers un runbook (optionnel)" value={runbookUrl} onChange={(e) => setRunbookUrl(e.target.value)} />
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Déclarer'}</button>
       </form>
     </Modal>

@@ -77,6 +77,11 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Runbook lié à un incident (migration 0008) : un incident peut porter un lien vers la documentation
+  opérationnelle qui vit déjà ailleurs (wiki, Confluence, README du dépôt) — Nexus ne stocke jamais le
+  contenu, seulement le lien, affiché directement sur la fiche de l'incident plutôt que d'obliger à le
+  chercher ailleurs. `runbookUrl` optionnel à la création (`POST /:id/incidents`) et modifiable ensuite
+  (`PUT /:id/incidents/:incidentId`, maintainer+).
 - Idempotence et retry des jobs (`src/services/jobService.js`, migration 0007) : `enqueue()` accepte une
   `idempotencyKey` optionnelle — un job déjà actif (pending/running) portant la même clé est renvoyé tel
   quel au lieu d'en créer un second, y compris sous course réelle (index unique partiel Postgres, pas

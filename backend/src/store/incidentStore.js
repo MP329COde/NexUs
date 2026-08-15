@@ -32,16 +32,16 @@ export async function getById(id) {
   return rows[0] || null;
 }
 
-export async function create({ projectId, jobId, title, description, severity, resourceType, resourceRef, createdBy }) {
+export async function create({ projectId, jobId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy }) {
   const { rows } = await query(
-    `INSERT INTO incidents (project_id, job_id, title, description, severity, resource_type, resource_ref, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [projectId || null, jobId || null, title, description || '', severity, resourceType || null, resourceRef || null, createdBy]
+    `INSERT INTO incidents (project_id, job_id, title, description, severity, resource_type, resource_ref, runbook_url, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [projectId || null, jobId || null, title, description || '', severity, resourceType || null, resourceRef || null, runbookUrl || null, createdBy]
   );
   return rows[0];
 }
 
-export async function update(id, { status, assignedTo, resolution }) {
+export async function update(id, { status, assignedTo, resolution, runbookUrl }) {
   const sets = ['updated_at = now()'];
   const params = [];
   if (status !== undefined) {
@@ -51,6 +51,7 @@ export async function update(id, { status, assignedTo, resolution }) {
   }
   if (assignedTo !== undefined) { params.push(assignedTo); sets.push(`assigned_to = $${params.length}`); }
   if (resolution !== undefined) { params.push(resolution); sets.push(`resolution = $${params.length}`); }
+  if (runbookUrl !== undefined) { params.push(runbookUrl || null); sets.push(`runbook_url = $${params.length}`); }
   params.push(id);
   const { rows } = await query(`UPDATE incidents SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
   return rows[0] || null;
