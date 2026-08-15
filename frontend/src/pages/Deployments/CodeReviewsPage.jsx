@@ -139,7 +139,9 @@ export default function CodeReviewsPage() {
                       <td style={{ padding: '10px 16px' }}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           {!i.reviewerIds.includes(user?.id) && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => assignMe(i)}>S'assigner</span>}
-                          <span className="btn" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => approve(i)}>{selfReview ? 'Auto-approuver' : 'Approuver'}</span>
+                          {user?.role === 'admin' && (
+                            <span className="btn" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => approve(i)}>{selfReview ? 'Auto-approuver' : 'Approuver'}</span>
+                          )}
                         </div>
                       </td>
                     </tr>

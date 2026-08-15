@@ -77,6 +77,15 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- **Failles corrigées** — `POST /api/pipelines/runs/:id/retry` et `POST /api/reviews/:key/approve` (vues
+  globales tous dépôts confondus) ne vérifiaient que `requireAuth` : n'importe quel compte authentifié
+  pouvait relancer un pipeline ou approuver une MR/PR sur n'importe quel dépôt de la plateforme. Le
+  commentaire de la route scopée équivalente (`routes/projects.routes.js`) déclarait déjà la vue globale
+  Pipelines "réservée aux admins pour l'usage transverse" — l'intention documentée n'était jamais
+  appliquée. Les deux routes exigent désormais `requireRole('admin')` ; assigner/désassigner un relecteur
+  (bookkeeping local, sans action externe) reste ouvert à tout utilisateur authentifié. Boutons "Relancer"
+  et "Approuver" masqués côté interface pour les comptes non-admin, pour ne jamais présenter une action
+  que le backend refuserait.
 - **Faille corrigée** — `POST /api/deployments/:id/sync` et `.../rollback` (route globale historique,
   distincte de `/api/projects/:id/deployments/:linkId/{sync,rollback}` qui était correctement gardée) ne
   vérifiaient que `requireAuth` : n'importe quel compte authentifié, membre ou non du projet concerné,

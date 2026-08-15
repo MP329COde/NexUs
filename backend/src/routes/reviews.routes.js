@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
 import * as reviewStore from '../store/reviewStore.js';
@@ -65,10 +65,18 @@ router.post('/:key/unassign', (req, res) => {
   res.json({ ok: true, assignment: reviewStore.unassign(key, userId) });
 });
 
-// Approuve directement sur la forge d'origine (proxy vers l'API réelle) : si
-// l'auto-approbation est bloquée côté GitLab/GitHub, l'erreur remontée par
-// l'API est renvoyée telle quelle, pas masquée.
-router.post('/:key/approve', asyncHandler(async (req, res) => {
+// Faille corrigée : cette vue globale (tous dépôts confondus) ne vérifiait
+// jusqu'ici que requireAuth — n'importe quel compte authentifié pouvait
+// approuver N'IMPORTE QUELLE MR/PR de n'importe quel dépôt configuré sur la
+// plateforme, sans lien avec un projet. L'équivalent scopé au projet
+// (POST /api/projects/:id/workspace/reviews/:reviewKey/approve, voir
+// routes/projects.routes.js) exige déjà maintainer+ ; cette vue globale
+// reste réservée aux admins, cohérent avec le traitement de la vue globale
+// Pipelines CI/CD (routes/pipelines.routes.js) pour le même usage
+// transverse. Approuve directement sur la forge d'origine (proxy vers
+// l'API réelle) : si l'auto-approbation est bloquée côté GitLab/GitHub,
+// l'erreur remontée par l'API est renvoyée telle quelle, pas masquée.
+router.post('/:key/approve', requireRole('admin'), asyncHandler(async (req, res) => {
   const key = decodeURIComponent(req.params.key);
   const [provider, ...rest] = key.split(':');
   if (provider === 'gitlab') {

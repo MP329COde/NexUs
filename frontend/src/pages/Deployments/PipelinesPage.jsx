@@ -9,6 +9,7 @@ import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const STATUS_TONE = { success: 'ok', failed: 'crit', running: 'info', cancelled: 'mut', other: 'mut' };
 const STATUS_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cours', cancelled: 'Annulé', other: '—' };
@@ -26,6 +27,7 @@ function formatDuration(seconds) {
 // Aucune exécution n'est simulée — liste et graphes vides si ni GitLab ni
 // GitHub ne sont configurés.
 export default function PipelinesPage() {
+  const { user } = useAuth();
   const { data, reload } = useApi(() => api.get('/pipelines/runs'), [], { pollMs: 15000 });
   const [filter, setFilter] = useState('');
   const [pending, setPending] = useState(null);
@@ -152,7 +154,7 @@ export default function PipelinesPage() {
                     <td style={{ padding: '9px 16px' }} className="mono">{formatDuration(r.durationSeconds)}</td>
                     <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
                     <td style={{ padding: '9px 16px' }}>
-                      {r.retryable && (
+                      {r.retryable && user?.role === 'admin' && (
                         <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => askRetry(r)}>
                           <Icon name="refresh" size={11} />Relancer
                         </span>
