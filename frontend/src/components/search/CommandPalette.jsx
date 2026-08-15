@@ -55,6 +55,22 @@ export default function CommandPalette({ open, onClose, context }) {
           items.push({ label: p.name, group: 'Projets', path: `/deployments/projects/${p.id}`, keywords: `projet ${p.name} ${p.description || ''}`, icon: 'folder' });
         }
       } catch { /* projets non disponibles */ }
+      // Incidents ouverts et changements en attente sur les projets de
+      // l'utilisateur (même endpoint que MyProjectsOverviewPanel, déjà
+      // scopé côté backend à ses propres projets) — réservé aux comptes
+      // non-admin : un admin voit déjà tout via AdminOverviewPanel, inutile
+      // de dupliquer un appel potentiellement lourd (tous les projets).
+      if (user?.role !== 'admin') {
+        try {
+          const res = await api.get('/projects/mine/overview');
+          for (const i of res.openIncidents || []) {
+            items.push({ label: `${i.projectName} — ${i.title}`, group: 'Incidents', path: `/deployments/projects/${i.projectId}`, keywords: `incident ${i.severity} ${i.title} ${i.projectName}`, icon: 'alertTriangle' });
+          }
+          for (const c of res.pendingChanges || []) {
+            items.push({ label: `${c.projectName} — ${c.title}`, group: 'Changements', path: `/deployments/projects/${c.projectId}`, keywords: `changement ${c.title} ${c.projectName}`, icon: 'gitBranch' });
+          }
+        } catch { /* socle relationnel non disponible */ }
+      }
       // Dépôts Git (GitLab/GitHub) : mêmes endpoints que le panneau Projets de
       // Développement, pour que la recherche globale couvre aussi les dépôts.
       try {
