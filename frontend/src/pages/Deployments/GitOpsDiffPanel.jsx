@@ -6,6 +6,7 @@ import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 // GitOps Diff : ce qu'Argo CD a déjà calculé lui-même (managed-resources) —
 // pour chaque ressource qu'il gère, l'état déclaré par Git (targetState) et
@@ -13,6 +14,7 @@ import { useNotify } from '../../context/NotificationContext.jsx';
 // console : c'est le même calcul qu'Argo CD utilise pour son propre badge
 // "OutOfSync", juste affiché lisiblement.
 export default function GitOpsDiffPanel({ linkId, span }) {
+  const { user } = useAuth();
   const { data, loading, error, reload } = useApi(() => api.get(`/deployments/${linkId}/gitops-diff`), [linkId]);
   const [expanded, setExpanded] = useState(null);
   const [confirmSync, setConfirmSync] = useState(false);
@@ -26,7 +28,7 @@ export default function GitOpsDiffPanel({ linkId, span }) {
       title="GitOps Diff"
       sub="Git (déclaré) vs Kubernetes (réel), calculé par Argo CD"
       span={span}
-      actions={outOfSync.length > 0 && (
+      actions={outOfSync.length > 0 && user?.role === 'admin' && (
         <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--tone-warn-fg)' }} onClick={() => setConfirmSync(true)}>
           <Icon name="sync" size={13} />Synchroniser {outOfSync.length} ressource(s)
         </span>

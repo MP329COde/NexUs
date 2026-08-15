@@ -86,6 +86,11 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   (bookkeeping local, sans action externe) reste ouvert à tout utilisateur authentifié. Boutons "Relancer"
   et "Approuver" masqués côté interface pour les comptes non-admin, pour ne jamais présenter une action
   que le backend refuserait.
+- Frontend cohérent avec le garde-fou backend ci-dessus : `PipelineView`/`GitOpsDiffPanel`
+  (`ReleasesPage`, vue globale tous projets confondus) affichaient les boutons Synchroniser/Déployer/
+  Rollback à tout utilisateur authentifié, alors que la page indique elle-même juste en dessous "les
+  actions de retrait/administration sont réservées aux administrateurs" — texte jamais appliqué à ces
+  boutons précis. Masqués pour les non-admins, cohérent avec le texte déjà présent sur la page.
 - **Faille corrigée** — `POST /api/deployments` (création), `PUT /:id` et `DELETE /:id` (le lien lui-même,
   pas seulement les actions sync/rollback) ne vérifiaient elles aussi que `requireAuth` : n'importe quel
   compte pouvait créer un lien, ou modifier/supprimer un lien existant — y compris rediriger

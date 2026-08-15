@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const STAGE_LABELS = {
   git: { gitlab: 'GitLab · CI/CD', github: 'GitHub · Actions' },
@@ -15,6 +16,7 @@ const STAGE_LABELS = {
 };
 
 export default function PipelineView({ linkId, span }) {
+  const { user } = useAuth();
   const { data, reload } = useApi(() => api.get(`/deployments/${linkId}/pipeline`), [linkId], { pollMs: 15000 });
   const notify = useNotify();
   const [confirmSync, setConfirmSync] = useState(false);
@@ -32,10 +34,12 @@ export default function PipelineView({ linkId, span }) {
       span={span}
       actions={(
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className="btn-outline" onClick={() => setConfirmSync(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon name="sync" size={13} />Synchroniser
-          </span>
-          {hasArgo && (
+          {user?.role === 'admin' && (
+            <span className="btn-outline" onClick={() => setConfirmSync(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="sync" size={13} />Synchroniser
+            </span>
+          )}
+          {hasArgo && user?.role === 'admin' && (
             <>
               <span className="btn-outline" onClick={() => setDeployOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Icon name="box" size={13} />Déployer une version
