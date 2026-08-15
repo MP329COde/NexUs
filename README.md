@@ -86,6 +86,13 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   (bookkeeping local, sans action externe) reste ouvert à tout utilisateur authentifié. Boutons "Relancer"
   et "Approuver" masqués côté interface pour les comptes non-admin, pour ne jamais présenter une action
   que le backend refuserait.
+- **Faille corrigée** — `POST /api/deployments` (création), `PUT /:id` et `DELETE /:id` (le lien lui-même,
+  pas seulement les actions sync/rollback) ne vérifiaient elles aussi que `requireAuth` : n'importe quel
+  compte pouvait créer un lien, ou modifier/supprimer un lien existant — y compris rediriger
+  silencieusement un lien vers un autre nom d'application ArgoCD, détournant la cible d'un futur sync
+  sans que personne s'en aperçoive. Même seuil désormais (maintainer+, owner en production) que
+  sync/rollback. Aucun usage frontend actuel de ces trois routes (pas de régression UI possible),
+  correction en profondeur de l'API elle-même. Vérifié en conditions réelles à chaque palier de rôle.
 - **Faille corrigée** — `POST /api/deployments/:id/sync` et `.../rollback` (route globale historique,
   distincte de `/api/projects/:id/deployments/:linkId/{sync,rollback}` qui était correctement gardée) ne
   vérifiaient que `requireAuth` : n'importe quel compte authentifié, membre ou non du projet concerné,

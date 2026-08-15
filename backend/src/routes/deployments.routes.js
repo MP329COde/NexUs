@@ -20,24 +20,25 @@ function requireArgocdApp(req, res) {
   return link;
 }
 
-// Faille corrigée : ce endpoint global (contrairement à
+// Faille corrigée : ces endpoints globaux (contrairement à
 // /api/projects/:id/deployments/:linkId/sync — routes/projects.routes.js,
-// qui exige maintainer+ et owner en production) ne vérifiait jusqu'ici que
-// requireAuth — n'importe quel compte "user" authentifié, membre ou non du
-// projet concerné, pouvait synchroniser/rollback N'IMPORTE QUELLE
-// application ArgoCD de la plateforme. Un lien rattaché à un projet exige
-// désormais le même rôle minimum que la route scopée équivalente ; un lien
-// non rattaché (projectId absent) reste réservé aux administrateurs, faute
-// de contexte projet auquel rattacher un rôle.
-async function requireMinRoleForLink(req, res, link, minRole) {
-  if (!link.projectId) {
+// qui exige maintainer+ et owner en production) ne vérifiaient jusqu'ici
+// que requireAuth — n'importe quel compte "user" authentifié, membre ou non
+// du projet concerné, pouvait synchroniser/rollback N'IMPORTE QUELLE
+// application ArgoCD de la plateforme, ou modifier/supprimer N'IMPORTE QUEL
+// lien de déploiement (y compris rediriger silencieusement un lien vers un
+// autre nom d'application ArgoCD). projectId absent (déploiement non
+// rattaché à un projet) reste réservé aux administrateurs, faute de
+// contexte auquel rattacher un rôle.
+async function requireMinRoleForProject(req, res, projectId, environmentId, minRole) {
+  if (!projectId) {
     if (req.user.role !== 'admin') {
       res.status(403).json({ ok: false, error: 'Réservé aux administrateurs (déploiement non rattaché à un projet)' });
       return false;
     }
     return true;
   }
-  const project = projectsStore.getProject(link.projectId);
+  const project = projectsStore.getProject(projectId);
   if (!project) {
     res.status(404).json({ ok: false, error: 'Projet introuvable pour ce déploiement' });
     return false;
@@ -47,10 +48,10 @@ async function requireMinRoleForLink(req, res, link, minRole) {
     res.status(403).json({ ok: false, error: `Rôle "${minRole}" minimum requis sur ce projet` });
     return false;
   }
-  if (link.environmentId) {
-    const pgProject = await orgStore.getProjectByLegacyId(link.projectId);
+  if (environmentId) {
+    const pgProject = await orgStore.getProjectByLegacyId(projectId);
     const environments = pgProject ? await orgStore.listEnvironments(pgProject.id) : [];
-    const env = environments.find((e) => e.id === link.environmentId);
+    const env = environments.find((e) => e.id === environmentId);
     if (env?.is_production && role !== 'owner') {
       res.status(403).json({ ok: false, error: "Cette action sur un environnement de production requiert le rôle propriétaire du projet" });
       return false;
@@ -59,10 +60,43 @@ async function requireMinRoleForLink(req, res, link, minRole) {
   return true;
 }
 
+function requireMinRoleForLink(req, res, link, minRole) {
+  return requireMinRoleForProject(req, res, link.projectId, link.environmentId, minRole);
+}
+
+function requireLink(req, res) {
+  const link = deploymentService.list().find((l) => l.id === req.params.id);
+  if (!link) {
+    res.status(404).json({ ok: false, error: 'Déploiement introuvable' });
+    return null;
+  }
+  return link;
+}
+
 router.get('/', asyncHandler(async (req, res) => res.json({ ok: true, items: deploymentService.list() })));
-router.post('/', asyncHandler(async (req, res) => res.status(201).json({ ok: true, link: deploymentService.create(req.body || {}) })));
-router.put('/:id', asyncHandler(async (req, res) => res.json({ ok: true, link: deploymentService.update(req.params.id, req.body || {}) })));
-router.delete('/:id', asyncHandler(async (req, res) => res.json(deploymentService.remove(req.params.id))));
+
+// Créer/modifier/supprimer le lien lui-même est au moins aussi sensible que
+// le synchroniser : modifier silencieusement le nom d'application ArgoCD
+// visé par un lien existant reviendrait à détourner la cible d'un futur
+// sync sans que personne s'en aperçoive. Même seuil (maintainer+, owner en
+// production) que les actions sync/rollback ci-dessous.
+router.post('/', asyncHandler(async (req, res) => {
+  const { projectId, environmentId } = req.body || {};
+  if (!(await requireMinRoleForProject(req, res, projectId || null, environmentId || null, 'maintainer'))) return;
+  res.status(201).json({ ok: true, link: deploymentService.create(req.body || {}) });
+}));
+router.put('/:id', asyncHandler(async (req, res) => {
+  const link = requireLink(req, res);
+  if (!link) return;
+  if (!(await requireMinRoleForLink(req, res, link, 'maintainer'))) return;
+  res.json({ ok: true, link: deploymentService.update(req.params.id, req.body || {}) });
+}));
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const link = requireLink(req, res);
+  if (!link) return;
+  if (!(await requireMinRoleForLink(req, res, link, 'maintainer'))) return;
+  res.json(deploymentService.remove(req.params.id));
+}));
 router.get('/:id/pipeline', asyncHandler(async (req, res) => res.json({ ok: true, ...(await deploymentService.getPipeline(req.params.id)) })));
 router.post('/:id/sync', asyncHandler(async (req, res) => {
   const link = requireArgocdApp(req, res);
