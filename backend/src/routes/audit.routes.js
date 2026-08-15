@@ -20,8 +20,17 @@ router.get('/', (req, res) => {
   res.json({ ok: true, items: listAuditEntries(parseFilters(req)) });
 });
 
+// Neutralise l'injection de formule CSV : les métadonnées peuvent contenir
+// des valeurs saisies par l'utilisateur (nom de projet, label de secret...)
+// — un nom commençant par =, +, -, @ ou une tabulation serait interprété
+// comme une formule par Excel/LibreOffice à l'ouverture (ex. un nom de
+// projet "=HYPERLINK(...)"). Préfixe d'une apostrophe (convention standard
+// de neutralisation, reconnue par les deux tableurs) sans altérer le texte
+// affiché.
+const FORMULA_PREFIX = /^[=+\-@\t]/;
 function csvEscape(value) {
-  const s = String(value ?? '');
+  let s = String(value ?? '');
+  if (FORMULA_PREFIX.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
