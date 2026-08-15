@@ -58,6 +58,10 @@ export function listTasks(projectId) {
   return (readStore('tasks') || []).filter((t) => t.projectId === projectId);
 }
 
+export function findTask(id) {
+  return (readStore('tasks') || []).find((t) => t.id === id);
+}
+
 export function createTask({ projectId, title, priority, assigneeId }) {
   const tasks = readStore('tasks') || [];
   const task = {
@@ -78,7 +82,12 @@ export function updateTask(id, payload) {
   const tasks = readStore('tasks') || [];
   const idx = tasks.findIndex((t) => t.id === id);
   if (idx === -1) return null;
-  tasks[idx] = { ...tasks[idx], ...payload };
+  // id/projectId jamais modifiables par le payload client : un PUT contenant
+  // {"projectId": "..."} ne doit jamais pouvoir déplacer une tâche vers un
+  // autre projet en contournant la vérification d'appartenance faite par
+  // l'appelant (routes/projects.routes.js).
+  const { id: _id, projectId: _projectId, ...safePayload } = payload;
+  tasks[idx] = { ...tasks[idx], ...safePayload };
   writeStore('tasks', tasks);
   return tasks[idx];
 }

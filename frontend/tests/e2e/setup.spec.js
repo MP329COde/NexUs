@@ -208,6 +208,27 @@ test.describe('Isolation inter-projets (API)', () => {
     expect(items.some((t) => t.title === 'Ma tâche')).toBe(true);
   });
 
+  // IDOR corrigé : PUT/DELETE .../tasks/:taskId ne vérifiaient jusqu'ici que
+  // le rôle sur le projet DE L'URL, jamais que la tâche visée appartenait
+  // réellement à ce projet — Alice (développeur sur son propre projet)
+  // pouvait modifier/supprimer une tâche de N'IMPORTE QUEL AUTRE projet en
+  // connaissant simplement son id, en passant par l'URL de SON projet à
+  // elle (le rôle vérifié n'a aucun rapport avec la tâche ciblée).
+  test("Alice ne peut pas modifier une tâche du projet de Bob via l'URL de son propre projet (IDOR, 404)", async () => {
+    const createBob = await adminApi.post(`/api/projects/${projectBobId}/tasks`, { data: { title: 'Tâche privée de Bob' } });
+    const { task: bobTask } = await createBob.json();
+
+    const tamper = await aliceApi.put(`/api/projects/${projectAliceId}/tasks/${bobTask.id}`, { data: { title: 'PIRATÉ' } });
+    expect(tamper.status()).toBe(404);
+
+    const stillIntact = await adminApi.get(`/api/projects/${projectBobId}/tasks`);
+    const { items } = await stillIntact.json();
+    expect(items.find((t) => t.id === bobTask.id)?.title).toBe('Tâche privée de Bob');
+
+    const removeAttempt = await aliceApi.delete(`/api/projects/${projectAliceId}/tasks/${bobTask.id}`);
+    expect(removeAttempt.status()).toBe(404);
+  });
+
   test('un utilisateur non authentifié ne peut lire aucun projet (401)', async ({ playwright }) => {
     const anon = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
     const res = await anon.get('/api/projects');

@@ -147,6 +147,13 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   un membre ajouté via `PUT /:id/members/:userId` pouvait accéder au projet par son id mais
   n'apparaissait jamais dans sa propre liste "Projets". Les deux sources sont désormais fusionnées
   (`listMyProjects()` dans `routes/projects.routes.js`).
+- **Faille corrigée (IDOR)** — `PUT`/`DELETE /api/projects/:id/tasks/:taskId` ne vérifiaient que le rôle
+  sur le projet DE L'URL, jamais que la tâche visée par `:taskId` lui appartenait réellement : un
+  développeur pouvait modifier ou supprimer une tâche de N'IMPORTE QUEL AUTRE projet en connaissant son
+  id, en passant simplement par l'URL de son propre projet. `store/projectsStore.js#updateTask` empêche
+  aussi désormais `projectId`/`id` d'être réécrits via le payload client (aurait permis de déplacer une
+  tâche vers un autre projet). Testé dans la suite e2e par défaut (pas de Postgres requis, stockage
+  legacy) : Alice ne peut ni lire ni écraser une tâche de Bob via l'URL de son propre projet.
 - Suite e2e Postgres (`frontend/playwright.postgres.config.js`, `tests/e2e-postgres/rbac.spec.js`) :
   couvre en HTTP réel (vrai backend + vraie base, pas des tests unitaires isolés) le RBAC relationnel
   que `tests/e2e/setup.spec.js` ne peut pas exercer (DATABASE_URL y est volontairement absent) —

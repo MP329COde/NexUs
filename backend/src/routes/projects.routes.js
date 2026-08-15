@@ -667,13 +667,22 @@ router.post('/:id/tasks', loadProjectAccess(), requireMinRole('developer'), asyn
   res.status(201).json({ ok: true, task });
 }));
 
+// Faille corrigée : ces deux routes ne vérifiaient jusqu'ici que le rôle
+// sur le projet DE L'URL, jamais que la tâche visée par :taskId lui
+// appartenait réellement — un développeur d'un projet A pouvait modifier
+// ou supprimer une tâche de n'importe quel autre projet B en connaissant
+// son id, contournant entièrement l'isolation inter-projets vérifiée par
+// ailleurs sur incidents/changements/webhooks/coffre-fort.
 router.put('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  const existing = store.findTask(req.params.taskId);
+  if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   const task = store.updateTask(req.params.taskId, req.body || {});
-  if (!task) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   res.json({ ok: true, task });
 }));
 
 router.delete('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  const existing = store.findTask(req.params.taskId);
+  if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   store.deleteTask(req.params.taskId);
   res.json({ ok: true });
 }));
