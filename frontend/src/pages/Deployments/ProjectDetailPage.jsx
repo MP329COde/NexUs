@@ -27,6 +27,7 @@ export default function ProjectDetailPage() {
   const deployments = useApi(() => api.get(`/projects/${id}/deployments`), [id]);
   const incidents = useApi(() => api.get(`/projects/${id}/incidents`), [id]);
   const changes = useApi(() => api.get(`/projects/${id}/changes`), [id]);
+  const maintenanceWindows = useApi(() => api.get(`/projects/${id}/maintenance-windows`), [id]);
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
@@ -188,6 +189,16 @@ export default function ProjectDetailPage() {
           projectId={id}
           role={projectRole}
           onChanged={changes.reload}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <MaintenanceWindowsPanel
+          windows={maintenanceWindows.data?.items || []}
+          environments={environments.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={maintenanceWindows.reload}
         />
       </div>
 
@@ -472,6 +483,142 @@ function ProposeChangeModal({ projectId, environments, onClose, onCreated, notif
         <input className="input" placeholder="Impact attendu (ex. indisponibilité 5 min)" value={impact} onChange={(e) => setImpact(e.target.value)} />
         <textarea className="input" placeholder="Description (optionnel)" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Proposer'}</button>
+      </form>
+    </Modal>
+  );
+}
+
+// Fenêtre de maintenance planifiée (voir store/maintenanceStore.js) : purement
+// déclaratif, informe l'équipe qu'une intervention est prévue sur une période
+// donnée. N'a aucun effet sur les autres gardes (ne dispense jamais de
+// l'approbation owner sur un changement production) — deux notions
+// distinctes, l'une informe, l'autre autorise.
+const now = () => new Date();
+function windowStatus(w) {
+  if (w.cancelled_at) return { label: 'Annulée', tone: 'mut' };
+  const start = new Date(w.starts_at);
+  const end = new Date(w.ends_at);
+  const n = now();
+  if (n < start) return { label: 'À venir', tone: 'mut' };
+  if (n >= start && n <= end) return { label: 'En cours', tone: 'warn' };
+  return { label: 'Terminée', tone: 'mut' };
+}
+
+function MaintenanceWindowsPanel({ windows, environments, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const canManage = roleAtLeast(role, 'maintainer');
+  const activeCount = windows.filter((w) => windowStatus(w).label === 'En cours').length;
+  const envName = (envId) => environments.find((e) => e.id === envId)?.name;
+
+  async function cancelWindow(w) {
+    setBusyId(w.id);
+    try {
+      await api.post(`/projects/${projectId}/maintenance-windows/${w.id}/cancel`);
+      notify('Fenêtre de maintenance annulée', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Panel
+      title="Fenêtres de maintenance"
+      sub={activeCount > 0 ? `${activeCount} en cours` : 'Aucune maintenance en cours'}
+      span={12}
+      actions={canManage && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setCreating(true)}>Planifier</span>}
+    >
+      {windows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune fenêtre de maintenance planifiée sur ce projet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {windows.map((w) => {
+            const status = windowStatus(w);
+            return (
+              <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+                <span className={`badge badge-${status.tone}`}>{status.label}</span>
+                {w.environment_id && <span className="badge badge-mut">{envName(w.environment_id) || 'environnement'}</span>}
+                <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{w.title}</span>
+                <span className="faint" style={{ fontSize: 11 }}>
+                  {new Date(w.starts_at).toLocaleString('fr-FR')} → {new Date(w.ends_at).toLocaleString('fr-FR')}
+                </span>
+                {!w.cancelled_at && status.label !== 'Terminée' && canManage && (
+                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer', color: 'var(--tone-crit-fg)' }} onClick={() => cancelWindow(w)}>
+                    {busyId === w.id ? '…' : 'Annuler'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {creating && (
+        <PlanMaintenanceWindowModal
+          projectId={projectId}
+          environments={environments}
+          onClose={() => setCreating(false)}
+          onCreated={() => { setCreating(false); onChanged(); }}
+          notify={notify}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function PlanMaintenanceWindowModal({ projectId, environments, onClose, onCreated, notify }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [environmentId, setEnvironmentId] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!title.trim() || !startsAt || !endsAt) return;
+    setBusy(true);
+    try {
+      await api.post(`/projects/${projectId}/maintenance-windows`, {
+        title: title.trim(),
+        description,
+        environmentId: environmentId || undefined,
+        startsAt: new Date(startsAt).toISOString(),
+        endsAt: new Date(endsAt).toISOString()
+      });
+      notify('Fenêtre de maintenance planifiée', { type: 'ok' });
+      onCreated();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Planifier une fenêtre de maintenance" onClose={onClose} width={420}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        <select className="input" value={environmentId} onChange={(e) => setEnvironmentId(e.target.value)}>
+          <option value="">Aucun environnement précis</option>
+          {environments.map((env) => <option key={env.id} value={env.id}>{env.name}{env.is_production ? ' (production)' : ''}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }} className="faint">
+            Début
+            <input className="input" type="datetime-local" required value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+          </label>
+          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }} className="faint">
+            Fin
+            <input className="input" type="datetime-local" required value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+          </label>
+        </div>
+        <textarea className="input" placeholder="Description (optionnel)" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Planifier'}</button>
       </form>
     </Modal>
   );

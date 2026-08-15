@@ -77,6 +77,12 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Fenêtres de maintenance (`src/store/maintenanceStore.js`) : période annoncée sur un projet
+  (optionnellement scopée à un environnement), purement déclarative — n'a aucun effet sur les autres
+  gardes, notamment n'accorde jamais de dispense d'approbation owner sur un changement production
+  (deux notions distinctes : l'une informe, l'autre autorise). Planifier exige `maintainer+` ; lecture
+  ouverte à tout membre du projet. `GET`/`POST /api/projects/:id/maintenance-windows`,
+  `POST /api/projects/:id/maintenance-windows/:windowId/cancel`.
 - Sauvegarde/restauration (`src/services/backupService.js`, `src/services/pgDumpService.js`) : chaque
   sauvegarde copie le store JSON/SQLite historique **et**, si `DATABASE_URL` est configuré, exporte le
   contenu du socle relationnel (organisations, projets, RBAC, environnements, jobs, incidents,

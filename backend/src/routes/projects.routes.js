@@ -16,6 +16,7 @@ import { syncApplication, rollbackApplication, getApplicationHistory } from '../
 import * as jobService from '../services/jobService.js';
 import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
+import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
 
 const router = Router();
@@ -455,6 +456,46 @@ router.post('/:id/changes/:changeId/execute', loadProjectAccess(), requireMinRol
   const updated = await changeStore.markExecuted(change.id);
   logAudit(req, 'change.executed', { projectId: req.legacyProject.id, changeId: change.id });
   res.json({ ok: true, change: updated });
+}));
+
+// Fenêtre de maintenance planifiée : purement déclaratif, voir
+// db/migrations/0006_maintenance_windows.sql — n'a aucun effet sur les
+// autres gardes (une fenêtre active ne dispense pas de l'approbation owner
+// sur un changement production).
+router.get('/:id/maintenance-windows', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await maintenanceStore.listForProject(req.pgProject.id) });
+}));
+
+router.post('/:id/maintenance-windows', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const { title, description, environmentId, startsAt, endsAt } = req.body || {};
+  if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
+  const starts = new Date(startsAt);
+  const ends = new Date(endsAt);
+  if (Number.isNaN(starts.getTime()) || Number.isNaN(ends.getTime())) {
+    return res.status(400).json({ ok: false, error: 'Dates de début/fin requises (ISO 8601)' });
+  }
+  if (ends <= starts) return res.status(400).json({ ok: false, error: 'La fin doit être après le début' });
+  if (environmentId) {
+    const environments = await orgStore.listEnvironments(req.pgProject.id);
+    if (!environments.some((e) => e.id === environmentId)) return res.status(400).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  }
+  const window = await maintenanceStore.create({
+    projectId: req.pgProject.id, environmentId, title, description, startsAt: starts.toISOString(), endsAt: ends.toISOString(), createdBy: req.user.id
+  });
+  logAudit(req, 'maintenance_window.create', { projectId: req.legacyProject.id, windowId: window.id, startsAt: window.starts_at, endsAt: window.ends_at });
+  res.status(201).json({ ok: true, window });
+}));
+
+router.post('/:id/maintenance-windows/:windowId/cancel', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const existing = await maintenanceStore.getById(req.params.windowId);
+  if (!existing || existing.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Fenêtre de maintenance introuvable pour ce projet' });
+  const window = await maintenanceStore.cancel(req.params.windowId);
+  if (!window) return res.status(409).json({ ok: false, error: 'Cette fenêtre est déjà annulée' });
+  logAudit(req, 'maintenance_window.cancel', { projectId: req.legacyProject.id, windowId: window.id });
+  res.json({ ok: true, window });
 }));
 
 router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler(async (req, res) => {

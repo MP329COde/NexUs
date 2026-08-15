@@ -16,7 +16,7 @@ import { logger } from '../utils/logger.js';
 const TABLES_IN_ORDER = [
   'organizations', 'org_members', 'teams', 'team_members',
   'projects', 'project_members', 'environments',
-  'jobs', 'incidents', 'incident_comments', 'changes'
+  'jobs', 'incidents', 'incident_comments', 'changes', 'maintenance_windows'
 ];
 
 export function relationalCoreConfigured() {
