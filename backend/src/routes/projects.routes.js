@@ -134,7 +134,28 @@ router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandl
   res.json({ ok: true, project });
 }));
 
+// Garde-fou avant une action irréversible : la suppression cascade sur tout
+// ce qui référence le projet (incidents, changements, jobs, fenêtres de
+// maintenance, membres — ON DELETE CASCADE, voir migrations). Bloquer tant
+// qu'il reste un incident ouvert ou un changement en attente évite de
+// perdre silencieusement un suivi opérationnel en cours ; pas de contourne-
+// ment (force flag) — la ressource bloquante doit être explicitement
+// résolue/rejetée d'abord, jamais escamotée par la suppression du projet.
 router.delete('/:id', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  if (req.pgProject) {
+    const [openIncidents, pendingChanges] = await Promise.all([
+      incidentStore.listForProject(req.pgProject.id, { status: 'open' }),
+      changeStore.listForProject(req.pgProject.id, { status: 'pending' })
+    ]);
+    const investigating = await incidentStore.listForProject(req.pgProject.id, { status: 'investigating' });
+    const blockers = openIncidents.length + investigating.length + pendingChanges.length;
+    if (blockers > 0) {
+      return res.status(409).json({
+        ok: false,
+        error: `Suppression bloquée : ${openIncidents.length + investigating.length} incident(s) non résolu(s) et ${pendingChanges.length} changement(s) en attente sur ce projet. Résolvez-les ou rejetez-les d'abord.`
+      });
+    }
+  }
   store.deleteProject(req.params.id);
   if (req.pgProject) await orgStore.deleteProjectByLegacyId(req.params.id);
   logAudit(req, 'project.delete', { projectId: req.params.id });

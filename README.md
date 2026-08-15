@@ -77,6 +77,11 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Garde-fou avant suppression de projet (`DELETE /:id`) : bloque (409) tant qu'il reste un incident non
+  résolu (`open`/`investigating`) ou un changement en attente sur le projet — la suppression cascade sur
+  tout ce qui le référence (incidents, changements, jobs, fenêtres de maintenance), donc silencieusement
+  perdre un suivi opérationnel en cours n'est jamais acceptable. Pas de contournement (`force`) : la
+  ressource bloquante doit être explicitement résolue ou rejetée d'abord.
 - Runbook lié à un incident (migration 0008) : un incident peut porter un lien vers la documentation
   opérationnelle qui vit déjà ailleurs (wiki, Confluence, README du dépôt) — Nexus ne stocke jamais le
   contenu, seulement le lien, affiché directement sur la fiche de l'incident plutôt que d'obliger à le
