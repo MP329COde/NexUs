@@ -77,6 +77,16 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- **Faille corrigée** — `POST /api/deployments/:id/sync` et `.../rollback` (route globale historique,
+  distincte de `/api/projects/:id/deployments/:linkId/{sync,rollback}` qui était correctement gardée) ne
+  vérifiaient que `requireAuth` : n'importe quel compte authentifié, membre ou non du projet concerné,
+  pouvait synchroniser ou faire un rollback de N'IMPORTE QUELLE application Argo CD de la plateforme.
+  Cette route globale reste activement utilisée par le frontend (`GitOpsDiffPanel`, `PipelineView`),
+  donc pas un code mort à supprimer — corrigée pour exiger le même rôle projet minimum que la route
+  scopée équivalente (`maintainer+` pour sync, `owner` pour rollback, `owner` supplémentaire si
+  l'environnement visé est en production), et réservée aux administrateurs pour un lien non rattaché à
+  un projet. Vérifié en conditions réelles (Postgres Docker) : non-membre et rôle insuffisant bloqués
+  (403), maintainer/owner passent la garde.
 - Rate-limiting sur `/api/terminal`, `/api/kubernetes` et `/api/proxmox` (30 req/min, `strictLimiter`) :
   absent jusqu'ici sur les trois alors qu'ils exécutent des actions d'infrastructure réelles (`scale`,
   `restart`, `delete`, `exec`, `apply`, purge de deployment, démarrage/arrêt de VM/LXC) — protéger

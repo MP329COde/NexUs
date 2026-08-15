@@ -4,6 +4,9 @@ import { requireAuth } from '../middleware/auth.js';
 import * as deploymentService from '../services/deploymentService.js';
 import { syncApplication, getApplicationHistory, rollbackApplication, getManagedResourcesDiff } from '../services/integrations/argocdService.js';
 import { logAudit } from '../services/auditService.js';
+import * as projectsStore from '../store/projectsStore.js';
+import * as orgStore from '../store/orgStore.js';
+import { resolveProjectRole } from '../middleware/projectAccess.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -17,6 +20,45 @@ function requireArgocdApp(req, res) {
   return link;
 }
 
+// Faille corrigée : ce endpoint global (contrairement à
+// /api/projects/:id/deployments/:linkId/sync — routes/projects.routes.js,
+// qui exige maintainer+ et owner en production) ne vérifiait jusqu'ici que
+// requireAuth — n'importe quel compte "user" authentifié, membre ou non du
+// projet concerné, pouvait synchroniser/rollback N'IMPORTE QUELLE
+// application ArgoCD de la plateforme. Un lien rattaché à un projet exige
+// désormais le même rôle minimum que la route scopée équivalente ; un lien
+// non rattaché (projectId absent) reste réservé aux administrateurs, faute
+// de contexte projet auquel rattacher un rôle.
+async function requireMinRoleForLink(req, res, link, minRole) {
+  if (!link.projectId) {
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ ok: false, error: 'Réservé aux administrateurs (déploiement non rattaché à un projet)' });
+      return false;
+    }
+    return true;
+  }
+  const project = projectsStore.getProject(link.projectId);
+  if (!project) {
+    res.status(404).json({ ok: false, error: 'Projet introuvable pour ce déploiement' });
+    return false;
+  }
+  const role = await resolveProjectRole(project, req.user);
+  if (!orgStore.projectRoleAtLeast(role, minRole)) {
+    res.status(403).json({ ok: false, error: `Rôle "${minRole}" minimum requis sur ce projet` });
+    return false;
+  }
+  if (link.environmentId) {
+    const pgProject = await orgStore.getProjectByLegacyId(link.projectId);
+    const environments = pgProject ? await orgStore.listEnvironments(pgProject.id) : [];
+    const env = environments.find((e) => e.id === link.environmentId);
+    if (env?.is_production && role !== 'owner') {
+      res.status(403).json({ ok: false, error: "Cette action sur un environnement de production requiert le rôle propriétaire du projet" });
+      return false;
+    }
+  }
+  return true;
+}
+
 router.get('/', asyncHandler(async (req, res) => res.json({ ok: true, items: deploymentService.list() })));
 router.post('/', asyncHandler(async (req, res) => res.status(201).json({ ok: true, link: deploymentService.create(req.body || {}) })));
 router.put('/:id', asyncHandler(async (req, res) => res.json({ ok: true, link: deploymentService.update(req.params.id, req.body || {}) })));
@@ -25,6 +67,7 @@ router.get('/:id/pipeline', asyncHandler(async (req, res) => res.json({ ok: true
 router.post('/:id/sync', asyncHandler(async (req, res) => {
   const link = requireArgocdApp(req, res);
   if (!link) return;
+  if (!(await requireMinRoleForLink(req, res, link, 'maintainer'))) return;
   const result = await syncApplication(link.argocdAppName, req.body?.revision);
   logAudit(req, 'argocd.application.synced', { linkId: link.id, appName: link.argocdAppName, revision: req.body?.revision || null });
   res.json({ ok: true, ...result });
@@ -42,6 +85,10 @@ router.get('/:id/history', asyncHandler(async (req, res) => {
 router.post('/:id/rollback', asyncHandler(async (req, res) => {
   const link = requireArgocdApp(req, res);
   if (!link) return;
+  // owner, pas seulement maintainer : même seuil que la route scopée
+  // équivalente (routes/projects.routes.js) — un rollback est plus
+  // destructeur qu'une simple synchronisation.
+  if (!(await requireMinRoleForLink(req, res, link, 'owner'))) return;
   const { historyId } = req.body || {};
   if (historyId === undefined) return res.status(400).json({ ok: false, error: 'historyId requis' });
   const result = await rollbackApplication(link.argocdAppName, historyId);
