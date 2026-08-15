@@ -28,6 +28,7 @@ export default function ProjectDetailPage() {
   const incidents = useApi(() => api.get(`/projects/${id}/incidents`), [id]);
   const changes = useApi(() => api.get(`/projects/${id}/changes`), [id]);
   const maintenanceWindows = useApi(() => api.get(`/projects/${id}/maintenance-windows`), [id]);
+  const jobs = useApi(() => api.get(`/projects/${id}/jobs`), [id], { pollMs: 10000 });
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
@@ -189,6 +190,15 @@ export default function ProjectDetailPage() {
           projectId={id}
           role={projectRole}
           onChanged={changes.reload}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <JobsPanel
+          jobs={jobs.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={jobs.reload}
         />
       </div>
 
@@ -485,6 +495,71 @@ function ProposeChangeModal({ projectId, environments, onClose, onCreated, notif
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Proposer'}</button>
       </form>
     </Modal>
+  );
+}
+
+const JOB_STATUS_TONE = { pending: 'mut', running: 'warn', succeeded: 'ok', failed: 'crit' };
+const JOB_STATUS_LABEL = { pending: 'En attente', running: 'En cours', succeeded: 'Réussi', failed: 'Échoué' };
+const JOB_TYPE_LABEL = { 'deployment.sync': 'Synchronisation', 'deployment.rollback': 'Rollback', 'security.scan': 'Scan réseau' };
+const RETRYABLE_JOB_TYPES = new Set(['deployment.sync', 'deployment.rollback']);
+
+// Historique des opérations asynchrones du projet (voir services/jobService.js) :
+// un job en échec peut être relancé explicitement (POST .../jobs/:jobId/retry,
+// maintainer+ requis, owner si l'action d'origine visait la production) —
+// crée toujours un NOUVEAU job plutôt que de muter l'original, pour garder
+// la trace de l'échec initial. idempotencyKey côté backend empêche deux
+// relances concurrentes du même job (double-clic).
+function JobsPanel({ jobs, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [retryingId, setRetryingId] = useState(null);
+  const canRetry = roleAtLeast(role, 'maintainer');
+  const runningCount = jobs.filter((j) => j.status === 'pending' || j.status === 'running').length;
+
+  async function retry(job) {
+    setRetryingId(job.id);
+    try {
+      await api.post(`/projects/${projectId}/jobs/${job.id}/retry`);
+      notify('Relance lancée', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
+  if (jobs.length === 0) return null;
+
+  return (
+    <Panel
+      title="Jobs"
+      sub={runningCount > 0 ? `${runningCount} en cours` : 'Historique des opérations asynchrones'}
+      span={12}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {jobs.slice(0, 15).map((j) => (
+          <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+            <span className={`badge badge-${JOB_STATUS_TONE[j.status]}`}>
+              {(j.status === 'running' || j.status === 'pending') && <Icon name="refresh" size={11} className="spin" />}
+              {JOB_STATUS_LABEL[j.status] || j.status}
+            </span>
+            <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>
+              {JOB_TYPE_LABEL[j.type] || j.type}
+              {j.retry_of && <span className="faint" style={{ fontWeight: 400 }}> (relance)</span>}
+            </span>
+            {j.status === 'failed' && j.error && (
+              <span className="faint" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={j.error}>{j.error}</span>
+            )}
+            <span className="faint" style={{ fontSize: 11 }}>{new Date(j.created_at).toLocaleString('fr-FR')}</span>
+            {j.status === 'failed' && canRetry && RETRYABLE_JOB_TYPES.has(j.type) && (
+              <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => retry(j)}>
+                {retryingId === j.id ? '…' : 'Relancer'}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
