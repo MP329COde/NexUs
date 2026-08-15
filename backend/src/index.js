@@ -67,6 +67,12 @@ app.use('/api/backups', strictLimiter);
 app.use('/api/identity', strictLimiter);
 app.use('/api/security/banlist', strictLimiter);
 app.use('/api/vault', strictLimiter);
+// Le terminal sécurisé exécute des actions Kubernetes réelles (scale,
+// restart, delete, exec, apply — voir services/terminalService.js) : au
+// moins aussi sensible que le coffre-fort ou la gestion des hôtes, ne
+// doit pas rester sans limite alors que toutes les autres routes
+// destructrices le sont.
+app.use('/api/terminal', strictLimiter);
 
 // Un scan nmap est coûteux (jusqu'à 2 min, charge CPU/réseau) : limite bien
 // plus stricte que le reste pour empêcher d'en déclencher en rafale.

@@ -77,6 +77,10 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Rate-limiting sur `/api/terminal` (30 req/min, `strictLimiter`) : absent jusqu'ici alors que ce
+  terminal exécute des actions Kubernetes réelles (`scale`, `restart`, `delete`, `exec`, `apply` — voir
+  `services/terminalService.js`), au moins aussi sensible que le coffre-fort ou la gestion des hôtes qui
+  étaient déjà protégés. Vérifié en conditions réelles : 429 après la 30ᵉ requête en une minute.
 - Journal d'audit : filtrage (recherche libre sur action/auteur/IP/métadonnées, préfixe d'action, plage
   de dates) et export CSV, aucun des deux n'existait jusqu'ici — le paramètre `action` de
   `GET /api/audit` était même silencieusement ignoré côté serveur avant cette correction (l'UI ne
