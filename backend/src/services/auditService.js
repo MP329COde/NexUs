@@ -25,8 +25,25 @@ export function logAudit(req, action, meta = {}) {
   }
 }
 
-export function listAuditEntries({ limit = 200, integrationKey = null } = {}) {
-  const entries = readStore('audit');
-  const filtered = integrationKey ? entries.filter((e) => e.meta?.key === integrationKey) : entries;
+// `action` : préfixe exact ("vault." trouve vault.create, vault.reveal...) —
+// évite de devoir connaître le nom d'action complet. `q` : recherche libre
+// insensible à la casse sur action/e-mail auteur/IP/JSON des métadonnées,
+// pour retrouver une action sans se souvenir dans quel champ chercher.
+// `since`/`until` : bornes ISO 8601 inclusives sur `at`.
+export function listAuditEntries({ limit = 200, integrationKey = null, action = null, q = null, since = null, until = null } = {}) {
+  let filtered = readStore('audit');
+  if (integrationKey) filtered = filtered.filter((e) => e.meta?.key === integrationKey);
+  if (action) filtered = filtered.filter((e) => e.action === action || e.action.startsWith(`${action}.`));
+  if (since) { const t = new Date(since).getTime(); if (!Number.isNaN(t)) filtered = filtered.filter((e) => new Date(e.at).getTime() >= t); }
+  if (until) { const t = new Date(until).getTime(); if (!Number.isNaN(t)) filtered = filtered.filter((e) => new Date(e.at).getTime() <= t); }
+  if (q) {
+    const needle = q.toLowerCase();
+    filtered = filtered.filter((e) => (
+      e.action.toLowerCase().includes(needle)
+      || (e.actorEmail || '').toLowerCase().includes(needle)
+      || (e.ip || '').toLowerCase().includes(needle)
+      || JSON.stringify(e.meta || {}).toLowerCase().includes(needle)
+    ));
+  }
   return filtered.slice(0, limit);
 }

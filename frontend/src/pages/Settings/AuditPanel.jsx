@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import Icon from '../../components/ui/Icon.jsx';
@@ -91,10 +92,38 @@ function toneFor(action) {
 // coffre-fort, pare-feu...) passe par logAudit() côté backend — cette page
 // en est la vue unifiée, avec qui a fait quoi, quand, et depuis quelle IP.
 export default function AuditPanel() {
-  const { data } = useApi(() => api.get('/audit'), [], { pollMs: 15000 });
+  const [q, setQ] = useState('');
+  const [since, setSince] = useState('');
+  const [until, setUntil] = useState('');
+  const params = new URLSearchParams();
+  if (q.trim()) params.set('q', q.trim());
+  if (since) params.set('since', new Date(since).toISOString());
+  if (until) params.set('until', new Date(until).toISOString());
+  const query = params.toString();
+  const { data } = useApi(() => api.get(`/audit${query ? `?${query}` : ''}`), [query], { pollMs: 15000 });
 
   return (
-    <Panel title="Journal d'audit — centre d'actions" sub="Chaque action qui modifie un système réel, les 200 dernières" span={12}>
+    <Panel
+      title="Journal d'audit — centre d'actions"
+      sub={`Chaque action qui modifie un système réel${query ? ' — filtré' : ', les 200 dernières'}`}
+      span={12}
+      actions={(
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input className="input" placeholder="Rechercher (action, auteur, IP...)" value={q} onChange={(e) => setQ(e.target.value)} style={{ height: 28, fontSize: 11.5, width: 200 }} />
+          <input className="input" type="date" value={since} onChange={(e) => setSince(e.target.value)} title="Depuis" style={{ height: 28, fontSize: 11.5 }} />
+          <input className="input" type="date" value={until} onChange={(e) => setUntil(e.target.value)} title="Jusqu'à" style={{ height: 28, fontSize: 11.5 }} />
+          <a
+            className="btn-outline"
+            style={{ height: 28, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            href={`/api/audit/export.csv${query ? `?${query}` : ''}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="externalLink" size={12} />Exporter CSV
+          </a>
+        </div>
+      )}
+    >
       <DataTable
         columns={['Action', 'Auteur', 'Détails', 'IP', 'Date']}
         rows={data?.items}

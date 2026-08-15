@@ -77,6 +77,11 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Journal d'audit : filtrage (recherche libre sur action/auteur/IP/métadonnées, préfixe d'action, plage
+  de dates) et export CSV, aucun des deux n'existait jusqu'ici — le paramètre `action` de
+  `GET /api/audit` était même silencieusement ignoré côté serveur avant cette correction (l'UI ne
+  l'exposait pas non plus). `GET /api/audit/export.csv` respecte les mêmes filtres que la vue à
+  l'écran, jamais un dump complet non filtré.
 - Garde-fou avant suppression de projet (`DELETE /:id`) : bloque (409) tant qu'il reste un incident non
   résolu (`open`/`investigating`) ou un changement en attente sur le projet — la suppression cascade sur
   tout ce qui le référence (incidents, changements, jobs, fenêtres de maintenance), donc silencieusement
