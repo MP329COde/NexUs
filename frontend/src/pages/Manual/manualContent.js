@@ -173,7 +173,22 @@ export const MANUAL_SECTIONS = [
       { type: 'note', text: "Pour des secrets de production, utilisez un vrai gestionnaire de secrets dédié (Vault, Bitwarden/Vaultwarden...) plutôt que ce générateur — volontairement simple, il ne remplace pas un coffre-fort avec contrôle d'accès et rotation." },
       { type: 'p', text: "Mots de passe (en bas de la page Développement) : deux niveaux distincts. « Mots de passe dev » sont visibles par tout développeur connecté (accès aux machines de test partagées). « Mots de passe production » sont réservés aux administrateurs, générés automatiquement côté serveur (256 caractères aléatoires) et ne sont révélés qu'après avoir retapé votre propre mot de passe (ré-authentification)." },
       { type: 'note', text: "Cette ré-authentification (« step-up ») protège contre une session laissée ouverte sur un poste partagé : même connecté, il faut reconfirmer son mot de passe pour voir un secret de production en clair." },
-      { type: 'note', text: "Approuver une merge request GitLab ou une pull request GitHub directement depuis la console est également accessible à tout compte connecté, pas seulement aux administrateurs — seule la mise en miroir GitLab → GitHub (Paramètres → Services Git) est réservée aux administrateurs." }
+      { type: 'note', text: "Sur ces vues globales (tous dépôts confondus), relancer un pipeline et approuver une merge request/pull request sont réservés aux administrateurs — la mise en miroir GitLab → GitHub (Paramètres → Services Git) l'est également. Depuis la fiche d'un projet précis en revanche, ces mêmes actions sont ouvertes dès le rôle developer/maintainer selon le rôle attribué sur ce projet (voir « Organisations et Projets » ci-dessous) — deux niveaux d'accès distincts pour la même action, selon qu'elle est déclenchée globalement ou dans le contexte d'un projet." }
+    ]
+  },
+  {
+    id: 'projects-rbac',
+    group: 'Modules opérationnels',
+    title: 'Organisations et Projets',
+    blocks: [
+      { type: 'p', text: "Au-delà du rôle global Administrateur/Utilisateur, chaque projet a son propre modèle de permissions à quatre niveaux, du moins au plus privilégié : viewer (lecture seule) < developer (déclarer un incident, proposer un changement, créer des tâches) < maintainer (approuver un changement, gérer les membres, relancer un job) < owner (approuver un changement production, supprimer le projet)." },
+      { type: 'note', text: "Un administrateur de plateforme garde toujours un accès owner implicite à tous les projets. Un owner/admin d'organisation a de même un accès owner implicite à tous les projets de son organisation." },
+      { type: 'p', text: "Organisations → Projets → Environnements : un projet appartient à une organisation et peut avoir plusieurs environnements (dev, staging, production...). Un environnement marqué production exige le rôle owner pour toute action dessus (synchronisation, rollback, approbation d'un changement le ciblant) — un maintainer peut proposer ou exécuter, mais pas approuver." },
+      { type: 'p', text: "Incidents : suivi d'un problème survenu (gravité, état, ressource affectée), avec un lien optionnel vers un runbook externe (wiki, Confluence) affiché directement sur la fiche. Clore un incident exige de documenter sa résolution — impossible de le fermer silencieusement." },
+      { type: 'p', text: "Changements contrôlés : une modification planifiée (pas un problème), avec impact attendu, décision et exécution distinctes. Proposer est ouvert à developer+ ; approuver/rejeter exige maintainer+ (owner si l'environnement visé est en production) ; exécuter reste bloqué tant que le changement n'est pas approuvé." },
+      { type: 'p', text: "Fenêtres de maintenance : période annoncée sur un projet, purement informative — elle n'accorde aucune dispense sur les autres garde-fous (une fenêtre active ne contourne jamais l'approbation owner requise sur un changement production)." },
+      { type: 'p', text: "Jobs asynchrones : les opérations longues (synchronisation/rollback Argo CD, scan réseau) s'exécutent en tâche de fond et sont suivies dans le panneau « Jobs » de la fiche projet. Un job en échec peut être relancé explicitement (mêmes droits que l'action d'origine) sans jamais perdre la trace de l'échec initial — la relance crée un nouveau job, l'original reste consultable." },
+      { type: 'note', text: "Un compte qui n'est membre d'aucun projet voit sa page d'accueil afficher « Mes projets » (incidents ouverts, changements en attente de sa décision, maintenances à venir sur ses propres projets) au lieu de la vue d'ensemble administrateur, réservée aux comptes admin." }
     ]
   },
   {
