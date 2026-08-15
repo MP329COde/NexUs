@@ -13,12 +13,45 @@ import { logger } from '../utils/logger.js';
 // lever une erreur (stockée dans `error`, job marqué 'failed'). Ne renvoie
 // jamais le job final ici : l'appelant a déjà répondu au client avant que
 // run() ne se termine — utiliser listJobs/getJob pour suivre l'état.
-export async function enqueue({ type, projectId, userId, payload = {} }, run) {
-  const { rows } = await query(
-    `INSERT INTO jobs (type, project_id, created_by, payload) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [type, projectId, userId, JSON.stringify(payload)]
-  );
-  const job = rows[0];
+//
+// idempotencyKey (optionnelle) : si un job ACTIF (pending/running) porte
+// déjà cette clé, il est renvoyé tel quel au lieu d'en créer un second —
+// un double-clic ou un retry réseau côté client ne déclenche jamais deux
+// fois la même opération réelle. Une fois le job terminé (succeeded/failed),
+// la clé redevient libre : un retry explicite après échec (voir
+// routes/projects.routes.js POST /:id/jobs/:jobId/retry) peut réutiliser la
+// même clé (`retry:<jobId original>`) pour rester idempotent lui aussi.
+//
+// retryOf (optionnelle) : id du job d'origine dont celui-ci est la
+// relance — pure traçabilité (`retry_of`), n'affecte pas l'exécution.
+export async function enqueue({ type, projectId, userId, payload = {}, idempotencyKey = null, retryOf = null }, run) {
+  if (idempotencyKey) {
+    const { rows: existing } = await query(
+      `SELECT * FROM jobs WHERE idempotency_key = $1 AND status IN ('pending', 'running')`,
+      [idempotencyKey]
+    );
+    if (existing[0]) return existing[0];
+  }
+  let job;
+  try {
+    const { rows } = await query(
+      `INSERT INTO jobs (type, project_id, created_by, payload, idempotency_key, retry_of) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [type, projectId, userId, JSON.stringify(payload), idempotencyKey, retryOf]
+    );
+    job = rows[0];
+  } catch (err) {
+    // Requête concurrente arrivée entre le SELECT et l'INSERT ci-dessus
+    // (fenêtre de course) : l'index unique partiel a tranché à notre place,
+    // on récupère le job gagnant plutôt que de faire échouer la requête.
+    if (err.code === '23505' && idempotencyKey) {
+      const { rows: winner } = await query(
+        `SELECT * FROM jobs WHERE idempotency_key = $1 AND status IN ('pending', 'running')`,
+        [idempotencyKey]
+      );
+      if (winner[0]) return winner[0];
+    }
+    throw err;
+  }
 
   // Volontairement non "awaité" par l'appelant : la promesse continue en
   // arrière-plan pendant que la réponse HTTP 202 part déjà. Toute erreur non

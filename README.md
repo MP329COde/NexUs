@@ -77,6 +77,16 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Idempotence et retry des jobs (`src/services/jobService.js`, migration 0007) : `enqueue()` accepte une
+  `idempotencyKey` optionnelle — un job déjà actif (pending/running) portant la même clé est renvoyé tel
+  quel au lieu d'en créer un second, y compris sous course réelle (index unique partiel Postgres, pas
+  une simple vérification applicative contournable). Utilisée sur les trois types de jobs existants
+  (`deployment.sync`, `deployment.rollback`, `security.scan`) pour qu'un double-clic ou un retry réseau
+  côté client ne déclenche jamais deux fois la même opération. Un job en échec peut être explicitement
+  relancé (`POST /api/projects/:id/jobs/:jobId/retry`, `POST /api/security/scans/:jobId/retry`) : crée
+  un NOUVEAU job (`retry_of` trace l'origine, l'original n'est jamais muté ni perdu) en rejouant les
+  mêmes gardes RBAC/production que l'action d'origine — jamais un raccourci pour contourner un rôle
+  insuffisant.
 - Dashboard par rôle (page d'accueil) : `AdminOverviewPanel` (intégrations en erreur, incidents/jobs
   plateforme) pour les administrateurs ; `MyProjectsOverviewPanel` (`GET /projects/mine/overview`) pour
   les comptes non-admin, qui n'agrège que ce qui concerne leurs propres projets (incidents ouverts,

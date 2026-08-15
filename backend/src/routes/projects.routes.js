@@ -328,7 +328,11 @@ router.post('/:id/deployments/:linkId/sync', loadProjectAccess(), requireMinRole
 
   if (req.pgProject) {
     const job = await jobService.enqueue(
-      { type: 'deployment.sync', projectId: req.pgProject.id, userId: req.user.id, payload: { linkId: link.id, appName: link.argocdAppName, revision } },
+      {
+        type: 'deployment.sync', projectId: req.pgProject.id, userId: req.user.id,
+        payload: { linkId: link.id, appName: link.argocdAppName, revision },
+        idempotencyKey: `deployment.sync:${link.id}`
+      },
       async () => {
         const result = await syncApplication(link.argocdAppName, revision);
         logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, revision });
@@ -352,7 +356,11 @@ router.post('/:id/deployments/:linkId/rollback', loadProjectAccess(), requireMin
 
   if (req.pgProject) {
     const job = await jobService.enqueue(
-      { type: 'deployment.rollback', projectId: req.pgProject.id, userId: req.user.id, payload: { linkId: link.id, appName: link.argocdAppName, historyId } },
+      {
+        type: 'deployment.rollback', projectId: req.pgProject.id, userId: req.user.id,
+        payload: { linkId: link.id, appName: link.argocdAppName, historyId },
+        idempotencyKey: `deployment.rollback:${link.id}`
+      },
       async () => {
         const result = await rollbackApplication(link.argocdAppName, historyId);
         logAudit(req, 'argocd.application.rolledback', { projectId: req.legacyProject.id, linkId: link.id, appName: link.argocdAppName, historyId });
@@ -380,6 +388,59 @@ router.get('/:id/jobs/:jobId', loadProjectAccess(), asyncHandler(async (req, res
     return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
   }
   res.json({ ok: true, job });
+}));
+
+// Relance d'un job de déploiement en échec (sync/rollback) : crée un
+// NOUVEAU job avec le même payload plutôt que de muter l'original (garde
+// l'historique complet, y compris l'échec initial). Rejoue les mêmes gardes
+// que l'action d'origine (rôle minimum par type, production réservée à
+// owner) — un retry n'est jamais un raccourci pour contourner le RBAC.
+// idempotencyKey dérivée du job d'origine : plusieurs clics rapides sur
+// "Relancer" ne déclenchent jamais deux relances concurrentes.
+router.post('/:id/jobs/:jobId/retry', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const original = await jobService.getJob(req.params.jobId);
+  if (!original || original.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
+  if (original.status !== 'failed') return res.status(409).json({ ok: false, error: 'Seul un job en échec peut être relancé' });
+
+  if (original.type === 'deployment.sync') {
+    const link = deploymentStore.getLink(original.payload.linkId);
+    if (!link || link.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Déploiement introuvable pour ce projet' });
+    await guardProductionEnvironment(req, link.environmentId);
+    const job = await jobService.enqueue(
+      {
+        type: 'deployment.sync', projectId: req.pgProject.id, userId: req.user.id,
+        payload: original.payload, idempotencyKey: `deployment.sync.retry:${original.id}`, retryOf: original.id
+      },
+      async () => {
+        const result = await syncApplication(link.argocdAppName, original.payload.revision);
+        logAudit(req, 'argocd.application.synced', { projectId: req.legacyProject.id, linkId: link.id, retryOf: original.id });
+        return result;
+      }
+    );
+    return res.status(202).json({ ok: true, job });
+  }
+
+  if (original.type === 'deployment.rollback') {
+    if (req.projectRole !== 'owner') return res.status(403).json({ ok: false, error: 'Rôle propriétaire requis pour relancer un rollback' });
+    const link = deploymentStore.getLink(original.payload.linkId);
+    if (!link || link.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Déploiement introuvable pour ce projet' });
+    await guardProductionEnvironment(req, link.environmentId);
+    const job = await jobService.enqueue(
+      {
+        type: 'deployment.rollback', projectId: req.pgProject.id, userId: req.user.id,
+        payload: original.payload, idempotencyKey: `deployment.rollback.retry:${original.id}`, retryOf: original.id
+      },
+      async () => {
+        const result = await rollbackApplication(link.argocdAppName, original.payload.historyId);
+        logAudit(req, 'argocd.application.rolledback', { projectId: req.legacyProject.id, linkId: link.id, retryOf: original.id });
+        return result;
+      }
+    );
+    return res.status(202).json({ ok: true, job });
+  }
+
+  res.status(400).json({ ok: false, error: `Type de job non re-lançable : "${original.type}"` });
 }));
 
 // --- Incidents : suivi opérationnel (gravité, état, ressource affectée,

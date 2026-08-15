@@ -52,8 +52,11 @@ router.post('/scans', asyncHandler(async (req, res) => {
   if (!target) return res.status(400).json({ ok: false, error: 'Cible requise (IP ou CIDR)' });
 
   if (pool) {
+    // Idempotence sur la cible : un double-clic (ou un retry réseau côté
+    // navigateur) sur le même scan en cours renvoie le job déjà actif au
+    // lieu de lancer un second nmap concurrent sur la même plage.
     const job = await jobService.enqueue(
-      { type: 'security.scan', projectId: null, userId: req.user.id, payload: { target } },
+      { type: 'security.scan', projectId: null, userId: req.user.id, payload: { target }, idempotencyKey: `security.scan:${target}` },
       async () => {
         const scan = await runScan(target);
         logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
@@ -66,6 +69,27 @@ router.post('/scans', asyncHandler(async (req, res) => {
   const scan = await runScan(target);
   logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount });
   res.status(201).json({ ok: true, scan });
+}));
+
+// Relance d'un scan en échec : nouveau job avec la même cible, jamais une
+// mutation du job d'origine (conserve l'historique). idempotencyKey dérivée
+// du job d'origine : plusieurs clics rapides sur "Relancer" ne créent
+// jamais deux relances concurrentes du même scan.
+router.post('/scans/:jobId/retry', asyncHandler(async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "DATABASE_URL n'est pas configuré" });
+  const original = await jobService.getJob(req.params.jobId);
+  if (!original || original.type !== 'security.scan') return res.status(404).json({ ok: false, error: 'Scan introuvable' });
+  if (original.status !== 'failed') return res.status(409).json({ ok: false, error: 'Seul un scan en échec peut être relancé' });
+  const { target } = original.payload;
+  const job = await jobService.enqueue(
+    { type: 'security.scan', projectId: null, userId: req.user.id, payload: { target }, idempotencyKey: `security.scan.retry:${original.id}`, retryOf: original.id },
+    async () => {
+      const scan = await runScan(target);
+      logAudit(req, 'security.scan.run', { target, hostCount: scan.hostCount, retryOf: original.id });
+      return scan;
+    }
+  );
+  res.status(202).json({ ok: true, job });
 }));
 
 // Tableau de sécurité global : agrège ce qui est réellement disponible
