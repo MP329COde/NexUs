@@ -9,6 +9,7 @@ import LiveActivityPanel from './LiveActivityPanel.jsx';
 import ServiceAvailabilityPanel from './ServiceAvailabilityPanel.jsx';
 import OpenAlertsPanel from './OpenAlertsPanel.jsx';
 import AdminOverviewPanel from './AdminOverviewPanel.jsx';
+import MyProjectsOverviewPanel from './MyProjectsOverviewPanel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 
@@ -78,6 +79,7 @@ export default function HomePage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <AdminOverviewPanel />
+        <MyProjectsOverviewPanel />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>

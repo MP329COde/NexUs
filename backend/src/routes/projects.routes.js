@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { loadProjectAccess, requireMinRole } from '../middleware/projectAccess.js';
+import { loadProjectAccess, requireMinRole, resolveProjectRole } from '../middleware/projectAccess.js';
 import * as store from '../store/projectsStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
@@ -27,18 +27,71 @@ router.use(requireAuth);
 // ("une personne qui ne travaille que sur un projet ne doit voir que
 // celui-ci"). Appliquée ici, pas seulement côté frontend : /projects/:id
 // refuse (404, volontairement pas 403 pour ne pas confirmer l'existence du
-// projet) l'accès à un projet dont on n'est pas membre. Le rôle exact
-// (viewer/developer/maintainer/owner) n'est disponible que pour les projets
-// déjà migrés vers le socle relationnel (voir middleware/projectAccess.js) ;
-// pour les autres, la liste utilise encore memberIds.
-router.get('/', (req, res) => {
-  const items = store.listProjects().filter((p) => req.user.role === 'admin' || store.isMember(p, req.user.id));
-  res.json({ ok: true, items });
-});
+// projet) l'accès à un projet dont on n'est pas membre. Un membre ajouté via
+// le RBAC relationnel (PUT /:id/members/:userId, table project_members) n'a
+// jamais son id inséré dans l'ancien memberIds plat — les deux sources
+// d'appartenance sont donc fusionnées ici (bug corrigé : sans ça, un tel
+// membre pouvait accéder au projet par son id ou depuis la recherche, mais
+// n'apparaissait jamais dans sa propre liste "Projets").
+async function listMyProjects(user) {
+  const all = store.listProjects();
+  if (user.role === 'admin') return all;
+  const relationalIds = pool ? new Set((await orgStore.listProjectsForUser(user.id)).map((p) => p.legacy_id).filter(Boolean)) : new Set();
+  return all.filter((p) => store.isMember(p, user.id) || relationalIds.has(p.id));
+}
+
+router.get('/', asyncHandler(async (req, res) => {
+  res.json({ ok: true, items: await listMyProjects(req.user) });
+}));
 
 router.get('/:id', loadProjectAccess(), (req, res) => {
   res.json({ ok: true, project: req.legacyProject, role: req.projectRole });
 });
+
+// Vue d'ensemble "mes projets" : équivalent de GET /system/overview (réservé
+// aux admins) mais pour un membre ordinaire — n'agrège que ce qui concerne
+// SES propres projets (incidents ouverts, changements en attente de sa
+// décision, maintenances à venir), jamais la plateforme entière. Placé sur
+// un segment à deux niveaux (/mine/overview) pour ne jamais entrer en
+// collision avec GET /:id (un seul segment).
+router.get('/mine/overview', asyncHandler(async (req, res) => {
+  const myProjects = await listMyProjects(req.user);
+  if (!pool || myProjects.length === 0) {
+    return res.json({ ok: true, relationalCoreConfigured: Boolean(pool), projects: [], openIncidents: [], pendingChanges: [], upcomingMaintenance: [] });
+  }
+  const perProject = await Promise.all(myProjects.map(async (legacy) => {
+    const pg = await orgStore.getProjectByLegacyId(legacy.id);
+    if (!pg) return null;
+    const role = await resolveProjectRole(legacy, req.user);
+    const [incidents, changes, windows] = await Promise.all([
+      incidentStore.listForProject(pg.id, { status: 'open' }),
+      changeStore.listForProject(pg.id, { status: 'pending' }),
+      maintenanceStore.listForProject(pg.id)
+    ]);
+    const now = Date.now();
+    return {
+      project: { id: legacy.id, name: legacy.name },
+      role,
+      openIncidents: incidents.map((i) => ({ id: i.id, title: i.title, severity: i.severity })),
+      pendingChanges: changes.map((c) => ({ id: c.id, title: c.title })),
+      upcomingMaintenance: windows.filter((w) => !w.cancelled_at && new Date(w.ends_at).getTime() > now)
+        .map((w) => ({ id: w.id, title: w.title, startsAt: w.starts_at, endsAt: w.ends_at }))
+    };
+  }));
+  const valid = perProject.filter(Boolean);
+  res.json({
+    ok: true,
+    relationalCoreConfigured: true,
+    projects: valid.map((v) => ({ ...v.project, role: v.role })),
+    openIncidents: valid.flatMap((v) => v.openIncidents.map((i) => ({ ...i, projectId: v.project.id, projectName: v.project.name }))),
+    pendingChanges: valid.flatMap((v) => v.pendingChanges.filter(() => roleAtLeastForDecide(v.role)).map((c) => ({ ...c, projectId: v.project.id, projectName: v.project.name }))),
+    upcomingMaintenance: valid.flatMap((v) => v.upcomingMaintenance.map((w) => ({ ...w, projectId: v.project.id, projectName: v.project.name })))
+  });
+}));
+
+function roleAtLeastForDecide(role) {
+  return role === 'maintainer' || role === 'owner';
+}
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { name, description, tags, memberIds, repoKeys } = req.body || {};

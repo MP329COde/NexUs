@@ -77,6 +77,15 @@ JSON/SQLite historique qui continue de porter le reste (intégrations, coffre-fo
   voir `req.rawBody` capturé dans `index.js`). Un pipeline/workflow en échec ouvre automatiquement un
   incident. URL + secret consultables/régénérables par maintainer+ via `GET`/`POST
   /api/projects/:id/webhook{,/rotate}`.
+- Dashboard par rôle (page d'accueil) : `AdminOverviewPanel` (intégrations en erreur, incidents/jobs
+  plateforme) pour les administrateurs ; `MyProjectsOverviewPanel` (`GET /projects/mine/overview`) pour
+  les comptes non-admin, qui n'agrège que ce qui concerne leurs propres projets (incidents ouverts,
+  changements en attente de décision, maintenances à venir) — jamais la plateforme entière. En corrigeant
+  ceci, un bug préexistant a été découvert et corrigé : `GET /projects` (la liste principale) ne
+  vérifiait que l'ancien `memberIds` plat, jamais l'appartenance `project_members` du socle relationnel —
+  un membre ajouté via `PUT /:id/members/:userId` pouvait accéder au projet par son id mais
+  n'apparaissait jamais dans sa propre liste "Projets". Les deux sources sont désormais fusionnées
+  (`listMyProjects()` dans `routes/projects.routes.js`).
 - Fenêtres de maintenance (`src/store/maintenanceStore.js`) : période annoncée sur un projet
   (optionnellement scopée à un environnement), purement déclarative — n'a aucun effet sur les autres
   gardes, notamment n'accorde jamais de dispense d'approbation owner sur un changement production
