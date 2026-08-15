@@ -71,8 +71,14 @@ app.use('/api/vault', strictLimiter);
 // restart, delete, exec, apply — voir services/terminalService.js) : au
 // moins aussi sensible que le coffre-fort ou la gestion des hôtes, ne
 // doit pas rester sans limite alors que toutes les autres routes
-// destructrices le sont.
+// destructrices le sont. /api/kubernetes et /api/proxmox exposent les
+// mêmes catégories d'action (scale/restart/rollback/purge/delete un pod,
+// démarrer/arrêter/réinitialiser une VM/LXC) directement, sans passer par
+// le terminal — protéger uniquement ce dernier aurait laissé la porte
+// dérobée grande ouverte par la route directe.
 app.use('/api/terminal', strictLimiter);
+app.use('/api/kubernetes', strictLimiter);
+app.use('/api/proxmox', strictLimiter);
 
 // Un scan nmap est coûteux (jusqu'à 2 min, charge CPU/réseau) : limite bien
 // plus stricte que le reste pour empêcher d'en déclencher en rafale.
