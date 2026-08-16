@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './DeploymentsLayout.css';
 
 const COLLAPSE_KEY = 'nexus-dev-nav-collapsed';
 
@@ -68,42 +69,23 @@ export default function DeploymentsLayout() {
     .map((e) => ({ label: e.label, url: e.baseUrl }));
 
   return (
-    <div style={{ display: 'flex', gap: collapsed ? 12 : 20, alignItems: 'flex-start' }}>
-      <nav
-        className="card"
-        style={{
-          flex: 'none', width: collapsed ? 56 : 210, padding: '10px 8px',
-          display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 24,
-          transition: 'width .15s ease'
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
+    <div className={`dev-layout${collapsed ? ' dev-layout-collapsed' : ''}`}>
+      <nav className={`card dev-nav${collapsed ? ' dev-nav-collapsed' : ''}`}>
+        <div className="dev-nav-groups">
           {GROUPS.map((g) => (
             <div key={g.label}>
-              {!collapsed && (
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faintest)', padding: '0 8px 5px' }}>
-                  {g.label}
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {!collapsed && <div className="dev-nav-group-label">{g.label}</div>}
+              <div className="dev-nav-group-items">
                 {g.items.map((it) => (
                   <NavLink
                     key={it.to}
                     to={it.to}
                     end={it.end}
                     title={collapsed ? it.label : undefined}
-                    style={({ isActive }) => ({
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: collapsed ? '9px 0' : '8px 10px',
-                      justifyContent: collapsed ? 'center' : 'flex-start',
-                      borderRadius: 8, fontSize: 12.5, fontWeight: isActive ? 600 : 500,
-                      textDecoration: 'none',
-                      color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                      background: isActive ? 'var(--primary-soft)' : 'transparent'
-                    })}
+                    className={({ isActive }) => `dev-nav-link${collapsed ? ' dev-nav-link-collapsed' : ''}${isActive ? ' dev-nav-link-active' : ''}`}
                   >
-                    <Icon name={it.icon} size={15} strokeWidth={1.7} style={{ flex: 'none' }} />
-                    {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label}</span>}
+                    <Icon name={it.icon} size={15} strokeWidth={1.7} className="dev-nav-link-icon" />
+                    {!collapsed && <span className="dev-nav-link-label">{it.label}</span>}
                   </NavLink>
                 ))}
               </div>
@@ -112,12 +94,8 @@ export default function DeploymentsLayout() {
         </div>
 
         {externalLinks.length > 0 && (
-          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {!collapsed && (
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faintest)', padding: '0 8px 5px' }}>
-                Outils réels
-              </div>
-            )}
+          <div className="dev-nav-external">
+            {!collapsed && <div className="dev-nav-group-label">Outils réels</div>}
             {externalLinks.map((l) => (
               <a
                 key={l.label}
@@ -125,16 +103,10 @@ export default function DeploymentsLayout() {
                 target="_blank"
                 rel="noreferrer"
                 title={collapsed ? l.label : undefined}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: collapsed ? '8px 0' : '7px 10px',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  borderRadius: 8, fontSize: 12, fontWeight: 500,
-                  textDecoration: 'none', color: 'var(--text-faint)'
-                }}
+                className={`dev-nav-external-link${collapsed ? ' dev-nav-external-link-collapsed' : ''}`}
               >
-                <Icon name="externalLink" size={13} strokeWidth={1.7} style={{ flex: 'none' }} />
-                {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.label}</span>}
+                <Icon name="externalLink" size={13} strokeWidth={1.7} className="dev-nav-link-icon" />
+                {!collapsed && <span className="dev-nav-link-label">{l.label}</span>}
               </a>
             ))}
           </div>
@@ -143,14 +115,13 @@ export default function DeploymentsLayout() {
         <button
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? 'Déployer' : 'Réduire'}
-          className="icon-btn"
-          style={{ alignSelf: collapsed ? 'center' : 'flex-end' }}
+          className={`icon-btn dev-nav-toggle${collapsed ? ' dev-nav-toggle-collapsed' : ''}`}
         >
           <Icon name={collapsed ? 'chevronsRight' : 'chevronsLeft'} size={15} />
         </button>
       </nav>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="dev-layout-content">
         <Outlet />
       </div>
     </div>
