@@ -15,13 +15,19 @@ export async function listOrganizationsForUser(userId) {
   return rows;
 }
 
-export async function createOrganization({ name, slug, ownerUserId }) {
+// Même palette rotative que projectsStore.js (PROJECT_COLORS), pour une
+// cohérence visuelle entre organisations et projets.
+const ORG_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899'];
+
+export async function createOrganization({ name, slug, ownerUserId, icon, color }) {
   const client = await (await import('../db/pool.js')).requirePool().connect();
   try {
     await client.query('BEGIN');
+    const { rows: countRows } = await client.query('SELECT COUNT(*)::int AS n FROM organizations');
+    const defaultColor = ORG_COLORS[countRows[0].n % ORG_COLORS.length];
     const { rows } = await client.query(
-      'INSERT INTO organizations (name, slug) VALUES ($1, $2) RETURNING *',
-      [name, slug]
+      'INSERT INTO organizations (name, slug, icon, color) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, slug, icon || null, color || defaultColor]
     );
     const org = rows[0];
     await client.query(
@@ -44,6 +50,18 @@ export async function getOrgRole(orgId, userId) {
     [orgId, userId]
   );
   return rows[0]?.role || null;
+}
+
+// icon/color toujours réécrits (jamais COALESCE) : un champ vide envoyé
+// depuis le frontend signifie "revenir à l'icône générique", exactement
+// comme pour les projets (store/projectsStore.js) — pas de distinction
+// entre "non fourni" et "explicitement vidé" à gérer côté client.
+export async function updateOrganization(orgId, { name, icon, color }) {
+  const { rows } = await query(
+    `UPDATE organizations SET name = COALESCE($2, name), icon = $3, color = COALESCE($4, color) WHERE id = $1 RETURNING *`,
+    [orgId, name || null, icon || null, color || null]
+  );
+  return rows[0] || null;
 }
 
 // --- Projets ---
