@@ -20,7 +20,8 @@ const TOOLS = [
   { id: 'semgrep', label: 'Semgrep', bin: 'semgrep', versionArgs: ['--version'] },
   { id: 'checkov', label: 'Checkov', bin: 'checkov', versionArgs: ['--version'] },
   { id: 'syft', label: 'Syft', bin: 'syft', versionArgs: ['version'] },
-  { id: 'cosign', label: 'cosign', bin: 'cosign', versionArgs: ['version'] }
+  { id: 'cosign', label: 'cosign', bin: 'cosign', versionArgs: ['version'] },
+  { id: 'zap-baseline', label: 'OWASP ZAP (zap-baseline.py)', bin: 'zap-baseline.py', versionArgs: ['-h'] }
 ];
 
 function which(bin) {
