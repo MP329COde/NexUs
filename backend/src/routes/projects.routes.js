@@ -19,6 +19,7 @@ import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
 import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } from '../services/environmentPromotionService.js';
+import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
 
@@ -230,6 +231,24 @@ router.delete('/:id/members/:userId', loadProjectAccess(), requireMinRole('maint
   await orgStore.removeMember(req.pgProject.id, req.params.userId);
   logAudit(req, 'project.member.remove', { projectId: req.legacyProject.id, userId: req.params.userId });
   res.json({ ok: true });
+}));
+
+// --- Octrois d'accès par ressource (granularité fine, socle relationnel
+// uniquement — voir store/orgStore.js, hasResourceAccess/vault.routes.js) ---
+router.get('/:id/resource-grants', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await listResourceGrants(req.pgProject.id) });
+}));
+
+router.put('/:id/resource-grants/:userId/:resource', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { resource, userId } = req.params;
+  if (resource !== 'vault') return res.status(400).json({ ok: false, error: 'Ressource inconnue' });
+  const { level } = req.body || {};
+  if (level && !['read', 'write'].includes(level)) return res.status(400).json({ ok: false, error: 'Niveau invalide (read ou write, ou vide pour retirer)' });
+  const grant = await setResourceGrant(req.pgProject.id, userId, resource, level || null, req.user.id);
+  logAudit(req, 'project.resourceGrant.set', { projectId: req.legacyProject.id, userId, resource, level: level || null });
+  res.json({ ok: true, grant });
 }));
 
 // --- Environnements (socle relationnel uniquement) ---

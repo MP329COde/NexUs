@@ -9,7 +9,7 @@ import { verifyPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getProject } from '../store/projectsStore.js';
 import { resolveProjectRole } from '../middleware/projectAccess.js';
-import { projectRoleAtLeast } from '../store/orgStore.js';
+import { projectRoleAtLeast, getProjectByLegacyId, getResourceGrant, resourceLevelAtLeast } from '../store/orgStore.js';
 
 // Résout le rôle réel (viewer/developer/maintainer/owner, ou null) via la
 // même logique que /projects/:id/* (middleware/projectAccess.js) — aupara-
@@ -21,6 +21,22 @@ async function projectEntryRole(entry, user) {
   if (entry.tier !== 'project') return 'owner'; // dev/prod : logique existante ci-dessous, inchangée
   const project = getProject(entry.projectId);
   return resolveProjectRole(project, user);
+}
+
+// Complète projectEntryRole : un membre en dessous du rôle global requis
+// (ex. viewer) peut tout de même satisfaire minRole si un octroi ponctuel
+// "vault" d'au moins resourceLevel lui a été accordé sur ce projet (voir
+// store/orgStore.js, hasResourceAccess/RESOURCE_BASE_ROLE) — jamais
+// l'inverse : un rôle global déjà suffisant n'a pas besoin d'octroi.
+async function projectEntryAccess(entry, user, minRole, resourceLevel) {
+  if (!entry) return false;
+  const role = await projectEntryRole(entry, user);
+  if (projectRoleAtLeast(role, minRole)) return true;
+  if (entry.tier !== 'project') return false;
+  const pgProject = await getProjectByLegacyId(entry.projectId);
+  if (!pgProject) return false;
+  const grant = await getResourceGrant(pgProject.id, user.id, 'vault');
+  return resourceLevelAtLeast(grant?.level, resourceLevel);
 }
 
 // Mots de passe dev : visibles par tout utilisateur authentifié (aide les
@@ -59,10 +75,11 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
   // 404 générique (pas 403) pour ne pas confirmer l'existence d'une entrée
   // hors de portée — même logique que projects.routes.js. Révéler un secret
   // exige au moins developer (même seuil que la création — voir
-  // projects.routes.js POST /:id/vault) : un viewer voit les métadonnées
-  // (label, notes...) mais jamais la valeur en clair.
-  const role = await projectEntryRole(entry, req.user);
-  if (!entry || !projectRoleAtLeast(role, 'developer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  // projects.routes.js POST /:id/vault), ou un octroi ponctuel "vault"
+  // (lecture) accordé au membre pour ce projet précis.
+  if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'read'))) {
+    return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  }
 
   if (entry.tier === 'prod' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
@@ -101,8 +118,11 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
-  const role = await projectEntryRole(entry, req.user);
-  if (!entry || !projectRoleAtLeast(role, 'developer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  // Modifier les métadonnées exige un octroi "vault" au niveau écriture
+  // (pas seulement lecture) quand le rôle global ne suffit pas déjà.
+  if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'write'))) {
+    return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  }
   if (entry.tier !== 'project' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
   }
