@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './OrganizationsPage.css';
 
 const ORG_EMOJIS = ['🏢', '🚀', '⚙️', '🛰️', '🔧', '🧩', '🗄️', '🌐', '🔥', '🧠', '🛡️', '📊'];
 const ORG_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899', '#475569'];
@@ -60,7 +61,7 @@ export default function OrganizationsPage() {
     return (
       <>
         <PageHeader title="Organisations" sub="Socle relationnel des projets, équipes et environnements" />
-        <div className="card" style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="card org-not-configured">
           Socle relationnel non configuré sur cette instance (variable d'environnement <code>DATABASE_URL</code> absente
           côté backend) — voir README, section « Socle relationnel ».
         </div>
@@ -74,7 +75,7 @@ export default function OrganizationsPage() {
         title="Organisations"
         sub="Regroupe équipes, projets et environnements — vous ne voyez que celles dont vous êtes membre"
         actions={(
-          <button className="btn" onClick={() => setFormOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <button className="btn org-header-action" onClick={() => setFormOpen(true)}>
             <Icon name="plus" size={14} />Nouvelle organisation
           </button>
         )}
@@ -82,35 +83,36 @@ export default function OrganizationsPage() {
 
       {formOpen && (
         <Modal title="Nouvelle organisation" onClose={() => setFormOpen(false)} width={420}>
-          <form onSubmit={createOrg} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <form onSubmit={createOrg} className="org-form-fields">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="org-form-label">Nom</label>
               <input className="input" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon équipe" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Identifiant (URL, minuscules/tirets)</label>
+              <label className="org-form-label">Identifiant (URL, minuscules/tirets)</label>
               <input className="input" required pattern="[a-z0-9-]+" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="mon-equipe" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>Icône (optionnel)</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <label className="org-form-label">Icône (optionnel)</label>
+              <div className="org-emoji-picker">
                 {ORG_EMOJIS.map((e) => (
                   <span
                     key={e} onClick={() => setIcon(e === icon ? '' : e)}
-                    style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', fontSize: 14, background: e === icon ? 'var(--primary-soft)' : 'var(--border-soft)', border: e === icon ? '1px solid var(--primary)' : '1px solid transparent' }}
+                    className={`org-emoji-option${e === icon ? ' org-emoji-option-active' : ''}`}
                   >{e}</span>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div className="org-color-picker">
               {ORG_COLORS.map((c) => (
                 <span
                   key={c} onClick={() => setColor(c)}
-                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: c === color ? '0 0 0 2px var(--surface), 0 0 0 4px var(--primary)' : 'none' }}
+                  className={`org-color-option${c === color ? ' org-color-option-active' : ''}`}
+                  style={{ background: c }}
                 />
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="org-form-actions">
               <span className="btn-outline" onClick={() => setFormOpen(false)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Création…' : 'Créer'}</button>
             </div>
@@ -121,23 +123,24 @@ export default function OrganizationsPage() {
       {editing && (
         <Modal title={`Modifier "${editing.name}"`} onClose={() => setEditing(null)} width={380}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>Icône</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+            <label className="org-form-label">Icône</label>
+            <div className="org-emoji-picker org-emoji-picker-spaced">
               {ORG_EMOJIS.map((e) => (
                 <span
                   key={e}
                   onClick={() => saveEdit(editing, { icon: e === editing.icon ? '' : e }).then(() => setEditing((prev) => ({ ...prev, icon: e === prev.icon ? '' : e })))}
-                  style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', fontSize: 14, background: e === editing.icon ? 'var(--primary-soft)' : 'var(--border-soft)', border: e === editing.icon ? '1px solid var(--primary)' : '1px solid transparent' }}
+                  className={`org-emoji-option${e === editing.icon ? ' org-emoji-option-active' : ''}`}
                 >{e}</span>
               ))}
             </div>
-            <label style={{ display: 'block', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>Couleur</label>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <label className="org-form-label">Couleur</label>
+            <div className="org-color-picker">
               {ORG_COLORS.map((c) => (
                 <span
                   key={c}
                   onClick={() => saveEdit(editing, { color: c }).then(() => setEditing((prev) => ({ ...prev, color: c })))}
-                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: c === editing.color ? '0 0 0 2px var(--surface), 0 0 0 4px var(--primary)' : 'none' }}
+                  className={`org-color-option${c === editing.color ? ' org-color-option-active' : ''}`}
+                  style={{ background: c }}
                 />
               ))}
             </div>
@@ -145,32 +148,32 @@ export default function OrganizationsPage() {
         </Modal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
+      <div className="org-grid">
         {organizations.length === 0 ? (
-          <div className="card" style={{ gridColumn: '1/-1', padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          <div className="card org-empty">
             Vous n'êtes membre d'aucune organisation. Les projets créés en créent automatiquement une par défaut.
           </div>
         ) : organizations.map((org) => (
-          <div key={org.id} className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
+          <div key={org.id} className="card org-card">
+            <div className="org-card-header">
+              <span className="org-card-title">
                 {org.icon ? (
-                  <span style={{ width: 22, height: 22, borderRadius: 6, background: org.color || 'var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flex: 'none' }}>{org.icon}</span>
+                  <span className="org-card-icon" style={{ background: org.color || 'var(--border-soft)' }}>{org.icon}</span>
                 ) : (
                   <Icon name="users" size={15} style={{ color: org.color || 'var(--text-faint)' }} />
                 )}
                 {org.name}
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="org-card-actions">
                 <span className="badge badge-vio">{org.my_role}</span>
                 {(org.my_role === 'owner' || org.my_role === 'admin') && (
-                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setEditing(org)}>
+                  <span className="btn-outline org-card-edit-btn" onClick={() => setEditing(org)}>
                     <Icon name="edit" size={12} />
                   </span>
                 )}
               </span>
             </div>
-            <p className="faint mono" style={{ fontSize: 12, margin: 0 }}>{org.slug}</p>
+            <p className="faint mono org-card-slug">{org.slug}</p>
           </div>
         ))}
       </div>
