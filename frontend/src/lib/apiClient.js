@@ -39,7 +39,9 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const message = data?.error || `Erreur ${res.status}`;
     if (res.status >= 500) notifyGlobalError(message);
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
   }
   return data;
 }

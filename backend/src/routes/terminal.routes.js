@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { runCommand, resolveTier, allowedVerbs } from '../services/terminalService.js';
 import { logAudit } from '../services/auditService.js';
 import { setTerminalTier } from '../store/usersStore.js';
@@ -8,7 +9,12 @@ import { createNotification } from '../store/notificationsStore.js';
 import { listPending, findPendingForUser, createRequest, decideRequest } from '../store/terminalAccessRequestsStore.js';
 
 const router = Router();
-router.use(requireAuth);
+// Porte d'entrée du terminal : la granularité fine (quel verbe kubectl est
+// autorisé) reste gérée par terminalTier/TIER_VERBS (voir runCommand ci-
+// dessous), mais l'accès à la route elle-même exige désormais la permission
+// RBAC 'terminal' comme le reste de la console (cohérence avec settings,
+// vault, kubernetes...).
+router.use(requireAuth, requirePermission('terminal', 'read'));
 
 const REQUESTABLE_TIERS = ['developer', 'maintainer'];
 
@@ -46,11 +52,11 @@ router.post('/access-request', asyncHandler(async (req, res) => {
 // Décisions : réservées aux admins, comme l'attribution manuelle du palier
 // (routes/users.routes.js PUT /:id/terminal-tier, chemin toujours disponible
 // en parallèle de ce parcours self-service).
-router.get('/access-requests', requireRole('admin'), (req, res) => {
+router.get('/access-requests', requirePermission('terminal', 'admin'), (req, res) => {
   res.json({ ok: true, items: listPending() });
 });
 
-router.post('/access-requests/:id/decide', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/access-requests/:id/decide', requirePermission('terminal', 'admin'), asyncHandler(async (req, res) => {
   const { approve } = req.body || {};
   const entry = decideRequest(req.params.id, { approve: Boolean(approve), decidedBy: req.user.email });
   if (!entry) return res.status(404).json({ ok: false, error: 'Demande introuvable' });

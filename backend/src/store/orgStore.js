@@ -399,3 +399,79 @@ export async function deleteTeam(id) {
   const { rowCount } = await query('DELETE FROM teams WHERE id = $1', [id]);
   return rowCount > 0;
 }
+
+// --- Wiki d'équipe (voir db/migrations/0012_wiki.sql pour le pourquoi :
+// contenu réellement stocké, contrairement au lien runbook des incidents).
+
+export async function listWikiPages(orgId, projectId) {
+  const { rows } = projectId
+    ? await query('SELECT * FROM wiki_pages WHERE org_id = $1 AND project_id = $2 ORDER BY title', [orgId, projectId])
+    : await query('SELECT * FROM wiki_pages WHERE org_id = $1 ORDER BY title', [orgId]);
+  return rows;
+}
+
+export async function searchWikiPages(orgId, q) {
+  const { rows } = await query(
+    `SELECT * FROM wiki_pages WHERE org_id = $1 AND (title ILIKE $2 OR content ILIKE $2) ORDER BY title LIMIT 50`,
+    [orgId, `%${q}%`]
+  );
+  return rows;
+}
+
+export async function getWikiPage(id) {
+  const { rows } = await query('SELECT * FROM wiki_pages WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createWikiPage({ orgId, projectId, slug, title, content, userId }) {
+  const { rows } = await query(
+    `INSERT INTO wiki_pages (org_id, project_id, slug, title, content, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
+    [orgId, projectId || null, slug, title, content || '', userId]
+  );
+  return rows[0];
+}
+
+// Écrit l'état courant dans wiki_page_revisions avant de l'écraser, pour
+// garder un historique complet (une révision = une version précédente).
+export async function updateWikiPage(id, { title, content, userId }) {
+  const client = await (await import('../db/pool.js')).requirePool().connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: current } = await client.query('SELECT * FROM wiki_pages WHERE id = $1 FOR UPDATE', [id]);
+    if (!current[0]) { await client.query('ROLLBACK'); return null; }
+    await client.query(
+      'INSERT INTO wiki_page_revisions (page_id, title, content, edited_by) VALUES ($1, $2, $3, $4)',
+      [id, current[0].title, current[0].content, userId]
+    );
+    const { rows } = await client.query(
+      `UPDATE wiki_pages SET title = $2, content = $3, updated_by = $4, updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, title, content, userId]
+    );
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteWikiPage(id) {
+  const { rowCount } = await query('DELETE FROM wiki_pages WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+export async function listWikiRevisions(pageId) {
+  const { rows } = await query(
+    'SELECT id, title, edited_by, edited_at FROM wiki_page_revisions WHERE page_id = $1 ORDER BY edited_at DESC',
+    [pageId]
+  );
+  return rows;
+}
+
+export async function getWikiRevision(id) {
+  const { rows } = await query('SELECT * FROM wiki_page_revisions WHERE id = $1', [id]);
+  return rows[0] || null;
+}

@@ -10,6 +10,7 @@ import argocdRoutes from './argocd.routes.js';
 import haproxyRoutes from './haproxy.routes.js';
 import gitlabRoutes from './gitlab.routes.js';
 import githubRoutes from './github.routes.js';
+import giteaRoutes from './gitea.routes.js';
 import proxmoxRoutes from './proxmox.routes.js';
 import traefikRoutes from './traefik.routes.js';
 import certmanagerRoutes from './certmanager.routes.js';
@@ -50,6 +51,7 @@ import reviewsRoutes from './reviews.routes.js';
 import pipelinesRoutes from './pipelines.routes.js';
 import shortcutsRoutes from './shortcuts.routes.js';
 import terminalRoutes from './terminal.routes.js';
+import wikiRoutes from './wiki.routes.js';
 
 const router = Router();
 
@@ -64,6 +66,7 @@ router.use('/argocd', argocdRoutes);
 router.use('/haproxy', haproxyRoutes);
 router.use('/gitlab', gitlabRoutes);
 router.use('/github', githubRoutes);
+router.use('/gitea', giteaRoutes);
 router.use('/proxmox', proxmoxRoutes);
 router.use('/traefik', traefikRoutes);
 router.use('/certmanager', certmanagerRoutes);
@@ -104,5 +107,6 @@ router.use('/reviews', reviewsRoutes);
 router.use('/pipelines', pipelinesRoutes);
 router.use('/shortcuts', shortcutsRoutes);
 router.use('/terminal', terminalRoutes);
+router.use('/wiki', wikiRoutes);
 
 export default router;

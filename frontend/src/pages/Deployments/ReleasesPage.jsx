@@ -1,10 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
-import DemoNote from '../../components/ui/DemoNote.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -13,21 +13,16 @@ import PipelineView from './PipelineView.jsx';
 import GitOpsDiffPanel from './GitOpsDiffPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
 
-// Panneau démonstration : la console n'a pas encore de détection statique de
-// "fichiers problématiques" (couverture/lint par commit) — nécessiterait une
-// intégration SonarQube ou équivalent.
-const DEMO_FILES = [
-  { path: 'src/services/paymentClient.ts', issue: 'Couverture de tests 41 % (seuil 70 %)', tone: 'warn' },
-  { path: 'src/routes/webhooks.ts', issue: '2 vulnérabilités modérées détectées', tone: 'crit' },
-  { path: 'infra/terraform/vpc.tf', issue: 'Dérive détectée vs état appliqué', tone: 'warn' }
-];
-
 export default function ReleasesPage() {
   const { user } = useAuth();
   const links = useApi(() => api.get('/deployments'), []);
   const [formOpen, setFormOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const isAdmin = user?.role === 'admin';
+  // Réservé aux admins côté API (mêmes règles que la page Supply Chain) :
+  // n'appelle /code-scans que pour un compte admin, sinon 403 assuré.
+  const codeScans = useApi(() => (isAdmin ? api.get('/code-scans') : Promise.resolve({ items: [] })), [isAdmin]);
+  const lastScan = codeScans.data?.items?.[0] || null;
 
   const apps = links.data?.items || [];
   const fullyLinked = apps.filter((l) => l.argocdAppName && l.k8sDeployment).length;
@@ -90,18 +85,33 @@ export default function ReleasesPage() {
         </div>
       )}
 
-      <Panel title="Fichiers à corriger" sub="Détection statique — démonstration" span={12} style={{ marginBottom: 16 }}>
-        <DemoNote>Aucune intégration d'analyse statique (type SonarQube) n'est branchée : liste illustrative pour valider la mise en page.</DemoNote>
-        <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {DEMO_FILES.map((f) => (
-            <div key={f.path} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
-              <Icon name="alertTriangle" size={14} style={{ color: `var(--tone-${f.tone}-fg)`, flex: 'none' }} />
-              <span className="mono" style={{ fontSize: 12, flex: 1 }}>{f.path}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>{f.issue}</span>
+      {isAdmin && (
+        <Panel
+          title="Fichiers à corriger"
+          sub={lastScan ? `Dernier scan Semgrep (${lastScan.target}) — ${new Date(lastScan.scannedAt).toLocaleString('fr-FR')}` : 'Analyse statique de la plateforme (Semgrep)'}
+          span={12}
+          style={{ marginBottom: 16 }}
+          actions={<Link to="/deployments/supply-chain" className="btn-outline" style={{ fontSize: 11.5, padding: '4px 10px', textDecoration: 'none' }}>Lancer/voir un scan</Link>}
+        >
+          {!lastScan ? (
+            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+              Aucun scan encore lancé. Cette liste vient de Semgrep (SAST réel, code source de la plateforme elle-même) — voir Supply Chain pour l'exécuter.
             </div>
-          ))}
-        </div>
-      </Panel>
+          ) : lastScan.total === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--tone-ok-fg)' }}>Aucun problème détecté au dernier scan.</div>
+          ) : (
+            <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {lastScan.findings.slice(0, 8).map((f, i) => (
+                <div key={`${f.file}:${f.line}:${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                  <Icon name="alertTriangle" size={14} style={{ color: `var(--tone-${f.severity === 'ERROR' ? 'crit' : f.severity === 'WARNING' ? 'warn' : 'mut'}-fg)`, flex: 'none' }} />
+                  <span className="mono" style={{ fontSize: 12, flex: 1 }}>{f.file}:{f.line}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>{f.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      )}
 
       <DevToolsPanel />
 

@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
+import * as gitea from '../services/integrations/giteaService.js';
 import * as reviewStore from '../store/reviewStore.js';
 import { listUsers } from '../store/usersStore.js';
 
@@ -49,6 +50,21 @@ router.get('/', asyncHandler(async (req, res) => {
     });
   } catch { /* GitHub non configuré */ }
 
+  try {
+    const repos = (await gitea.listRepos()).slice(0, 20);
+    const perRepo = await Promise.allSettled(repos.map((r) => gitea.listPullRequests(r.fullName.split('/')[0], r.name)));
+    perRepo.forEach((res_, i) => {
+      if (res_.status !== 'fulfilled') return;
+      for (const p of res_.value) {
+        items.push(withAssignment({
+          key: `gitea:${repos[i].fullName}:${p.number}`, provider: 'gitea', owner: repos[i].fullName.split('/')[0], repoName: repos[i].name, number: p.number,
+          repo: repos[i].fullName, title: p.title, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch,
+          author: p.author, webUrl: p.webUrl, createdAt: p.createdAt
+        }));
+      }
+    });
+  } catch { /* Gitea non configuré */ }
+
   const users = listUsers();
   const reviewerNames = Object.fromEntries(users.map((u) => [u.id, u.name]));
   res.json({ ok: true, items, reviewerNames });
@@ -63,6 +79,38 @@ router.post('/:key/unassign', (req, res) => {
   const key = decodeURIComponent(req.params.key);
   const userId = req.body?.userId || req.user.id;
   res.json({ ok: true, assignment: reviewStore.unassign(key, userId) });
+});
+
+// Créneaux récurrents de revue de code (planification, indépendante des MR/PR
+// ouvertes à un instant T) — lecture pour tout compte connecté, écriture
+// réservée aux admins (même logique que la vue globale d'approbation ci-dessous).
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+router.get('/schedules', (req, res) => {
+  res.json({ ok: true, items: reviewStore.listSchedules() });
+});
+
+router.post('/schedules', requireRole('admin'), (req, res) => {
+  const { label, weekday, startTime, endTime, reviewerIds } = req.body || {};
+  if (!WEEKDAYS.includes(weekday)) {
+    return res.status(400).json({ ok: false, error: 'Jour de semaine invalide (0-6)' });
+  }
+  if (!/^\d{2}:\d{2}$/.test(startTime || '') || !/^\d{2}:\d{2}$/.test(endTime || '')) {
+    return res.status(400).json({ ok: false, error: 'Heures invalides (HH:MM attendu)' });
+  }
+  const entry = reviewStore.createSchedule({ label, weekday, startTime, endTime, reviewerIds });
+  res.status(201).json({ ok: true, schedule: entry });
+});
+
+router.put('/schedules/:id', requireRole('admin'), (req, res) => {
+  const updated = reviewStore.updateSchedule(req.params.id, req.body || {});
+  if (!updated) return res.status(404).json({ ok: false, error: 'Créneau introuvable' });
+  res.json({ ok: true, schedule: updated });
+});
+
+router.delete('/schedules/:id', requireRole('admin'), (req, res) => {
+  const removed = reviewStore.deleteSchedule(req.params.id);
+  if (!removed) return res.status(404).json({ ok: false, error: 'Créneau introuvable' });
+  res.json({ ok: true });
 });
 
 // Faille corrigée : cette vue globale (tous dépôts confondus) ne vérifiait
@@ -89,6 +137,13 @@ router.post('/:key/approve', requireRole('admin'), asyncHandler(async (req, res)
     const number = rest[rest.length - 1];
     const [owner, repoName] = repo.split('/');
     const result = await github.approvePullRequest(owner, repoName, number);
+    return res.json({ ok: true, result });
+  }
+  if (provider === 'gitea') {
+    const repo = rest.slice(0, -1).join(':');
+    const number = rest[rest.length - 1];
+    const [owner, repoName] = repo.split('/');
+    const result = await gitea.approvePullRequest(owner, repoName, number);
     return res.json({ ok: true, result });
   }
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });

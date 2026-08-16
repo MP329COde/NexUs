@@ -65,4 +65,18 @@ router.post('/runs/:id/retry', requireRole('admin'), asyncHandler(async (req, re
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
 }));
 
+// Détail jobs/étapes d'une exécution — GitHub Actions uniquement (GitLab
+// expose déjà ce niveau de détail directement dans son interface, moins
+// pertinent à dupliquer ici vu l'absence d'API équivalente simple).
+router.get('/runs/:id/jobs', asyncHandler(async (req, res) => {
+  const key = decodeURIComponent(req.params.id);
+  const [provider, ...rest] = key.split(':');
+  if (provider !== 'github') return res.status(400).json({ ok: false, error: 'Détail des jobs disponible pour GitHub Actions uniquement' });
+  const repoFull = rest.slice(0, -1).join(':');
+  const runId = rest[rest.length - 1];
+  const [owner, repo] = repoFull.split('/');
+  const jobs = await github.listWorkflowRunJobs(owner, repo, runId);
+  res.json({ ok: true, items: jobs });
+}));
+
 export default router;

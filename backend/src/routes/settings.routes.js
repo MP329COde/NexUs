@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS, SECRET_FIELDS } from '../store/settingsStore.js';
 import { integrations } from '../services/integrationRegistry.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
@@ -9,7 +10,7 @@ import { logAudit } from '../services/auditService.js';
 // Connexions à l'infrastructure (tokens, URLs...) : réservé aux administrateurs.
 // Les préférences propres à chaque utilisateur vivent dans /api/auth/profile.
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('settings', 'admin'));
 
 router.get('/', asyncHandler(async (req, res) => {
   res.json({ ok: true, integrations: getAllRedacted(), console: readStore('console') });

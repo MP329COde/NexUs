@@ -14,7 +14,10 @@ export function useApi(fetcher, deps = [], { pollMs = 0 } = {}) {
       setData(result);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      // status vient d'apiClient.js (attaché aux erreurs HTTP) — permet à
+      // l'UI de distinguer "trop de requêtes" (429) d'une session expirée
+      // (401) plutôt qu'un message générique.
+      setError({ status: err.status, message: err.message });
     } finally {
       setLoading(false);
     }

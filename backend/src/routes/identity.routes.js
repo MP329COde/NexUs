@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import axios from 'axios';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { getRedacted, save } from '../store/identityStore.js';
 import { logAudit } from '../services/auditService.js';
 
 // Politique de connexion + configuration SSO : réservé aux administrateurs.
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('identity', 'admin'));
 
 router.get('/', (req, res) => {
   res.json({ ok: true, identity: getRedacted() });

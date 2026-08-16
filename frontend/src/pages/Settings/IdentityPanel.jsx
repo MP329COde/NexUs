@@ -6,7 +6,7 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
 export default function IdentityPanel() {
-  const { data, reload } = useApi(() => api.get('/identity'), []);
+  const { data, error, reload } = useApi(() => api.get('/identity'), []);
   const notify = useNotify();
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,20 @@ export default function IdentityPanel() {
     }
   }, [data]);
 
-  if (!form) return null;
+  if (!form) {
+    if (error) {
+      return (
+        <div style={{ padding: 16, fontSize: 13, color: 'var(--tone-crit-fg)' }}>
+          {error.status === 429
+            ? 'Trop de requêtes envoyées au serveur — réessayez dans une minute.'
+            : error.status === 401
+              ? 'Session expirée — reconnectez-vous.'
+              : `Impossible de charger la politique de connexion : ${error.message}`}
+        </div>
+      );
+    }
+    return null;
+  }
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));

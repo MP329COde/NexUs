@@ -24,6 +24,7 @@ export default function PipelineView({ linkId, span }) {
   const [rollbackOpen, setRollbackOpen] = useState(false);
 
   const hasArgo = data?.stages?.argocd?.configured;
+  const [provisionOpen, setProvisionOpen] = useState(false);
 
   const gitLabel = typeof STAGE_LABELS.git === 'object' ? (STAGE_LABELS.git[data?.stages.git.provider] || 'Git') : STAGE_LABELS.git;
 
@@ -54,7 +55,12 @@ export default function PipelineView({ linkId, span }) {
     >
       <div style={{ display: 'flex', gap: 12, padding: 16, flexWrap: 'wrap' }}>
         <StageCard label={gitLabel} stage={data?.stages.git} stageKey="git" />
-        <StageCard label={STAGE_LABELS.argocd} stage={data?.stages.argocd} stageKey="argocd" />
+        <StageCard
+          label={STAGE_LABELS.argocd}
+          stage={data?.stages.argocd}
+          stageKey="argocd"
+          action={!hasArgo && user?.role === 'admin' ? { label: 'Provisionner', onClick: () => setProvisionOpen(true) } : null}
+        />
         <StageCard label={STAGE_LABELS.kubernetes} stage={data?.stages.kubernetes} stageKey="kubernetes" />
         <StageCard label={STAGE_LABELS.proxy} stage={data?.stages.proxy} stageKey="proxy" />
       </div>
@@ -80,6 +86,7 @@ export default function PipelineView({ linkId, span }) {
 
       {deployOpen && <DeployVersionModal linkId={linkId} appName={data?.link.name} onClose={() => setDeployOpen(false)} onDone={reload} />}
       {rollbackOpen && <RollbackModal linkId={linkId} appName={data?.link.name} onClose={() => setRollbackOpen(false)} onDone={reload} />}
+      {provisionOpen && <ProvisionArgocdModal linkId={linkId} appName={data?.link.name} onClose={() => setProvisionOpen(false)} onDone={reload} />}
     </Panel>
   );
 }
@@ -172,7 +179,7 @@ function RollbackModal({ linkId, appName, onClose, onDone }) {
   );
 }
 
-function StageCard({ label, stage, stageKey }) {
+function StageCard({ label, stage, stageKey, action }) {
   if (!stage) return null;
   const tone = !stage.configured ? 'mut' : stage.error ? 'crit' : 'ok';
   const externalUrl = stage.latestPipeline?.webUrl || stage.webUrl;
@@ -188,7 +195,67 @@ function StageCard({ label, stage, stageKey }) {
           <Icon name="externalLink" size={12} />Ouvrir dans l'outil
         </a>
       )}
+      {action && (
+        <span className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, marginTop: 8, height: 24, padding: '0 8px' }} onClick={action.onClick}>
+          <Icon name="plus" size={11} />{action.label}
+        </span>
+      )}
     </div>
+  );
+}
+
+// Crée/reconfigure directement l'application Argo CD depuis la console (voir
+// POST /deployments/:id/provision-argocd-app) : l'admin n'a plus besoin
+// d'ouvrir l'interface Argo CD pour créer l'Application elle-même.
+function ProvisionArgocdModal({ linkId, appName, onClose, onDone }) {
+  const notify = useNotify();
+  const [namespace, setNamespace] = useState('');
+  const [path, setPath] = useState('.');
+  const [automatedSync, setAutomatedSync] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/deployments/${linkId}/provision-argocd-app`, { destinationNamespace: namespace.trim(), path: path.trim() || '.', automatedSync });
+      notify(`Application Argo CD provisionnée pour ${appName}`, { type: 'ok' });
+      onDone();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Provisionner l'application Argo CD" sub={appName} onClose={onClose} width={420}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.6 }}>
+          Crée (ou met à jour) l'Application dans Argo CD à partir du dépôt Git déjà lié — pas besoin de la créer manuellement dans l'interface Argo CD.
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Namespace cible</label>
+          <input className="input mono" autoFocus required value={namespace} onChange={(e) => setNamespace(e.target.value)} placeholder="production" />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Chemin des manifestes dans le dépôt</label>
+          <input className="input mono" value={path} onChange={(e) => setPath(e.target.value)} placeholder="." />
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+          <input type="checkbox" checked={automatedSync} onChange={(e) => setAutomatedSync(e.target.checked)} />
+          Synchronisation automatique (prune + self-heal)
+        </label>
+        {error && <div style={{ fontSize: 12, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <span className="btn-outline" onClick={onClose}>Annuler</span>
+          <button className="btn" type="submit" disabled={busy}>{busy ? 'Provisionnement…' : 'Provisionner'}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

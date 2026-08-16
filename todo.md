@@ -1,0 +1,24 @@
+# Tâches non terminées (audit du 2026-08-16)
+
+Généré après audit du code réel (voir `fonctions.md`, section "Propositions").
+Chaque tâche est supprimée de ce fichier au fur et à mesure qu'elle est traitée,
+et documentée dans `fonctions.md` une fois réellement faite.
+
+- [x] Paramètres : le point rouge sur l'onglet Paramètres/Admin était permanent — il disparaît maintenant après le premier clic (localStorage). `frontend/src/components/layout/DomainNav.jsx`
+- [x] Apparence : sélecteur de couleur d'accent (bleu Windows 11 par défaut, rose, violet, vert, orange, rouge, sarcelle) ajouté dans Compte → Apparence, persisté par utilisateur, appliqué en clair et sombre. `frontend/src/context/ThemeContext.jsx`, `frontend/src/styles/theme.css`, `frontend/src/pages/Account/AccountPage.jsx`, `backend/src/routes/auth.routes.js`, `backend/src/store/usersStore.js`.
+- [ ] CSS : de nombreuses pages utilisent du style inline massif plutôt que des classNames + CSS séparé, rendant le ciblage difficile en dev (ex: HomePage, NetworkPage, KubernetesPage). Chantier de fond, à traiter page par page.
+- [x] Vue générale : panneau "Fonctionnalités bloquées" listant chaque intégration non configurée/en échec avec sa raison exacte et un lien direct vers Paramètres pour la corriger (visible admin uniquement pour le lien). `frontend/src/pages/Home/BlockedFeaturesPanel.jsx`, branché dans `HomePage.jsx`, alimenté par `/status/overview` (déjà existant, aucune donnée inventée).
+- [x] Vue générale : paramètre "Réserver la Vue générale aux administrateurs" ajouté (Paramètres → Plateforme), masque le lien de nav ET bloque l'accès direct par URL pour les non-admins. `backend/src/routes/auth.routes.js` (`/me` expose `homeRestrictedToAdmins`), `frontend/src/context/AuthContext.jsx`, `frontend/src/components/layout/DomainNav.jsx`, `frontend/src/components/layout/RequireHomeAccess.jsx`, `frontend/src/pages/Settings/PlatformPanel.jsx`.
+- [ ] RBAC : la matrice de permissions par groupe (Paramètres → Groupes) est enregistrée mais non appliquée aux routes (la plupart sont déjà admin-only au niveau routeur) — nécessite une décision de modèle avant câblage, pas un simple branchement.
+- [x] Dépôts Git : Gitea intégré (statut, dépôts, pull requests, approbation) — merge dans la liste unifiée des dépôts et des revues, réservé volontairement à la lecture + approbation (pas d'éditeur GitOps arborescence/commit, non démontrable sans instance Gitea réelle). `backend/src/services/integrations/giteaService.js`, `backend/src/routes/gitea.routes.js`, `backend/src/routes/repos.routes.js`, `backend/src/routes/reviews.routes.js`, `backend/src/services/integrationRegistry.js`, `frontend/src/config/integrationForms.js`. Bitbucket reste non intégré.
+- [x] Revue de code : planification de créneaux récurrents (jour de semaine + plage horaire + relecteurs désignés), CRUD complet, lecture pour tous/écriture admin. `backend/src/store/reviewStore.js` (listSchedules/createSchedule/updateSchedule/deleteSchedule), `backend/src/routes/reviews.routes.js` (`/reviews/schedules`), `frontend/src/pages/Deployments/ReviewSchedulePanel.jsx`, branché dans `CodeReviewsPage.jsx`.
+- [x] Tests & Qualité : rendue réelle — dérivée de l'historique CI réel (`/pipelines/runs`, GitLab+GitHub), plus de chiffres inventés. Recadrée honnêtement en "fiabilité des pipelines" (taux de succès, tendance quotidienne, détail par dépôt) car aucun framework de tests/format JUnit n'est parsé — un vrai "nombre de tests"/"couverture" resterait fabriqué sans ça. `frontend/src/pages/Deployments/TestsQualityPage.jsx`.
+- [x] Releases : panneau "Fichiers à corriger" (factice, façon SonarQube) remplacé par les vrais résultats du dernier scan Semgrep déjà réel (`/code-scans`), avec lien vers Supply Chain pour lancer/voir un scan. Le reste de la page (applications suivies, pipeline, diff GitOps) était déjà réel. `frontend/src/pages/Deployments/ReleasesPage.jsx`.
+- [ ] MFA obligatoire, restriction par CIDR, déconnexion sur inactivité : retirés volontairement car "décoratifs" (non branchés à une vraie logique) — à re-évaluer si un durcissement auth est voulu.
+
+## Déjà vérifié comme fait (pas de todo)
+Connexion par nom d'utilisateur, passkeys WebAuthn, secrets jamais en clair par défaut,
+générateur de mot de passe avancé (entropie, temps de cassage, symboles perso, passphrase),
+coffres dev/prod/projet avec rotation auto, verrouillage compte + ban IP auto,
+ArgoCD/Proxmox liés avec redirection directe, terminal K8s en self-service avec demande
+d'accès admin, Trivy/Semgrep/Checkov/Syft/cosign, Wazuh, HAProxy, Traefik, cert-manager.

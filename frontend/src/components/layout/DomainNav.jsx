@@ -1,11 +1,32 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { DOMAINS } from '../../config/domains.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Icon from '../ui/Icon.jsx';
 
+const ADMIN_DOT_SEEN_KEY = 'nexus.adminDot.seen';
+
 export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }) {
-  const { user } = useAuth();
-  const visible = DOMAINS.filter((d) => !d.adminOnly || user?.role === 'admin');
+  const { user, homeRestrictedToAdmins, hasPermission } = useAuth();
+  // Paramètres reste listé pour les adminOnly, mais aussi pour tout compte
+  // "user" ayant au moins une permission RBAC sur un des domaines exposés
+  // par cette page (settings/identity/users/inventory) — sinon le lien
+  // disparaîtrait alors que l'utilisateur a un onglet accessible.
+  const SETTINGS_DOMAINS = ['settings', 'identity', 'users', 'inventory'];
+  const visible = DOMAINS.filter((d) => {
+    if (d.id === 'home' && homeRestrictedToAdmins) return user?.role === 'admin';
+    if (d.id === 'adm') return user?.role === 'admin' || SETTINGS_DOMAINS.some((domain) => hasPermission(domain, 'read'));
+    return !d.adminOnly || user?.role === 'admin';
+  });
+  // Le point rouge sur Paramètres signale un accès admin nouvellement disponible ;
+  // il ne doit être visible qu'une fois, jusqu'au premier clic sur l'onglet.
+  const [adminDotSeen, setAdminDotSeen] = useState(() => localStorage.getItem(ADMIN_DOT_SEEN_KEY) === '1');
+  const dismissAdminDot = () => {
+    if (!adminDotSeen) {
+      localStorage.setItem(ADMIN_DOT_SEEN_KEY, '1');
+      setAdminDotSeen(true);
+    }
+  };
   // Le tiroir mobile est toujours en labels complets (indépendant de la
   // préférence "réduite" de la barre desktop, qui n'a pas de sens en overlay).
   const effectiveCollapsed = collapsed && !mobileOpen;
@@ -35,7 +56,7 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
               key={d.id}
               to={d.path}
               title={effectiveCollapsed ? d.label : undefined}
-              onClick={onCloseMobile}
+              onClick={() => { onCloseMobile(); if (d.id === 'adm') dismissAdminDot(); }}
               className="domain-nav-item"
               style={({ isActive }) => ({
                 width: effectiveCollapsed ? 44 : '100%',
@@ -55,7 +76,7 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
             >
               <span style={{ position: 'relative', display: 'flex', flex: 'none' }}>
                 <Icon name={d.id} size={19} strokeWidth={1.7} />
-                {d.id === 'adm' && (
+                {d.id === 'adm' && !adminDotSeen && (
                   <span
                     title="Accès administrateur"
                     style={{ position: 'absolute', top: -2, right: -3, width: 6, height: 6, borderRadius: '50%', background: 'var(--tone-crit-dot)' }}

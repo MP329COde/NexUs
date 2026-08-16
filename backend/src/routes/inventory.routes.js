@@ -1,12 +1,22 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { hasPermission } from '../store/groupsStore.js';
 import { listAssets, createAsset, updateAsset, deleteAsset, ASSET_CATEGORIES, ASSET_STATES } from '../store/inventoryStore.js';
 import { logAudit } from '../services/auditService.js';
 
-// Inventaire des actifs matériels : réservé aux administrateurs.
+// Inventaire des actifs matériels : réservé à l'admin principal (le tout
+// premier compte créé au bootstrap) et aux comptes ayant explicitement la
+// permission 'inventory' au niveau admin. Volontairement N'utilise PAS
+// requirePermission() ici : son bypass implicite pour role==='admin'
+// donnerait accès à tout admin de plateforme, ce qui est exactement ce que
+// cette restriction doit exclure.
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, (req, res, next) => {
+  if (req.user?.isPrimaryAdmin) return next();
+  if (hasPermission(req.user.id, 'inventory', 'admin')) return next();
+  return res.status(403).json({ ok: false, error: 'Réservé à l\'admin principal ou aux comptes autorisés' });
+});
 
 router.get('/', (req, res) => {
   res.json({ ok: true, items: listAssets(), categories: ASSET_CATEGORIES, states: ASSET_STATES });

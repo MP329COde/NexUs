@@ -8,6 +8,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import ManifestExplorerModal from './ManifestExplorerModal.jsx';
+import RepoStructureModal from './RepoStructureModal.jsx';
 
 const ROLE_LABELS = {
   framework: 'Framework de base', service: 'Service applicatif', library: 'Bibliothèque',
@@ -48,6 +49,8 @@ export default function GitReposPage() {
   const [editing, setEditing] = useState(null);
   const [scriptFor, setScriptFor] = useState(null);
   const [exploring, setExploring] = useState(null);
+  const [structuring, setStructuring] = useState(null);
+  const [generatingCiFor, setGeneratingCiFor] = useState(null);
 
   const items = data?.items || [];
   const q = filter.trim().toLowerCase();
@@ -128,6 +131,14 @@ export default function GitReposPage() {
                         <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setExploring(r)}>
                           <Icon name="folder" size={12} />Manifests
                         </span>
+                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setStructuring(r)}>
+                          <Icon name="layers" size={12} />Structure
+                        </span>
+                        {r.provider === 'github' && (
+                          <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setGeneratingCiFor(r)}>
+                            <Icon name="sync" size={12} />Générer CI
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -167,7 +178,52 @@ export default function GitReposPage() {
       {exploring && (
         <ManifestExplorerModal repo={exploring} onClose={() => setExploring(null)} />
       )}
+
+      {structuring && (
+        <RepoStructureModal repo={structuring} onClose={() => setStructuring(null)} />
+      )}
+
+      {generatingCiFor && (
+        <GenerateCiModal repo={generatingCiFor} onClose={() => setGeneratingCiFor(null)} />
+      )}
     </>
+  );
+}
+
+function GenerateCiModal({ repo, onClose }) {
+  const notify = useNotify();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const res = await api.post(`/repos/${encodeURIComponent(repo.key)}/workflows/generate-ci`, { baseBranch: repo.defaultBranch });
+      setResult(res.pullRequest);
+      notify('Pull request de workflow créée', { type: 'ok' });
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Générer un workflow GitHub Actions" sub={repo.name} onClose={onClose} width={480}>
+      {result ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 12.5 }}>Pull request ouverte avec un workflow CI (lint/test/build + SAST Semgrep + SCA Trivy + scan de secrets GitGuardian).</div>
+          <a href={result.webUrl} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none', textAlign: 'center' }}>Ouvrir la pull request #{result.number}</a>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Crée <code className="mono">.github/workflows/ci.yml</code> à partir de la stack détectée du dépôt (lint/test/build) avec des jobs de sécurité prêts à l'emploi (Semgrep, Trivy, GitGuardian — vraies actions GitHub, à activer en ajoutant <code className="mono">GITGUARDIAN_API_KEY</code> aux secrets du dépôt) et ouvre une pull request. Rien n'est appliqué directement sur la branche par défaut.
+          </div>
+          <button className="btn" disabled={busy} onClick={generate}>{busy ? 'Génération…' : 'Générer et ouvrir la pull request'}</button>
+        </div>
+      )}
+    </Modal>
   );
 }
 

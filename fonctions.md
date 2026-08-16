@@ -10,10 +10,11 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **backups.routes.js** — Liste, création, import, téléchargement, restauration, suppression de sauvegardes.
 - **certmanager.routes.js** — Statut cert-manager, liste des certificats (CRD Kubernetes), renouvellement forcé.
 - **console.routes.js** — Info console minimale (authentifiée).
-- **deployments.routes.js** — CRUD de liens de déploiement (projet↔dépôt↔cible), pipeline associé, sync GitOps, diff, historique, rollback.
+- **deployments.routes.js** — CRUD de liens de déploiement (projet↔dépôt↔cible), pipeline associé, sync GitOps, diff, historique, rollback, **provisionnement direct de l'application Argo CD** (`POST /:id/provision-argocd-app` : crée/met à jour l'Application dans Argo CD depuis le dépôt déjà lié — repo résolu automatiquement, sync automatisée par défaut — sans passer par l'interface Argo CD).
 - **devtools.routes.js** — Détection des outils dev présents sur la machine backend (git, docker, kubectl, node...).
 - **domains.routes.js** — Liste des domaines gérés.
 - **github.routes.js** — Statut, dépôts, workflow runs, pull requests GitHub.
+- **gitea.routes.js** — Statut, dépôts, pull requests Gitea (lecture + approbation ; pas d'éditeur GitOps arborescence/commit, contrairement à GitLab/GitHub).
 - **gitlab.routes.js** — Statut, projets, pipelines, merge requests GitLab, miroirs GitLab→GitHub (admin).
 - **grafana.routes.js** — Statut Grafana, dashboards, alertes.
 - **groups.routes.js** — CRUD des groupes d'utilisateurs.
@@ -28,15 +29,15 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **incidents.routes.js** — Liste globale des incidents.
 - **inventory.routes.js** — CRUD inventaire matériel/logiciel.
 - **jobs.routes.js** — Liste (admin) et suivi d'un job asynchrone.
-- **kubernetes.routes.js** — Namespaces, pods, deployments, services, logs/describe/metrics/owners de pod, restart/scale/rollback/purge deployment, suppression de pod.
+- **kubernetes.routes.js** — Namespaces, pods, deployments, services, logs/describe/metrics/owners de pod, restart/scale/rollback/purge deployment, suppression de pod, **remontée vers le lien de déploiement** (`GET /deployments/:namespace/:name/links` : dépôt Git et application Argo CD qui déploient cette ressource, s'il existe un lien correspondant dans `deploymentStore`).
 - **networkTopology.routes.js** — Topologie réseau agrégée (proxies, HAProxy, Traefik, Proxmox, K8s).
 - **organizations.routes.js** — Liste/création d'organisations, projets d'une organisation.
-- **pipelines.routes.js** — Vue agrégée des runs CI (GitLab+GitHub), relance d'un run.
+- **pipelines.routes.js** — Vue agrégée des runs CI (GitLab+GitHub), relance d'un run, **détail jobs/étapes d'un run** (`GET /runs/:id/jobs`, GitHub Actions uniquement).
 - **projects.routes.js** — CRUD projets (allowlist stricte des champs modifiables), membres, environnements, espace de travail, webhook & rotation secret, déploiements liés, jobs, incidents, changements, fenêtres de maintenance, tâches, raccourcis, coffre-fort projet, **mot de passe de coffre-fort projet** (`PUT`/`DELETE /:id/vault-password`).
 - **proxies.routes.js** — CRUD proxies, test de connexion, application HAProxy/Traefik, marquage critique.
 - **proxmox.routes.js** — Statut, nœuds, VMs, actions (start/shutdown/reboot).
-- **repos.routes.js** — Dépôts GitLab+GitHub, métadonnées locales, arborescence/fichier, proposition de changement (branche+commit+MR/PR).
-- **reviews.routes.js** — MR/PR ouvertes, assignation locale de relecteur, approbation proxifiée.
+- **repos.routes.js** — Dépôts GitLab+GitHub+Gitea (Gitea en lecture seule, sans éditeur GitOps), métadonnées locales, arborescence/fichier, proposition de changement (branche+commit+MR/PR), **structure de développement d'un dépôt** (`GET /:key/structure` : stack détectée depuis les fichiers racine, gestionnaire de paquets, présence de CI/Docker Compose, scripts npm si `package.json` présent — rien d'inventé, uniquement lu en direct sur la branche par défaut), **génération de workflow GitHub Actions** (`POST /:key/workflows/generate-ci`, GitHub uniquement : construit un `.github/workflows/ci.yml` adapté à la stack détectée — lint/test/build + jobs SAST Semgrep, SCA Trivy, secret scanning GitGuardian via de vraies actions GitHub tierces — et l'ouvre en pull request, jamais appliqué directement sur la branche par défaut).
+- **reviews.routes.js** — MR/PR ouvertes (GitLab+GitHub+Gitea), assignation locale de relecteur, approbation proxifiée, **planification de créneaux de revue récurrents** (`GET/POST /schedules`, `PUT`/`DELETE /schedules/:id` : jour de semaine + plage horaire + relecteurs désignés, écriture admin).
 - **security.routes.js** — Banlist IP, scans sécurité (nmap), vue d'ensemble sécurité, trafic + blocage automatique.
 - **settings.routes.js** — Paramètres généraux console, config par intégration.
 - **setup.routes.js** — Statut d'installation initiale, création admin+config, provisioning.
@@ -51,6 +52,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **volumes.routes.js** — CRUD stockage (volumes, NAS, pools ZFS, partages).
 - **wazuh.routes.js** — Statut, agents, résumé Wazuh.
 - **webhooks.routes.js** — Réception de webhooks entrants GitLab/GitHub par projet.
+- **wiki.routes.js** — Wiki d'équipe : CRUD de pages par organisation (optionnellement liées à un projet), historique des révisions (`GET /:id/revisions`), recherche (`?q=`). Contenu réellement stocké en base (socle Postgres, `wiki_pages`/`wiki_page_revisions`, migration `0012_wiki.sql`) — à la différence du lien runbook des incidents qui pointe vers une doc externe. Lecture/écriture ouvertes à tout membre de l'organisation, suppression réservée à owner/admin d'organisation ou admin plateforme.
 
 ## Backend — Services (`backend/src/services/**/*.js`)
 
@@ -80,9 +82,10 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **updateService.js** — Vérification des mises à jour via git.
 - **vaultRotationService.js** — Vérifie toutes les 30s les entrées de coffre dont la rotation (2-5 min) est due et régénère leur secret.
 - **secretLeakScanService.js** — Scan quotidien (4h) des dépôts liés à un projet, rotation automatique immédiate si un secret prod/projet connu est trouvé en clair.
-- **integrations/argocdService.js** — API REST ArgoCD réelle.
+- **kubernetesAlertService.js** — Vérification toutes les 60s de l'état de tous les pods du cluster (`listPods`) : notification (`notificationsStore`) sur redémarrages excessifs (proxy CrashLoopBackOff, seuil 5) et pod en Pending depuis plus de 10 min ; chaque franchissement de seuil n'est notifié qu'une fois.
+- **integrations/argocdService.js** — API REST ArgoCD réelle, **création/mise à jour d'Application** (`upsertApplication`, `POST /api/v1/applications?upsert=true`).
 - **integrations/certManagerService.js** — CRD Kubernetes cert-manager.
-- **integrations/githubService.js** — API REST GitHub réelle (repos, runs, PR, arborescence/fichier, commit, branche, PR).
+- **integrations/githubService.js** — API REST GitHub réelle (repos, runs, PR, arborescence/fichier, commit, branche, PR), **jobs/étapes d'un run** (`listWorkflowRunJobs`).
 - **integrations/gitlabService.js** — API v4 GitLab réelle (projects, pipelines, MR, branches, commits, mirrors, arborescence/fichier, commit, branche, MR).
 - **integrations/grafanaService.js** — API REST Grafana réelle.
 - **integrations/haproxyService.js** — Data Plane API v2/v3 réelle.
@@ -114,6 +117,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **InfraLoadPanels.jsx** — Charge CPU/RAM Proxmox + répartition VM/LXC/Pods.
 - **LiveActivityPanel.jsx** — Flux fusionné audit + sauvegardes, admin uniquement.
 - **OpenAlertsPanel.jsx** — Alertes Grafana + agents Wazuh déconnectés.
+- **BlockedFeaturesPanel.jsx** — Liste grisée des intégrations non configurées ou en échec, avec raison exacte (issue de `/status/overview`) et lien de correction pour les admins.
 - **ServiceAvailabilityPanel.jsx** — Disponibilité 24h par service important.
 
 ### Développement (Deployments)
@@ -121,16 +125,17 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **ProjectsPage.jsx** — Liste/création de projets, **icône (emoji) et couleur personnalisées**.
 - **ProjectDetailPage.jsx** — Fiche projet complète. Rôles granulaires (viewer/developer/maintainer/owner) **+ octroi ponctuel d'accès au coffre-fort du projet** par membre (lecture / lecture+édition), indépendant du rôle global — un viewer peut ainsi consulter ou éditer des secrets sans être promu sur tout le reste.
 - **OrganizationsPage.jsx** — Organisations (socle PostgreSQL).
-- **GitReposPage.jsx** — Dépôts GitLab+GitHub, étiquetage manuel.
-- **PipelinesPage.jsx / PipelineView.jsx / GitOpsDiffPanel.jsx** — Pipelines CI agrégés, détail, diff GitOps.
+- **WikiPage.jsx** — Wiki d'équipe par organisation : liste/recherche de pages, édition (titre + texte), historique des révisions, suppression. Socle PostgreSQL (`GET/POST/PUT/DELETE /api/wiki`).
+- **GitReposPage.jsx** — Dépôts GitLab+GitHub, étiquetage manuel, bouton **« Structure »** ouvrant `RepoStructureModal.jsx` (stack détectée, CI, Docker Compose, scripts `package.json`, arborescence racine, via `GET /repos/:key/structure`), bouton **« Générer CI »** (dépôts GitHub) ouvrant `GenerateCiModal` qui déclenche `POST /repos/:key/workflows/generate-ci` et affiche le lien de la pull request créée.
+- **PipelinesPage.jsx / PipelineView.jsx / GitOpsDiffPanel.jsx** — Pipelines CI agrégés, détail, diff GitOps ; bouton **« Jobs »** (runs GitHub) ouvrant le détail jobs/étapes d'une exécution ; bouton **« Provisionner »** sur l'étape Argo CD non liée (admin) ouvrant `ProvisionArgocdModal` qui crée l'Application Argo CD depuis le lien existant.
 - **ManifestExplorerModal.jsx** — Navigation/édition YAML → commit → MR/PR.
-- **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
+- **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs. **ReviewSchedulePanel.jsx** : créneaux récurrents de revue (jour + plage horaire + relecteurs), CRUD admin.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
 - **EnvironmentsPage.jsx** — Réel : environnements du socle relationnel (production/staging créés automatiquement par projet) agrégés tous projets confondus, liaison à une application Argo CD existante, promotion réelle (revision lue sur l'environnement source via l'API Argo CD, synchronisée sur l'environnement cible), historique des promotions (succès/échecs réels, jamais inventés).
 - **ImagesRegistryPage.jsx** — Tableau "Dépôt d'images" du haut de page en démonstration, mais **scanner Trivy réel** (TrivyScanPanel.jsx, à la demande + planifié horaire), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel), **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft pour le SBOM, cosign/Sigstore pour la signature) et **registre d'images privé réel et optionnel** (PrivateRegistryPanel.jsx, Docker Distribution — service Compose sous profil `registry`, activé via `install.sh`).
-- **ReleasesPage.jsx** — Démonstration.
+- **ReleasesPage.jsx** — Réel : applications suivies, pipeline complet, diff GitOps (déjà réels) + panneau "Fichiers à corriger" alimenté par le dernier scan Semgrep réel (`/code-scans`), lien vers Supply Chain pour lancer un scan.
 - **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM, signature et registre** (Syft + cosign + registre privé, voir Images & registry) réels. Seule la signature d'*image* (par opposition à la signature du SBOM) reste hors périmètre — nécessiterait de pousser une image via la console elle-même, qu'elle ne construit pas.
-- **TestsQualityPage.jsx** — Démonstration.
+- **TestsQualityPage.jsx** — Réel, recadré : "fiabilité des pipelines" dérivée de l'historique CI réel (`/pipelines/runs`, GitLab+GitHub), pas de "couverture de tests" inventée en l'absence d'un framework de tests/format JUnit intégré. Taux de succès, tendance quotidienne 30j, détail par dépôt.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
 - **SecretsPage.jsx / VaultPanel.jsx** — Coffre dev/prod, triple vérification prod, **champs symboles autorisés/interdits**, **rotation automatique configurable**, compte à rebours de rotation.
 - **SecretLeakScanPanel.jsx** — Historique du **scan quotidien de secrets committés** dans les dépôts liés aux projets (rotation auto en cas de détection), déclenchement manuel.
@@ -149,7 +154,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 ### Kubernetes
 
 - **KubernetesPage.jsx** — Namespaces/pods/deployments/services.
-- **PodDetailDialog.jsx / PodLogsDialog.jsx / DiagnosticsModal.jsx** — Détail, logs, diagnostic d'un pod/deployment.
+- **PodDetailDialog.jsx / PodLogsDialog.jsx / DiagnosticsModal.jsx** — Détail, logs, diagnostic d'un pod/deployment ; **DiagnosticsModal** ouvre aussi, si un lien de déploiement correspond, des raccourcis directs vers le dépôt Git et l'application Argo CD (`GET /kubernetes/deployments/:namespace/:name/links`).
 - **ServicesPage.jsx** — Services Kubernetes.
 - **TerminalPage.jsx** — Terminal sécurisé, grammaire de commandes fixe, **formulaire de demande d'accès self-service** si aucun palier n'est attribué.
 - **KubernetesLayout.jsx** — Layout de section.
@@ -169,8 +174,8 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, pas d'intégration réelle).
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
 - **ReportPage.jsx** — Rapport imprimable.
-- **ManualPage.jsx** — Documentation intégrée.
-- **AccountPage.jsx** — Profil utilisateur, préférences, **import d'image de profil** (redimensionnement client 256×256, mutuellement exclusif avec l'emoji), **gestion des clés d'accès (passkeys WebAuthn)** — enregistrement/suppression réels via @simplewebauthn.
+- **ManualPage.jsx** — Documentation intégrée, incluant un groupe **« Manuel de code »** (structure du dépôt, conventions JSX/React, patrons backend — services/integrations, strangler pattern Postgres/JSON, jobService, rôles projet) destiné aux contributeurs du code de Nexus Console lui-même.
+- **AccountPage.jsx** — Profil utilisateur, préférences, **import d'image de profil** (redimensionnement client 256×256, mutuellement exclusif avec l'emoji), **gestion des clés d'accès (passkeys WebAuthn)** — enregistrement/suppression réels via @simplewebauthn, **couleur d'accent** (7 teintes dont bleu Windows 11 par défaut, persistée par utilisateur, appliquée en clair et sombre via `data-accent` sur `<html>`).
 
 ### Connexion / Onboarding / Installation
 
@@ -189,7 +194,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **InventoryPanel.jsx** — Inventaire matériel/logiciel.
 - **AuditPanel.jsx** — Journal d'audit centralisé.
 - **SystemPanel.jsx** — Version, mise à jour, overview.
-- **PlatformPanel.jsx** — Paramètres généraux.
+- **PlatformPanel.jsx** — Paramètres généraux, **restriction de la Vue générale aux administrateurs** (masque le lien de nav + bloque l'accès direct par URL pour les non-admins).
 - **InfrastructureStatusPanel.jsx** — Statut de chaque intégration.
 - **RestoreBackupDialog.jsx** — Import/restauration de sauvegarde.
 
@@ -197,6 +202,8 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 - **components/vault/RotationCountdown.jsx** — Compte à rebours avant rotation automatique d'un secret, ré-authentification silencieuse tant que le panneau reste ouvert.
 - **components/ui/Avatar.jsx** — Avatar utilisateur à trois niveaux (image importée > emoji > initiales), utilisé par Header.jsx et AccountPage.jsx.
+- **components/layout/DomainNav.jsx** — Navigation par domaines ; le point rouge "accès administrateur" sur Paramètres disparaît définitivement dès le premier clic (persisté en localStorage), au lieu d'être affiché en permanence.
+- **components/layout/RequireHomeAccess.jsx** — Garde de route pour la Vue générale quand `homeRestrictedToAdmins` est actif.
 
 ## Intégrations externes
 
@@ -204,6 +211,8 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | --- | --- | --- |
 | GitHub | Complet | repos, workflow runs, PR, création de dépôt (miroir) |
 | GitLab | Complet | projects, pipelines, MR, branches, commits, push mirrors |
+| Gitea | Partiel | repos, PR, approbation ; pas d'éditeur GitOps (arborescence/commit) ni de pipelines |
+| Bitbucket | Absent | Jamais intégré |
 | Proxmox | Complet | nodes, VMs, actions start/shutdown/reboot |
 | Kubernetes | Complet | namespaces, pods, deployments, services, logs, exec, scale, rollback |
 | ArgoCD | Complet | applications, sync status, diff GitOps |

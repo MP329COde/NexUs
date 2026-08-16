@@ -7,7 +7,12 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
-const DOMAIN_LABELS = { infrastructure: 'Infrastructure', network: 'Réseaux', security: 'Sécurité', automation: 'Automatisation' };
+const DOMAIN_LABELS = {
+  infrastructure: 'Infrastructure', network: 'Réseaux', security: 'Sécurité', automation: 'Automatisation',
+  monitoring: 'Monitoring', terminal: 'Terminal', identity: 'Connexion & identité', users: 'Utilisateurs',
+  settings: 'Paramètres', inventory: 'Inventaire', vault: 'Coffre-fort', kubernetes: 'Kubernetes',
+  hosts: 'Hôtes', backups: 'Sauvegardes', audit: 'Journal d\'audit', proxmox: 'Proxmox'
+};
 const LEVEL_LABELS = { none: 'Aucun', read: 'Lecture', write: 'Écriture', admin: 'Admin' };
 const LEVEL_TONE = { none: 'mut', read: 'ok', write: 'warn', admin: 'crit' };
 
@@ -61,10 +66,11 @@ export default function GroupsPanel() {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
       <div style={{ gridColumn: 'span 12' }}>
         <DemoNote>
-          Les groupes et la matrice ci-dessous sont enregistrés réellement, mais aucune route n'applique encore ces niveaux de droits :
-          l'autorisation reste aujourd'hui binaire (rôle plateforme admin/utilisateur — un utilisateur ne voit que ses projets, un admin voit tout).
-          Restreindre par exemple "Sécurité" à un groupe précis nécessiterait de faire évoluer ce modèle route par route,
-          une décision à prendre explicitement plutôt qu'à câbler au fil de l'eau.
+          Les groupes ci-dessous sont de vrais rôles composables : un compte peut appartenir à plusieurs groupes à la fois, et
+          reçoit l'union de leurs permissions (ex. « Développeur » + « Monitoring » donne accès aux deux, sans donner accès au Terminal
+          si aucun des deux groupes ne l'accorde). Ces niveaux sont appliqués directement par les routes Paramètres, Connexion &amp; identité,
+          Utilisateurs, Inventaire, Terminal, Coffre-fort, Kubernetes et Sécurité. Les comptes administrateur de plateforme gardent un
+          accès complet implicite à tous les domaines, quels que soient leurs groupes.
         </DemoNote>
       </div>
       <Panel title="Créer un groupe" span={4}>

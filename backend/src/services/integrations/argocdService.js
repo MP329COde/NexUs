@@ -74,6 +74,31 @@ export async function getManagedResourcesDiff(name) {
   }));
 }
 
+// Crée ou met à jour (upsert=true côté API Argo CD) l'Application elle-même
+// depuis Nexus : une fois Argo CD connecté, l'admin ne devrait plus avoir à
+// la créer/reconfigurer manuellement dans l'interface Argo CD — la console
+// reste la seule source de vérité (voir base-dev/developement item 15).
+// Sync automatisée (prune + self-heal) par défaut, cohérent avec un usage
+// GitOps standard ; désactivable via automatedSync: false pour un
+// déploiement piloté manuellement.
+export async function upsertApplication({ name, project = 'default', repoURL, path, targetRevision = 'HEAD', destinationServer = 'https://kubernetes.default.svc', destinationNamespace, automatedSync = true }) {
+  const c = client();
+  if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });
+  const body = {
+    metadata: { name },
+    spec: {
+      project,
+      source: { repoURL, path: path || '.', targetRevision },
+      destination: { server: destinationServer, namespace: destinationNamespace },
+      syncPolicy: automatedSync
+        ? { automated: { prune: true, selfHeal: true }, syncOptions: ['CreateNamespace=true'] }
+        : undefined
+    }
+  };
+  await request(c.http, { method: 'POST', url: '/api/v1/applications', params: { upsert: true }, data: body }, 'Argo CD');
+  return { ok: true, name };
+}
+
 export async function rollbackApplication(name, historyId) {
   const c = client();
   if (!c) throw new IntegrationError('Argo CD non configuré', { status: 409 });

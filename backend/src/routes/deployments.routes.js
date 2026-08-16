@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as deploymentService from '../services/deploymentService.js';
-import { syncApplication, getApplicationHistory, rollbackApplication, getManagedResourcesDiff } from '../services/integrations/argocdService.js';
+import { syncApplication, getApplicationHistory, rollbackApplication, getManagedResourcesDiff, upsertApplication } from '../services/integrations/argocdService.js';
+import * as gitlab from '../services/integrations/gitlabService.js';
 import { logAudit } from '../services/auditService.js';
 import * as projectsStore from '../store/projectsStore.js';
 import * as orgStore from '../store/orgStore.js';
@@ -128,6 +129,47 @@ router.post('/:id/rollback', asyncHandler(async (req, res) => {
   const result = await rollbackApplication(link.argocdAppName, historyId);
   logAudit(req, 'argocd.application.rolledback', { linkId: link.id, appName: link.argocdAppName, historyId });
   res.json({ ok: true, ...result });
+}));
+
+// Crée/reconfigure directement l'application Argo CD depuis le lien de
+// déploiement, sans passer par l'interface Argo CD — voir upsertApplication.
+// Le repo Git est résolu depuis le lien lui-même (jamais redemandé) ; seuls
+// le chemin des manifestes et le namespace cible sont à préciser si absents.
+router.post('/:id/provision-argocd-app', asyncHandler(async (req, res) => {
+  const link = requireLink(req, res);
+  if (!link) return;
+  if (!(await requireMinRoleForLink(req, res, link, 'maintainer'))) return;
+
+  let repoURL;
+  if (link.gitProvider === 'github') {
+    if (!link.githubOwner || !link.githubRepo) return res.status(400).json({ ok: false, error: 'Ce lien n\'a pas de dépôt GitHub associé' });
+    repoURL = `https://github.com/${link.githubOwner}/${link.githubRepo}.git`;
+  } else {
+    if (!link.gitlabProjectId) return res.status(400).json({ ok: false, error: 'Ce lien n\'a pas de dépôt GitLab associé' });
+    const project = await gitlab.getProject(link.gitlabProjectId);
+    repoURL = `${project.webUrl}.git`;
+  }
+
+  const namespace = req.body?.destinationNamespace || link.k8sNamespace;
+  if (!namespace) return res.status(400).json({ ok: false, error: 'destinationNamespace requis (ou k8sNamespace déjà défini sur le lien)' });
+  const appName = link.argocdAppName || `${link.name.toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
+
+  await upsertApplication({
+    name: appName,
+    project: req.body?.project,
+    repoURL,
+    path: req.body?.path,
+    targetRevision: req.body?.targetRevision,
+    destinationNamespace: namespace,
+    automatedSync: req.body?.automatedSync !== false
+  });
+
+  if (!link.argocdAppName || link.argocdAppName !== appName) {
+    deploymentService.update(link.id, { argocdAppName: appName });
+  }
+
+  logAudit(req, 'argocd.application.provisioned', { linkId: link.id, appName, namespace });
+  res.status(201).json({ ok: true, appName });
 }));
 
 export default router;

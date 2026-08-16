@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import * as k8s from '../services/integrations/kubernetesService.js';
 import { logAudit } from '../services/auditService.js';
+import * as deploymentStore from '../store/deploymentStore.js';
+import { getRawIntegration } from '../store/settingsStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -42,7 +45,32 @@ router.get('/events', asyncHandler(async (req, res) => {
   if (!req.query.namespace) return res.status(400).json({ ok: false, error: 'namespace requis' });
   res.json({ ok: true, items: await k8s.listEvents(req.query.namespace, req.query.involvedObject) });
 }));
-router.use(requireRole('admin'));
+
+// Remonte depuis une ressource Kubernetes vers le lien de déploiement
+// (projet ↔ dépôt ↔ Argo CD ↔ Kubernetes) qui la déploie, s'il en existe un
+// — évite de naviguer manuellement entre Kubernetes, Argo CD et le dépôt.
+router.get('/deployments/:namespace/:name/links', asyncHandler(async (req, res) => {
+  const link = deploymentStore.listLinks().find(
+    (l) => l.k8sNamespace === req.params.namespace && l.k8sDeployment === req.params.name
+  );
+  if (!link) return res.json({ ok: true, link: null });
+  const argocdCfg = getRawIntegration('argocd');
+  res.json({
+    ok: true,
+    link: {
+      id: link.id,
+      name: link.name,
+      argocdAppName: link.argocdAppName,
+      argocdWebUrl: link.argocdAppName && argocdCfg.baseUrl ? `${argocdCfg.baseUrl.replace(/\/$/, '')}/applications/${link.argocdAppName}` : null,
+      gitProvider: link.gitProvider,
+      gitlabProjectId: link.gitlabProjectId || null,
+      githubOwner: link.githubOwner || null,
+      githubRepo: link.githubRepo || null
+    }
+  });
+}));
+
+router.use(requirePermission('kubernetes', 'write'));
 
 router.post('/deployments/:namespace/:name/restart', asyncHandler(async (req, res) => {
   const result = await k8s.restartDeployment(req.params.namespace, req.params.name);

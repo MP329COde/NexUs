@@ -149,7 +149,7 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
       </div>
 
       {schema.fields.length > 0 && (
-        <form onSubmit={save}>
+        <form onSubmit={save} autoComplete="off">
           {schema.fields.map((f) => (
             <div key={f.key} style={{ marginBottom: 10 }}>
               {/* Contrôle imbriqué dans <label> (association implicite), pas relié par un id
@@ -165,6 +165,13 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
                     <input
                       className="input"
                       type={f.type === 'password' ? 'password' : 'text'}
+                      // name unique par intégration+champ, et autoComplete
+                      // dédié : ces jetons/URLs d'infrastructure ne sont pas
+                      // des identifiants de compte, mais type="password"
+                      // déclenche quand même le gestionnaire de mots de passe
+                      // du navigateur sans ces deux attributs.
+                      name={`${integrationKey}-${f.key}`}
+                      autoComplete={f.type === 'password' ? 'new-password' : 'off'}
                       placeholder={f.placeholder}
                       value={form[f.key] ?? ''}
                       onChange={(e) => set(f.key, e.target.value)}

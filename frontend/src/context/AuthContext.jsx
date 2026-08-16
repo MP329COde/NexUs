@@ -1,16 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/apiClient.js';
+import { hasPermission } from '../lib/permissions.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [homeRestrictedToAdmins, setHomeRestrictedToAdmins] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const data = await api.get('/auth/me');
       setUser(data.user);
+      setHomeRestrictedToAdmins(Boolean(data.homeRestrictedToAdmins));
     } catch {
       setUser(null);
     } finally {
@@ -45,8 +48,10 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const checkPermission = useCallback((domain, minLevel) => hasPermission(user, domain, minLevel), [user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, completeOnboarding, refresh, setUserFromSession }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, completeOnboarding, refresh, setUserFromSession, homeRestrictedToAdmins, hasPermission: checkPermission }}>
       {children}
     </AuthContext.Provider>
   );

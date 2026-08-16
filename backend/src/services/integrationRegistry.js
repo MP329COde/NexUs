@@ -3,6 +3,7 @@ import * as argocdService from './integrations/argocdService.js';
 import * as haproxyService from './integrations/haproxyService.js';
 import * as gitlabService from './integrations/gitlabService.js';
 import * as githubService from './integrations/githubService.js';
+import * as giteaService from './integrations/giteaService.js';
 import * as proxmoxService from './integrations/proxmoxService.js';
 import * as traefikService from './integrations/traefikService.js';
 import * as certManagerService from './integrations/certManagerService.js';
@@ -19,6 +20,7 @@ export const integrations = {
   haproxy: { label: 'HAProxy', service: haproxyService, domain: 'net' },
   gitlab: { label: 'GitLab', service: gitlabService, domain: 'dev' },
   github: { label: 'GitHub', service: githubService, domain: 'dev' },
+  gitea: { label: 'Gitea', service: giteaService, domain: 'dev' },
   proxmox: { label: 'Proxmox', service: proxmoxService, domain: 'inf' },
   traefik: { label: 'Traefik', service: traefikService, domain: 'net' },
   certManager: { label: 'Cert-Manager', service: certManagerService, domain: 'net' },
@@ -28,7 +30,7 @@ export const integrations = {
 };
 
 export {
-  kubernetesService, argocdService, haproxyService, gitlabService, githubService,
+  kubernetesService, argocdService, haproxyService, gitlabService, githubService, giteaService,
   proxmoxService, traefikService, certManagerService, grafanaService, wazuhService,
   privateRegistryService
 };

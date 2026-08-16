@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import * as store from '../store/hostsStore.js';
 import { listCatalog, previewScript } from '../services/agentCatalog.js';
 import { runScript } from '../services/sshExecutor.js';
@@ -11,7 +12,7 @@ import { getCriticalHostsSnapshot } from '../services/hostMetricsService.js';
 // Gestion des hôtes et installation d'agents : réservée aux administrateurs.
 // L'exécution est toujours limitée au catalogue fermé (agentCatalog.js).
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('hosts', 'admin'));
 
 router.get('/ssh-public-key', (req, res) => {
   res.json({ ok: true, publicKey: getConsolePublicKey() });

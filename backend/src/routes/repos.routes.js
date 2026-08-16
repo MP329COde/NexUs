@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as gitlab from '../services/integrations/gitlabService.js';
 import * as github from '../services/integrations/githubService.js';
+import * as gitea from '../services/integrations/giteaService.js';
 import * as meta from '../store/repoMetaStore.js';
 import { logAudit } from '../services/auditService.js';
 
@@ -38,6 +39,18 @@ router.get('/', asyncHandler(async (req, res) => {
       });
     }
   } catch { /* GitHub non configuré */ }
+  try {
+    const repos = await gitea.listRepos();
+    for (const r of repos) {
+      const key = `gitea:${r.fullName}`;
+      const m = meta.getRepoMeta(key);
+      items.push({
+        key, provider: 'gitea', id: r.id, name: r.name, path: r.fullName, defaultBranch: r.defaultBranch,
+        visibility: r.private ? 'private' : 'public', webUrl: r.webUrl, lastActivity: r.pushedAt,
+        role: m?.role || null, tags: m?.tags || []
+      });
+    }
+  } catch { /* Gitea non configuré */ }
   res.json({ ok: true, items });
 }));
 
@@ -67,6 +80,92 @@ router.get('/:key/tree', asyncHandler(async (req, res) => {
     return res.json({ ok: true, items: await github.listTree(owner, repo, path, ref) });
   }
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+// --- Structure de développement : détecte la stack et les points d'entrée
+// d'un dépôt à partir de son arborescence racine et, si présent, de son
+// package.json — jamais inventé, uniquement ce qui est réellement lu sur la
+// branche par défaut. Sert la page "structure de développement" par dépôt.
+const STACK_SIGNALS = [
+  { file: 'package.json', label: 'Node.js / JavaScript' },
+  { file: 'requirements.txt', label: 'Python (pip)' },
+  { file: 'pyproject.toml', label: 'Python (poetry/PEP 517)' },
+  { file: 'go.mod', label: 'Go' },
+  { file: 'Cargo.toml', label: 'Rust' },
+  { file: 'pom.xml', label: 'Java (Maven)' },
+  { file: 'build.gradle', label: 'Java/Kotlin (Gradle)' },
+  { file: 'composer.json', label: 'PHP (Composer)' },
+  { file: 'Gemfile', label: 'Ruby (Bundler)' },
+  { file: 'Dockerfile', label: 'Docker' },
+  { file: 'docker-compose.yml', label: 'Docker Compose' },
+  { file: 'docker-compose.yaml', label: 'Docker Compose' },
+  { file: 'Makefile', label: 'Make' },
+  { file: '.gitlab-ci.yml', label: 'GitLab CI' },
+  { file: 'terraform.tf', label: 'Terraform' }
+];
+const PACKAGE_MANAGER_SIGNALS = [
+  { file: 'pnpm-lock.yaml', manager: 'pnpm' },
+  { file: 'yarn.lock', manager: 'yarn' },
+  { file: 'package-lock.json', manager: 'npm' }
+];
+
+router.get('/:key/structure', asyncHandler(async (req, res) => {
+  const { provider, id } = parseKey(req.params.key);
+  const ref = req.query.ref || undefined;
+
+  async function readTree(path) {
+    if (provider === 'gitlab') return gitlab.listTree(id, path, ref);
+    if (provider === 'github') {
+      const [owner, repo] = id.split('/');
+      return github.listTree(owner, repo, path, ref);
+    }
+    throw Object.assign(new Error('Fournisseur inconnu'), { status: 400 });
+  }
+  async function readFile(path) {
+    if (provider === 'gitlab') return gitlab.getFileContent(id, path, ref);
+    const [owner, repo] = id.split('/');
+    return github.getFileContent(owner, repo, path, ref);
+  }
+
+  const root = await readTree('');
+  const names = new Set(root.map((i) => i.name));
+
+  const stack = STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label);
+  const packageManager = PACKAGE_MANAGER_SIGNALS.find((s) => names.has(s.file))?.manager || null;
+
+  let hasCI = names.has('.gitlab-ci.yml');
+  if (names.has('.github')) {
+    try {
+      const workflows = await readTree('.github/workflows');
+      if (workflows.some((w) => w.type === 'file')) hasCI = true;
+    } catch { /* pas de dossier .github/workflows */ }
+  }
+
+  let packageJson = null;
+  if (names.has('package.json')) {
+    try {
+      const f = await readFile('package.json');
+      const parsed = JSON.parse(f.content);
+      packageJson = {
+        name: parsed.name || null,
+        scripts: parsed.scripts || {},
+        dependenciesCount: Object.keys(parsed.dependencies || {}).length,
+        devDependenciesCount: Object.keys(parsed.devDependencies || {}).length
+      };
+    } catch { /* package.json illisible/invalide, on l'ignore silencieusement */ }
+  }
+
+  res.json({
+    ok: true,
+    structure: {
+      root: root.map((i) => ({ name: i.name, type: i.type, path: i.path })),
+      stack,
+      packageManager,
+      hasCI,
+      dockerCompose: names.has('docker-compose.yml') || names.has('docker-compose.yaml'),
+      packageJson
+    }
+  });
 }));
 
 router.get('/:key/file', asyncHandler(async (req, res) => {
@@ -110,6 +209,94 @@ router.post('/:key/propose-change', asyncHandler(async (req, res) => {
     return res.status(201).json({ ok: true, branch, mergeRequest: { iid: pr.number, webUrl: pr.webUrl } });
   }
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+// Génère un workflow GitHub Actions prêt à l'emploi (lint/test/build + SAST
+// Semgrep + SCA Trivy + secret scanning GitGuardian, via de vraies actions
+// publiées, pas un appel fictif) et l'ouvre en pull request — l'admin n'a
+// pas à écrire le fichier lui-même (voir base-dev/developement item 13).
+// GitHub Actions uniquement : GitLab a son .gitlab-ci.yml natif équivalent.
+function buildCiWorkflow({ stack, packageManager }) {
+  const isNode = stack.includes('Node.js / JavaScript');
+  const installCmd = packageManager === 'pnpm' ? 'pnpm install --frozen-lockfile' : packageManager === 'yarn' ? 'yarn install --frozen-lockfile' : 'npm ci';
+  const buildJob = isNode ? `
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: ${installCmd}
+      - run: npm run lint --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present` : `
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Aucune stack Node.js détectée — adaptez ce job (lint/test/build) à votre langage."`;
+
+  return `# Généré par Nexus Console depuis la structure détectée du dépôt.
+# Adaptez les jobs ci-dessous à vos besoins ; les jobs de sécurité utilisent
+# de vraies actions GitHub tierces (pas un service Nexus) — GITGUARDIAN_API_KEY
+# doit être ajouté aux secrets du dépôt pour activer le scan de secrets.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:${buildJob}
+
+  sast-semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+
+  sca-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          severity: CRITICAL,HIGH
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: GitGuardian/ggshield-action@v1
+        env:
+          GITGUARDIAN_API_KEY: \${{ secrets.GITGUARDIAN_API_KEY }}
+`;
+}
+
+router.post('/:key/workflows/generate-ci', asyncHandler(async (req, res) => {
+  const { provider, id } = parseKey(req.params.key);
+  if (provider !== 'github') return res.status(400).json({ ok: false, error: 'La génération de workflow GitHub Actions ne concerne que les dépôts GitHub.' });
+  const baseBranch = req.body?.baseBranch;
+  if (!baseBranch) return res.status(400).json({ ok: false, error: 'baseBranch requis' });
+
+  const [owner, repo] = id.split('/');
+  const root = await github.listTree(owner, repo, '', baseBranch);
+  const names = new Set(root.map((i) => i.name));
+  const stack = STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label);
+  const packageManager = PACKAGE_MANAGER_SIGNALS.find((s) => names.has(s.file))?.manager || null;
+
+  const branch = `nexus/github-actions-ci-${Date.now()}`;
+  const workflow = buildCiWorkflow({ stack, packageManager });
+  await github.createBranch(owner, repo, branch, baseBranch);
+  await github.commitFile(owner, repo, branch, '.github/workflows/ci.yml', workflow, 'Ajoute un workflow CI (Nexus Console)');
+  const pr = await github.createPullRequest(owner, repo, branch, baseBranch, 'Ajoute un workflow GitHub Actions CI');
+  logAudit(req, 'workflow.ci.generated', { provider, repo: id, branch, prNumber: pr.number });
+  res.status(201).json({ ok: true, branch, pullRequest: { number: pr.number, webUrl: pr.webUrl } });
 }));
 
 export default router;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
 import MiniDonut from '../../components/ui/MiniDonut.jsx';
@@ -31,6 +32,7 @@ export default function PipelinesPage() {
   const { data, reload } = useApi(() => api.get('/pipelines/runs'), [], { pollMs: 15000 });
   const [filter, setFilter] = useState('');
   const [pending, setPending] = useState(null);
+  const [jobsFor, setJobsFor] = useState(null);
   const notify = useNotify();
 
   const runs = data?.items || [];
@@ -154,11 +156,18 @@ export default function PipelinesPage() {
                     <td style={{ padding: '9px 16px' }} className="mono">{formatDuration(r.durationSeconds)}</td>
                     <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
                     <td style={{ padding: '9px 16px' }}>
-                      {r.retryable && user?.role === 'admin' && (
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => askRetry(r)}>
-                          <Icon name="refresh" size={11} />Relancer
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {r.provider === 'github' && (
+                          <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => setJobsFor(r)}>
+                            <Icon name="layers" size={11} />Jobs
+                          </span>
+                        )}
+                        {r.retryable && user?.role === 'admin' && (
+                          <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => askRetry(r)}>
+                            <Icon name="refresh" size={11} />Relancer
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -179,7 +188,45 @@ export default function PipelinesPage() {
           onConfirm={pending.run}
         />
       )}
+
+      {jobsFor && <JobsModal run={jobsFor} onClose={() => setJobsFor(null)} />}
     </>
+  );
+}
+
+const STEP_ICON = { success: 'check', failure: 'xCircle', cancelled: 'xCircle' };
+
+function JobsModal({ run, onClose }) {
+  const { data, loading, error } = useApi(() => api.get(`/pipelines/runs/${encodeURIComponent(run.id)}/jobs`), [run.id]);
+  const jobs = data?.items || [];
+  return (
+    <Modal title="Jobs de l'exécution" sub={`${run.repo} · ${run.branch || ''}`} onClose={onClose} width={560}>
+      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
+      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {!loading && jobs.length === 0 && !error && <div className="faint" style={{ fontSize: 12.5 }}>Aucun job trouvé pour cette exécution.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {jobs.map((j) => (
+          <div key={j.id}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span className={`badge badge-${STATUS_TONE[j.conclusion === 'success' ? 'success' : j.status === 'in_progress' ? 'running' : j.conclusion ? 'failed' : 'other']}`}>
+                <span className="dot" />{j.status === 'in_progress' ? 'En cours' : (j.conclusion || j.status)}
+              </span>
+              <a href={j.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, textDecoration: 'none', color: 'inherit' }}>{j.name}</a>
+            </div>
+            {j.steps.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingLeft: 4 }}>
+                {j.steps.map((s) => (
+                  <div key={s.number} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <Icon name={STEP_ICON[s.conclusion] || 'clock'} size={12} style={{ color: s.conclusion === 'success' ? 'var(--tone-ok-fg)' : s.conclusion === 'failure' ? 'var(--tone-crit-fg)' : 'var(--text-faint)', flex: 'none' }} />
+                    {s.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Modal>
   );
 }
 

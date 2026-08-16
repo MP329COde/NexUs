@@ -5,7 +5,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useTheme, THEME_MODES } from '../../context/ThemeContext.jsx';
+import { useTheme, THEME_MODES, ACCENT_COLORS } from '../../context/ThemeContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
@@ -45,7 +45,7 @@ function resizeImageToDataUrl(file) {
 
 export default function AccountPage() {
   const { user, updateProfile } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent } = useTheme();
   const notify = useNotify();
 
   const [name, setName] = useState(user?.name || '');
@@ -168,6 +168,21 @@ export default function AccountPage() {
             </div>
             <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
               Système suit le réglage de votre appareil ; Auto (horaire) bascule sombre entre 20h et 7h, quel que soit l'appareil.
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', margin: '18px 0 8px' }}>Couleur d'accent</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {ACCENT_COLORS.map(({ value, label, swatch }) => (
+                <span
+                  key={value}
+                  onClick={() => setAccent(value)}
+                  title={label}
+                  style={{
+                    width: 28, height: 28, borderRadius: '50%', background: swatch, cursor: 'pointer',
+                    boxShadow: accent === value ? '0 0 0 2px var(--surface), 0 0 0 4px var(--text)' : '0 0 0 1px var(--border)'
+                  }}
+                />
+              ))}
             </div>
           </div>
         </Panel>

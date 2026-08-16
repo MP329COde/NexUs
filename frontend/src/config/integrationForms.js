@@ -78,6 +78,21 @@ export const INTEGRATION_FORMS = {
       { key: 'token', label: 'Token d\'accès personnel (scope repo + workflow)', type: 'password', secret: true }
     ]
   },
+  gitea: {
+    label: 'Gitea',
+    hint: 'Dépôts et pull requests (lecture + approbation). Auto-hébergé, alternative légère à GitLab/GitHub.',
+    guide: [
+      "Dans Gitea : icône de profil → Paramètres → Applications.",
+      "Générez un token avec les portées repo (lecture) et pull_request (approbation).",
+      "Copiez-le immédiatement : Gitea ne l'affichera plus jamais ensuite.",
+      "L'URL de l'instance est la racine de votre Gitea (ex: https://gitea.homelab.local), sans /api."
+    ],
+    fields: [
+      { key: 'baseUrl', label: 'URL de l\'instance', placeholder: 'https://gitea.homelab.local' },
+      { key: 'token', label: 'Token d\'accès', type: 'password', secret: true, hint: 'Portées repo + pull_request requises.' }
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'gitea' }
+  },
   proxmox: {
     label: 'Proxmox VE',
     hint: 'Nœuds, VM et conteneurs LXC.',
@@ -165,4 +180,4 @@ export const INTEGRATION_FORMS = {
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry'];

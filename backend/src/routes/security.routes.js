@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { listBannedIps, banIp, unbanIp, normalizeIp } from '../store/banlistStore.js';
 import { listScans, getLastScan, runScan } from '../services/networkScanService.js';
 import { getRecentTraffic, getSuspiciousIps } from '../services/trafficMonitorService.js';
@@ -16,7 +17,7 @@ import { runSecretLeakScan } from '../services/secretLeakScanService.js';
 
 // IPs bannies + scans réseau : réservé aux administrateurs.
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('security', 'admin'));
 
 router.get('/banlist', (req, res) => {
   res.json({ ok: true, items: listBannedIps() });

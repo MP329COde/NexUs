@@ -75,6 +75,27 @@ export async function listWorkflowRuns(owner, repo) {
   }));
 }
 
+// Détail par job/étape d'un run (visualisation "jobs et logs" côté CI/CD) :
+// chaque step renvoie déjà son statut/conclusion via l'API GitHub, pas
+// besoin de télécharger l'archive de logs pour ça. Le lien "Voir les logs
+// complets" reste le webUrl du job lui-même (page GitHub native), Nexus ne
+// duplique pas un viewer de logs bruts.
+export async function listWorkflowRunJobs(owner, repo, runId) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, params: { per_page: 50 } }, 'GitHub');
+  return (data.jobs || []).map((j) => ({
+    id: j.id,
+    name: j.name,
+    status: j.status,
+    conclusion: j.conclusion,
+    startedAt: j.started_at,
+    completedAt: j.completed_at,
+    webUrl: j.html_url,
+    steps: (j.steps || []).map((s) => ({ name: s.name, status: s.status, conclusion: s.conclusion, number: s.number }))
+  }));
+}
+
 // Alertes de dépendances vulnérables : lit Dependabot (déjà activé/exécuté
 // par GitHub lui-même sur le dépôt), plutôt que de cloner le dépôt et
 // lancer un scan localement — plus fiable (base de vulnérabilités GitHub

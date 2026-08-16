@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import RequireAuth from './components/layout/RequireAuth.jsx';
-import RequireRole from './components/layout/RequireRole.jsx';
+import RequirePermission from './components/layout/RequirePermission.jsx';
+import RequireHomeAccess from './components/layout/RequireHomeAccess.jsx';
 import SetupGate from './components/layout/SetupGate.jsx';
 import Shell from './components/layout/Shell.jsx';
 import LoginPage from './pages/Login/LoginPage.jsx';
@@ -24,6 +25,7 @@ import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
 import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
 import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
 import OrganizationsPage from './pages/Deployments/OrganizationsPage.jsx';
+import WikiPage from './pages/Deployments/WikiPage.jsx';
 import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
 import GitReposPage from './pages/Deployments/GitReposPage.jsx';
 import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
@@ -55,7 +57,7 @@ export const router = createBrowserRouter([
       {
         element: <RequireAuth><Shell /></RequireAuth>,
         children: [
-          { index: true, element: <HomePage />, handle: { title: 'Vue générale' } },
+          { index: true, element: <RequireHomeAccess><HomePage /></RequireHomeAccess>, handle: { title: 'Vue générale' } },
           {
             path: 'deployments',
             element: <DeploymentsLayout />,
@@ -64,6 +66,7 @@ export const router = createBrowserRouter([
               { index: true, element: <ToolsAccessPage /> },
               { path: 'projects', element: <ProjectsPage /> },
               { path: 'organizations', element: <OrganizationsPage /> },
+              { path: 'wiki', element: <WikiPage /> },
               { path: 'projects/:id', element: <ProjectDetailPage /> },
               { path: 'repos', element: <GitReposPage /> },
               { path: 'reviews', element: <CodeReviewsPage /> },
@@ -83,7 +86,7 @@ export const router = createBrowserRouter([
             handle: { title: 'Infrastructure' },
             children: [
               { index: true, element: <ProxmoxPage /> },
-              { path: 'hosts', element: <RequireRole role="admin"><HostsPage /></RequireRole> }
+              { path: 'hosts', element: <RequirePermission domain="hosts" level="admin"><HostsPage /></RequirePermission> }
             ]
           },
           {
@@ -114,7 +117,11 @@ export const router = createBrowserRouter([
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
           { path: 'report', element: <ReportPage />, handle: { title: 'Rapport de santé' } },
-          { path: 'settings', element: <RequireRole role="admin"><SettingsPage /></RequireRole>, handle: { title: 'Paramètres' } }
+          // Garde globale retirée : chaque onglet a désormais sa propre
+          // permission RBAC (voir RequirePermission dans SettingsPage.jsx),
+          // un compte "user" peut donc accéder à la page si au moins un
+          // onglet lui est ouvert, sans avoir le rôle admin de plateforme.
+          { path: 'settings', element: <SettingsPage />, handle: { title: 'Paramètres' } }
         ]
       }
     ]

@@ -216,6 +216,55 @@ export const MANUAL_SECTIONS = [
     ]
   },
   {
+    id: 'code-overview',
+    group: 'Manuel de code',
+    title: 'Structure du dépôt',
+    blocks: [
+      { type: 'p', text: "Nexus Console est un monorepo à deux couches : « backend/ » (API Node.js/Express, seule couche autorisée à parler aux services d'infrastructure) et « frontend/ » (console React/Vite, qui ne parle qu'au backend via /api). Le frontend ne contacte jamais Kubernetes, Proxmox, GitLab, etc. directement." },
+      { type: 'code', text: "backend/\n  src/routes/*.routes.js        un fichier de routes par domaine\n  src/services/*.js             logique métier\n  src/services/integrations/*   un module par outil externe\n  src/store/*.js                persistance JSON (backend/data, ignoré par git)\n  src/db/                       socle relationnel PostgreSQL + migrations\n  src/middleware/               auth, accès projet, etc.\nfrontend/\n  src/pages/**/*.jsx            une page par écran, groupées par section\n  src/components/**/*.jsx       composants partagés (ui/, vault/, ...)\n  src/App.jsx / router          déclaration des routes et du menu latéral" },
+      { type: 'note', text: "Ajouter une intégration future = un fichier dans services/integrations/, une entrée dans settingsStore.js (SECRET_FIELDS), une route — sans toucher au reste. Ce patron est systématique dans tout le backend, à respecter pour toute nouvelle intégration." }
+    ]
+  },
+  {
+    id: 'code-jsx-react',
+    group: 'Manuel de code',
+    title: 'JSX, pages et composants',
+    blocks: [
+      { type: 'p', text: "Chaque écran est une page fonctionnelle dans frontend/src/pages/<Section>/<Nom>Page.jsx, sans classe, avec des hooks React standards (useState, useEffect) — pas de state manager externe. Les sous-écrans d'une même section (ex. Kubernetes, Réseau) partagent un <Section>Layout.jsx qui pose la barre latérale secondaire et le fil d'ariane de la section." },
+      { type: 'p', text: "Les composants réutilisables (boutons, icônes, avatar, cartes) vivent dans components/ui/ ; les composants liés à un domaine précis (ex. coffre-fort) dans components/<domaine>/. Une page compose des composants, elle n'en redéfinit pas la logique en double." },
+      { type: 'code', text: "export default function ExamplePage() {\n  const [items, setItems] = useState([]);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    api.get('/example').then((res) => setItems(res.data)).finally(() => setLoading(false));\n  }, []);\n\n  return (\n    <div className=\"card\" style={{ padding: 20 }}>\n      {/* le style inline avec les variables CSS var(--...) est la convention du projet */}\n    </div>\n  );\n}" },
+      { type: 'note', text: "Convention du projet : styles en `style={{...}}` inline avec des variables CSS (var(--primary), var(--text-muted), var(--surface-2)...) pour rester compatible thème clair/sombre/auto, plutôt que des classes CSS dédiées par page." },
+      { type: 'p', text: "Contenu de type « manuel »/documentation (comme cette page) est séparé du composant d'affichage : un fichier *Content.js exporte des données structurées (groupes, sections, blocs), le composant .jsx ne fait que les afficher. Le même patron est réutilisé pour toute page fortement éditoriale." }
+    ]
+  },
+  {
+    id: 'code-backend',
+    group: 'Manuel de code',
+    title: 'Patrons backend',
+    blocks: [
+      { type: 'p', text: "Chaque module d'intégration (services/integrations/xService.js) expose au minimum getStatus() et répond { configured: false } plutôt que d'échouer si l'outil n'est pas encore paramétré — la console doit rester utilisable dès l'installation, jamais un écran cassé." },
+      { type: 'p', text: "Deux couches de persistance coexistent délibérément (stratégie « strangler ») : le store JSON/SQLite historique (backend/data/, secrets chiffrés AES-256-GCM via src/utils/crypto.js, jamais renvoyés en clair au frontend) et le socle relationnel PostgreSQL (organisations, projets, rôles, environnements) activé par la variable DATABASE_URL. Les routes /api/projects/:id/* passent par middleware/projectAccess.js, avec repli automatique sur l'ancien modèle si le projet n'est pas encore migré vers Postgres." },
+      { type: 'p', text: "Rôles projet du moins au plus privilégié : viewer < developer < maintainer < owner (voir « Organisations et Projets » ci-dessus) — toujours vérifier le rôle le plus proche de la ressource visée, jamais seulement requireAuth, pour toute nouvelle route touchant un projet ou un environnement." },
+      { type: 'p', text: "Les opérations longues (sync/rollback ArgoCD, scans réseau ou sécurité) passent par services/jobService.js : exécution asynchrone persistée, suivie via GET /api/projects/:id/jobs/:jobId ou GET /api/jobs/:id, jamais bloquantes sur la requête HTTP, jamais de statut fantôme au redémarrage." },
+      { type: 'note', text: "Principe non négociable du projet : aucune donnée simulée. Une page pour laquelle l'intégration réelle n'existe pas encore doit afficher clairement « Démonstration » ou « Non intégré » (voir SupplyChainPage, ReleasesPage) plutôt que d'inventer des résultats." }
+    ]
+  },
+  {
+    id: 'code-conventions',
+    group: 'Manuel de code',
+    title: 'Conventions et mise à jour du manuel',
+    blocks: [
+      { type: 'p', text: "Migrations SQL versionnées et numérotées séquentiellement dans backend/src/db/migrations/, appliquées automatiquement au démarrage (idempotentes, une transaction par fichier) — on ne modifie jamais une migration déjà appliquée, on en ajoute une nouvelle." },
+      { type: 'p', text: "fonctions.md, à la racine du dépôt, est l'inventaire des fonctionnalités réellement présentes dans le code (à distinguer des idées encore à l'état de spécification dans base-dev/) — il doit être mis à jour à chaque fonctionnalité ajoutée ou modifiée." },
+      { type: 'ul', items: [
+        'Nommage : PascalCase pour les composants/pages (ProjectDetailPage.jsx), camelCase pour les services et fonctions (deploymentService.js), kebab/plat pour les routes (projects.routes.js).',
+        'Toute nouvelle route sensible doit être ajoutée avec son garde-fou de rôle dès l\'écriture (pas « à sécuriser plus tard ») — voir les failles corrigées documentées dans fonctions.md pour l\'historique des oublis de ce type.',
+        'Un composant qui dépasse largement la taille d\'un écran doit être découpé en sous-composants dans le même dossier plutôt que garder toute la logique dans la page.'
+      ] },
+      { type: 'note', text: "Ce manuel de code documente les patrons déjà en place, pas une cible théorique : à mettre à jour dès qu'un nouveau patron structurant apparaît dans le code (nouvelle convention, nouvelle couche), pas de façon isolée à la fin d'un cycle." }
+    ]
+  },
+  {
     id: 'admin-users',
     group: 'Administration',
     title: 'Administration : Utilisateurs',

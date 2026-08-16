@@ -32,10 +32,11 @@ function Block({ block }) {
   return null;
 }
 
-const GROUP_ORDER = ['Démarrage', 'Modules opérationnels', 'Administration', 'Sécurité & déploiement'];
+const GROUP_ORDER = ['Démarrage', 'Modules opérationnels', 'Manuel de code', 'Administration', 'Sécurité & déploiement'];
 const GROUP_DESCRIPTIONS = {
   'Démarrage': "Ce qu'il faut savoir avant toute chose : ce que fait la console, le tout premier accès, les rôles, et comment lire la page d'accueil.",
   'Modules opérationnels': "Le fonctionnement de chaque domaine métier au quotidien : intégrations, Kubernetes, réseaux, infrastructure, développement, monitoring et cybersécurité.",
+  'Manuel de code': "Pour contribuer au code de Nexus Console elle-même : structure des dossiers, conventions JSX/React, gestion d'état, patrons backend déjà en place. Mis à jour au fil des évolutions du code, pas figé.",
   'Administration': "Les pages réservées aux administrateurs, pour gérer les comptes, les groupes, l'inventaire, la plateforme, l'identité et le système.",
   'Sécurité & déploiement': "Ce qui protège la console, comment la déployer en production, et quoi faire en cas de problème."
 };

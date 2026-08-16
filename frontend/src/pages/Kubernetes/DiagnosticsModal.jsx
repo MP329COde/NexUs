@@ -10,9 +10,14 @@ import { runDiagnostics } from '../../lib/diagnostics.js';
 // juste ce qu'un administrateur vérifierait à la main, dans l'ordre.
 export default function DiagnosticsModal({ namespace, name, onClose }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/deployments/${namespace}/${name}/diagnostics`), [namespace, name]);
+  const { data: linkData } = useApi(() => api.get(`/kubernetes/deployments/${namespace}/${name}/links`), [namespace, name]);
 
   const result = data ? runDiagnostics({ deploymentName: name, ...data }) : null;
   const worst = result?.findings.some((f) => f.severity === 'crit') ? 'crit' : result?.findings.length ? 'warn' : 'ok';
+  const link = linkData?.link;
+  const gitWebUrl = link?.gitProvider === 'github' && link.githubOwner && link.githubRepo
+    ? `https://github.com/${link.githubOwner}/${link.githubRepo}`
+    : null;
 
   return (
     <Modal
@@ -28,6 +33,21 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
     >
       {loading && <div className="faint" style={{ fontSize: 12.5 }}>Analyse en cours…</div>}
       {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+
+      {link && (link.argocdWebUrl || gitWebUrl) && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {gitWebUrl && (
+            <a href={gitWebUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+              <Icon name="gitBranch" size={12} />Dépôt Git
+            </a>
+          )}
+          {link.argocdWebUrl && (
+            <a href={link.argocdWebUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+              <Icon name="argocd" size={12} />Application Argo CD
+            </a>
+          )}
+        </div>
+      )}
 
       {result && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

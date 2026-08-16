@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import {
   listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret, nextRotationAt
 } from '../store/vaultStore.js';
@@ -50,11 +51,11 @@ router.get('/dev', (req, res) => {
   res.json({ ok: true, items: listVaultEntries('dev') });
 });
 
-router.get('/prod', requireRole('admin'), (req, res) => {
+router.get('/prod', requirePermission('vault', 'admin'), (req, res) => {
   res.json({ ok: true, items: listVaultEntries('prod') });
 });
 
-router.post('/dev', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/dev', requirePermission('vault', 'write'), asyncHandler(async (req, res) => {
   const { label, username, secret, notes, url } = req.body || {};
   if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et mot de passe requis' });
   const entry = createVaultEntry({ tier: 'dev', label, username, secret, notes, url, actor: req.user });
@@ -62,7 +63,7 @@ router.post('/dev', requireRole('admin'), asyncHandler(async (req, res) => {
   res.status(201).json({ ok: true, entry });
 }));
 
-router.post('/prod', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/prod', requirePermission('vault', 'admin'), asyncHandler(async (req, res) => {
   const { label, username, notes, url, rotationMinutes } = req.body || {};
   if (!label) return res.status(400).json({ ok: false, error: 'Nom requis' });
   const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, url, rotationMinutes, actor: req.user });

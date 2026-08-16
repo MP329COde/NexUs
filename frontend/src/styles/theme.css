@@ -58,6 +58,47 @@
   --tone-mut-fg: #9AA7C2;   --tone-mut-bg: rgba(154,167,194,.12); --tone-mut-br: rgba(154,167,194,.3);  --tone-mut-dot: #6B7A9C;
 }
 
+/* Accent de couleur : indépendant du mode clair/sombre, choisi par l'utilisateur
+   dans Paramètres → Apparence (ThemeContext pose data-accent sur <html>).
+   'blue' reprend la teinte par défaut ci-dessus (bleu Windows 11) et n'a donc
+   pas besoin d'être redéfini explicitement. */
+:root[data-accent='pink'] {
+  --primary: #EC4899; --primary-hover: #DB2777; --primary-soft: #FDF2F8;
+}
+:root[data-accent='purple'] {
+  --primary: #7C3AED; --primary-hover: #6D28D9; --primary-soft: #F5F3FF;
+}
+:root[data-accent='green'] {
+  --primary: #059669; --primary-hover: #047857; --primary-soft: #ECFDF5;
+}
+:root[data-accent='orange'] {
+  --primary: #EA580C; --primary-hover: #C2410C; --primary-soft: #FFF7ED;
+}
+:root[data-accent='red'] {
+  --primary: #DC2626; --primary-hover: #B91C1C; --primary-soft: #FEF2F2;
+}
+:root[data-accent='teal'] {
+  --primary: #0D9488; --primary-hover: #0F766E; --primary-soft: #F0FDFA;
+}
+:root[data-theme='dark'][data-accent='pink'] {
+  --primary: #F472B6; --primary-hover: #F9A8D4; --primary-soft: rgba(244,114,182,.16);
+}
+:root[data-theme='dark'][data-accent='purple'] {
+  --primary: #A78BFA; --primary-hover: #C4B5FD; --primary-soft: rgba(167,139,250,.16);
+}
+:root[data-theme='dark'][data-accent='green'] {
+  --primary: #34D399; --primary-hover: #6EE7B7; --primary-soft: rgba(52,211,153,.16);
+}
+:root[data-theme='dark'][data-accent='orange'] {
+  --primary: #FB923C; --primary-hover: #FDBA74; --primary-soft: rgba(251,146,60,.16);
+}
+:root[data-theme='dark'][data-accent='red'] {
+  --primary: #F87171; --primary-hover: #FCA5A5; --primary-soft: rgba(248,113,113,.16);
+}
+:root[data-theme='dark'][data-accent='teal'] {
+  --primary: #2DD4BF; --primary-hover: #5EEAD4; --primary-soft: rgba(45,212,191,.16);
+}
+
 * { transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
-import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess } from '../store/usersStore.js';
+import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
 import { banIp, normalizeIp } from '../store/banlistStore.js';
+import { permissionsForUser } from '../store/groupsStore.js';
 import { createNotification } from '../store/notificationsStore.js';
+import { readStore } from '../store/jsonStore.js';
 
 const router = Router();
 const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -77,6 +79,12 @@ router.post('/login', asyncHandler(async (req, res) => {
     return res.status(401).json({ ok: false, error: 'Identifiants invalides' });
   }
 
+  const validityError = validityWindowError(user);
+  if (validityError) {
+    logAudit({ user: { email: user.email }, ip: req.ip }, 'auth.login.failed', { reason: validityError });
+    return res.status(401).json({ ok: false, error: validityError });
+  }
+
   recordLoginSuccess(user.id);
   const token = signSession(user);
   res.cookie(SESSION_COOKIE, token, {
@@ -99,13 +107,23 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ ok: true, user: req.user });
+  // homeRestrictedToAdmins vit dans les paramètres console (admin-only en
+  // écriture, cf. settings.routes.js) mais doit être lisible par tout compte
+  // connecté pour que le frontend sache s'il doit masquer "Vue générale".
+  const console_ = readStore('console');
+  // Union des permissions de tous les groupes/rôles de l'utilisateur (voir
+  // groupsStore.permissionsForUser) : un admin de plateforme n'a pas besoin
+  // de groupes, RequirePermission côté frontend applique le même bypass
+  // implicite que le middleware backend (role === 'admin').
+  const permissions = permissionsForUser(req.user.id);
+  res.json({ ok: true, user: { ...req.user, permissions }, homeRestrictedToAdmins: Boolean(console_.homeRestrictedToAdmins) });
 });
 
 const THEME_VALUES = ['system', 'light', 'dark', 'schedule'];
+const ACCENT_VALUES = ['blue', 'pink', 'purple', 'green', 'orange', 'red', 'teal'];
 
 router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
-  const { name, avatarEmoji, avatarColor, avatarImage, theme } = req.body || {};
+  const { name, avatarEmoji, avatarColor, avatarImage, theme, accentColor } = req.body || {};
   if (avatarColor && !AVATAR_COLOR_PATTERN.test(avatarColor)) {
     return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
   }
@@ -117,11 +135,14 @@ router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
   if (theme && !THEME_VALUES.includes(theme)) {
     return res.status(400).json({ ok: false, error: `Thème invalide (attendu: ${THEME_VALUES.join(', ')})` });
   }
+  if (accentColor && !ACCENT_VALUES.includes(accentColor)) {
+    return res.status(400).json({ ok: false, error: `Accent invalide (attendu: ${ACCENT_VALUES.join(', ')})` });
+  }
   // Image et emoji sont mutuellement exclusifs à l'affichage (voir
   // components/ui/Avatar.jsx) : renseigner explicitement l'un efface l'autre,
   // pour ne jamais laisser les deux enregistrés en même temps.
   const body = req.body || {};
-  const patch = { name, theme };
+  const patch = { name, theme, accentColor };
   if (Object.prototype.hasOwnProperty.call(body, 'avatarImage')) {
     patch.avatarImage = avatarImage;
     patch.avatarEmoji = avatarImage ? '' : avatarEmoji;

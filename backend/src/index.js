@@ -17,6 +17,7 @@ import { scheduleInfraLoadSampling } from './services/infraLoadService.js';
 import { scheduleVaultRotation } from './services/vaultRotationService.js';
 import { scheduleDailySecretLeakScan } from './services/secretLeakScanService.js';
 import { scheduleHourlyTrivyScan } from './services/scheduledTrivyScanService.js';
+import { scheduleClusterHealthChecks } from './services/kubernetesAlertService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -32,6 +33,7 @@ scheduleInfraLoadSampling();
 scheduleVaultRotation();
 scheduleDailySecretLeakScan();
 scheduleHourlyTrivyScan();
+scheduleClusterHealthChecks();
 
 const app = express();
 
@@ -63,17 +65,22 @@ app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/sta
 
 // Protège les routes sensibles (auth, écriture de config) contre le bruteforce/abus,
 // sans limiter les endpoints de lecture appelés en polling par le dashboard.
-const strictLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
-app.use('/api/auth/login', strictLimiter);
-app.use('/api/auth/webauthn', strictLimiter);
-app.use('/api/auth/password', strictLimiter);
-app.use('/api/setup', strictLimiter);
-app.use('/api/settings', strictLimiter);
-app.use('/api/hosts', strictLimiter);
-app.use('/api/backups', strictLimiter);
-app.use('/api/identity', strictLimiter);
-app.use('/api/security/banlist', strictLimiter);
-app.use('/api/vault', strictLimiter);
+// Une instance PAR route (voir makeScanLimiter ci-dessous pour la même
+// remarque) : une seule instance partagée sur 13 chemins ferait cumuler tout
+// le polling dashboard (hosts, kubernetes, proxmox...) dans un seul budget de
+// 30 req/min, épuisé avant même d'ouvrir Paramètres → Plateforme/Identité —
+// c'est précisément ce qui provoquait des 429 sur ces deux pages.
+const makeStrictLimiter = () => rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
+app.use('/api/auth/login', makeStrictLimiter());
+app.use('/api/auth/webauthn', makeStrictLimiter());
+app.use('/api/auth/password', makeStrictLimiter());
+app.use('/api/setup', makeStrictLimiter());
+app.use('/api/settings', makeStrictLimiter());
+app.use('/api/hosts', makeStrictLimiter());
+app.use('/api/backups', makeStrictLimiter());
+app.use('/api/identity', makeStrictLimiter());
+app.use('/api/security/banlist', makeStrictLimiter());
+app.use('/api/vault', makeStrictLimiter());
 // Le terminal sécurisé exécute des actions Kubernetes réelles (scale,
 // restart, delete, exec, apply — voir services/terminalService.js) : au
 // moins aussi sensible que le coffre-fort ou la gestion des hôtes, ne
@@ -83,9 +90,9 @@ app.use('/api/vault', strictLimiter);
 // démarrer/arrêter/réinitialiser une VM/LXC) directement, sans passer par
 // le terminal — protéger uniquement ce dernier aurait laissé la porte
 // dérobée grande ouverte par la route directe.
-app.use('/api/terminal', strictLimiter);
-app.use('/api/kubernetes', strictLimiter);
-app.use('/api/proxmox', strictLimiter);
+app.use('/api/terminal', makeStrictLimiter());
+app.use('/api/kubernetes', makeStrictLimiter());
+app.use('/api/proxmox', makeStrictLimiter());
 
 // Chaque type de scan coûteux (nmap, Trivy, Semgrep) a sa PROPRE instance de
 // limiteur : express-rate-limit compte par store, donc réutiliser la même

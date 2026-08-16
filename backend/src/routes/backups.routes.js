@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { createBackup, listBackups, getBackupPath, deleteBackup, importBackup, restoreBackup } from '../services/backupService.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('backups', 'admin'));
 
 router.get('/', (req, res) => {
   res.json({ ok: true, items: listBackups() });

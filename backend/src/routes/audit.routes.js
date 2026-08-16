@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { listAuditEntries } from '../services/auditService.js';
 
 const router = Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requirePermission('audit', 'read'));
 
 function parseFilters(req) {
   return {

@@ -2,7 +2,19 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
 
 const STORAGE_KEY = 'nexus-theme';
+const ACCENT_STORAGE_KEY = 'nexus-accent';
 const ThemeContext = createContext(null);
+
+// Bleu = teinte par défaut de l'app (proche du bleu d'accentuation Windows 11).
+export const ACCENT_COLORS = [
+  { value: 'blue', label: 'Bleu', swatch: '#2563EB' },
+  { value: 'pink', label: 'Rose', swatch: '#EC4899' },
+  { value: 'purple', label: 'Violet', swatch: '#7C3AED' },
+  { value: 'green', label: 'Vert', swatch: '#059669' },
+  { value: 'orange', label: 'Orange', swatch: '#EA580C' },
+  { value: 'red', label: 'Rouge', swatch: '#DC2626' },
+  { value: 'teal', label: 'Sarcelle', swatch: '#0D9488' }
+];
 
 // 4 modes : 'light'/'dark' forcent explicitement la palette (via data-theme sur
 // <html>) ; 'system' suit prefers-color-scheme ; 'schedule' bascule sombre la
@@ -27,6 +39,7 @@ function prefersDark() {
 export function ThemeProvider({ children }) {
   const { user } = useAuth();
   const [theme, setThemeState] = useState(() => localStorage.getItem(STORAGE_KEY) || 'system');
+  const [accent, setAccentState] = useState(() => localStorage.getItem(ACCENT_STORAGE_KEY) || 'blue');
   const [systemDark, setSystemDark] = useState(prefersDark);
   const [night, setNight] = useState(isNightNow);
 
@@ -36,6 +49,10 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     if (user?.theme) setThemeState(user.theme);
   }, [user?.theme]);
+
+  useEffect(() => {
+    if (user?.accentColor) setAccentState(user.accentColor);
+  }, [user?.accentColor]);
 
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
@@ -60,6 +77,11 @@ export function ThemeProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme, resolved]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-accent', accent);
+    localStorage.setItem(ACCENT_STORAGE_KEY, accent);
+  }, [accent]);
+
   const { updateProfile } = useAuth();
 
   function setTheme(value) {
@@ -67,10 +89,15 @@ export function ThemeProvider({ children }) {
     if (user) updateProfile({ theme: value }).catch(() => {});
   }
 
+  function setAccent(value) {
+    setAccentState(value);
+    if (user) updateProfile({ accentColor: value }).catch(() => {});
+  }
+
   const toggle = () => setTheme(resolved === 'dark' ? 'light' : 'dark');
 
   return (
-    <ThemeContext.Provider value={{ theme, resolved, setTheme, toggle }}>
+    <ThemeContext.Provider value={{ theme, resolved, setTheme, toggle, accent, setAccent }}>
       {children}
     </ThemeContext.Provider>
   );

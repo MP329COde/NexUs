@@ -23,6 +23,7 @@
             resolved = (h < 7 || h >= 20) ? 'dark' : 'light';
           }
           document.documentElement.setAttribute('data-theme', resolved);
+          document.documentElement.setAttribute('data-accent', localStorage.getItem('nexus-accent') || 'blue');
         } catch (e) {}
       })();
     </script>

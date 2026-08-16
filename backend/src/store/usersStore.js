@@ -33,6 +33,17 @@ export function findUserById(id) {
   return listUsers().find((u) => u.id === id);
 }
 
+// Fenêtre de validité (comptes temporaires) : vérifiée à la fois au login
+// (auth.routes.js, avant de délivrer un JWT) et à chaque requête authentifiée
+// (requireAuth, middleware/auth.js) puisque la validité peut expirer en
+// cours de session.
+export function validityWindowError(user) {
+  const now = Date.now();
+  if (user.validFrom && new Date(user.validFrom).getTime() > now) return 'Compte pas encore actif';
+  if (user.validUntil && new Date(user.validUntil).getTime() < now) return 'Compte expiré';
+  return null;
+}
+
 export function countAdmins(users = listUsers()) {
   return users.filter((u) => u.role === 'admin' && u.active !== false).length;
 }
@@ -47,7 +58,7 @@ const AVATAR_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#
 // bootstrap admin et le setup initial n'en ont pas besoin ; seule la création
 // d'un compte par un admin (routes/users.routes.js) le met à true, sauf si
 // l'admin indique avoir déjà configuré le compte lui-même.
-export function createUser({ email, password, name, username, role = 'user', mustOnboard = false }) {
+export function createUser({ email, password, name, username, role = 'user', mustOnboard = false, validFrom = null, validUntil = null, isPrimaryAdmin = false }) {
   if (findUserByEmail(email)) {
     throw Object.assign(new Error('Un utilisateur avec cet e-mail existe déjà'), { status: 409 });
   }
@@ -66,6 +77,7 @@ export function createUser({ email, password, name, username, role = 'user', mus
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
     avatarImage: null, // data URL (image importée) — prioritaire sur avatarEmoji à l'affichage
     theme: null,
+    accentColor: null,
     mustOnboard,
     // Palier du Terminal sécurisé — indépendant du rôle admin/user : null
     // (par défaut) = aucun accès au terminal, même pour un compte "user".
@@ -73,6 +85,16 @@ export function createUser({ email, password, name, username, role = 'user', mus
     // implicitement, sans avoir besoin d'être positionné ici — cf.
     // resolveTerminalTier() dans terminalService.js.
     terminalTier: null,
+    // Fenêtre de validité optionnelle (comptes temporaires) : hors de cette
+    // fenêtre, la connexion est refusée (voir requireAuth et POST /auth/login)
+    // même avec un mot de passe correct. null = pas de borne.
+    validFrom,
+    validUntil,
+    // Positionné uniquement par ensureBootstrapAdmin() sur le tout premier
+    // compte créé — jamais accepté depuis une route utilisateur, non
+    // transférable. Donne accès à l'Inventaire même sans permission RBAC
+    // explicite (voir routes/inventory.routes.js).
+    isPrimaryAdmin,
     createdAt: new Date().toISOString()
   };
   users.push(user);
@@ -84,7 +106,7 @@ export function updateUser(id, patch) {
   const users = listUsers();
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
-  const allowed = ['name', 'avatarEmoji', 'avatarColor', 'avatarImage', 'theme'];
+  const allowed = ['name', 'avatarEmoji', 'avatarColor', 'avatarImage', 'theme', 'accentColor'];
   for (const key of allowed) {
     if (patch[key] !== undefined) users[idx][key] = patch[key] || null;
   }
@@ -161,7 +183,7 @@ export function clearOnboarding(id) {
 
 // Réservé aux admins (routes/users.routes.js) : changement de rôle / activation.
 // Refuse de retirer le dernier admin actif pour ne jamais verrouiller la console.
-export function setUserAdminFields(id, { role, active }) {
+export function setUserAdminFields(id, { role, active, validFrom, validUntil }) {
   const users = listUsers();
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
@@ -173,6 +195,8 @@ export function setUserAdminFields(id, { role, active }) {
   }
   if (role) users[idx].role = role;
   if (active !== undefined) users[idx].active = active;
+  if (validFrom !== undefined) users[idx].validFrom = validFrom || null;
+  if (validUntil !== undefined) users[idx].validUntil = validUntil || null;
   writeStore('users', users);
   return users[idx];
 }
@@ -206,8 +230,26 @@ export function deleteUser(id) {
 // Sans ces variables, la console reste sans utilisateur et affiche l'assistant
 // de première configuration (GET /api/setup/status → needsSetup: true).
 export function ensureBootstrapAdmin() {
-  if (hasAnyUser()) return;
+  if (hasAnyUser()) {
+    ensurePrimaryAdmin();
+    return;
+  }
   if (!env.adminEmail || !env.adminPassword) return;
-  createUser({ email: env.adminEmail, password: env.adminPassword, name: 'Administrateur', role: 'admin' });
+  createUser({ email: env.adminEmail, password: env.adminPassword, name: 'Administrateur', role: 'admin', isPrimaryAdmin: true });
   logger.warn(`Compte admin créé depuis les variables d'environnement (${env.adminEmail}).`);
+}
+
+// Rattrapage idempotent pour les bases existantes créées avant l'introduction
+// d'isPrimaryAdmin : si personne ne porte le flag, on promeut l'admin actif
+// le plus ancien (createdAt minimal) — sinon Inventaire deviendrait
+// inaccessible à tout le monde (voir routes/inventory.routes.js).
+function ensurePrimaryAdmin() {
+  const users = listUsers();
+  if (users.some((u) => u.isPrimaryAdmin)) return;
+  const admins = users.filter((u) => u.role === 'admin' && u.active !== false)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  if (!admins.length) return;
+  const idx = users.findIndex((u) => u.id === admins[0].id);
+  users[idx].isPrimaryAdmin = true;
+  writeStore('users', users);
 }

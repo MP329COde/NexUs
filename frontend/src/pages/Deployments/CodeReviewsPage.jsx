@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import ReviewSchedulePanel from './ReviewSchedulePanel.jsx';
 
 function hoursSince(iso) {
   if (!iso) return null;
@@ -152,6 +153,10 @@ export default function CodeReviewsPage() {
           </div>
         )}
       </Panel>
+
+      <div style={{ marginBottom: 16 }}>
+        <ReviewSchedulePanel reviewerNames={reviewerNames} />
+      </div>
 
       <Panel title="Charge de relecture" sub="Revues assignées par personne" span={12}>
         {loadRows.length === 0 ? (
