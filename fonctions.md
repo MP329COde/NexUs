@@ -41,7 +41,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **status.routes.js** — Santé, vue d'ensemble plateforme, statuts par service, charge infra en direct.
 - **system.routes.js** — Version, vérification de mise à jour (git), overview système.
 - **teams.routes.js** — Équipes par organisation, gestion membres.
-- **terminal.routes.js** — Permissions terminal par palier utilisateur, exécution de commande via grammaire fixe.
+- **terminal.routes.js** — Permissions terminal par palier utilisateur, exécution de commande via grammaire fixe, **demande d'accès self-service** avec approbation/refus admin.
 - **traefik.routes.js** — Statut, routeurs, services Traefik.
 - **users.routes.js** — CRUD utilisateurs, palier terminal.
 - **vault.routes.js** — Coffres dev/prod, révélation avec vérification de mot de passe (compte, ou mot de passe de projet dédié pour tier `project`), édition/suppression, **rotation automatique configurable (2-5 min)** des secrets prod/projet avec échéance exposée au reveal.
@@ -98,6 +98,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **projectsStore.js** — Projets, backlog, **mot de passe de coffre-fort projet** (`vaultPasswordHash`, jamais exposé au client — retiré par `middleware/projectAccess.js`).
 - **banlistStore.js** — Liste d'IPs bannies, normalisation IPv4/IPv6.
 - **notificationsStore.js** — Alertes de sécurité persistantes (verrouillage de compte, bannissement IP auto, secret committé, vulnérabilité critique), visibles par les admins même après reconnexion.
+- **terminalAccessRequestsStore.js** — Demandes d'accès au terminal sécurisé (self-service), une par utilisateur en attente à la fois.
 
 ## Frontend — Pages (`frontend/src/pages/**/*.jsx`)
 
@@ -147,7 +148,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **KubernetesPage.jsx** — Namespaces/pods/deployments/services.
 - **PodDetailDialog.jsx / PodLogsDialog.jsx / DiagnosticsModal.jsx** — Détail, logs, diagnostic d'un pod/deployment.
 - **ServicesPage.jsx** — Services Kubernetes.
-- **TerminalPage.jsx** — Terminal sécurisé, grammaire de commandes fixe.
+- **TerminalPage.jsx** — Terminal sécurisé, grammaire de commandes fixe, **formulaire de demande d'accès self-service** si aucun palier n'est attribué.
 - **KubernetesLayout.jsx** — Layout de section.
 
 ### Réseau
@@ -181,7 +182,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **IntegrationPanel.jsx** — Configuration/test de chaque intégration.
 - **GitServicesPanel.jsx** — Configuration GitLab/GitHub.
 - **IdentityPanel.jsx** — Configuration OIDC/LDAP.
-- **UsersPanel.jsx / GroupsPanel.jsx** — CRUD utilisateurs et groupes.
+- **UsersPanel.jsx / GroupsPanel.jsx** — CRUD utilisateurs et groupes, **file d'approbation des demandes d'accès terminal**.
 - **InventoryPanel.jsx** — Inventaire matériel/logiciel.
 - **AuditPanel.jsx** — Journal d'audit centralisé.
 - **SystemPanel.jsx** — Version, mise à jour, overview.
@@ -235,7 +236,6 @@ Cette section liste des pistes non implémentées, à prioriser avec l'utilisate
 - Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
-- Système de demande de permission (utilisateur → admin) avec notification, pour le terminal Kubernetes sécurisé.
 - Rôles par projet/organisation avec icônes personnalisées, plusieurs projets par organisation (déjà partiellement en place via le socle relationnel — à vérifier/étendre).
 
 Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) — existaient déjà avant cet inventaire.
