@@ -71,6 +71,10 @@ if [ ! -f .env ]; then
 
   JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   MASTER_KEY="$(openssl rand -hex 32 2>/dev/null || head -c32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  # Obligatoire pour le service postgres de docker-compose.yml (socle
+  # organisations/équipes/projets) : sans cette valeur, `docker compose up`
+  # échoue immédiatement sur POSTGRES_PASSWORD non défini.
+  POSTGRES_PASSWORD="$(openssl rand -hex 24 2>/dev/null || head -c24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
   # sed portable (BSD/macOS vs GNU) : édition via un fichier temporaire plutôt que -i sans suffixe.
   tmp="$(mktemp)"
@@ -78,6 +82,7 @@ if [ ! -f .env ]; then
     -e "s/^CONSOLE_PORT=.*/CONSOLE_PORT=${PORT}/" \
     -e "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" \
     -e "s/^NEXUS_MASTER_KEY=.*/NEXUS_MASTER_KEY=${MASTER_KEY}/" \
+    -e "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" \
     .env > "$tmp" && mv "$tmp" .env
 
   if [ "$ASSUME_YES" = 0 ]; then
@@ -103,6 +108,33 @@ CONSOLE_PORT="${CONSOLE_PORT:-8080}"
 
 # --- 3. Build & démarrage --------------------------------------------------
 if [ "$UPDATE_ONLY" = 1 ]; then
+  # Sauvegarde infra (volume de données + dump Postgres) avant de toucher
+  # à quoi que ce soit : indépendante de l'état de santé de l'application
+  # (contrairement à un appel à POST /api/backups, qui suppose la console
+  # déjà debout et un compte admin sous la main). Ignorée en douceur si
+  # c'est une toute première installation (rien à sauvegarder encore).
+  if docker compose ps --status running --format '{{.Name}}' 2>/dev/null | grep -q .; then
+    BACKUP_DIR="backups/pre-update-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$BACKUP_DIR"
+    info "Sauvegarde avant mise à jour dans ${BACKUP_DIR}/…"
+    if docker compose exec -T postgres pg_dump -U nexus -d nexus > "${BACKUP_DIR}/postgres.sql" 2>/dev/null && [ -s "${BACKUP_DIR}/postgres.sql" ]; then
+      ok "Dump PostgreSQL sauvegardé."
+    else
+      warn "Dump PostgreSQL indisponible (service peut-être pas démarré) — poursuite sans lui."
+      rm -f "${BACKUP_DIR}/postgres.sql"
+    fi
+    # Passe par le conteneur backend lui-même (qui monte déjà le volume sur
+    # /app/data) plutôt que par le nom du volume Docker : ce nom dépend du
+    # nom du dossier du dépôt (préfixe de projet Compose), pas garanti
+    # identique d'une machine à l'autre.
+    if docker compose exec -T backend tar czf - -C /app/data . > "${BACKUP_DIR}/nexus_data.tar.gz" 2>/dev/null && [ -s "${BACKUP_DIR}/nexus_data.tar.gz" ]; then
+      ok "Volume de données sauvegardé (${BACKUP_DIR}/nexus_data.tar.gz)."
+    else
+      warn "Sauvegarde du volume de données échouée — poursuite (vérifiez ${BACKUP_DIR}/ avant de continuer si les données comptent)."
+    fi
+    echo -e "  ${DIM}En cas de problème : docker compose down puis restaurer depuis ${BACKUP_DIR}/${RESET}"
+  fi
+
   info "Mise à jour : git pull, rebuild, redémarrage…"
   git pull --ff-only || warn "git pull a échoué ou n'est pas un dépôt git — poursuite avec les sources locales."
 fi
