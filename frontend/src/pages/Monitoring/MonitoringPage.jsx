@@ -6,6 +6,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './MonitoringPage.css';
 
 const SEVERITY_FILTERS = [
   { value: '', label: 'Toutes' },
@@ -55,25 +56,25 @@ export default function MonitoringPage() {
     <>
       <PageHeader title="Monitoring" sub={status.data?.status?.message} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="monitoring-kpi-grid">
         <KpiCard label="Alertes critiques" value={critCount} tint={critCount > 0 ? '#F43F5E' : '#10B981'} />
         <KpiCard label="Avertissements" value={warnCount} tint={warnCount > 0 ? '#F59E0B' : '#10B981'} />
         <KpiCard label="Tableaux de bord" value={dashboards.data?.items?.length ?? '—'} tint="#3B82F6" />
         <KpiCard label="Hôtes surveillés" value={nodes === null ? '—' : nodes.length} tint="#8B5CF6" note={nodes?.length === 0 ? 'Proxmox non configuré' : undefined} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="monitoring-panel-grid">
         <Panel
           title="Alertes actives"
           sub="Grafana, temps réel"
           span={12}
           actions={(
-            <div style={{ display: 'flex', gap: 4, background: 'var(--border-soft)', borderRadius: 8, padding: 3 }}>
+            <div className="monitoring-severity-tabs">
               {SEVERITY_FILTERS.map((f) => (
                 <span
                   key={f.value}
                   onClick={() => setSeverityFilter(f.value)}
-                  style={{ padding: '4px 11px', borderRadius: 6, fontSize: 12, fontWeight: severityFilter === f.value ? 600 : 500, color: severityFilter === f.value ? 'var(--text)' : 'var(--text-muted)', background: severityFilter === f.value ? 'var(--surface)' : 'transparent', boxShadow: severityFilter === f.value ? 'var(--shadow-card)' : 'none', cursor: 'pointer' }}
+                  className={`monitoring-severity-tab${severityFilter === f.value ? ' monitoring-severity-tab-active' : ''}`}
                 >
                   {f.label}
                 </span>
@@ -87,7 +88,7 @@ export default function MonitoringPage() {
             emptyTitle={severityFilter ? 'Aucune alerte pour ce filtre' : 'Aucune alerte active'}
             renderRow={(a, i) => (
               <tr key={i}>
-                <td style={{ fontWeight: 500 }}>{a.name}</td>
+                <td className="monitoring-cell-name">{a.name}</td>
                 <td><span className={`badge badge-${a.severity === 'critical' ? 'crit' : a.severity === 'warning' ? 'warn' : 'info'}`}><span className="dot" />{a.severity}</span></td>
                 <td>{a.status}</td>
                 <td className="mono faint">{a.startsAt ? new Date(a.startsAt).toLocaleString('fr-FR') : '—'}</td>
@@ -98,14 +99,14 @@ export default function MonitoringPage() {
 
         {nodes && nodes.length > 0 && (
           <Panel title="Hôtes" sub="Charge en direct (nœuds Proxmox)" span={12}>
-            <div style={{ padding: 6 }}>
+            <div className="monitoring-host-list">
               {nodes.map((n) => {
                 const cpuPct = Math.round((n.cpu || 0) * 100);
                 const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
                 return (
-                  <div key={n.node} style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '11px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-                    <span style={{ fontWeight: 600, fontSize: 13, width: 120 }}>{n.node}</span>
-                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'}`} style={{ flex: 'none' }}><span className="dot" />{n.status}</span>
+                  <div key={n.node} className="monitoring-host-row">
+                    <span className="monitoring-host-name">{n.node}</span>
+                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} monitoring-host-badge`}><span className="dot" />{n.status}</span>
                     <MiniGauge label="CPU" pct={cpuPct} />
                     <MiniGauge label="RAM" pct={memPct} />
                   </div>
@@ -122,7 +123,7 @@ export default function MonitoringPage() {
             emptyTitle="Aucun tableau de bord"
             renderRow={(d) => (
               <tr key={d.uid}>
-                <td style={{ fontWeight: 500 }}>{d.title}</td>
+                <td className="monitoring-cell-name">{d.title}</td>
                 <td className="muted">{d.folderTitle || '—'}</td>
                 <td><a href={d.url} target="_blank" rel="noreferrer">Ouvrir dans Grafana ↗</a></td>
               </tr>
@@ -137,12 +138,12 @@ export default function MonitoringPage() {
 function MiniGauge({ label, pct }) {
   const color = pct > 85 ? 'var(--tone-crit-dot)' : pct > 65 ? 'var(--tone-warn-dot)' : 'var(--tone-ok-dot)';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
-      <span className="faint" style={{ fontSize: 10.5, width: 26, flex: 'none' }}>{label}</span>
-      <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, transition: 'width .3s ease' }} />
+    <div className="monitoring-gauge">
+      <span className="faint monitoring-gauge-label">{label}</span>
+      <div className="monitoring-gauge-track">
+        <div className="monitoring-gauge-fill" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
       </div>
-      <span className="mono" style={{ fontSize: 11, width: 32, flex: 'none', textAlign: 'right' }}>{pct}%</span>
+      <span className="mono monitoring-gauge-value">{pct}%</span>
     </div>
   );
 }

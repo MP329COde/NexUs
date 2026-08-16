@@ -1,0 +1,98 @@
+.monitoring-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.monitoring-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.monitoring-severity-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--border-soft);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.monitoring-severity-tab {
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.monitoring-severity-tab-active {
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.monitoring-cell-name {
+  font-weight: 500;
+}
+
+.monitoring-host-list {
+  padding: 6px;
+}
+
+.monitoring-host-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.monitoring-host-name {
+  font-weight: 600;
+  font-size: 13px;
+  width: 120px;
+}
+
+.monitoring-host-badge {
+  flex: none;
+}
+
+.monitoring-gauge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.monitoring-gauge-label {
+  font-size: 10.5px;
+  width: 26px;
+  flex: none;
+}
+
+.monitoring-gauge-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.monitoring-gauge-fill {
+  height: 100%;
+  transition: width .3s ease;
+}
+
+.monitoring-gauge-value {
+  font-size: 11px;
+  width: 32px;
+  flex: none;
+  text-align: right;
+}
