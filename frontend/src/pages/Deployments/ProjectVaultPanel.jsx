@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import RotationCountdown from '../../components/vault/RotationCountdown.jsx';
 
-const EMPTY_FORM = { label: '', username: '', secret: '', url: '', notes: '' };
+const EMPTY_FORM = { label: '', username: '', secret: '', url: '', notes: '', rotationMinutes: '' };
 
 function accessIcon(url) {
   if (/^ssh:\/\//i.test(url)) return 'terminal';
@@ -29,8 +30,11 @@ export default function ProjectVaultPanel({ project, canManage }) {
   const [busy, setBusy] = useState(false);
   const [revealing, setRevealing] = useState(null);
   const [stepUpPassword, setStepUpPassword] = useState('');
-  const [revealed, setRevealed] = useState({});
+  const [revealed, setRevealed] = useState({}); // { [id]: { secret, rotatesAt, secretVersion } }
   const [editing, setEditing] = useState(null);
+  const sessionPasswordsRef = useRef({});
+
+  useEffect(() => () => { sessionPasswordsRef.current = {}; }, []);
 
   const items = data?.items || [];
 
@@ -77,15 +81,27 @@ export default function ProjectVaultPanel({ project, canManage }) {
     reload();
   }
 
-  async function doReveal(entry) {
+  async function doReveal(entry, currentPassword = stepUpPassword, silent) {
     try {
-      const res = await api.post(`/vault/${entry.id}/reveal`, { currentPassword: stepUpPassword });
-      setRevealed((r) => ({ ...r, [entry.id]: res.secret }));
-      setRevealing(null);
-      setStepUpPassword('');
+      const res = await api.post(`/vault/${entry.id}/reveal`, { currentPassword });
+      setRevealed((r) => ({ ...r, [entry.id]: { secret: res.secret, rotatesAt: res.rotatesAt, secretVersion: res.secretVersion } }));
+      if (currentPassword) sessionPasswordsRef.current[entry.id] = currentPassword;
+      if (!silent) {
+        setRevealing(null);
+        setStepUpPassword('');
+      }
     } catch (err) {
-      notify(err.message, { type: 'crit' });
+      if (silent) {
+        setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; });
+        delete sessionPasswordsRef.current[entry.id];
+      } else {
+        notify(err.message, { type: 'crit' });
+      }
     }
+  }
+
+  function silentRefresh(entry) {
+    doReveal(entry, sessionPasswordsRef.current[entry.id], true);
   }
 
   async function copy(secret) {
@@ -128,9 +144,17 @@ export default function ProjectVaultPanel({ project, canManage }) {
                     <Icon name="shield" size={12} /> Révéler
                   </span>
                 ) : (
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id])}>
-                    <Icon name="copy" size={12} /> Copier
-                  </span>
+                  <>
+                    <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id].secret)}>
+                      <Icon name="copy" size={12} /> Copier
+                    </span>
+                    <span
+                      className="btn-outline" title="Masquer" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }}
+                      onClick={() => { setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; }); delete sessionPasswordsRef.current[entry.id]; }}
+                    >
+                      <Icon name="eyeOff" size={12} />
+                    </span>
+                  </>
                 )}
                 {canManage && (
                   <>
@@ -144,8 +168,11 @@ export default function ProjectVaultPanel({ project, canManage }) {
                 )}
               </div>
               {revealed[entry.id] !== undefined && (
-                <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all' }}>
-                  {revealed[entry.id]}
+                <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>{revealed[entry.id].secret}</span>
+                  {revealed[entry.id].rotatesAt && (
+                    <RotationCountdown rotatesAt={revealed[entry.id].rotatesAt} onDue={() => silentRefresh(entry)} />
+                  )}
                 </div>
               )}
             </div>
@@ -210,6 +237,16 @@ export default function ProjectVaultPanel({ project, canManage }) {
             <div>
               <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès (optionnel)</label>
               <input className="input" autoComplete="off" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} placeholder="ssh://user@10.0.0.12" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Rotation automatique</label>
+              <select className="input" value={form.rotationMinutes} onChange={(e) => setForm((f) => ({ ...f, rotationMinutes: e.target.value }))}>
+                <option value="">Pas de rotation auto</option>
+                <option value="2">Toutes les 2 min</option>
+                <option value="3">Toutes les 3 min</option>
+                <option value="4">Toutes les 4 min</option>
+                <option value="5">Toutes les 5 min</option>
+              </select>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <span className="btn-outline" onClick={() => setFormOpen(false)}>Annuler</span>

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import {
-  listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret
+  listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret, nextRotationAt
 } from '../store/vaultStore.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
@@ -47,10 +47,10 @@ router.post('/dev', requireRole('admin'), asyncHandler(async (req, res) => {
 }));
 
 router.post('/prod', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { label, username, notes, url } = req.body || {};
+  const { label, username, notes, url, rotationMinutes } = req.body || {};
   if (!label) return res.status(400).json({ ok: false, error: 'Nom requis' });
-  const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, url, actor: req.user });
-  logAudit(req, 'vault.create', { id: entry.id, tier: 'prod', label });
+  const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, url, rotationMinutes, actor: req.user });
+  logAudit(req, 'vault.create', { id: entry.id, tier: 'prod', label, rotationMinutes: entry.rotationMinutes });
   res.status(201).json({ ok: true, entry });
 }));
 
@@ -77,7 +77,7 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
 
   const secret = revealVaultEntry(entry.id);
   logAudit(req, 'vault.reveal', { id: entry.id, tier: entry.tier, label: entry.label });
-  res.json({ ok: true, secret });
+  res.json({ ok: true, secret, secretVersion: entry.secretVersion || 1, rotatesAt: nextRotationAt(entry), rotationMinutes: entry.rotationMinutes || null });
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
@@ -87,9 +87,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (entry.tier !== 'project' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
   }
-  const { label, username, url, notes } = req.body || {};
-  const updated = updateVaultEntry(entry.id, { label, username, url, notes });
-  logAudit(req, 'vault.update', { id: entry.id, tier: entry.tier, label: updated.label });
+  const { label, username, url, notes, rotationMinutes } = req.body || {};
+  const updated = updateVaultEntry(entry.id, { label, username, url, notes, rotationMinutes });
+  logAudit(req, 'vault.update', { id: entry.id, tier: entry.tier, label: updated.label, rotationMinutes: updated.rotationMinutes });
   res.json({ ok: true, entry: updated });
 }));
 

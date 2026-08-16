@@ -14,6 +14,7 @@ import { scheduleDailyBackups } from './services/backupService.js';
 import { scheduleHourlyStatusSnapshot } from './services/statusHistoryService.js';
 import { scheduleCriticalHostsRefresh } from './services/hostMetricsService.js';
 import { scheduleInfraLoadSampling } from './services/infraLoadService.js';
+import { scheduleVaultRotation } from './services/vaultRotationService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -26,6 +27,7 @@ scheduleDailyBackups();
 scheduleHourlyStatusSnapshot();
 scheduleCriticalHostsRefresh();
 scheduleInfraLoadSampling();
+scheduleVaultRotation();
 
 const app = express();
 

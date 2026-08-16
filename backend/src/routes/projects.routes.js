@@ -724,10 +724,10 @@ router.get('/:id/vault', loadProjectAccess(), (req, res) => {
 });
 
 router.post('/:id/vault', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
-  const { label, username, secret, notes, url } = req.body || {};
+  const { label, username, secret, notes, url, rotationMinutes } = req.body || {};
   if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et secret requis' });
-  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: req.legacyProject.id, label, username, secret, notes, url, actor: req.user });
-  logAudit(req, 'vault.create', { id: entry.id, tier: 'project', projectId: req.legacyProject.id, label });
+  const entry = vaultStore.createVaultEntry({ tier: 'project', projectId: req.legacyProject.id, label, username, secret, notes, url, rotationMinutes, actor: req.user });
+  logAudit(req, 'vault.create', { id: entry.id, tier: 'project', projectId: req.legacyProject.id, label, rotationMinutes: entry.rotationMinutes });
   res.status(201).json({ ok: true, entry });
 }));
 

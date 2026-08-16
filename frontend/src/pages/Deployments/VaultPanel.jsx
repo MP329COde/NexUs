@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
@@ -6,9 +6,10 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import RotationCountdown from '../../components/vault/RotationCountdown.jsx';
 
 const EMPTY_DEV_FORM = { label: '', username: '', secret: '', url: '', notes: '' };
-const EMPTY_PROD_FORM = { label: '', username: '', url: '', notes: '' };
+const EMPTY_PROD_FORM = { label: '', username: '', url: '', notes: '', rotationMinutes: '' };
 
 // Icône selon le schéma de l'URL d'accès (ssh://, rdp://, http(s)://...) —
 // purement indicative, aucune analyse de sécurité de l'URL n'est faite ici.
@@ -45,8 +46,15 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
   const [revealStep, setRevealStep] = useState(1); // triple vérification prod : 1 avertissement, 2 mot de passe, 3 confirmation finale
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [stepUpPassword, setStepUpPassword] = useState('');
-  const [revealed, setRevealed] = useState({}); // { [id]: secret }
+  const [revealed, setRevealed] = useState({}); // { [id]: { secret, rotatesAt, secretVersion } }
   const [editing, setEditing] = useState(null); // entrée en cours d'édition (métadonnées seulement)
+  // Mot de passe conservé en mémoire (jamais persisté) le temps que le
+  // panneau reste ouvert, pour permettre la ré-révélation silencieuse à
+  // chaque rotation sans redemander le mot de passe à chaque fois — "rester
+  // connecté au projet pour continuer à visualiser les mots de passe".
+  const sessionPasswordsRef = useRef({});
+
+  useEffect(() => () => { sessionPasswordsRef.current = {}; }, []);
 
   const items = data?.items || [];
 
@@ -88,17 +96,32 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
     reload();
   }
 
-  async function doReveal(entry, currentPassword) {
+  async function doReveal(entry, currentPassword, silent) {
     try {
       const res = await api.post(`/vault/${entry.id}/reveal`, currentPassword ? { currentPassword } : {});
-      setRevealed((r) => ({ ...r, [entry.id]: res.secret }));
-      setRevealing(null);
-      setStepUpPassword('');
-      setRevealStep(1);
-      setConfirmChecked(false);
+      setRevealed((r) => ({ ...r, [entry.id]: { secret: res.secret, rotatesAt: res.rotatesAt, secretVersion: res.secretVersion } }));
+      if (currentPassword) sessionPasswordsRef.current[entry.id] = currentPassword;
+      if (!silent) {
+        setRevealing(null);
+        setStepUpPassword('');
+        setRevealStep(1);
+        setConfirmChecked(false);
+      }
     } catch (err) {
-      notify(err.message, { type: 'crit' });
+      if (silent) {
+        // La ré-authentification en mémoire a expiré (session déconnectée) —
+        // on masque le secret plutôt que d'insister silencieusement.
+        setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; });
+        delete sessionPasswordsRef.current[entry.id];
+      } else {
+        notify(err.message, { type: 'crit' });
+      }
     }
+  }
+
+  function silentRefresh(entry) {
+    const pw = sessionPasswordsRef.current[entry.id];
+    doReveal(entry, pw, true);
   }
 
   function startReveal(entry) {
@@ -142,9 +165,17 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
                   <Icon name="shield" size={12} /> Révéler
                 </span>
               ) : (
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id])}>
-                  <Icon name="copy" size={12} /> Copier
-                </span>
+                <>
+                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id].secret)}>
+                    <Icon name="copy" size={12} /> Copier
+                  </span>
+                  <span
+                    className="btn-outline" title="Masquer" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }}
+                    onClick={() => { setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; }); delete sessionPasswordsRef.current[entry.id]; }}
+                  >
+                    <Icon name="eyeOff" size={12} />
+                  </span>
+                </>
               )}
               {canManage && (
                 <>
@@ -159,8 +190,11 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
             </div>
 
             {revealed[entry.id] !== undefined && (
-              <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all' }}>
-                {revealed[entry.id]}
+              <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>{revealed[entry.id].secret}</span>
+                {revealed[entry.id].rotatesAt && (
+                  <RotationCountdown rotatesAt={revealed[entry.id].rotatesAt} onDue={() => silentRefresh(entry)} />
+                )}
               </div>
             )}
           </div>
@@ -252,6 +286,19 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
             <input className="input" type="password" autoComplete="new-password" placeholder="Mot de passe" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} style={{ flex: '1 1 140px' }} />
           )}
           <input className="input" autoComplete="off" placeholder="URL d'accès (optionnel) — ssh://…" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} style={{ flex: '1 1 200px' }} />
+          {tier === 'prod' && (
+            <select
+              className="input" value={form.rotationMinutes}
+              onChange={(e) => setForm((f) => ({ ...f, rotationMinutes: e.target.value }))}
+              style={{ flex: '1 1 170px' }} title="Rotation automatique du secret"
+            >
+              <option value="">Pas de rotation auto</option>
+              <option value="2">Rotation toutes les 2 min</option>
+              <option value="3">Rotation toutes les 3 min</option>
+              <option value="4">Rotation toutes les 4 min</option>
+              <option value="5">Rotation toutes les 5 min</option>
+            </select>
+          )}
           <button className="btn" type="submit" disabled={busy} style={{ flex: 'none' }}>
             {busy ? 'Ajout…' : tier === 'prod' ? 'Générer & ajouter' : 'Ajouter'}
           </button>
