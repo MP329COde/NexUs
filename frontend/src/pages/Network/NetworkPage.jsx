@@ -8,6 +8,7 @@ import { useNotify } from '../../context/NotificationContext.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import ProxyFormDialog from './ProxyFormDialog.jsx';
 import AttachFrontendDialog from './AttachFrontendDialog.jsx';
+import './NetworkPage.css';
 
 export default function NetworkPage() {
   const proxies = useApi(() => api.get('/proxies'), [], { pollMs: 20000 });
@@ -53,13 +54,13 @@ export default function NetworkPage() {
         title="Réseaux"
         sub="Reverse proxies, domaines, TLS et routage vers vos services"
         actions={(
-          <button className="btn" onClick={() => { setEditing(null); setFormOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <button className="btn network-header-action" onClick={() => { setEditing(null); setFormOpen(true); }}>
             <Icon name="plus" size={15} />Nouveau proxy
           </button>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="network-panel-grid">
         <Panel title="Reverse proxies" sub="Gérés depuis la console (Traefik ou HAProxy)" span={12}>
           <DataTable
             columns={['Nom', 'Domaine', 'Cible', 'Moteur', 'TLS', 'Statut', 'Important', 'Actions']}
@@ -79,19 +80,19 @@ export default function NetworkPage() {
                   </span>
                 </td>
                 <td>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Affiché dans la disponibilité 24h de l'accueil">
+                  <label className="network-critical-toggle" title="Affiché dans la disponibilité 24h de l'accueil">
                     <input type="checkbox" checked={Boolean(p.critical)} onChange={() => toggleCritical(p)} />
                   </label>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span className="btn-outline" style={btnMini} onClick={() => { setEditing(p); setFormOpen(true); }}><Icon name="edit" size={13} />Modifier</span>
-                    <span className="btn-outline" style={btnMini} onClick={() => apply(p.id)}><Icon name="sync" size={13} />Appliquer</span>
+                  <div className="network-row-actions">
+                    <span className="btn-outline network-action-btn" onClick={() => { setEditing(p); setFormOpen(true); }}><Icon name="edit" size={13} />Modifier</span>
+                    <span className="btn-outline network-action-btn" onClick={() => apply(p.id)}><Icon name="sync" size={13} />Appliquer</span>
                     {p.engine === 'haproxy' && (
-                      <span className="btn-outline" style={btnMini} onClick={() => setAttaching(p)}><Icon name="gitBranch" size={13} />Frontend</span>
+                      <span className="btn-outline network-action-btn" onClick={() => setAttaching(p)}><Icon name="gitBranch" size={13} />Frontend</span>
                     )}
-                    <span className="btn-outline" style={btnMini} onClick={() => testConnection(p.id)}><Icon name="externalLink" size={13} />Tester</span>
-                    <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => remove(p.id)}><Icon name="trash" size={13} />Suppr.</span>
+                    <span className="btn-outline network-action-btn" onClick={() => testConnection(p.id)}><Icon name="externalLink" size={13} />Tester</span>
+                    <span className="btn-outline network-action-btn network-action-btn-danger" onClick={() => remove(p.id)}><Icon name="trash" size={13} />Suppr.</span>
                   </div>
                 </td>
               </tr>
@@ -112,7 +113,7 @@ export default function NetworkPage() {
                 <td>
                   {d.certificate
                     ? <span className={`badge badge-${d.certificate.ready ? 'ok' : 'warn'}`}><span className="dot" />{d.certificate.name}</span>
-                    : <span className="faint" style={{ fontSize: 12.5 }}>—</span>}
+                    : <span className="faint network-cert-empty">—</span>}
                 </td>
               </tr>
             )}
@@ -132,5 +133,3 @@ export default function NetworkPage() {
     </>
   );
 }
-
-const btnMini = { height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 5 };
