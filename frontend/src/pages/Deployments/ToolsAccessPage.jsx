@@ -7,6 +7,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './ToolsAccessPage.css';
 
 const CATEGORY_BY_KEY = {
   gitlab: 'Code & revue', github: 'Code & revue',
@@ -90,13 +91,13 @@ export default function ToolsAccessPage() {
         title="Accès aux outils"
         sub="Point d'entrée vers la chaîne de développement. Chaque lien ouvre l'outil concerné."
         actions={(
-          <button className="btn" onClick={() => setFormOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <button className="btn tools-header-action" onClick={() => setFormOpen(true)}>
             <Icon name="plus" size={14} />Ajouter un raccourci
           </button>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="tools-kpi-grid">
         <KpiCard label="Outils connectés" value={connectedCount} unit={`/ ${cards.length}`} tint="#3B82F6" />
         <KpiCard label="Ouverts aujourd'hui" value={openedToday} tint="#8B5CF6" note="raccourcis suivis" />
         <KpiCard label="Raccourcis personnalisés" value={shortcutItems.length} tint="#F59E0B" />
@@ -105,22 +106,22 @@ export default function ToolsAccessPage() {
 
       {formOpen && (
         <Modal title="Ajouter un raccourci" sub="Lien manuel vers un outil externe non intégré" onClose={() => setFormOpen(false)} width={440}>
-          <form onSubmit={addShortcut} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={addShortcut} className="tools-form-fields">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="tools-form-label">Nom</label>
               <input className="input" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="SonarQube" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL</label>
+              <label className="tools-form-label">URL</label>
               <input className="input" required type="url" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} placeholder="https://sonar.lab.local" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Catégorie</label>
+              <label className="tools-form-label">Catégorie</label>
               <select className="input" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
                 {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="tools-form-actions">
               <span className="btn-outline" onClick={() => setFormOpen(false)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Ajout…' : 'Ajouter'}</button>
             </div>
@@ -128,41 +129,40 @@ export default function ToolsAccessPage() {
         </Modal>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="tools-category-grid">
         {CATEGORY_ORDER.map((cat) => {
           const items = cards.filter((c) => c.category === cat);
           return (
-            <Panel key={cat} title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name={CATEGORY_ICON[cat]} size={13} style={{ color: 'var(--text-faint)' }} />{cat}</span>)} sub={CATEGORY_SUB[cat]} span={6}>
+            <Panel
+              key={cat}
+              title={(<span className="tools-panel-title"><Icon name={CATEGORY_ICON[cat]} size={13} className="tools-panel-title-icon" />{cat}</span>)}
+              sub={CATEGORY_SUB[cat]}
+              span={6}
+            >
               {items.length === 0 ? (
-                <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)', textAlign: 'center' }}>Aucun outil dans cette catégorie</div>
+                <div className="tools-category-empty">Aucun outil dans cette catégorie</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, padding: 14 }}>
+                <div className="tools-card-grid">
                   {items.map((c) => (
-                    <div
-                      key={c.key}
-                      onClick={() => openCard(c)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', cursor: c.url ? 'pointer' : 'default', position: 'relative' }}
-                    >
-                      <span style={{
-                        width: 32, height: 32, borderRadius: 8, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: c.configured ? (c.ok ? 'var(--tone-ok-soft, var(--primary-soft))' : 'var(--tone-crit-soft, var(--primary-soft))') : 'var(--border-soft)',
-                        color: c.configured ? (c.ok ? 'var(--tone-ok-fg)' : 'var(--tone-crit-fg)') : 'var(--text-faint)'
-                      }}>
+                    <div key={c.key} onClick={() => openCard(c)} className={`tools-card${c.url ? ' tools-card-clickable' : ''}`}>
+                      <span
+                        className="tools-card-icon"
+                        style={{
+                          background: c.configured ? (c.ok ? 'var(--tone-ok-soft, var(--primary-soft))' : 'var(--tone-crit-soft, var(--primary-soft))') : 'var(--border-soft)',
+                          color: c.configured ? (c.ok ? 'var(--tone-ok-fg)' : 'var(--tone-crit-fg)') : 'var(--text-faint)'
+                        }}
+                      >
                         <Icon name={c.icon} size={15} />
                       </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
-                        <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div className="tools-card-body">
+                        <div className="tools-card-label">{c.label}</div>
+                        <div className="mono tools-card-url">
                           {c.configured ? (c.url ? c.url.replace(/^https?:\/\//, '') : 'connecté') : 'Non configuré'}
                         </div>
                       </div>
-                      {c.url && <Icon name="externalLink" size={13} style={{ color: 'var(--text-faint)', flex: 'none' }} />}
+                      {c.url && <Icon name="externalLink" size={13} className="tools-card-external-icon" />}
                       {c.kind === 'shortcut' && (
-                        <span
-                          onClick={(e) => { e.stopPropagation(); removeShortcut(c.id); }}
-                          title="Retirer"
-                          style={{ position: 'absolute', top: 4, right: 4, color: 'var(--text-faintest)', cursor: 'pointer' }}
-                        >
+                        <span onClick={(e) => { e.stopPropagation(); removeShortcut(c.id); }} title="Retirer" className="tools-card-remove">
                           <Icon name="x" size={12} />
                         </span>
                       )}
@@ -176,25 +176,25 @@ export default function ToolsAccessPage() {
       </div>
 
       <Panel title="État des intégrations de la chaîne" sub="Statut en direct" span={12}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <div className="tools-table-wrap">
+          <table className="tools-table">
             <thead>
               <tr>
                 {['Outil', 'Domaine', 'État', 'Message', 'Latence'].map((c) => (
-                  <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                  <th key={c} className="tools-table-head">{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {integrations.map((e) => (
-                <tr key={e.key} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                  <td style={{ padding: '9px 16px', fontWeight: 600 }}>{e.label}</td>
-                  <td style={{ padding: '9px 16px', color: 'var(--text-muted)' }}>{CATEGORY_BY_KEY[e.key] || '—'}</td>
-                  <td style={{ padding: '9px 16px' }}>
+                <tr key={e.key} className="tools-table-row">
+                  <td className="tools-table-cell tools-table-cell-name">{e.label}</td>
+                  <td className="tools-table-cell tools-table-cell-domain">{CATEGORY_BY_KEY[e.key] || '—'}</td>
+                  <td className="tools-table-cell">
                     <span className={`badge badge-${e.configured ? (e.ok ? 'ok' : 'crit') : 'mut'}`}><span className="dot" />{e.configured ? (e.ok ? 'Connecté' : 'Erreur') : 'Non configuré'}</span>
                   </td>
-                  <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{e.message}</td>
-                  <td style={{ padding: '9px 16px' }} className="mono muted">{e.latencyMs} ms</td>
+                  <td className="tools-table-cell tools-table-cell-message">{e.message}</td>
+                  <td className="tools-table-cell mono muted">{e.latencyMs} ms</td>
                 </tr>
               ))}
             </tbody>
