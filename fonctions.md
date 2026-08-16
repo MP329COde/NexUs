@@ -115,7 +115,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Développement (Deployments)
 
-- **ProjectsPage.jsx** — Liste/création de projets.
+- **ProjectsPage.jsx** — Liste/création de projets, **icône (emoji) et couleur personnalisées**.
 - **ProjectDetailPage.jsx** — Fiche projet complète.
 - **OrganizationsPage.jsx** — Organisations (socle PostgreSQL).
 - **GitReposPage.jsx** — Dépôts GitLab+GitHub, étiquetage manuel.
@@ -236,6 +236,7 @@ Cette section liste des pistes non implémentées, à prioriser avec l'utilisate
 - Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
-- Rôles par projet/organisation avec icônes personnalisées, plusieurs projets par organisation (déjà partiellement en place via le socle relationnel — à vérifier/étendre).
+- Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
+- Rôles par projet avec granularité fine par ressource (au-delà de viewer/developer/maintainer/owner déjà en place via le socle relationnel).
 
 Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) — existaient déjà avant cet inventaire.
