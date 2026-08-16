@@ -73,6 +73,57 @@ export function projectRoleAtLeast(role, min) {
   return (PROJECT_ROLE_RANK[role] || 0) >= (PROJECT_ROLE_RANK[min] || 0);
 }
 
+// --- Octrois d'accès par ressource (granularité fine, en complément du rôle
+// global — voir migrations/0011_project_resource_grants.sql) ---
+
+const RESOURCE_LEVEL_RANK = { read: 1, write: 2 };
+// Rôle global minimal qui donne déjà accès à une ressource, indépendamment
+// de tout octroi — un octroi ne fait jamais que combler l'écart en dessous
+// de ce seuil, jamais le dépasser à la baisse.
+const RESOURCE_BASE_ROLE = { vault: 'developer' };
+
+export function hasResourceAccess(projectRole, grantLevel, resource, minLevel) {
+  if (projectRoleAtLeast(projectRole, RESOURCE_BASE_ROLE[resource])) return true;
+  if (!grantLevel) return false;
+  return (RESOURCE_LEVEL_RANK[grantLevel] || 0) >= (RESOURCE_LEVEL_RANK[minLevel] || 0);
+}
+
+export function resourceLevelAtLeast(level, min) {
+  if (!level) return false;
+  return (RESOURCE_LEVEL_RANK[level] || 0) >= (RESOURCE_LEVEL_RANK[min] || 0);
+}
+
+export async function listResourceGrants(projectId) {
+  const { rows } = await query(
+    'SELECT * FROM project_resource_grants WHERE project_id = $1 ORDER BY resource, user_id',
+    [projectId]
+  );
+  return rows;
+}
+
+export async function getResourceGrant(projectId, userId, resource) {
+  const { rows } = await query(
+    'SELECT * FROM project_resource_grants WHERE project_id = $1 AND user_id = $2 AND resource = $3',
+    [projectId, userId, resource]
+  );
+  return rows[0] || null;
+}
+
+export async function setResourceGrant(projectId, userId, resource, level, grantedBy) {
+  if (!level) {
+    await query('DELETE FROM project_resource_grants WHERE project_id = $1 AND user_id = $2 AND resource = $3', [projectId, userId, resource]);
+    return null;
+  }
+  const { rows } = await query(
+    `INSERT INTO project_resource_grants (project_id, user_id, resource, level, granted_by)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (project_id, user_id, resource) DO UPDATE SET level = excluded.level, granted_by = excluded.granted_by
+     RETURNING *`,
+    [projectId, userId, resource, level, grantedBy]
+  );
+  return rows[0];
+}
+
 export async function listProjectsForUser(userId) {
   const { rows } = await query(
     `SELECT DISTINCT p.*, COALESCE(pm.role,

@@ -793,12 +793,28 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
   const [adding, setAdding] = useState(false);
   const migrated = members?.migrated;
   const items = migrated ? members.items : null;
+  const grants = useApi(() => (migrated && canManage ? api.get(`/projects/${projectId}/resource-grants`) : Promise.resolve(null)), [projectId, migrated, canManage]);
+  const grantFor = (userId) => grants.data?.items?.find((g) => g.user_id === userId && g.resource === 'vault');
 
   async function setRole(userId, role) {
     try {
       await api.put(`/projects/${projectId}/members/${userId}`, { role });
       notify('Rôle mis à jour', { type: 'ok' });
       onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
+  // Octroi ponctuel d'accès au coffre-fort du projet, indépendant du rôle
+  // global — utile pour un viewer/developer qui doit consulter ou éditer des
+  // secrets sans être promu maintainer sur tout le reste (voir
+  // orgStore.hasResourceAccess, vault.routes.js).
+  async function setVaultGrant(userId, level) {
+    try {
+      await api.put(`/projects/${projectId}/resource-grants/${userId}/vault`, { level: level || undefined });
+      notify(level ? 'Accès coffre-fort accordé' : 'Accès coffre-fort retiré', { type: 'ok' });
+      grants.reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
     }
@@ -817,16 +833,30 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
             ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
             : items.map((m) => (
                 canManage ? (
-                  <label key={m.user_id} className="badge badge-vio" style={{ gap: 4 }}>
-                    <span className="dot" />{userName(m.user_id)}
-                    <select
-                      value={m.role}
-                      onChange={(e) => setRole(m.user_id, e.target.value)}
-                      style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 11, cursor: 'pointer' }}
-                    >
-                      {Object.entries(TEAM_ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                  </label>
+                  <div key={m.user_id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <label className="badge badge-vio" style={{ gap: 4 }}>
+                      <span className="dot" />{userName(m.user_id)}
+                      <select
+                        value={m.role}
+                        onChange={(e) => setRole(m.user_id, e.target.value)}
+                        style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                      >
+                        {Object.entries(TEAM_ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </label>
+                    {roleAtLeast(m.role, 'developer') ? null : (
+                      <select
+                        value={grantFor(m.user_id)?.level || ''}
+                        onChange={(e) => setVaultGrant(m.user_id, e.target.value)}
+                        title="Accès ponctuel au coffre-fort du projet, sans changer le rôle global"
+                        style={{ fontSize: 10, height: 20, border: '1px dashed var(--border-soft)', borderRadius: 5, background: 'transparent', color: 'var(--text-faint)' }}
+                      >
+                        <option value="">Coffre-fort : aucun accès</option>
+                        <option value="read">Coffre-fort : lecture</option>
+                        <option value="write">Coffre-fort : lecture + édition</option>
+                      </select>
+                    )}
+                  </div>
                 ) : (
                   <span key={m.user_id} className="badge badge-vio">
                     <span className="dot" />{userName(m.user_id)} · {TEAM_ROLE_LABEL[m.role] || m.role}
