@@ -51,6 +51,7 @@ export function createUser({ email, password, name, username, role = 'user', mus
     passwordHash: hashPassword(password),
     avatarEmoji: null,
     avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
+    avatarImage: null, // data URL (image importée) — prioritaire sur avatarEmoji à l'affichage
     theme: null,
     mustOnboard,
     // Palier du Terminal sécurisé — indépendant du rôle admin/user : null
@@ -70,7 +71,7 @@ export function updateUser(id, patch) {
   const users = listUsers();
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
-  const allowed = ['name', 'avatarEmoji', 'avatarColor', 'theme'];
+  const allowed = ['name', 'avatarEmoji', 'avatarColor', 'avatarImage', 'theme'];
   for (const key of allowed) {
     if (patch[key] !== undefined) users[idx][key] = patch[key] || null;
   }

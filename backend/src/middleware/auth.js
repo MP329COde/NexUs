@@ -15,7 +15,7 @@ export function signSession(user) {
 export function toPublicUser(user) {
   return {
     id: user.id, email: user.email, name: user.name, username: user.username || null, role: user.role,
-    active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor,
+    active: user.active !== false, avatarEmoji: user.avatarEmoji, avatarColor: user.avatarColor, avatarImage: user.avatarImage || null,
     theme: user.theme || 'system', mustOnboard: user.mustOnboard === true,
     terminalTier: user.role === 'admin' ? 'admin' : (user.terminalTier || null)
   };

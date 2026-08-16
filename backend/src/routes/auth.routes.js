@@ -16,6 +16,21 @@ const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 // différents, qui lui reste couvert par le seul rate-limit IP générique.
 const AUTO_BAN_ATTEMPTS = 12;
 
+// data URL uniquement (jamais une URL distante — pas de SSRF possible côté
+// serveur puisque rien n'est jamais fetché) ; limite haute généreuse mais
+// bornée pour éviter qu'un avatar ne gonfle indéfiniment le store SQLite
+// (~700 Ko encodé ≈ 512 Ko d'image brute, largement suffisant après le
+// redimensionnement côté client à 256×256).
+const AVATAR_IMAGE_PATTERN = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+const AVATAR_IMAGE_MAX_LENGTH = 700_000;
+
+function validateAvatarImage(avatarImage) {
+  if (!avatarImage) return null;
+  if (avatarImage.length > AVATAR_IMAGE_MAX_LENGTH) return 'Image trop volumineuse (700 Ko max une fois encodée)';
+  if (!AVATAR_IMAGE_PATTERN.test(avatarImage)) return 'Format d\'image invalide (PNG, JPEG, WEBP ou GIF attendu)';
+  return null;
+}
+
 router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
   const user = email && findUserByEmail(email);
@@ -73,17 +88,37 @@ router.get('/me', requireAuth, (req, res) => {
 const THEME_VALUES = ['system', 'light', 'dark', 'schedule'];
 
 router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
-  const { name, avatarEmoji, avatarColor, theme } = req.body || {};
+  const { name, avatarEmoji, avatarColor, avatarImage, theme } = req.body || {};
   if (avatarColor && !AVATAR_COLOR_PATTERN.test(avatarColor)) {
     return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
   }
   if (avatarEmoji && [...avatarEmoji].length > 2) {
     return res.status(400).json({ ok: false, error: 'Avatar trop long (1 à 2 caractères/emoji)' });
   }
+  const avatarImageError = validateAvatarImage(avatarImage);
+  if (avatarImageError) return res.status(400).json({ ok: false, error: avatarImageError });
   if (theme && !THEME_VALUES.includes(theme)) {
     return res.status(400).json({ ok: false, error: `Thème invalide (attendu: ${THEME_VALUES.join(', ')})` });
   }
-  const updated = updateUser(req.user.id, { name, avatarEmoji, avatarColor, theme });
+  // Image et emoji sont mutuellement exclusifs à l'affichage (voir
+  // components/ui/Avatar.jsx) : renseigner explicitement l'un efface l'autre,
+  // pour ne jamais laisser les deux enregistrés en même temps.
+  const body = req.body || {};
+  const patch = { name, theme };
+  if (Object.prototype.hasOwnProperty.call(body, 'avatarImage')) {
+    patch.avatarImage = avatarImage;
+    patch.avatarEmoji = avatarImage ? '' : avatarEmoji;
+  } else if (Object.prototype.hasOwnProperty.call(body, 'avatarEmoji')) {
+    // Le formulaire envoie toujours avatarEmoji (même vide, pour revenir aux
+    // initiales) quand aucune image n'est sélectionnée — ce champ étant
+    // présent, l'image précédente doit être effacée dans tous les cas,
+    // sinon "Retirer l'image importée" puis "Enregistrer" ne fait rien.
+    patch.avatarEmoji = avatarEmoji;
+    patch.avatarImage = '';
+  }
+  if (avatarColor !== undefined) patch.avatarColor = avatarColor;
+  const updated = updateUser(req.user.id, patch);
+  logAudit(req, 'auth.profile.updated', { avatarImageChanged: avatarImage !== undefined });
   res.json({ ok: true, user: toPublicUser(updated) });
 }));
 
