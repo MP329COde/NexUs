@@ -160,7 +160,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
 - **ReportPage.jsx** — Rapport imprimable.
 - **ManualPage.jsx** — Documentation intégrée.
-- **AccountPage.jsx** — Profil utilisateur, préférences.
+- **AccountPage.jsx** — Profil utilisateur, préférences, **import d'image de profil** (redimensionnement client 256×256, mutuellement exclusif avec l'emoji).
 
 ### Connexion / Onboarding / Installation
 
@@ -186,6 +186,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 ## Frontend — Composants partagés notables
 
 - **components/vault/RotationCountdown.jsx** — Compte à rebours avant rotation automatique d'un secret, ré-authentification silencieuse tant que le panneau reste ouvert.
+- **components/ui/Avatar.jsx** — Avatar utilisateur à trois niveaux (image importée > emoji > initiales), utilisé par Header.jsx et AccountPage.jsx.
 
 ## Intégrations externes
 
@@ -231,5 +232,4 @@ Cette section liste des pistes non implémentées, à prioriser avec l'utilisate
 - Connexion par nom d'utilisateur (sans email) + clés d'accès (WebAuthn/passkeys).
 - Système de demande de permission (utilisateur → admin) avec notification, pour le terminal Kubernetes sécurisé.
 - Redirection directe vers Proxmox/ArgoCD depuis les pages Infrastructure/CI-CD avec la bonne URL.
-- Import d'image de profil utilisateur.
 - Rôles par projet/organisation avec icônes personnalisées, plusieurs projets par organisation (déjà partiellement en place via le socle relationnel — à vérifier/étendre).
