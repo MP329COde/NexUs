@@ -1,0 +1,133 @@
+.env-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.env-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.env-project-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.env-toggle-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.env-table-wrap {
+  overflow-x: auto;
+}
+
+.env-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.env-table-head {
+  text-align: left;
+  padding: 8px 14px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.env-table-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.env-table-cell {
+  padding: 9px 14px;
+}
+
+.env-badge-kind {
+  margin-right: 6px;
+}
+
+.env-link-form {
+  display: flex;
+  gap: 6px;
+}
+
+.env-link-input {
+  height: 26px;
+  font-size: 11.5px;
+  width: 140px;
+}
+
+.env-link-save-btn {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.env-link-value {
+  cursor: pointer;
+}
+
+.env-link-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.env-app-error {
+  font-size: 11px;
+}
+
+.env-promote-select {
+  height: 26px;
+  font-size: 11.5px;
+}
+
+.env-promote-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
+
+.env-history {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.env-history-heading {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.env-history-empty {
+  font-size: 12px;
+}
+
+.env-history-row {
+  display: flex;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.env-history-icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.env-history-meta {
+  font-size: 10.5px;
+}
