@@ -49,6 +49,22 @@ function summarize(reports, rootPath) {
   return { total: findings.length, findings: findings.slice(0, 200) };
 }
 
+// Scan d'un répertoire arbitraire déjà cloné sur disque — voir
+// projectScanService.js pour l'analyse IaC par projet (Dockerfiles,
+// docker-compose, Terraform) plutôt que la seule plateforme elle-même.
+export async function scanDirectory(dirPath, frameworks = 'dockerfile,terraform') {
+  const stdout = await run(['-d', dirPath, '--framework', frameworks, '-o', 'json', '--compact', '--quiet']);
+  let report;
+  try {
+    report = JSON.parse(stdout);
+  } catch (err) {
+    logger.error({ err, dirPath }, 'Sortie Checkov illisible');
+    throw Object.assign(new Error('Réponse Checkov illisible'), { status: 502 });
+  }
+  const { total, findings } = summarize(report, dirPath);
+  return { scannedAt: new Date().toISOString(), frameworks, total, findings };
+}
+
 export async function scanIac() {
   const stdout = await run(['-d', REPO_ROOT, '--framework', FRAMEWORKS, '-o', 'json', '--compact', '--quiet']);
   let report;

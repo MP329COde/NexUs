@@ -29,6 +29,7 @@ export default function ProjectDetailPage() {
   const changes = useApi(() => api.get(`/projects/${id}/changes`), [id]);
   const maintenanceWindows = useApi(() => api.get(`/projects/${id}/maintenance-windows`), [id]);
   const jobs = useApi(() => api.get(`/projects/${id}/jobs`), [id], { pollMs: 10000 });
+  const securityScans = useApi(() => api.get(`/projects/${id}/security-scans`), [id]);
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
@@ -208,6 +209,16 @@ export default function ProjectDetailPage() {
           projectId={id}
           role={projectRole}
           onChanged={jobs.reload}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <SecurityScansPanel
+          scans={securityScans.data?.items || []}
+          repoCount={p.repoKeys.length}
+          projectId={id}
+          role={projectRole}
+          onChanged={securityScans.reload}
         />
       </div>
 
@@ -574,6 +585,81 @@ function JobsPanel({ jobs, projectId, role, onChanged }) {
         ))}
       </div>
     </Panel>
+  );
+}
+
+// DevSecOps par projet : SAST (Semgrep) + SCA (Trivy fs) + IaC (Checkov) sur
+// les dépôts réellement liés au projet, exécutés en clonant temporairement
+// chaque dépôt côté backend (voir routes/projects.routes.js
+// GET/POST /:id/security-scans) — distinct des scans "plateforme entière"
+// de Supply Chain Security.
+function SecurityScansPanel({ scans, repoCount, projectId, role, onChanged }) {
+  const notify = useNotify();
+  const [running, setRunning] = useState(false);
+  const canRun = roleAtLeast(role, 'maintainer');
+  const latest = scans[0];
+
+  async function run() {
+    setRunning(true);
+    try {
+      await api.post(`/projects/${projectId}/security-scans`, {});
+      notify('Scan de sécurité terminé', { type: 'ok' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <Panel
+      title="Sécurité du code (SAST / SCA / IaC)"
+      sub="Semgrep, Trivy et Checkov sur les dépôts liés à ce projet"
+      span={12}
+      actions={canRun && (
+        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6, cursor: repoCount === 0 ? 'not-allowed' : 'pointer', opacity: repoCount === 0 ? 0.5 : 1 }} onClick={repoCount > 0 ? run : undefined}>
+          <Icon name={running ? 'refresh' : 'shield'} size={12} className={running ? 'spin' : ''} />{running ? 'Analyse en cours…' : 'Lancer un scan'}
+        </span>
+      )}
+    >
+      {repoCount === 0 ? (
+        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun dépôt rattaché à ce projet.</div>
+      ) : scans.length === 0 ? (
+        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun scan lancé pour l'instant.</div>
+      ) : (
+        <div style={{ padding: '4px 16px 16px' }}>
+          <div className="faint" style={{ fontSize: 11, marginBottom: 10 }}>Dernier scan : {new Date(latest.createdAt).toLocaleString('fr-FR')}</div>
+          {latest.results.map((r) => (
+            <div key={r.repoKey} style={{ padding: '10px 0', borderTop: '1px solid var(--border-soft)' }}>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{r.repoKey}</div>
+              {r.error ? (
+                <div style={{ fontSize: 12, color: 'var(--tone-crit-fg)' }}>{r.error}</div>
+              ) : (
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <ScanResultBadge label="SAST (Semgrep)" result={r.sast} />
+                  <ScanResultBadge label="SCA (Trivy)" result={r.sca} />
+                  <ScanResultBadge label="IaC (Checkov)" result={r.iac} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function ScanResultBadge({ label, result }) {
+  if (result?.error) {
+    return <div style={{ fontSize: 11.5 }}><span className="faint">{label} : </span><span style={{ color: 'var(--tone-crit-fg)' }}>{result.error}</span></div>;
+  }
+  const total = result?.total ?? 0;
+  return (
+    <div style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span className="faint">{label}</span>
+      <span className={`badge badge-${total > 0 ? 'warn' : 'ok'}`}><span className="dot" />{total} problème(s)</span>
+    </div>
   );
 }
 

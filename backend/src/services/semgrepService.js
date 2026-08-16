@@ -77,3 +77,21 @@ export async function scanCode(target) {
   const { counts, total, findings } = summarize(report, REPO_ROOT);
   return { target, scannedAt: new Date().toISOString(), counts, total, findings };
 }
+
+// Scan d'un répertoire arbitraire déjà présent sur disque (jamais un chemin
+// fourni tel quel par le client — voir projectScanService.js, qui clone
+// d'abord le dépôt d'un projet dans un dossier temporaire contrôlé par le
+// backend avant d'appeler cette fonction). Même sortie que scanCode(),
+// utilisée pour le SAST par projet plutôt que le seul code de la plateforme.
+export async function scanDirectory(dirPath) {
+  const stdout = await run(['--config', 'auto', '--json', '--quiet', '--timeout', '100', dirPath]);
+  let report;
+  try {
+    report = JSON.parse(stdout);
+  } catch (err) {
+    logger.error({ err, dirPath }, 'Sortie Semgrep illisible');
+    throw Object.assign(new Error('Réponse Semgrep illisible'), { status: 502 });
+  }
+  const { counts, total, findings } = summarize(report, dirPath);
+  return { scannedAt: new Date().toISOString(), counts, total, findings };
+}

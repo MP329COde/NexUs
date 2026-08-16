@@ -22,6 +22,8 @@ import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } 
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
+import { scanProjectRepos } from '../services/projectScanService.js';
+import * as projectScansStore from '../store/projectScansStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -205,6 +207,25 @@ router.delete('/:id', loadProjectAccess(), requireMinRole('owner'), asyncHandler
 }));
 
 // --- Membres et rôles (socle relationnel uniquement) ---
+// DevSecOps par projet : SAST (Semgrep), SCA (Trivy fs) et IaC (Checkov) sur
+// les dépôts réellement liés au projet, contrairement aux scans "plateforme
+// entière" de codeScans.routes.js/iacScans.routes.js. Lancer un scan est au
+// moins aussi sensible qu'un job de synchronisation (clone via jeton Git
+// configuré) : maintainer+, comme le reste des actions d'écriture du projet.
+router.get('/:id/security-scans', loadProjectAccess(), asyncHandler(async (req, res) => {
+  res.json({ ok: true, items: projectScansStore.listScans(req.legacyProject.id) });
+}));
+
+router.post('/:id/security-scans', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const repoKeys = req.legacyProject.repoKeys || [];
+  if (repoKeys.length === 0) return res.status(400).json({ ok: false, error: 'Aucun dépôt lié à ce projet' });
+  const results = await scanProjectRepos(repoKeys);
+  const entry = projectScansStore.recordScan(req.legacyProject.id, results);
+  const totalFindings = results.reduce((sum, r) => sum + (r.sast?.total || 0) + (r.sca?.total || 0) + (r.iac?.total || 0), 0);
+  logAudit(req, 'project.securityScan.run', { projectId: req.legacyProject.id, repoCount: repoKeys.length, totalFindings });
+  res.status(201).json({ ok: true, scan: entry });
+}));
+
 router.get('/:id/members', loadProjectAccess(), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
   res.json({ ok: true, items: await orgStore.listMembers(req.pgProject.id), migrated: true });

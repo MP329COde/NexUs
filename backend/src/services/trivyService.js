@@ -72,3 +72,20 @@ export async function scanImage(imageRef) {
     counts, total, findings
   };
 }
+
+// SCA (Software Composition Analysis) sur les dépendances déclarées d'un
+// répertoire déjà cloné sur disque (package-lock.json, requirements.txt,
+// go.sum...) — `trivy fs`, complémentaire au scan d'image ci-dessus. Voir
+// projectScanService.js pour le clonage contrôlé côté projet.
+export async function scanFilesystem(dirPath) {
+  const stdout = await run(['fs', '--format', 'json', '--quiet', '--timeout', '120s', dirPath]);
+  let report;
+  try {
+    report = JSON.parse(stdout);
+  } catch (err) {
+    logger.error({ err, dirPath }, 'Sortie Trivy illisible');
+    throw Object.assign(new Error('Réponse Trivy illisible'), { status: 502 });
+  }
+  const { counts, total, findings } = summarize(report);
+  return { scannedAt: new Date().toISOString(), counts, total, findings };
+}
