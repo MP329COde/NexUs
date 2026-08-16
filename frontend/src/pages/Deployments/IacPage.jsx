@@ -25,7 +25,7 @@ export default function IacPage() {
 
   async function deleteWorkspace(ws) {
     try {
-      await api.delete(`/iac/workspaces/${ws.id}`);
+      await api.del(`/iac/workspaces/${ws.id}`);
       notify('Espace de travail supprimé', { type: 'ok' });
       reload();
     } catch (err) {

@@ -45,7 +45,7 @@ export default function WikiPage() {
 
   async function deletePage(id) {
     try {
-      await api.delete(`/wiki/${id}`);
+      await api.del(`/wiki/${id}`);
       notify('Page supprimée', { type: 'ok' });
       if (selectedId === id) setSelectedId(null);
       pages.reload();
