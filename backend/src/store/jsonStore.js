@@ -35,7 +35,8 @@ const DEFAULTS = {
   imageScans: [], // historique des scans Trivy d'images (voir store/imageScansStore.js)
   notifications: [], // alertes de sécurité persistantes visibles par les admins (voir store/notificationsStore.js)
   terminalAccessRequests: [], // demandes d'accès au terminal sécurisé (voir store/terminalAccessRequestsStore.js)
-  codeScans: [] // historique des scans Semgrep (voir store/codeScansStore.js)
+  codeScans: [], // historique des scans Semgrep (voir store/codeScansStore.js)
+  iacScans: [] // historique des scans Checkov IaC (voir store/iacScansStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée
