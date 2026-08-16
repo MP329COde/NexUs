@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { useClosablePopover } from '../../hooks/useClosablePopover.js';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../ui/Icon.jsx';
+import Avatar from '../ui/Avatar.jsx';
 import BrandMark from '../ui/BrandMark.jsx';
 import { toneFromScore, toneLabel, buildDomainRows } from '../../lib/health.js';
 
@@ -182,23 +183,13 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
         </div>
 
         <div style={{ position: 'relative' }} ref={userP.ref}>
-          <div
-            onClick={() => { setUserMenu((v) => !v); setNotifMenu(false); }}
-            title={user?.name}
-            style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: user?.avatarEmoji ? 'var(--border-soft)' : (user?.avatarColor || '#0F172A'),
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: user?.avatarEmoji ? 15 : 12, fontWeight: 600, cursor: 'pointer'
-            }}
-          >
-            {user?.avatarEmoji || (user?.name || '??').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
+          <div onClick={() => { setUserMenu((v) => !v); setNotifMenu(false); }} title={user?.name} style={{ cursor: 'pointer' }}>
+            <Avatar user={user} size={32} />
           </div>
           {userP.visible && (
             <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 280, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${userP.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: user?.avatarEmoji ? 'var(--border-soft)' : (user?.avatarColor || '#0F172A'), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: user?.avatarEmoji ? 17 : 13, fontWeight: 600, flex: 'none' }}>
-                  {user?.avatarEmoji || (user?.name || '??').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
-                </div>
+                <Avatar user={user} size={36} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user?.name}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
