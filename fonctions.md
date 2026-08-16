@@ -170,11 +170,11 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
 - **ReportPage.jsx** — Rapport imprimable.
 - **ManualPage.jsx** — Documentation intégrée.
-- **AccountPage.jsx** — Profil utilisateur, préférences, **import d'image de profil** (redimensionnement client 256×256, mutuellement exclusif avec l'emoji).
+- **AccountPage.jsx** — Profil utilisateur, préférences, **import d'image de profil** (redimensionnement client 256×256, mutuellement exclusif avec l'emoji), **gestion des clés d'accès (passkeys WebAuthn)** — enregistrement/suppression réels via @simplewebauthn.
 
 ### Connexion / Onboarding / Installation
 
-- **LoginPage.jsx / LoginVisual.jsx** — Connexion par e-mail ou nom d'utilisateur.
+- **LoginPage.jsx / LoginVisual.jsx** — Connexion par e-mail ou nom d'utilisateur, **ou par clé d'accès (passkey WebAuthn/FIDO2)**, réelle (@simplewebauthn/server, ECDSA/RSA selon l'authentificateur) — jamais un remplacement obligatoire du mot de passe.
 - **OnboardingPage.jsx** — Écran de première connexion.
 - **SetupPage.jsx** — Assistant de première installation.
 - **InstallScreen.jsx** — Suivi des jobs d'installation.
@@ -241,7 +241,6 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
 - ~~Registre privé~~ — **fait** : service `registry:2` (Docker Distribution) optionnel dans `docker-compose.yml` (profil `registry`, activé via `install.sh`), navigable en direct depuis Images & registry (PrivateRegistryPanel.jsx). Pas Harbor/GHCR à proprement parler (API compatible identique), pas d'UI de gestion des utilisateurs au-delà du compte unique généré à l'installation.
-- Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
 - Rôles par projet avec granularité fine par ressource (au-delà de viewer/developer/maintainer/owner déjà en place via le socle relationnel).
 

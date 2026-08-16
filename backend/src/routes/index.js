@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
+import webauthnRoutes from './webauthn.routes.js';
 import setupRoutes from './setup.routes.js';
 import usersRoutes from './users.routes.js';
 import settingsRoutes from './settings.routes.js';
@@ -53,6 +54,7 @@ import terminalRoutes from './terminal.routes.js';
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/auth/webauthn', webauthnRoutes);
 router.use('/setup', setupRoutes);
 router.use('/users', usersRoutes);
 router.use('/settings', settingsRoutes);

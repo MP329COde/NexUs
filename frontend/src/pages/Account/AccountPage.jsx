@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { startRegistration } from '@simplewebauthn/browser';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
@@ -6,6 +7,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme, THEME_MODES } from '../../context/ThemeContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 
 const EMOJIS = ['🧑‍💻', '🛰️', '🐳', '🦾', '🔧', '🛡️', '⚡', '🌐', '🧠', '🔥', '🚀', '🗄️'];
@@ -178,8 +180,80 @@ export default function AccountPage() {
             <button className="btn" type="submit" disabled={savingPassword}>{savingPassword ? 'Enregistrement…' : 'Changer le mot de passe'}</button>
           </form>
         </Panel>
+
+        <PasskeysPanel />
       </div>
     </>
+  );
+}
+
+function formatDate(iso) {
+  return iso ? new Date(iso).toLocaleString('fr-FR') : '—';
+}
+
+// Clés d'accès (passkeys WebAuthn) — authentification cryptographique réelle
+// via @simplewebauthn/browser, en complément du mot de passe (voir
+// backend/src/routes/webauthn.routes.js). L'enregistrement peut échouer si
+// le navigateur/l'appareil ne propose aucun authentificateur compatible :
+// c'est signalé tel quel, jamais masqué.
+function PasskeysPanel() {
+  const notify = useNotify();
+  const { data, loading, reload } = useApi(() => api.get('/auth/webauthn/credentials'), []);
+  const [registering, setRegistering] = useState(false);
+  const items = data?.items || [];
+
+  async function register() {
+    setRegistering(true);
+    try {
+      const { options } = await api.post('/auth/webauthn/register-options');
+      const response = await startRegistration({ optionsJSON: options });
+      await api.post('/auth/webauthn/register-verify', { response });
+      notify('Clé d\'accès enregistrée', { type: 'ok' });
+      reload();
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') notify(err.message, { type: 'crit' });
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  async function remove(id) {
+    if (!confirm('Supprimer cette clé d\'accès ?')) return;
+    try {
+      await api.del(`/auth/webauthn/credentials/${id}`);
+      notify('Clé supprimée', { type: 'ok' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
+  return (
+    <Panel title="Clés d'accès (passkeys)" sub="Connexion sans mot de passe via empreinte, visage ou clé de sécurité" span={12}>
+      <div style={{ padding: 16 }}>
+        <button className="btn" type="button" onClick={register} disabled={registering} style={{ marginBottom: 14 }}>
+          {registering ? 'En attente de l\'authentificateur…' : '+ Enregistrer une clé d\'accès'}
+        </button>
+        {loading ? (
+          <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>
+        ) : items.length === 0 ? (
+          <div className="faint" style={{ fontSize: 12.5 }}>Aucune clé d'accès enregistrée — la connexion par mot de passe reste disponible.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {items.map((c) => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-soft)' }}>
+                <Icon name="lock" size={14} style={{ color: 'var(--text-faint)' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.label}{c.deviceType === 'multiDevice' ? ' (synchronisée)' : ''}</div>
+                  <div className="faint" style={{ fontSize: 11 }}>Ajoutée le {formatDate(c.createdAt)}{c.lastUsedAt ? ` · dernière utilisation ${formatDate(c.lastUsedAt)}` : ' · jamais utilisée'}</div>
+                </div>
+                <button className="btn" type="button" onClick={() => remove(c.id)} style={{ height: 26, padding: '0 10px', fontSize: 11.5 }}>Supprimer</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }
 
