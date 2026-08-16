@@ -240,7 +240,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
 - MFA obligatoire, restriction par réseau (CIDR) et déconnexion sur inactivité — retirés de l'assistant de configuration initiale car ils n'étaient reliés à aucune application réelle (voir commit "Retire les réglages décoratifs..."). De vraies pistes si un durcissement de l'authentification est voulu au-delà des passkeys WebAuthn déjà réelles.
+- Matrice de permissions par groupe (Paramètres → Groupes & permissions) — enregistrée réellement mais non appliquée : la plupart des routes qu'elle viserait (hosts, sécurité...) sont déjà 100 % réservées aux admins au niveau du routeur, donc la câbler suppose d'abord une décision explicite sur le modèle d'autorisation (faire évoluer le binaire admin/utilisateur actuel), pas un simple branchement.
 
-Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) — existaient déjà avant cet inventaire.
+Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) ; icônes personnalisées pour les organisations ; rôles de projet à granularité fine par ressource (coffre-fort).
