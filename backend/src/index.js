@@ -104,6 +104,8 @@ const iacScanLimiter = makeScanLimiter();
 app.use('/api/iac-scans', (req, res, next) => (req.method === 'POST' ? iacScanLimiter(req, res, next) : next()));
 const sbomLimiter = makeScanLimiter();
 app.use('/api/sbom', (req, res, next) => (req.method === 'POST' ? sbomLimiter(req, res, next) : next()));
+const signaturesLimiter = makeScanLimiter();
+app.use('/api/signatures', (req, res, next) => (req.method === 'POST' ? signaturesLimiter(req, res, next) : next()));
 
 // Point d'entrée public (pas de session, pas de compte derrière la requête
 // pour appliquer les limites globales par utilisateur) : limite par IP pour
