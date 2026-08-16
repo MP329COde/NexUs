@@ -33,7 +33,8 @@ const DEFAULTS = {
   shortcuts: [], // raccourcis ajoutés manuellement vers des outils externes (voir store/shortcutsStore.js)
   secretLeaks: [], // secrets prod/projet détectés en clair dans un dépôt (voir store/secretLeaksStore.js)
   imageScans: [], // historique des scans Trivy d'images (voir store/imageScansStore.js)
-  notifications: [] // alertes de sécurité persistantes visibles par les admins (voir store/notificationsStore.js)
+  notifications: [], // alertes de sécurité persistantes visibles par les admins (voir store/notificationsStore.js)
+  terminalAccessRequests: [] // demandes d'accès au terminal sécurisé (voir store/terminalAccessRequestsStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

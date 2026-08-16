@@ -7,12 +7,26 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
+const TIER_LABEL = { developer: 'Developer', maintainer: 'Maintainer' };
+
 export default function UsersPanel() {
   const { user: me } = useAuth();
   const notify = useNotify();
   const { data, reload } = useApi(() => api.get('/users'), []);
+  const requests = useApi(() => api.get('/terminal/access-requests'), []);
   const [form, setForm] = useState({ email: '', name: '', password: '', role: 'user', skipOnboarding: false });
   const [busy, setBusy] = useState(false);
+
+  async function decide(req, approve) {
+    try {
+      await api.post(`/terminal/access-requests/${req.id}/decide`, { approve });
+      notify(approve ? `Accès ${TIER_LABEL[req.requestedTier]} accordé à ${req.userName}` : 'Demande refusée', { type: approve ? 'ok' : 'info' });
+      requests.reload();
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
 
   async function invite(e) {
     e.preventDefault();
@@ -67,8 +81,29 @@ export default function UsersPanel() {
     }
   }
 
+  const pendingRequests = requests.data?.items || [];
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      {pendingRequests.length > 0 && (
+        <Panel title="Demandes d'accès terminal" sub="En attente d'approbation" span={12}>
+          <div style={{ padding: 6 }}>
+            {pendingRequests.map((r) => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: '1px solid var(--border-soft)' }}>
+                <Icon name="terminal" size={14} style={{ color: 'var(--text-faint)', flex: 'none' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5 }}><strong>{r.userName}</strong> ({r.userEmail}) demande le palier <strong>{TIER_LABEL[r.requestedTier]}</strong></div>
+                  {r.reason && <div className="faint" style={{ fontSize: 11.5 }}>{r.reason}</div>}
+                  <div className="mono faint" style={{ fontSize: 10.5 }}>{new Date(r.createdAt).toLocaleString('fr-FR')}</div>
+                </div>
+                <span className="btn-outline" style={btnMini} onClick={() => decide(r, true)}><Icon name="check" size={13} />Approuver</span>
+                <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => decide(r, false)}><Icon name="xCircle" size={13} />Refuser</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
       <Panel title="Utilisateurs de la console" sub="Les administrateurs accèdent aux intégrations ; les autres comptes ne voient que la console et leurs propres réglages" span={8}>
         <DataTable
           columns={['Utilisateur', 'Rôle', 'Terminal', 'Statut', 'Actions']}
