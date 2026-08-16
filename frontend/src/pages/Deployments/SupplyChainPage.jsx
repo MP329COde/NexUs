@@ -6,11 +6,11 @@ import CodeScanPanel from './CodeScanPanel.jsx';
 import IacScanPanel from './IacScanPanel.jsx';
 
 // Tout le pipeline (source, SAST, secrets, dépendances/conteneur, IaC, SBOM,
-// signature, déploiement) est désormais réel : Semgrep (CodeScanPanel), le
-// scan de secrets committés (Secrets & variables), Trivy et Syft (Images &
-// registry), Checkov (IacScanPanel), cosign (signature du SBOM, Images &
-// registry) et Argo CD (Déploiements). Seul le registre privé authentifié
-// reste en démonstration (Docker Hub public, lui, est réel).
+// signature, registre, déploiement) est désormais réel : Semgrep
+// (CodeScanPanel), le scan de secrets committés (Secrets & variables), Trivy
+// et Syft (Images & registry), Checkov (IacScanPanel), cosign (signature du
+// SBOM, Images & registry), le registre privé (Docker Distribution, optionnel
+// — voir install.sh) et Argo CD (Déploiements).
 const STAGES = [
   { id: 'source', label: 'Source', icon: 'gitBranch', tool: 'Dépôts Git (réel)', note: 'Code source récupéré depuis GitLab/GitHub — voir Dépôts Git.', real: true },
   { id: 'sast', label: 'SAST', icon: 'terminal', tool: 'Semgrep (réel, ci-dessous)', note: 'Analyse statique du code à la recherche de vulnérabilités.', real: true },
@@ -20,7 +20,7 @@ const STAGES = [
   { id: 'iac', label: 'IaC', icon: 'layers', tool: 'Checkov (réel, ci-dessous)', note: 'Bonnes pratiques de sécurité sur les Dockerfiles et manifests.', real: true },
   { id: 'sbom', label: 'SBOM', icon: 'layers', tool: 'Syft (réel, voir Images & registry)', note: 'Inventaire logiciel de l\'image (Software Bill of Materials).', real: true },
   { id: 'signature', label: 'Signature', icon: 'certificate', tool: 'cosign / Sigstore (réel, voir Images & registry)', note: 'Signature cryptographique du SBOM avant publication.', real: true },
-  { id: 'registry', label: 'Registre', icon: 'image', tool: 'Docker Hub public (réel) — registre privé en démonstration', note: 'Publication de l\'image signée dans le registre.', real: false },
+  { id: 'registry', label: 'Registre', icon: 'image', tool: 'Registre privé + Docker Hub public (réels, voir Images & registry)', note: 'Publication de l\'image signée dans le registre.', real: true },
   { id: 'argocd', label: 'Argo CD', icon: 'sync', tool: 'Déploiements (réel)', note: 'Déploiement — voir GitOps Diff sur la fiche de déploiement.', real: true }
 ];
 
@@ -29,8 +29,8 @@ export default function SupplyChainPage() {
     <>
       <PageHeader title="Supply Chain Security" sub="Pipeline de sécurité de la chaîne d'approvisionnement logicielle, de la source au déploiement." />
       <DemoNote>
-        Seul le registre privé authentifié reste en démonstration (Docker Hub public, lui, est réel). Le reste du pipeline est réel : Semgrep (SAST, ci-dessous), scan quotidien de secrets committés,
-        Trivy (dépendances/conteneur), Syft (SBOM), signature cosign du SBOM et Checkov (IaC) — voir les badges "Réel" ci-dessous.
+        Pipeline entièrement réel : Semgrep (SAST, ci-dessous), scan quotidien de secrets committés, Trivy (dépendances/conteneur, planifié + à la demande),
+        Syft (SBOM), signature cosign du SBOM, Checkov (IaC) et registre privé (optionnel, activé via install.sh) — voir les badges "Réel" ci-dessous.
       </DemoNote>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>

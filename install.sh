@@ -38,7 +38,7 @@ if ! command -v docker >/dev/null 2>&1; then
   OS="$(uname -s)"
   if [ "$OS" = "Linux" ]; then
     warn "Docker n'est pas installé."
-    if [ "$ASSUME_YES" = 1 ] || { read -r -p "Installer Docker maintenant via get.docker.com ? [o/N] " REPLY; [ "${REPLY,,}" = "o" ]; }; then
+    if [ "$ASSUME_YES" = 1 ] || { read -r -p "Installer Docker maintenant via get.docker.com ? [o/N] " REPLY; [[ "$REPLY" =~ ^[Oo]$ ]]; }; then
       info "Installation de Docker (get.docker.com)…"
       curl -fsSL https://get.docker.com | sh
       sudo usermod -aG docker "$USER" 2>/dev/null || true
@@ -88,7 +88,7 @@ if [ ! -f .env ]; then
   if [ "$ASSUME_YES" = 0 ]; then
     echo
     read -r -p "Créer un compte administrateur automatiquement (sinon l'assistant de configuration s'affichera au premier accès) ? [o/N] " REPLY
-    if [ "${REPLY,,}" = "o" ]; then
+    if [[ "$REPLY" =~ ^[Oo]$ ]]; then
       read -r -p "  E-mail administrateur : " ADMIN_EMAIL
       read -r -s -p "  Mot de passe (8 caractères min.) : " ADMIN_PASSWORD; echo
       tmp="$(mktemp)"
@@ -103,6 +103,50 @@ else
   ok ".env existant conservé tel quel (supprimez-le pour régénérer les secrets)."
 fi
 
+# --- 2bis. Registre d'images privé (optionnel) ------------------------------
+# Composant complémentaire (service Compose sous profil "registry", jamais
+# démarré sans accord explicite) : pour les images propriétaires qui ne
+# peuvent pas atterrir sur Docker Hub public. Demandé ici uniquement — le
+# reste du script n'installe/active rien sans être passé par une question
+# interactive (ou --yes, qui laisse tout désactivé par défaut).
+ENABLE_REGISTRY=0
+if [ -f registry-auth/htpasswd ]; then
+  ENABLE_REGISTRY=1
+  ok "Registre d'images privé déjà configuré (registry-auth/htpasswd) — conservé."
+elif [ "$ASSUME_YES" = 0 ]; then
+  echo
+  read -r -p "Activer un registre d'images privé (pour vos builds propriétaires) ? [o/N] " REPLY
+  if [[ "$REPLY" =~ ^[Oo]$ ]]; then
+    if ! command -v docker >/dev/null 2>&1; then
+      die "Docker requis pour générer les identifiants du registre."
+    fi
+    REG_USER="nexus"
+    read -r -p "  Nom d'utilisateur du registre [${REG_USER}] : " INPUT_REG_USER
+    [ -n "$INPUT_REG_USER" ] && REG_USER="$INPUT_REG_USER"
+    # Port par défaut 5000 fréquemment pris (AirPlay Receiver sur macOS,
+    # entre autres) — demandé explicitement plutôt que de laisser
+    # `docker compose up` échouer plus loin avec une erreur peu parlante.
+    REG_PORT="5000"
+    read -r -p "  Port d'exposition du registre [${REG_PORT}] : " INPUT_REG_PORT
+    [ -n "$INPUT_REG_PORT" ] && REG_PORT="$INPUT_REG_PORT"
+    REG_PASSWORD="$(openssl rand -hex 16 2>/dev/null || head -c16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    mkdir -p registry-auth
+    info "Génération des identifiants du registre (htpasswd, bcrypt)…"
+    docker run --rm httpd:2-alpine htpasswd -Bbn "$REG_USER" "$REG_PASSWORD" > registry-auth/htpasswd
+    tmp="$(mktemp)"
+    sed \
+      -e "s/^REGISTRY_PORT=.*/REGISTRY_PORT=${REG_PORT}/" \
+      -e "s/^REGISTRY_USERNAME=.*/REGISTRY_USERNAME=${REG_USER}/" \
+      -e "s/^REGISTRY_PASSWORD=.*/REGISTRY_PASSWORD=${REG_PASSWORD}/" \
+      .env > "$tmp" && mv "$tmp" .env
+    ENABLE_REGISTRY=1
+    ok "Registre privé configuré. Identifiants dans .env — configurez Paramètres → Registre privé"
+    ok "  avec l'URL http://registry:5000 une fois la console démarrée (accès interne au réseau Docker)."
+  fi
+fi
+COMPOSE_PROFILE_ARGS=()
+[ "$ENABLE_REGISTRY" = 1 ] && COMPOSE_PROFILE_ARGS=(--profile registry)
+
 CONSOLE_PORT="$(grep -E '^CONSOLE_PORT=' .env | cut -d= -f2)"
 CONSOLE_PORT="${CONSOLE_PORT:-8080}"
 
@@ -113,7 +157,7 @@ if [ "$UPDATE_ONLY" = 1 ]; then
   # (contrairement à un appel à POST /api/backups, qui suppose la console
   # déjà debout et un compte admin sous la main). Ignorée en douceur si
   # c'est une toute première installation (rien à sauvegarder encore).
-  if docker compose ps --status running --format '{{.Name}}' 2>/dev/null | grep -q .; then
+  if docker compose "${COMPOSE_PROFILE_ARGS[@]}" ps --status running --format '{{.Name}}' 2>/dev/null | grep -q .; then
     BACKUP_DIR="backups/pre-update-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$BACKUP_DIR"
     info "Sauvegarde avant mise à jour dans ${BACKUP_DIR}/…"
@@ -140,10 +184,10 @@ if [ "$UPDATE_ONLY" = 1 ]; then
 fi
 
 info "Construction des images…"
-docker compose build
+docker compose "${COMPOSE_PROFILE_ARGS[@]}" build
 
 info "Démarrage des services…"
-docker compose up -d
+docker compose "${COMPOSE_PROFILE_ARGS[@]}" up -d
 
 info "Attente que la console réponde…"
 for i in $(seq 1 30); do
@@ -169,5 +213,10 @@ echo -e "  ${BOLD}Local :${RESET}  http://localhost:${CONSOLE_PORT}"
 echo
 if ! grep -qE '^ADMIN_EMAIL=.+' .env 2>/dev/null; then
   echo "Aucun compte admin pré-créé : l'assistant de configuration initiale s'affichera au premier accès."
+fi
+if [ "$ENABLE_REGISTRY" = 1 ]; then
+  REGISTRY_PORT_VAL="$(grep -E '^REGISTRY_PORT=' .env | cut -d= -f2)"; REGISTRY_PORT_VAL="${REGISTRY_PORT_VAL:-5000}"
+  echo -e "  ${BOLD}Registre privé :${RESET}  ${LAN_IP:-localhost}:${REGISTRY_PORT_VAL}  ${DIM}(docker login, identifiants dans .env — voir Paramètres → Registre privé dans la console)${RESET}"
+  echo -e "  ${DIM}Sans certificat TLS : ajoutez \"insecure-registries\": [\"${LAN_IP:-localhost}:${REGISTRY_PORT_VAL}\"] au démon Docker des machines qui doivent y pousser des images.${RESET}"
 fi
 echo -e "${DIM}Commandes utiles : docker compose logs -f · docker compose down · ./install.sh --update${RESET}"

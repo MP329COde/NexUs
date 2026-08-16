@@ -18,6 +18,7 @@ backend/data/.ssh_console_key.*
 backend/data/cosign/
 backend/data/backups/
 /backups/
+/registry-auth/
 
 # Playwright (suite e2e — voir frontend/playwright.config.js)
 frontend/.pw-data/
