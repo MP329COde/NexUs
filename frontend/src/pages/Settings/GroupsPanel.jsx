@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
+import DemoNote from '../../components/ui/DemoNote.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
@@ -58,6 +59,14 @@ export default function GroupsPanel() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div style={{ gridColumn: 'span 12' }}>
+        <DemoNote>
+          Les groupes et la matrice ci-dessous sont enregistrés réellement, mais aucune route n'applique encore ces niveaux de droits :
+          l'autorisation reste aujourd'hui binaire (rôle plateforme admin/utilisateur — un utilisateur ne voit que ses projets, un admin voit tout).
+          Restreindre par exemple "Sécurité" à un groupe précis nécessiterait de faire évoluer ce modèle route par route,
+          une décision à prendre explicitement plutôt qu'à câbler au fil de l'eau.
+        </DemoNote>
+      </div>
       <Panel title="Créer un groupe" span={4}>
         <form onSubmit={createGroup} style={{ padding: 16 }}>
           <Field label="Nom"><input className="input" required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
