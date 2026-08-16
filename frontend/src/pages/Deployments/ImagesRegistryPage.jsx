@@ -6,6 +6,7 @@ import DemoNote from '../../components/ui/DemoNote.jsx';
 import TrivyScanPanel from './TrivyScanPanel.jsx';
 import DockerHubLookupPanel from './DockerHubLookupPanel.jsx';
 import SbomPanel from './SbomPanel.jsx';
+import PrivateRegistryPanel from './PrivateRegistryPanel.jsx';
 
 // Démonstration : aucune intégration de registre d'images (Harbor, GHCR
 // interrogé en détail...) n'existe dans la console.
@@ -20,7 +21,7 @@ export default function ImagesRegistryPage() {
   return (
     <>
       <PageHeader title="Images & registry" sub="Images publiées, taille, signatures et vulnérabilités détectées." />
-      <DemoNote>Aucun registre d'images n'est intégré à la console (Harbor, GHCR...). Tableau illustratif pour valider la mise en page.</DemoNote>
+      <DemoNote>Le tableau "Dépôt d'images" ci-dessous reste illustratif — un vrai registre privé (Docker Distribution) est disponible juste au-dessus une fois activé (voir install.sh).</DemoNote>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <DockerHubLookupPanel />
@@ -32,6 +33,10 @@ export default function ImagesRegistryPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <SbomPanel />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <PrivateRegistryPanel />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>

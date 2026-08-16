@@ -14,7 +14,8 @@ export const SECRET_FIELDS = {
   traefik: ['password'],
   certManager: [],
   grafana: ['apiKey'],
-  wazuh: ['password']
+  wazuh: ['password'],
+  registry: ['password']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -83,7 +84,8 @@ function isConfigured(key, entry) {
     traefik: ['apiUrl'],
     certManager: [],
     grafana: ['baseUrl'],
-    wazuh: ['baseUrl']
+    wazuh: ['baseUrl'],
+    registry: ['baseUrl']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

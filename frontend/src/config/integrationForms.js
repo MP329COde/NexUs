@@ -147,7 +147,22 @@ export const INTEGRATION_FORMS = {
       { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'wazuh', port: 55000 }
+  },
+  registry: {
+    label: 'Registre privé',
+    hint: 'Registre d\'images Docker privé (service "registry" de docker-compose.yml) — pour vos builds propriétaires.',
+    guide: [
+      "Activez le registre lors de l'installation (./install.sh, question « Activer un registre d'images privé ? ») — il génère les identifiants automatiquement.",
+      "Depuis la console elle-même (dans le réseau Docker interne) : http://registry:5000.",
+      "Depuis une autre machine (docker push/pull) : http://<IP-de-cette-machine>:5000, avec le compte défini à l'installation (voir .env, REGISTRY_USERNAME/REGISTRY_PASSWORD).",
+      "Sans certificat TLS, ajoutez cette adresse aux \"insecure-registries\" du démon Docker de chaque machine qui doit y pousser des images."
+    ],
+    fields: [
+      { key: 'baseUrl', label: 'URL du registre', placeholder: 'http://registry:5000', hint: 'http://registry:5000 depuis la console elle-même.' },
+      { key: 'username', label: "Nom d'utilisateur" },
+      { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
+    ]
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry'];

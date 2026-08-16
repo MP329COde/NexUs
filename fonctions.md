@@ -127,9 +127,9 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
 - **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
-- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre privé intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel) et **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft — Anchore — pour le SBOM, cosign/Sigstore pour la signature, paire de clés locale dédiée à l'instance).
+- **ImagesRegistryPage.jsx** — Tableau "Dépôt d'images" du haut de page en démonstration, mais **scanner Trivy réel** (TrivyScanPanel.jsx, à la demande + planifié horaire), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel), **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft pour le SBOM, cosign/Sigstore pour la signature) et **registre d'images privé réel et optionnel** (PrivateRegistryPanel.jsx, Docker Distribution — service Compose sous profil `registry`, activé via `install.sh`).
 - **ReleasesPage.jsx** — Démonstration.
-- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM et signature** (Syft + cosign, voir Images & registry) réels. Seul le registre privé authentifié reste non intégré.
+- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM, signature et registre** (Syft + cosign + registre privé, voir Images & registry) réels. Seule la signature d'*image* (par opposition à la signature du SBOM) reste hors périmètre — nécessiterait de pousser une image via la console elle-même, qu'elle ne construit pas.
 - **TestsQualityPage.jsx** — Démonstration.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
 - **SecretsPage.jsx / VaultPanel.jsx** — Coffre dev/prod, triple vérification prod, **champs symboles autorisés/interdits**, **rotation automatique configurable**, compte à rebours de rotation.
@@ -213,7 +213,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Wazuh | Complet | agents, résumé, auth JWT cachée |
 | cert-manager | Complet (dépendant) | Via CRD Kubernetes |
 | Docker | Absent | Jamais intégré |
-| Registre d'images (Harbor/GHCR) | Stub | Démonstration uniquement |
+| Registre d'images privé | Complet (optionnel) | Service `registry:2` (Docker Distribution), profil Compose `registry`, activé via `install.sh` |
 | Scanners sécurité (SAST/SCA) | Complet | Semgrep + Checkov, voir ci-dessous |
 | Frameworks de tests | Stub | Page en anticipation |
 | Multi-environnements | Stub | Démonstration |
@@ -240,7 +240,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait, et le scan Trivy est désormais aussi **planifié automatiquement** (toutes les heures, en plus du déclenchement manuel — voir ci-dessous). C'est désormais le seul maillon non intégré du pipeline Supply Chain Security (source, SAST, secrets, dépendances/conteneur, IaC, SBOM et signature du SBOM sont réels).
+- ~~Registre privé~~ — **fait** : service `registry:2` (Docker Distribution) optionnel dans `docker-compose.yml` (profil `registry`, activé via `install.sh`), navigable en direct depuis Images & registry (PrivateRegistryPanel.jsx). Pas Harbor/GHCR à proprement parler (API compatible identique), pas d'UI de gestion des utilisateurs au-delà du compte unique généré à l'installation.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
