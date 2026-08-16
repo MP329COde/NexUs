@@ -16,6 +16,7 @@ import { scheduleCriticalHostsRefresh } from './services/hostMetricsService.js';
 import { scheduleInfraLoadSampling } from './services/infraLoadService.js';
 import { scheduleVaultRotation } from './services/vaultRotationService.js';
 import { scheduleDailySecretLeakScan } from './services/secretLeakScanService.js';
+import { scheduleHourlyTrivyScan } from './services/scheduledTrivyScanService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -30,6 +31,7 @@ scheduleCriticalHostsRefresh();
 scheduleInfraLoadSampling();
 scheduleVaultRotation();
 scheduleDailySecretLeakScan();
+scheduleHourlyTrivyScan();
 
 const app = express();
 
@@ -93,7 +95,12 @@ app.use('/api/proxmox', strictLimiter);
 // d'origine ("empêche d'en déclencher en rafale" — par outil, pas au total).
 const makeScanLimiter = () => rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/security/scans', makeScanLimiter());
-app.use('/api/image-scans', makeScanLimiter());
+// POST uniquement : la lecture de l'historique (GET, y compris le
+// run-scheduled déclenché en arrière-plan) ne doit pas partager le même
+// budget que le déclenchement d'un scan Trivy coûteux — même raisonnement
+// que code-scans/iac-scans/sbom ci-dessous.
+const imageScanLimiter = makeScanLimiter();
+app.use('/api/image-scans', (req, res, next) => (req.method === 'POST' ? imageScanLimiter(req, res, next) : next()));
 // POST uniquement pour le scan de code : la lecture de l'historique (GET) ne
 // doit pas être bridée par la même limite que le déclenchement d'un scan
 // coûteux, sinon consulter des résultats déjà calculés devient impossible
