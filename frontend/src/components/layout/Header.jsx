@@ -29,6 +29,20 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
   const notif = useClosablePopover(notifMenu, setNotifMenu);
   const userP = useClosablePopover(userMenu, setUserMenu);
   const { data } = useApi(() => api.get('/status/overview'), [], { pollMs: 20000 });
+  // Alertes de sécurité persistantes côté serveur (verrouillage de compte,
+  // bannissement IP, secret committé, vulnérabilité critique) — distinctes
+  // de `history` (toasts de la session en cours, perdus au rechargement) et
+  // réservées aux admins, comme les événements qui les déclenchent.
+  const isAdmin = user?.role === 'admin';
+  const serverNotifs = useApi(() => (isAdmin ? api.get('/notifications') : Promise.resolve(null)), [isAdmin], { pollMs: 30000 });
+  const serverItems = serverNotifs.data?.items || [];
+  const unreadCount = serverNotifs.data?.unreadCount || 0;
+
+  async function markAllServerRead() {
+    if (unreadCount === 0) return;
+    await api.post('/notifications/read-all');
+    serverNotifs.reload();
+  }
   const { data: consoleData } = useApi(() => api.get('/console'), []);
   const score = data?.score ?? null;
   const tone = toneFromScore(score);
@@ -157,15 +171,36 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
         <div style={{ position: 'relative' }} ref={notif.ref}>
           <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn" style={{ position: 'relative' }}>
             <Icon name="bell" size={16} />
-            {history.length > 0 && <span style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: 'var(--tone-crit-dot)', border: '2px solid var(--surface)' }} />}
+            {(history.length > 0 || unreadCount > 0) && <span style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: 'var(--tone-crit-dot)', border: '2px solid var(--surface)' }} />}
           </button>
           {notif.visible && (
             <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 340, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${notif.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
+              {isAdmin && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', borderBottom: '1px solid var(--border-soft)' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Alertes de sécurité{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
+                    {unreadCount > 0 && <span onClick={markAllServerRead} style={{ fontSize: 11.5, color: 'var(--text-faint)', cursor: 'pointer' }}>Tout marquer lu</span>}
+                  </div>
+                  <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                    {serverItems.length === 0 && <div style={{ padding: 16, fontSize: 12, color: 'var(--text-faint)', textAlign: 'center' }}>Aucune alerte</div>}
+                    {serverItems.map((n) => (
+                      <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 15px', borderBottom: '1px solid var(--border-soft)', background: n.read ? 'transparent' : 'var(--border-soft)' }}>
+                        <span style={{ color: `var(--tone-${n.severity}-fg)`, flex: 'none', marginTop: 1 }}><Icon name={TONE_ICON[n.severity] || 'info'} size={15} /></span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {n.title && <div style={{ fontSize: 12.5, fontWeight: 600 }}>{n.title}</div>}
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{n.message}</div>
+                          <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faintest)', marginTop: 2 }}>{new Date(n.createdAt).toLocaleString('fr-FR')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Notifications</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Activité de la session</span>
                 {history.length > 0 && <span onClick={clearHistory} style={{ fontSize: 11.5, color: 'var(--text-faint)', cursor: 'pointer' }}>Effacer</span>}
               </div>
-              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
                 {history.length === 0 && <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)', textAlign: 'center' }}>Aucune notification récente</div>}
                 {history.map((n) => (
                   <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 15px', borderBottom: '1px solid var(--border-soft)' }}>

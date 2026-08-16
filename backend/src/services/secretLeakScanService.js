@@ -3,6 +3,7 @@ import * as github from './integrations/githubService.js';
 import { listProjects } from '../store/projectsStore.js';
 import { findSecretMatchInText, forceRotateSecret } from '../store/vaultStore.js';
 import { recordLeak } from '../store/secretLeaksStore.js';
+import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
 
 // Scan quotidien des dépôts liés à un projet, à la recherche d'un mot de
@@ -63,6 +64,11 @@ async function scanRepo(project, repoKey) {
         label: match.label, tier: match.tier, action: rotated ? 'rotated' : 'detected'
       });
       logger.warn(`Secret "${match.label}" (${match.tier}) détecté dans ${repoKey}:${filePath} — rotation automatique déclenchée.`);
+      createNotification({
+        type: 'vault.leak.detected', severity: 'crit', title: 'Secret committé détecté',
+        message: `"${match.label}" (${match.tier}) trouvé en clair dans ${repoKey}:${filePath} — régénéré automatiquement.`,
+        meta: { projectId: project.id, repoKey, filePath, vaultEntryId: match.id }
+      });
     }
   }
 }

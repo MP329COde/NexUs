@@ -32,7 +32,8 @@ const DEFAULTS = {
   reviewAssignments: [], // relecteurs auto-assignés sur une MR/PR (voir store/reviewStore.js)
   shortcuts: [], // raccourcis ajoutés manuellement vers des outils externes (voir store/shortcutsStore.js)
   secretLeaks: [], // secrets prod/projet détectés en clair dans un dépôt (voir store/secretLeaksStore.js)
-  imageScans: [] // historique des scans Trivy d'images (voir store/imageScansStore.js)
+  imageScans: [], // historique des scans Trivy d'images (voir store/imageScansStore.js)
+  notifications: [] // alertes de sécurité persistantes visibles par les admins (voir store/notificationsStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée
