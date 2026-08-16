@@ -24,9 +24,20 @@ function randomIndex(max) {
   return bytes[0] % max;
 }
 
-function generateRandom(length, opts, excludeAmbiguous) {
+function buildAlphabet(opts, excludeAmbiguous, extraChars, excludeChars) {
   let alphabet = Object.entries(opts).filter(([, on]) => on).map(([k]) => CHARSETS[k]).join('');
+  alphabet += extraChars || '';
   if (excludeAmbiguous) alphabet = alphabet.replace(AMBIGUOUS, '');
+  if (excludeChars) {
+    const excludeSet = new Set(excludeChars);
+    alphabet = Array.from(alphabet).filter((c) => !excludeSet.has(c)).join('');
+  }
+  // dédoublonne (extraChars peut recouvrir un charset déjà actif)
+  return Array.from(new Set(alphabet)).join('');
+}
+
+function generateRandom(length, opts, excludeAmbiguous, extraChars, excludeChars) {
+  const alphabet = buildAlphabet(opts, excludeAmbiguous, extraChars, excludeChars);
   if (!alphabet) return '';
   const bytes = new Uint32Array(length);
   crypto.getRandomValues(bytes);
@@ -54,21 +65,27 @@ export default function PasswordGeneratorPanel({ onSaved }) {
   const [length, setLength] = useState(24);
   const [opts, setOpts] = useState({ lower: true, upper: true, digits: true, symbols: true });
   const [excludeAmbiguous, setExcludeAmbiguous] = useState(false);
+  const [extraChars, setExtraChars] = useState('');
+  const [excludeChars, setExcludeChars] = useState('');
   const [wordCount, setWordCount] = useState(4);
   const [separator, setSeparator] = useState('-');
   const [capitalize, setCapitalize] = useState(true);
   const [appendNumber, setAppendNumber] = useState(true);
-  const [value, setValue] = useState(() => generateRandom(24, { lower: true, upper: true, digits: true, symbols: true }, false));
+  const [value, setValue] = useState(() => generateRandom(24, { lower: true, upper: true, digits: true, symbols: true }, false, '', ''));
   const [history, setHistory] = useState([]);
   const [saveOpen, setSaveOpen] = useState(false);
 
-  const alphabetSize = Object.entries(opts).filter(([, on]) => on).reduce((s, [k]) => s + CHARSETS[k].length, 0) - (excludeAmbiguous ? 5 : 0);
+  const alphabetSize = buildAlphabet(opts, excludeAmbiguous, extraChars, excludeChars).length;
   const bits = mode === 'random' ? entropyBitsForRandom(length, Math.max(alphabetSize, 1)) : entropyBitsForPassphrase(wordCount, PASSPHRASE_WORDS.length);
   const strength = strengthLabel(bits);
   const crackTime = crackTimeLabel(bits);
 
+  function regenRandom(l = length, o = opts, ea = excludeAmbiguous, ex = extraChars, exc = excludeChars) {
+    return generateRandom(l, o, ea, ex, exc);
+  }
+
   function regenerate() {
-    const next = mode === 'random' ? generateRandom(length, opts, excludeAmbiguous) : generatePassphrase(wordCount, separator, capitalize, appendNumber);
+    const next = mode === 'random' ? regenRandom() : generatePassphrase(wordCount, separator, capitalize, appendNumber);
     setValue(next);
     setHistory((h) => [next, ...h.filter((v) => v !== next)].slice(0, HISTORY_LIMIT));
   }
@@ -76,7 +93,7 @@ export default function PasswordGeneratorPanel({ onSaved }) {
   function toggle(key) {
     const next = { ...opts, [key]: !opts[key] };
     setOpts(next);
-    setValue(generateRandom(length, next, excludeAmbiguous));
+    setValue(regenRandom(length, next));
   }
 
   async function copy(text = value) {
@@ -91,7 +108,7 @@ export default function PasswordGeneratorPanel({ onSaved }) {
           {[['random', 'Caractères aléatoires'], ['passphrase', 'Phrase de passe']].map(([id, label]) => (
             <div
               key={id}
-              onClick={() => { setMode(id); setValue(id === 'random' ? generateRandom(length, opts, excludeAmbiguous) : generatePassphrase(wordCount, separator, capitalize, appendNumber)); }}
+              onClick={() => { setMode(id); setValue(id === 'random' ? regenRandom() : generatePassphrase(wordCount, separator, capitalize, appendNumber)); }}
               style={{ padding: '7px 4px', marginRight: 14, fontSize: 12.5, fontWeight: mode === id ? 600 : 500, color: mode === id ? 'var(--primary)' : 'var(--text-muted)', borderBottom: mode === id ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}
             >
               {label}
@@ -119,8 +136,8 @@ export default function PasswordGeneratorPanel({ onSaved }) {
           <>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: 'var(--text-muted)' }}>Longueur : {length}</label>
             <input
-              type="range" min={12} max={64} value={length}
-              onChange={(e) => { const l = Number(e.target.value); setLength(l); setValue(generateRandom(l, opts, excludeAmbiguous)); }}
+              type="range" min={12} max={128} value={length}
+              onChange={(e) => { const l = Number(e.target.value); setLength(l); setValue(regenRandom(l)); }}
               style={{ width: '100%', marginBottom: 14 }}
             />
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12.5, marginBottom: 10 }}>
@@ -130,10 +147,30 @@ export default function PasswordGeneratorPanel({ onSaved }) {
                 </label>
               ))}
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
-              <input type="checkbox" checked={excludeAmbiguous} onChange={(e) => { setExcludeAmbiguous(e.target.checked); setValue(generateRandom(length, opts, e.target.checked)); }} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer', marginBottom: 10 }}>
+              <input type="checkbox" checked={excludeAmbiguous} onChange={(e) => { setExcludeAmbiguous(e.target.checked); setValue(regenRandom(length, opts, e.target.checked)); }} />
               Exclure les caractères ambigus (0, O, 1, l, I)
             </label>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+              <div style={{ flex: '1 1 160px' }}>
+                <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>Symboles autorisés en plus</label>
+                <input
+                  className="input mono" placeholder="ex. €§~"
+                  value={extraChars}
+                  onChange={(e) => { setExtraChars(e.target.value); setValue(regenRandom(length, opts, excludeAmbiguous, e.target.value)); }}
+                  style={{ height: 30, fontSize: 12.5 }}
+                />
+              </div>
+              <div style={{ flex: '1 1 160px' }}>
+                <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>Caractères interdits</label>
+                <input
+                  className="input mono" placeholder={'ex. "\'`;'}
+                  value={excludeChars}
+                  onChange={(e) => { setExcludeChars(e.target.value); setValue(regenRandom(length, opts, excludeAmbiguous, extraChars, e.target.value)); }}
+                  style={{ height: 30, fontSize: 12.5 }}
+                />
+              </div>
+            </div>
           </>
         ) : (
           <>

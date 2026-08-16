@@ -1,21 +1,51 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
-import { findUserByEmail, updateUser, updatePassword, clearOnboarding } from '../store/usersStore.js';
+import { findUserByEmail, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
+import { banIp, normalizeIp } from '../store/banlistStore.js';
 
 const router = Router();
 const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+// Au-delà de ce nombre d'échecs successifs sur UN SEUL compte (bien plus que
+// le seuil de verrouillage), l'IP source est bannie automatiquement : ce
+// n'est plus une erreur de frappe mais une attaque ciblée et concentrée —
+// à distinguer d'un volume de connexions élevé mais réparti sur des comptes
+// différents, qui lui reste couvert par le seul rate-limit IP générique.
+const AUTO_BAN_ATTEMPTS = 12;
 
 router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
   const user = email && findUserByEmail(email);
+
+  if (user) {
+    const lock = getLockStatus(user);
+    if (lock.locked) {
+      logAudit({ user: { email }, ip: req.ip }, 'auth.login.locked', {});
+      return res.status(423).json({ ok: false, error: `Compte temporairement verrouillé après plusieurs échecs. Réessayez après ${new Date(lock.lockUntil).toLocaleTimeString('fr-FR')}.` });
+    }
+  }
+
   if (!user || user.active === false || !verifyPassword(password || '', user.passwordHash)) {
-    logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', {});
+    if (user) {
+      const { locked, attempts } = recordLoginFailure(user.id);
+      logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', { attempts, locked });
+      if (attempts >= AUTO_BAN_ATTEMPTS) {
+        const ip = normalizeIp(req.ip);
+        try {
+          banIp(ip, `Bannissement automatique : ${attempts} échecs de connexion consécutifs ciblant le compte ${email}`, 'system');
+          logAudit({ user: { email }, ip: req.ip }, 'auth.login.autoban', { ip, attempts });
+        } catch { /* déjà bannie */ }
+      }
+    } else {
+      logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', {});
+    }
     return res.status(401).json({ ok: false, error: 'Identifiants invalides' });
   }
+
+  recordLoginSuccess(user.id);
   const token = signSession(user);
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,

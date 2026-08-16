@@ -78,6 +78,54 @@ export function updateUser(id, patch) {
   return users[idx];
 }
 
+// Verrouillage de compte après échecs de connexion rapprochés sur CE compte
+// (brute-force ciblé) — distinct du rate-limit IP générique (index.js), qui
+// laisse passer un trafic distribué normal mais ne protège pas un compte
+// visé depuis plusieurs IP. Fenêtre glissante : les échecs plus vieux que
+// FAILURE_WINDOW_MS ne comptent plus, pour ne pas verrouiller un compte à
+// cause d'une poignée d'erreurs de frappe étalées sur plusieurs jours.
+const MAX_FAILED_ATTEMPTS = 5;
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
+
+export function getLockStatus(user) {
+  if (!user?.lockUntil) return { locked: false };
+  const lockUntil = new Date(user.lockUntil).getTime();
+  if (lockUntil <= Date.now()) return { locked: false };
+  return { locked: true, lockUntil: user.lockUntil };
+}
+
+// Retourne { locked, attempts, lockUntil } après avoir enregistré l'échec.
+export function recordLoginFailure(id) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return { locked: false, attempts: 0 };
+  const user = users[idx];
+  const now = Date.now();
+  const withinWindow = user.lastFailedAt && (now - new Date(user.lastFailedAt).getTime()) < FAILURE_WINDOW_MS;
+  const attempts = (withinWindow ? user.failedAttempts || 0 : 0) + 1;
+  user.failedAttempts = attempts;
+  user.lastFailedAt = new Date(now).toISOString();
+  let locked = false;
+  if (attempts >= MAX_FAILED_ATTEMPTS) {
+    user.lockUntil = new Date(now + LOCK_DURATION_MS).toISOString();
+    locked = true;
+  }
+  writeStore('users', users);
+  return { locked, attempts, lockUntil: user.lockUntil || null };
+}
+
+export function recordLoginSuccess(id) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].failedAttempts = 0;
+  users[idx].lastFailedAt = null;
+  users[idx].lockUntil = null;
+  writeStore('users', users);
+  return users[idx];
+}
+
 export function updatePassword(id, passwordHash) {
   const users = listUsers();
   const idx = users.findIndex((u) => u.id === id);
