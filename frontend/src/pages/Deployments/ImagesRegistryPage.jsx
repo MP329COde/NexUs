@@ -4,6 +4,7 @@ import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import DemoNote from '../../components/ui/DemoNote.jsx';
 import TrivyScanPanel from './TrivyScanPanel.jsx';
+import DockerHubLookupPanel from './DockerHubLookupPanel.jsx';
 
 // Démonstration : aucune intégration de registre d'images (Harbor, GHCR
 // interrogé en détail...) n'existe dans la console.
@@ -19,6 +20,10 @@ export default function ImagesRegistryPage() {
     <>
       <PageHeader title="Images & registry" sub="Images publiées, taille, signatures et vulnérabilités détectées." />
       <DemoNote>Aucun registre d'images n'est intégré à la console (Harbor, GHCR...). Tableau illustratif pour valider la mise en page.</DemoNote>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <DockerHubLookupPanel />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <TrivyScanPanel />
