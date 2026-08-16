@@ -22,6 +22,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **dockerHub.routes.js** — Consultation du registre public Docker Hub (tags, métadonnées), sans authentification.
 - **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
 - **codeScans.routes.js** — Analyse statique de code via Semgrep sur le code source de la plateforme (admin), historique des scans.
+- **iacScans.routes.js** — Analyse IaC (Dockerfiles) via Checkov sur la plateforme (admin), historique des scans.
 - **notifications.routes.js** — Alertes de sécurité persistantes (admin) : liste, marquage lu/tout lu.
 - **identity.routes.js** — Config d'identité (OIDC/LDAP), test de connexion OIDC.
 - **incidents.routes.js** — Liste globale des incidents.
@@ -128,7 +129,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
 - **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre privé intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx) et **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel).
 - **ReleasesPage.jsx** — Démonstration.
-- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** pour l'analyse statique Semgrep réelle. Reste non intégré : SBOM, signature.
+- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep) et **IacScanPanel.jsx** (Checkov) réels. Reste non intégré : SBOM, signature.
 - **TestsQualityPage.jsx** — Démonstration.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
 - **SecretsPage.jsx / VaultPanel.jsx** — Coffre dev/prod, triple vérification prod, **champs symboles autorisés/interdits**, **rotation automatique configurable**, compte à rebours de rotation.
@@ -220,6 +221,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande |
 | Docker Hub (public) | Complet | API v2 publique, sans authentification, recherche de tags en direct |
 | Semgrep | Complet | Binaire local (open source, règles communautaires gratuites), scan à la demande sur le code de la plateforme |
+| Checkov | Complet | Binaire local (open source, Bridgecrew CE), scan IaC (Dockerfiles) à la demande |
 | SSH (agents/services) | Complet | Clé unique console, catalogue fermé de scripts |
 
 ## Sécurité des secrets (état détaillé)
@@ -237,8 +239,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
 - Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait ; scan de vulnérabilités horaire automatique (le scan Trivy est à la demande pour l'instant, pas planifié).
-- Checkov pour l'analyse IaC — Semgrep (SAST), le scan de secrets committés et Trivy (dépendances/conteneur) sont faits.
-- SBOM (ex. Syft) et signature d'image (ex. Cosign/Sigstore).
+- SBOM (ex. Syft) et signature d'image (ex. Cosign/Sigstore) — tout le reste du pipeline Supply Chain Security est réel (source, SAST, secrets, dépendances/conteneur, IaC, déploiement).
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
