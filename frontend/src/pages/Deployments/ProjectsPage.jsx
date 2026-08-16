@@ -9,7 +9,9 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
-const EMPTY_FORM = { name: '', description: '', memberIds: [] };
+const EMPTY_FORM = { name: '', description: '', memberIds: [], icon: '', color: '' };
+const PROJECT_EMOJIS = ['📦', '🚀', '⚙️', '🛰️', '🔧', '🧩', '🗄️', '🌐', '🔥', '🧠', '🛡️', '📊'];
+const PROJECT_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899', '#475569'];
 
 // "Projets" : fiches projet réelles (store projectsStore.js). Visibilité
 // appliquée côté serveur (GET /projects) — un compte Utilisateur ne voit ici
@@ -77,6 +79,17 @@ export default function ProjectsPage() {
                 <input className="input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Passerelle API publique" />
               </div>
             </div>
+            <label style={{ display: 'block', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>Icône (optionnel)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {PROJECT_EMOJIS.map((e) => (
+                <span key={e} onClick={() => setForm((f) => ({ ...f, icon: e === f.icon ? '' : e }))} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, cursor: 'pointer', fontSize: 14, background: e === form.icon ? 'var(--primary-soft)' : 'var(--border-soft)', border: e === form.icon ? '1px solid var(--primary)' : '1px solid transparent' }}>{e}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              {PROJECT_COLORS.map((c) => (
+                <span key={c} onClick={() => setForm((f) => ({ ...f, color: c }))} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: c === form.color ? '0 0 0 2px var(--surface), 0 0 0 4px var(--primary)' : 'none' }} />
+              ))}
+            </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>
               <Icon name="users" size={13} />Membres — un compte n'ayant qu'un seul projet ne verra que celui-ci
             </label>
@@ -105,7 +118,12 @@ export default function ProjectsPage() {
           <Link key={p.id} to={`/deployments/projects/${p.id}`} className="card" style={{ padding: 16, textDecoration: 'none', color: 'inherit', display: 'block' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
-                <Icon name="folder" size={15} style={{ color: 'var(--text-faint)' }} />{p.name}
+                {p.icon ? (
+                  <span style={{ width: 22, height: 22, borderRadius: 6, background: p.color || 'var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flex: 'none' }}>{p.icon}</span>
+                ) : (
+                  <Icon name="folder" size={15} style={{ color: p.color || 'var(--text-faint)' }} />
+                )}
+                {p.name}
               </span>
               <span className={`badge badge-${p.status === 'active' ? 'ok' : p.status === 'paused' ? 'warn' : 'mut'}`}><span className="dot" />{p.status}</span>
             </div>

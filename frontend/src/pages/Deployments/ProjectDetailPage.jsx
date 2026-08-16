@@ -80,7 +80,16 @@ export default function ProjectDetailPage() {
   return (
     <>
       <PageHeader
-        title={p.name}
+        title={(
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {p.icon ? (
+              <span style={{ width: 30, height: 30, borderRadius: 8, background: p.color || 'var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flex: 'none' }}>{p.icon}</span>
+            ) : (
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || 'var(--text-faint)', flex: 'none' }} />
+            )}
+            {p.name}
+          </span>
+        )}
         sub={p.description || 'Fiche projet'}
         actions={<Link to="/deployments/projects" className="btn-outline" style={{ textDecoration: 'none' }}>← Tous les projets</Link>}
       />
