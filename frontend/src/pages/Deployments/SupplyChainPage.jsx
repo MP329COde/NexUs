@@ -5,11 +5,11 @@ import DemoNote from '../../components/ui/DemoNote.jsx';
 import CodeScanPanel from './CodeScanPanel.jsx';
 import IacScanPanel from './IacScanPanel.jsx';
 
-// SBOM et signature restent non intégrés — le reste du pipeline (source,
-// SAST, secrets, dépendances/conteneur, IaC, déploiement) est désormais
-// réel : Semgrep (CodeScanPanel), le scan de secrets committés (Secrets &
-// variables), Trivy (Images & registry), Checkov (IacScanPanel) et Argo CD
-// (Déploiements).
+// Seule la signature d'image reste non intégrée — le reste du pipeline
+// (source, SAST, secrets, dépendances/conteneur, IaC, SBOM, déploiement)
+// est désormais réel : Semgrep (CodeScanPanel), le scan de secrets committés
+// (Secrets & variables), Trivy et Syft (Images & registry), Checkov
+// (IacScanPanel) et Argo CD (Déploiements).
 const STAGES = [
   { id: 'source', label: 'Source', icon: 'gitBranch', tool: 'Dépôts Git (réel)', note: 'Code source récupéré depuis GitLab/GitHub — voir Dépôts Git.', real: true },
   { id: 'sast', label: 'SAST', icon: 'terminal', tool: 'Semgrep (réel, ci-dessous)', note: 'Analyse statique du code à la recherche de vulnérabilités.', real: true },
@@ -17,7 +17,7 @@ const STAGES = [
   { id: 'deps', label: 'Scan de dépendances', icon: 'box', tool: 'Trivy (réel, voir Images & registry)', note: 'Vulnérabilités connues (CVE) dans les librairies utilisées.', real: true },
   { id: 'container', label: 'Scan de conteneur', icon: 'cube', tool: 'Trivy (réel, voir Images & registry)', note: 'Vulnérabilités dans l\'image construite (OS + dépendances).', real: true },
   { id: 'iac', label: 'IaC', icon: 'layers', tool: 'Checkov (réel, ci-dessous)', note: 'Bonnes pratiques de sécurité sur les Dockerfiles et manifests.', real: true },
-  { id: 'sbom', label: 'SBOM', icon: 'layers', tool: 'ex. Syft', note: 'Inventaire logiciel de l\'image (Software Bill of Materials).', real: false },
+  { id: 'sbom', label: 'SBOM', icon: 'layers', tool: 'Syft (réel, voir Images & registry)', note: 'Inventaire logiciel de l\'image (Software Bill of Materials).', real: true },
   { id: 'signature', label: 'Signature', icon: 'certificate', tool: 'ex. Cosign / Sigstore', note: 'Signature cryptographique de l\'image avant publication.', real: false },
   { id: 'registry', label: 'Registre', icon: 'image', tool: 'Docker Hub public (réel) — registre privé en démonstration', note: 'Publication de l\'image signée dans le registre.', real: false },
   { id: 'argocd', label: 'Argo CD', icon: 'sync', tool: 'Déploiements (réel)', note: 'Déploiement — voir GitOps Diff sur la fiche de déploiement.', real: true }
@@ -28,8 +28,8 @@ export default function SupplyChainPage() {
     <>
       <PageHeader title="Supply Chain Security" sub="Pipeline de sécurité de la chaîne d'approvisionnement logicielle, de la source au déploiement." />
       <DemoNote>
-        SBOM et signature d'image ne sont pas encore intégrés. Le reste du pipeline est réel : Semgrep (SAST, ci-dessous), scan quotidien de secrets committés,
-        Trivy (dépendances/conteneur) et Docker Hub public — voir les badges "Réel" ci-dessous.
+        Seule la signature d'image n'est pas encore intégrée. Le reste du pipeline est réel : Semgrep (SAST, ci-dessous), scan quotidien de secrets committés,
+        Trivy (dépendances/conteneur), Syft (SBOM), Checkov (IaC) et Docker Hub public — voir les badges "Réel" ci-dessous.
       </DemoNote>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
@@ -58,7 +58,7 @@ export default function SupplyChainPage() {
       </Panel>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
-        {STAGES.filter((s) => !['source', 'argocd', 'sast', 'iac'].includes(s.id)).map((s) => (
+        {STAGES.filter((s) => !['source', 'argocd', 'sast', 'iac', 'sbom'].includes(s.id)).map((s) => (
           <Panel key={s.id} title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name={s.icon} size={13} style={{ color: 'var(--text-faint)' }} />{s.label}</span>)} span={4}>
             <div style={{ padding: 14, fontSize: 12.5 }}>
               <div className="faint" style={{ marginBottom: 6 }}>{s.note}</div>

@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import DemoNote from '../../components/ui/DemoNote.jsx';
 import TrivyScanPanel from './TrivyScanPanel.jsx';
 import DockerHubLookupPanel from './DockerHubLookupPanel.jsx';
+import SbomPanel from './SbomPanel.jsx';
 
 // Démonstration : aucune intégration de registre d'images (Harbor, GHCR
 // interrogé en détail...) n'existe dans la console.
@@ -27,6 +28,10 @@ export default function ImagesRegistryPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <TrivyScanPanel />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <SbomPanel />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
