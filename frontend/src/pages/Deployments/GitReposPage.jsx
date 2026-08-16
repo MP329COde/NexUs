@@ -9,6 +9,7 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import ManifestExplorerModal from './ManifestExplorerModal.jsx';
 import RepoStructureModal from './RepoStructureModal.jsx';
+import './GitReposPage.css';
 
 const ROLE_LABELS = {
   framework: 'Framework de base', service: 'Service applicatif', library: 'Bibliothèque',
@@ -76,7 +77,7 @@ export default function GitReposPage() {
     <>
       <PageHeader title="Dépôts Git" sub="Dépôts hébergés sur les forges configurées (GitLab, GitHub)." />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="repos-kpi-grid">
         <KpiCard label="Dépôts" value={items.length} tint="#3B82F6" note={providers > 0 ? `${providers} forge(s) connectée(s)` : 'Aucune forge configurée'} />
         <KpiCard label="Étiquetés" value={tagged} unit={`/ ${items.length || 0}`} tint="#8B5CF6" />
         <KpiCard label="Privés" value={privateCount} tint="#F59E0B" />
@@ -86,56 +87,56 @@ export default function GitReposPage() {
         title="Dépôts"
         sub="Triés par activité"
         span={12}
-        actions={<input className="input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ height: 30, fontSize: 12.5, width: 180 }} />}
+        actions={<input className="input repos-filter-input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} />}
       >
         {filtered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          <div className="repos-empty">
             {items.length === 0 ? 'Aucune forge configurée (GitLab/GitHub) — voir Paramètres → Intégrations' : 'Aucun dépôt ne correspond au filtre'}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <div className="repos-table-wrap">
+            <table className="repos-table">
               <thead>
                 <tr>
                   {['Dépôt', 'Fournisseur', 'Visibilité', 'Branche par défaut', 'Rôle', 'Dernière activité', 'Actions'].map((c) => (
-                    <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                    <th key={c} className="repos-table-head">{c}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.key} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                    <td style={{ padding: '10px 16px', fontWeight: 600 }}>{r.name}<div className="faint mono" style={{ fontSize: 10.5, fontWeight: 400 }}>{r.path}</div></td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}>
-                        <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={13} style={{ color: 'var(--text-faint)' }} />{r.provider}
+                  <tr key={r.key} className="repos-table-row">
+                    <td className="repos-table-cell repos-cell-name">{r.name}<div className="faint mono repos-cell-path">{r.path}</div></td>
+                    <td className="repos-table-cell">
+                      <span className="repos-provider">
+                        <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={13} className="repos-provider-icon" />{r.provider}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px' }}><span className={`badge badge-${VISIBILITY_TONE[r.visibility]}`}><span className="dot" />{VISIBILITY_LABEL[r.visibility]}</span></td>
-                    <td style={{ padding: '10px 16px' }} className="mono muted">{r.defaultBranch}</td>
-                    <td style={{ padding: '10px 16px' }}>{r.role ? <span className="badge badge-vio"><Icon name={ROLE_ICON[r.role] || 'box'} size={11} />{ROLE_LABELS[r.role]}</span> : <span className="faint">—</span>}</td>
-                    <td style={{ padding: '10px 16px', color: 'var(--text-faint)' }}>{r.lastActivity ? new Date(r.lastActivity).toLocaleDateString('fr-FR') : '—'}</td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <a href={r.webUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+                    <td className="repos-table-cell"><span className={`badge badge-${VISIBILITY_TONE[r.visibility]}`}><span className="dot" />{VISIBILITY_LABEL[r.visibility]}</span></td>
+                    <td className="repos-table-cell mono muted">{r.defaultBranch}</td>
+                    <td className="repos-table-cell">{r.role ? <span className="badge badge-vio"><Icon name={ROLE_ICON[r.role] || 'box'} size={11} />{ROLE_LABELS[r.role]}</span> : <span className="faint">—</span>}</td>
+                    <td className="repos-table-cell repos-cell-date">{r.lastActivity ? new Date(r.lastActivity).toLocaleDateString('fr-FR') : '—'}</td>
+                    <td className="repos-table-cell">
+                      <div className="repos-row-actions">
+                        <a href={r.webUrl} target="_blank" rel="noreferrer" className="btn-outline repos-action-btn repos-action-btn-link">
                           <Icon name="externalLink" size={12} />Ouvrir
                         </a>
-                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setEditing({ key: r.key, name: r.name, role: r.role || '', tags: (r.tags || []).join(', ') })}>
+                        <span className="btn-outline repos-action-btn" onClick={() => setEditing({ key: r.key, name: r.name, role: r.role || '', tags: (r.tags || []).join(', ') })}>
                           <Icon name="edit" size={12} />Étiqueter
                         </span>
                         {r.role && (
-                          <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setScriptFor(r)}>
+                          <span className="btn-outline repos-action-btn" onClick={() => setScriptFor(r)}>
                             <Icon name="terminal" size={12} />Script
                           </span>
                         )}
-                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setExploring(r)}>
+                        <span className="btn-outline repos-action-btn" onClick={() => setExploring(r)}>
                           <Icon name="folder" size={12} />Manifests
                         </span>
-                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setStructuring(r)}>
+                        <span className="btn-outline repos-action-btn" onClick={() => setStructuring(r)}>
                           <Icon name="layers" size={12} />Structure
                         </span>
                         {r.provider === 'github' && (
-                          <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setGeneratingCiFor(r)}>
+                          <span className="btn-outline repos-action-btn" onClick={() => setGeneratingCiFor(r)}>
                             <Icon name="sync" size={12} />Générer CI
                           </span>
                         )}
@@ -151,19 +152,19 @@ export default function GitReposPage() {
 
       {editing && (
         <Modal title={`Étiqueter « ${editing.name} »`} sub="Rôle du dépôt et étiquettes libres" onClose={() => setEditing(null)} width={460}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="repos-modal-form">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Rôle</label>
+              <label className="repos-form-label">Rôle</label>
               <select className="input" value={editing.role} onChange={(e) => setEditing((s) => ({ ...s, role: e.target.value }))}>
                 <option value="">Aucun rôle</option>
                 {Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Étiquettes</label>
+              <label className="repos-form-label">Étiquettes</label>
               <input className="input" placeholder="étiquettes séparées par des virgules" value={editing.tags} onChange={(e) => setEditing((s) => ({ ...s, tags: e.target.value }))} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="repos-form-actions">
               <span className="btn-outline" onClick={() => setEditing(null)}>Annuler</span>
               <button className="btn" onClick={() => saveMeta({ key: editing.key }, editing.role, editing.tags)}>Enregistrer</button>
             </div>
@@ -211,13 +212,13 @@ function GenerateCiModal({ repo, onClose }) {
   return (
     <Modal title="Générer un workflow GitHub Actions" sub={repo.name} onClose={onClose} width={480}>
       {result ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 12.5 }}>Pull request ouverte avec un workflow CI (lint/test/build + SAST Semgrep + SCA Trivy + scan de secrets GitGuardian).</div>
-          <a href={result.webUrl} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none', textAlign: 'center' }}>Ouvrir la pull request #{result.number}</a>
+        <div className="repos-generate-result">
+          <div className="repos-generate-result-text">Pull request ouverte avec un workflow CI (lint/test/build + SAST Semgrep + SCA Trivy + scan de secrets GitGuardian).</div>
+          <a href={result.webUrl} target="_blank" rel="noreferrer" className="btn repos-generate-pr-link">Ouvrir la pull request #{result.number}</a>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <div className="repos-generate-intro">
+          <div className="repos-generate-desc">
             Crée <code className="mono">.github/workflows/ci.yml</code> à partir de la stack détectée du dépôt (lint/test/build) avec des jobs de sécurité prêts à l'emploi (Semgrep, Trivy, GitGuardian — vraies actions GitHub, à activer en ajoutant <code className="mono">GITGUARDIAN_API_KEY</code> aux secrets du dépôt) et ouvre une pull request. Rien n'est appliqué directement sur la branche par défaut.
           </div>
           <button className="btn" disabled={busy} onClick={generate}>{busy ? 'Génération…' : 'Générer et ouvrir la pull request'}</button>
@@ -240,12 +241,12 @@ function ScriptModal({ repo, onClose }) {
       onClose={onClose}
       width={560}
       actions={(
-        <span className="btn" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={copy}>
+        <span className="btn repos-script-copy-btn" onClick={copy}>
           <Icon name="copy" size={13} />Copier le script
         </span>
       )}
     >
-      <pre className="mono" style={{ margin: 0, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2, var(--bg))', fontSize: 12, overflowX: 'auto' }}>{cloneScript(repo)}</pre>
+      <pre className="mono repos-script-pre">{cloneScript(repo)}</pre>
     </Modal>
   );
 }
