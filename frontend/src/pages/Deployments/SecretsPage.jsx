@@ -6,6 +6,7 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import VaultPanel from './VaultPanel.jsx';
 import PasswordGeneratorPanel from './PasswordGeneratorPanel.jsx';
+import SecretLeakScanPanel from './SecretLeakScanPanel.jsx';
 
 // "Secrets & variables" : coffre réel (voir VaultPanel.jsx / backend
 // services/vaultService.js), chiffré au repos. Les secrets dev sont visibles
@@ -36,10 +37,16 @@ export default function SecretsPage() {
         {isAdmin && <KpiCard label="Secrets production" value={prodCount} tint="#F43F5E" note="triple vérification requise" />}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
         <VaultPanel refreshKey={refreshKey} />
         <PasswordGeneratorPanel onSaved={() => setRefreshKey((k) => k + 1)} />
       </div>
+
+      {isAdmin && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+          <SecretLeakScanPanel />
+        </div>
+      )}
     </>
   );
 }

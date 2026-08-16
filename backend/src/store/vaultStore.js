@@ -128,6 +128,39 @@ export function rotateDueSecrets() {
   return rotated;
 }
 
+// Rotation immédiate, hors échéance planifiée — déclenchée quand un secret
+// est détecté en clair dans un dépôt (voir secretLeakScanService.js). Ne
+// s'applique jamais au tier 'dev' (mots de passe stables de machines de
+// test, pas des secrets de production).
+export function forceRotateSecret(id) {
+  const entries = readStore('vault') || [];
+  const entry = entries.find((e) => e.id === id);
+  if (!entry || entry.tier === 'dev') return null;
+  entry.secretEncrypted = encryptSecret(generateProdSecret());
+  entry.secretVersion = (entry.secretVersion || 1) + 1;
+  entry.rotatedAt = new Date().toISOString();
+  writeStore('vault', entries);
+  return toMeta(entry);
+}
+
+// Comparaison à temps constant : le scan compare un contenu de fichier à
+// des dizaines de secrets déchiffrés, une comparaison `===` classique fuit
+// une information de timing négligeable ici (le contenu scanné n'est pas
+// un attaquant actif), mais rester cohérent avec verifyPassword() ne coûte
+// rien et évite d'avoir à se reposer sur ce raisonnement plus tard.
+export function findSecretMatchInText(text) {
+  const entries = readStore('vault') || [];
+  const matches = [];
+  for (const entry of entries) {
+    if (entry.tier === 'dev') continue; // secrets partagés dev, pas des fuites à traiter
+    const secret = decryptSecret(entry.secretEncrypted);
+    if (secret && secret.length >= 12 && text.includes(secret)) {
+      matches.push(toMeta(entry));
+    }
+  }
+  return matches;
+}
+
 export function deleteVaultEntry(id) {
   const entries = readStore('vault') || [];
   const next = entries.filter((e) => e.id !== id);
