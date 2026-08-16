@@ -207,6 +207,44 @@ export async function createEnvironment(projectId, { name, kind, isProduction })
   return rows[0];
 }
 
+export async function getEnvironment(id) {
+  const { rows } = await query('SELECT * FROM environments WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+// Lie un environnement à une application Argo CD réelle existante — jamais
+// une valeur inventée : c'est ce lien qui permet ensuite de lire un état de
+// déploiement réel (revision/santé) et de déclencher de vraies promotions
+// (voir services/environmentPromotionService.js).
+export async function setEnvironmentArgocdApp(id, argocdApp) {
+  const { rows } = await query(
+    'UPDATE environments SET argocd_app = $2 WHERE id = $1 RETURNING *',
+    [id, argocdApp || null]
+  );
+  return rows[0] || null;
+}
+
+export async function recordPromotion({ projectId, fromEnvironmentId, toEnvironmentId, argocdApp, revision, status, message, triggeredBy }) {
+  const { rows } = await query(
+    `INSERT INTO environment_promotions (project_id, from_environment_id, to_environment_id, argocd_app, revision, status, message, triggered_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [projectId, fromEnvironmentId || null, toEnvironmentId, argocdApp, revision || null, status, message || null, triggeredBy]
+  );
+  return rows[0];
+}
+
+export async function listPromotions(projectId, limit = 30) {
+  const { rows } = await query(
+    `SELECT p.*, fe.name AS from_environment_name, te.name AS to_environment_name
+     FROM environment_promotions p
+     LEFT JOIN environments fe ON fe.id = p.from_environment_id
+     JOIN environments te ON te.id = p.to_environment_id
+     WHERE p.project_id = $1 ORDER BY p.created_at DESC LIMIT $2`,
+    [projectId, limit]
+  );
+  return rows;
+}
+
 // --- Équipes : regroupement d'utilisateurs distinct des projets (une
 // équipe peut travailler sur plusieurs projets, un projet peut impliquer
 // plusieurs équipes — contrairement à project_members qui reste la source

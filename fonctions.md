@@ -126,7 +126,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **ManifestExplorerModal.jsx** — Navigation/édition YAML → commit → MR/PR.
 - **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
-- **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
+- **EnvironmentsPage.jsx** — Réel : environnements du socle relationnel (production/staging créés automatiquement par projet) agrégés tous projets confondus, liaison à une application Argo CD existante, promotion réelle (revision lue sur l'environnement source via l'API Argo CD, synchronisée sur l'environnement cible), historique des promotions (succès/échecs réels, jamais inventés).
 - **ImagesRegistryPage.jsx** — Tableau "Dépôt d'images" du haut de page en démonstration, mais **scanner Trivy réel** (TrivyScanPanel.jsx, à la demande + planifié horaire), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel), **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft pour le SBOM, cosign/Sigstore pour la signature) et **registre d'images privé réel et optionnel** (PrivateRegistryPanel.jsx, Docker Distribution — service Compose sous profil `registry`, activé via `install.sh`).
 - **ReleasesPage.jsx** — Démonstration.
 - **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM, signature et registre** (Syft + cosign + registre privé, voir Images & registry) réels. Seule la signature d'*image* (par opposition à la signature du SBOM) reste hors périmètre — nécessiterait de pousser une image via la console elle-même, qu'elle ne construit pas.
@@ -216,7 +216,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Registre d'images privé | Complet (optionnel) | Service `registry:2` (Docker Distribution), profil Compose `registry`, activé via `install.sh` |
 | Scanners sécurité (SAST/SCA) | Complet | Semgrep + Checkov, voir ci-dessous |
 | Frameworks de tests | Stub | Page en anticipation |
-| Multi-environnements | Stub | Démonstration |
+| Multi-environnements | Complet | Environnements réels (socle relationnel) + promotion via Argo CD |
 | nmap | Complet | Exécution réelle, validation stricte de cible |
 | Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande **+ re-scan automatique horaire** de chaque image déjà vue, avec alerte si nouvelle vulnérabilité critique |
 | Docker Hub (public) | Complet | API v2 publique, sans authentification, recherche de tags en direct |
@@ -241,7 +241,6 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
 - ~~Registre privé~~ — **fait** : service `registry:2` (Docker Distribution) optionnel dans `docker-compose.yml` (profil `registry`, activé via `install.sh`), navigable en direct depuis Images & registry (PrivateRegistryPanel.jsx). Pas Harbor/GHCR à proprement parler (API compatible identique), pas d'UI de gestion des utilisateurs au-delà du compte unique généré à l'installation.
-- Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
 - Rôles par projet avec granularité fine par ressource (au-delà de viewer/developer/maintainer/owner déjà en place via le socle relationnel).

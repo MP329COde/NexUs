@@ -144,8 +144,8 @@ elif [ "$ASSUME_YES" = 0 ]; then
     ok "  avec l'URL http://registry:5000 une fois la console démarrée (accès interne au réseau Docker)."
   fi
 fi
-COMPOSE_PROFILE_ARGS=()
-[ "$ENABLE_REGISTRY" = 1 ] && COMPOSE_PROFILE_ARGS=(--profile registry)
+COMPOSE_PROFILE_ARGS=""
+[ "$ENABLE_REGISTRY" = 1 ] && COMPOSE_PROFILE_ARGS="--profile registry"
 
 CONSOLE_PORT="$(grep -E '^CONSOLE_PORT=' .env | cut -d= -f2)"
 CONSOLE_PORT="${CONSOLE_PORT:-8080}"
@@ -157,7 +157,7 @@ if [ "$UPDATE_ONLY" = 1 ]; then
   # (contrairement à un appel à POST /api/backups, qui suppose la console
   # déjà debout et un compte admin sous la main). Ignorée en douceur si
   # c'est une toute première installation (rien à sauvegarder encore).
-  if docker compose "${COMPOSE_PROFILE_ARGS[@]}" ps --status running --format '{{.Name}}' 2>/dev/null | grep -q .; then
+  if docker compose $COMPOSE_PROFILE_ARGS ps --status running --format '{{.Name}}' 2>/dev/null | grep -q .; then
     BACKUP_DIR="backups/pre-update-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$BACKUP_DIR"
     info "Sauvegarde avant mise à jour dans ${BACKUP_DIR}/…"
@@ -184,10 +184,10 @@ if [ "$UPDATE_ONLY" = 1 ]; then
 fi
 
 info "Construction des images…"
-docker compose "${COMPOSE_PROFILE_ARGS[@]}" build
+docker compose $COMPOSE_PROFILE_ARGS build
 
 info "Démarrage des services…"
-docker compose "${COMPOSE_PROFILE_ARGS[@]}" up -d
+docker compose $COMPOSE_PROFILE_ARGS up -d
 
 info "Attente que la console réponde…"
 for i in $(seq 1 30); do
