@@ -18,6 +18,8 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
+import { verifyPassword, hashPassword } from '../utils/crypto.js';
+import { getMinPasswordLength } from '../store/identityStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -125,13 +127,44 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
-  const project = store.updateProject(req.params.id, req.body || {});
+  // Allowlist explicite : req.body ne doit jamais pouvoir écrire des champs
+  // internes comme vaultPasswordHash (géré exclusivement par les routes
+  // dédiées ci-dessous, avec re-authentification).
+  const { name, description, tags, memberIds, repoKeys, status } = req.body || {};
+  const project = store.updateProject(req.params.id, { name, description, tags, memberIds, repoKeys, status });
   if (req.pgProject) {
-    const { name, description, tags, repoKeys } = req.body || {};
     await orgStore.updateProjectByLegacyId(req.params.id, { name, description, tags, repoKeys });
   }
   logAudit(req, 'project.update', { projectId: project.id });
-  res.json({ ok: true, project });
+  const { vaultPasswordHash, ...publicProject } = project;
+  res.json({ ok: true, project: publicProject });
+}));
+
+// Mot de passe de coffre-fort du projet : verrou distinct du mot de passe du
+// compte, requis pour révéler ses secrets (voir vault.routes.js). Seul un
+// owner/maintainer peut le définir ; le changer exige de retaper l'ancien
+// (sauf s'il n'était pas encore défini, ou pour un admin plateforme).
+router.put('/:id/vault-password', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const minLength = getMinPasswordLength();
+  if (!newPassword || newPassword.length < minLength) {
+    return res.status(400).json({ ok: false, error: `Le mot de passe doit contenir au moins ${minLength} caractères` });
+  }
+  const rawProject = store.getProject(req.params.id);
+  if (rawProject.vaultPasswordHash && req.user.role !== 'admin') {
+    if (!verifyPassword(currentPassword || '', rawProject.vaultPasswordHash)) {
+      return res.status(401).json({ ok: false, error: 'Mot de passe de coffre-fort actuel incorrect' });
+    }
+  }
+  store.setProjectVaultPassword(req.params.id, hashPassword(newPassword));
+  logAudit(req, 'project.vaultPassword.set', { projectId: req.params.id });
+  res.json({ ok: true });
+}));
+
+router.delete('/:id/vault-password', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  store.clearProjectVaultPassword(req.params.id);
+  logAudit(req, 'project.vaultPassword.clear', { projectId: req.params.id });
+  res.json({ ok: true });
 }));
 
 // Garde-fou avant une action irréversible : la suppression cascade sur tout

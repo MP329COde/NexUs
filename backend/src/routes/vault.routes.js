@@ -68,10 +68,29 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
   }
 
-  if (entry.tier === 'prod' || entry.tier === 'project') {
+  if (entry.tier === 'prod') {
     const me = findUserByEmail(req.user.email);
     if (!verifyPassword(req.body?.currentPassword || '', me.passwordHash)) {
       return res.status(401).json({ ok: false, error: 'Mot de passe incorrect' });
+    }
+  }
+
+  // Tier 'project' : si le projet a défini un mot de passe de coffre-fort
+  // dédié, il remplace le mot de passe du compte (verrou propre au projet,
+  // partagé entre ses membres, plutôt que le mot de passe personnel de
+  // chacun). Rétrocompatible : tant qu'aucun mot de passe de coffre n'est
+  // défini, on retombe sur l'ancien comportement (mot de passe du compte).
+  if (entry.tier === 'project') {
+    const project = getProject(entry.projectId);
+    if (project?.vaultPasswordHash) {
+      if (!verifyPassword(req.body?.projectPassword ?? req.body?.currentPassword ?? '', project.vaultPasswordHash)) {
+        return res.status(401).json({ ok: false, error: 'Mot de passe de coffre-fort du projet incorrect' });
+      }
+    } else {
+      const me = findUserByEmail(req.user.email);
+      if (!verifyPassword(req.body?.currentPassword || '', me.passwordHash)) {
+        return res.status(401).json({ ok: false, error: 'Mot de passe incorrect' });
+      }
     }
   }
 

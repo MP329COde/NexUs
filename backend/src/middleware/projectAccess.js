@@ -38,7 +38,13 @@ export function loadProjectAccess() {
     try {
       const project = legacyStore.getProject(req.params.id);
       if (!project) return res.status(404).json({ ok: false, error: 'Projet introuvable' });
-      req.legacyProject = project;
+      // Copie superficielle + retrait du hash : req.legacyProject part vers
+      // les réponses JSON telles quelles à plusieurs endroits du routeur, le
+      // hash ne doit donc jamais y figurer, même indirectement.
+      const { vaultPasswordHash, ...publicProject } = project;
+      req.legacyProject = publicProject;
+      req.legacyProject.vaultPasswordSet = Boolean(vaultPasswordHash);
+      req.projectHasVaultPassword = Boolean(vaultPasswordHash);
 
       if (pool) {
         req.pgProject = await getProjectByLegacyId(project.id);
