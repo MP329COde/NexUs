@@ -40,8 +40,8 @@ export default function LoginPage() {
           </div>
           <p className="faint" style={{ fontSize: 13, margin: '4px 0 26px' }}>Connectez-vous pour accéder à votre infrastructure.</p>
 
-          <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, marginBottom: 6 }}>Adresse e-mail</label>
-          <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: 14 }} autoFocus />
+          <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, marginBottom: 6 }}>E-mail ou nom de connexion</label>
+          <input className="input" type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: 14 }} autoFocus />
 
           <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, marginBottom: 6 }}>Mot de passe</label>
           <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginBottom: 18 }} />
