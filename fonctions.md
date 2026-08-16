@@ -127,9 +127,9 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
 - **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
-- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre privé intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel) et **génération de SBOM réelle** (SbomPanel.jsx, Syft — Anchore, open source).
+- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre privé intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel) et **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft — Anchore — pour le SBOM, cosign/Sigstore pour la signature, paire de clés locale dédiée à l'instance).
 - **ReleasesPage.jsx** — Démonstration.
-- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov) et **SBOM** (Syft, voir Images & registry) réels. Seule la signature d'image reste non intégrée.
+- **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM et signature** (Syft + cosign, voir Images & registry) réels. Seul le registre privé authentifié reste non intégré.
 - **TestsQualityPage.jsx** — Démonstration.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
 - **SecretsPage.jsx / VaultPanel.jsx** — Coffre dev/prod, triple vérification prod, **champs symboles autorisés/interdits**, **rotation automatique configurable**, compte à rebours de rotation.
@@ -223,6 +223,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Semgrep | Complet | Binaire local (open source, règles communautaires gratuites), scan à la demande sur le code de la plateforme |
 | Checkov | Complet | Binaire local (open source, Bridgecrew CE), scan IaC (Dockerfiles) à la demande |
 | Syft | Complet | Binaire local (Anchore, open source), génération de SBOM à la demande sur n'importe quelle image accessible |
+| cosign | Complet | Binaire local (Sigstore, open source), signature/vérification réelle des SBOM via paire de clés locale (bundle + journal de transparence Rekor public) |
 | SSH (agents/services) | Complet | Clé unique console, catalogue fermé de scripts |
 
 ## Sécurité des secrets (état détaillé)
@@ -239,8 +240,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait ; scan de vulnérabilités horaire automatique (le scan Trivy est à la demande pour l'instant, pas planifié).
-- Signature d'image (ex. Cosign/Sigstore) — seul maillon non intégré du pipeline Supply Chain Security ; le reste est réel (source, SAST, secrets, dépendances/conteneur, IaC, SBOM, déploiement).
+- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait ; scan de vulnérabilités horaire automatique (le scan Trivy est à la demande pour l'instant, pas planifié). C'est désormais le seul maillon non intégré du pipeline Supply Chain Security (source, SAST, secrets, dépendances/conteneur, IaC, SBOM et signature du SBOM sont réels).
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).

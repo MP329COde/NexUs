@@ -15,6 +15,7 @@ backend/data/*.json.migrated
 backend/data/*.db
 backend/data/.master.key
 backend/data/.ssh_console_key.*
+backend/data/cosign/
 backend/data/backups/
 
 # Playwright (suite e2e — voir frontend/playwright.config.js)
