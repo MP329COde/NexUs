@@ -17,6 +17,8 @@ function formatDate(iso) {
 // registre n'est intégré à la console, mais n'importe quelle image
 // accessible publiquement (Docker Hub, GHCR public...) peut être scannée à
 // la demande, indépendamment du tableau de démonstration ci-dessous.
+// Chaque image scannée au moins une fois est ensuite re-scannée
+// automatiquement toutes les heures (voir scheduledTrivyScanService.js).
 export default function TrivyScanPanel() {
   const notify = useNotify();
   const { data, loading, reload } = useApi(() => api.get('/image-scans'), []);
@@ -74,7 +76,7 @@ export default function TrivyScanPanel() {
                 style={{ padding: '9px 12px', cursor: 'pointer', background: active?.id === s.id ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
               >
                 <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.imageRef}</div>
-                <div className="faint" style={{ fontSize: 10.5 }}>{formatDate(s.scannedAt)}</div>
+                <div className="faint" style={{ fontSize: 10.5 }}>{formatDate(s.scannedAt)}{s.trigger === 'scheduled' ? ' · planifié' : ''}</div>
               </div>
             ))
           )}
@@ -89,6 +91,7 @@ export default function TrivyScanPanel() {
                 <Icon name="image" size={15} style={{ color: 'var(--text-faint)' }} />
                 <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{active.imageRef}</span>
                 {active.osFamily && <span className="faint" style={{ fontSize: 11 }}>{active.osFamily} {active.osVersion}</span>}
+                {active.trigger === 'scheduled' && <span className="badge badge-mut" style={{ fontSize: 10 }}>Scan planifié (horaire)</span>}
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
                 {SEVERITY_ORDER.filter((sev) => active.counts[sev] > 0).map((sev) => (

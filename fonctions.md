@@ -218,7 +218,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Frameworks de tests | Stub | Page en anticipation |
 | Multi-environnements | Stub | Démonstration |
 | nmap | Complet | Exécution réelle, validation stricte de cible |
-| Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande |
+| Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande **+ re-scan automatique horaire** de chaque image déjà vue, avec alerte si nouvelle vulnérabilité critique |
 | Docker Hub (public) | Complet | API v2 publique, sans authentification, recherche de tags en direct |
 | Semgrep | Complet | Binaire local (open source, règles communautaires gratuites), scan à la demande sur le code de la plateforme |
 | Checkov | Complet | Binaire local (open source, Bridgecrew CE), scan IaC (Dockerfiles) à la demande |
@@ -240,7 +240,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait ; scan de vulnérabilités horaire automatique (le scan Trivy est à la demande pour l'instant, pas planifié). C'est désormais le seul maillon non intégré du pipeline Supply Chain Security (source, SAST, secrets, dépendances/conteneur, IaC, SBOM et signature du SBOM sont réels).
+- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait, et le scan Trivy est désormais aussi **planifié automatiquement** (toutes les heures, en plus du déclenchement manuel — voir ci-dessous). C'est désormais le seul maillon non intégré du pipeline Supply Chain Security (source, SAST, secrets, dépendances/conteneur, IaC, SBOM et signature du SBOM sont réels).
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
