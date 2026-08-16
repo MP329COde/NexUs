@@ -38,7 +38,8 @@ const DEFAULTS = {
   codeScans: [], // historique des scans Semgrep (voir store/codeScansStore.js)
   iacScans: [], // historique des scans Checkov IaC (voir store/iacScansStore.js)
   sboms: [], // historique des SBOM générés via Syft (voir store/sbomStore.js)
-  signatures: {} // signatures cosign des SBOM, indexées par id de SBOM (voir store/signaturesStore.js)
+  signatures: {}, // signatures cosign des SBOM, indexées par id de SBOM (voir store/signaturesStore.js)
+  webauthnCredentials: [] // clés d'accès (passkeys) enregistrées par utilisateur (voir store/webauthnStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

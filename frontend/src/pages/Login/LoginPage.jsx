@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { api } from '../../lib/apiClient.js';
 import LoginVisual from './LoginVisual.jsx';
 import BrandMark from '../../components/ui/BrandMark.jsx';
 
 export default function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, setUserFromSession } = useAuth();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
 
   if (user) return <Navigate to={location.state?.from || '/'} replace />;
 
@@ -24,6 +27,24 @@ export default function LoginPage() {
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Clé d'accès (passkey) : options envoyées même sans identifiant renseigné
+  // (le navigateur propose alors les passkeys "découvrables" qu'il connaît
+  // pour ce site) — jamais de mot de passe impliqué dans ce flux.
+  async function onPasskey() {
+    setPasskeyBusy(true);
+    setError(null);
+    try {
+      const { requestId, options } = await api.post('/auth/webauthn/login-options', { identifier: email || undefined });
+      const response = await startAuthentication({ optionsJSON: options });
+      const data = await api.post('/auth/webauthn/login-verify', { requestId, response });
+      setUserFromSession(data.user);
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') setError(err.message);
+    } finally {
+      setPasskeyBusy(false);
     }
   }
 
@@ -50,6 +71,16 @@ export default function LoginPage() {
 
           <button className="btn" type="submit" disabled={busy} style={{ width: '100%' }}>
             {busy ? 'Connexion…' : 'Se connecter'}
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+            <span className="faint" style={{ fontSize: 11 }}>ou</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+          </div>
+
+          <button className="btn-outline" type="button" onClick={onPasskey} disabled={passkeyBusy} style={{ width: '100%', height: 36 }}>
+            {passkeyBusy ? 'En attente de la clé d\'accès…' : 'Se connecter avec une clé d\'accès'}
           </button>
         </form>
       </div>
