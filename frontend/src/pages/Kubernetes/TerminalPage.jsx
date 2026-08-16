@@ -5,6 +5,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 
 const VERB_HELP = {
   get: 'get pods|deployments|services [-n <namespace>]',
@@ -25,7 +26,26 @@ const TIER_LABEL = { developer: 'Developer', maintainer: 'Maintainer', admin: 'A
 // (Developer/Maintainer/Admin) détermine les verbes disponibles ; un compte
 // "user" sans palier assigné n'a par défaut aucun accès.
 export default function TerminalPage() {
+  const notify = useNotify();
   const perms = useApi(() => api.get('/terminal/permissions'), []);
+  const accessRequest = useApi(() => api.get('/terminal/access-request'), []);
+  const [requestedTier, setRequestedTier] = useState('developer');
+  const [reason, setReason] = useState('');
+  const [requesting, setRequesting] = useState(false);
+
+  async function submitAccessRequest(e) {
+    e.preventDefault();
+    setRequesting(true);
+    try {
+      await api.post('/terminal/access-request', { tier: requestedTier, reason });
+      notify('Demande envoyée — un administrateur doit l\'approuver.', { type: 'ok' });
+      accessRequest.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRequesting(false);
+    }
+  }
   const [searchParams, setSearchParams] = useSearchParams();
   const [command, setCommand] = useState(searchParams.get('prefill') || '');
   const [manifest, setManifest] = useState('');
@@ -70,10 +90,30 @@ export default function TerminalPage() {
       />
 
       {!perms.loading && !tier && (
-        <div className="card" style={{ padding: 30, textAlign: 'center' }}>
+        <div className="card" style={{ padding: 30, textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
           <Icon name="lock" size={22} style={{ color: 'var(--text-faint)', marginBottom: 8 }} />
           <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>Aucun accès au terminal</div>
-          <div className="faint" style={{ fontSize: 12.5 }}>Demandez à un administrateur de vous attribuer un palier depuis Paramètres → Utilisateurs.</div>
+          {accessRequest.data?.pending ? (
+            <div className="faint" style={{ fontSize: 12.5 }}>
+              Demande de palier <strong>{TIER_LABEL[accessRequest.data.pending.requestedTier]}</strong> envoyée le {new Date(accessRequest.data.pending.createdAt).toLocaleString('fr-FR')} — en attente d'un administrateur.
+            </div>
+          ) : (
+            <form onSubmit={submitAccessRequest} style={{ textAlign: 'left', marginTop: 14 }}>
+              <div className="faint" style={{ fontSize: 12.5, marginBottom: 12, textAlign: 'center' }}>
+                Demandez un palier — un administrateur recevra une notification et pourra l'approuver depuis Paramètres → Utilisateurs.
+              </div>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Palier souhaité</label>
+              <select className="input" value={requestedTier} onChange={(e) => setRequestedTier(e.target.value)} style={{ marginBottom: 10 }}>
+                <option value="developer">Developer — lecture seule (get, logs, describe)</option>
+                <option value="maintainer">Maintainer — lecture + scale/restart</option>
+              </select>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Motif (optionnel)</label>
+              <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ex. débogage du déploiement api-gateway" style={{ marginBottom: 14 }} />
+              <button className="btn" type="submit" disabled={requesting} style={{ width: '100%' }}>
+                {requesting ? 'Envoi…' : "Demander l'accès"}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
