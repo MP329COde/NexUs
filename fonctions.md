@@ -6,7 +6,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 
 - **argocd.routes.js** — Statut ArgoCD, liste des applications, détail d'une application (sync status).
 - **audit.routes.js** — Consultation du journal d'audit (liste + export CSV).
-- **auth.routes.js** — Connexion/déconnexion, session (`/me`), profil, mot de passe, onboarding première connexion. Verrouillage de compte après échecs répétés + bannissement IP automatique en cas d'attaque ciblée (voir `usersStore.js`).
+- **auth.routes.js** — Connexion (e-mail **ou nom d'utilisateur**)/déconnexion, session (`/me`), profil, mot de passe, onboarding première connexion. Verrouillage de compte après échecs répétés + bannissement IP automatique en cas d'attaque ciblée (voir `usersStore.js`).
 - **backups.routes.js** — Liste, création, import, téléchargement, restauration, suppression de sauvegardes.
 - **certmanager.routes.js** — Statut cert-manager, liste des certificats (CRD Kubernetes), renouvellement forcé.
 - **console.routes.js** — Info console minimale (authentifiée).
@@ -170,7 +170,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Connexion / Onboarding / Installation
 
-- **LoginPage.jsx / LoginVisual.jsx** — Connexion.
+- **LoginPage.jsx / LoginVisual.jsx** — Connexion par e-mail ou nom d'utilisateur.
 - **OnboardingPage.jsx** — Écran de première connexion.
 - **SetupPage.jsx** — Assistant de première installation.
 - **InstallScreen.jsx** — Suivi des jobs d'installation.
@@ -234,7 +234,7 @@ Cette section liste des pistes non implémentées, à prioriser avec l'utilisate
 - Intégration registre d'images (Harbor/GHCR/Docker Hub) avec scan de vulnérabilités horaire.
 - Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
-- Connexion par nom d'utilisateur (sans email) + clés d'accès (WebAuthn/passkeys).
+- Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
 - Système de demande de permission (utilisateur → admin) avec notification, pour le terminal Kubernetes sécurisé.
 - Rôles par projet/organisation avec icônes personnalisées, plusieurs projets par organisation (déjà partiellement en place via le socle relationnel — à vérifier/étendre).
 
