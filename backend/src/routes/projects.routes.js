@@ -18,6 +18,7 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
+import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } from '../services/environmentPromotionService.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
 
@@ -234,7 +235,11 @@ router.delete('/:id/members/:userId', loadProjectAccess(), requireMinRole('maint
 // --- Environnements (socle relationnel uniquement) ---
 router.get('/:id/environments', loadProjectAccess(), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
-  res.json({ ok: true, items: await orgStore.listEnvironments(req.pgProject.id), migrated: true });
+  // Statut réel (santé/revision) de chaque environnement lié à une
+  // application Argo CD — jamais de version inventée, voir
+  // environmentPromotionService.js.
+  const items = await listEnvironmentsWithStatus(req.pgProject.id);
+  res.json({ ok: true, items, migrated: true });
 }));
 
 router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
@@ -244,6 +249,31 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction });
   logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
   res.status(201).json({ ok: true, environment });
+}));
+
+router.put('/:id/environments/:envId/link', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { argocdApp } = req.body || {};
+  const environment = await linkEnvironment(req.params.envId, argocdApp || null);
+  logAudit(req, 'project.environment.link', { projectId: req.legacyProject.id, environmentId: req.params.envId, argocdApp: argocdApp || null });
+  res.json({ ok: true, environment });
+}));
+
+router.get('/:id/environments/promotions', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await listPromotions(req.pgProject.id) });
+}));
+
+router.post('/:id/environments/:envId/promote', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  await guardProductionEnvironment(req, req.params.envId);
+  const { fromEnvironmentId } = req.body || {};
+  const promotion = await promote({
+    projectId: req.pgProject.id, fromEnvironmentId: fromEnvironmentId || null,
+    toEnvironmentId: req.params.envId, triggeredBy: req.user.id
+  });
+  logAudit(req, 'project.environment.promote', { projectId: req.legacyProject.id, toEnvironmentId: req.params.envId, fromEnvironmentId: fromEnvironmentId || null, status: promotion.status });
+  res.status(201).json({ ok: true, promotion });
 }));
 
 // --- Espace de travail : agrège l'état réel des dépôts liés au projet
