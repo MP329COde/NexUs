@@ -1,0 +1,40 @@
+.home-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.home-header-actions a,
+.home-header-actions button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.home-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.home-error-banner {
+  padding: 14px;
+  margin-bottom: 16px;
+  color: var(--tone-crit-fg);
+  font-size: 13px;
+}
+
+.home-loading-banner {
+  padding: 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.home-panel-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}

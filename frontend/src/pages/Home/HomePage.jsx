@@ -13,6 +13,7 @@ import BlockedFeaturesPanel from './BlockedFeaturesPanel.jsx';
 import MyProjectsOverviewPanel from './MyProjectsOverviewPanel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './HomePage.css';
 
 export default function HomePage() {
   const { data, loading, error, reload } = useApi(() => api.get('/status/overview'), [], { pollMs: 15000 });
@@ -57,47 +58,47 @@ export default function HomePage() {
         title="Vue générale"
         sub="État global de l'infrastructure : Kubernetes, Argo CD, HAProxy, GitLab, Proxmox, Traefik, Cert-Manager et Grafana."
         actions={(
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Link to="/report" className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
+          <div className="home-header-actions">
+            <Link to="/report" className="btn-outline">
               <Icon name="externalLink" size={14} />Rapport
             </Link>
-            <button className="btn-outline" onClick={onRefresh} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <button className="btn-outline" onClick={onRefresh}>
               <Icon name="refresh" size={14} className={spinning ? 'spin' : ''} />Actualiser
             </button>
           </div>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(215px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="home-kpi-grid">
         <KpiCard label="Santé globale" value={data ? `${data.score}` : '—'} unit="%" tint="#3B82F6" note="pondérée sur les intégrations configurées" />
         <KpiCard label="Nœuds en ligne" value={nodes ? nodes.online : '—'} unit={nodes ? `/ ${nodes.total}` : ''} tint="#8B5CF6" note={nodes ? undefined : 'Non configuré (Proxmox)'} />
         <KpiCard label="Alertes ouvertes" value={alertsCount ?? '—'} tint={alertsCount > 0 ? '#F43F5E' : '#10B981'} note="Grafana + agents Wazuh déconnectés" />
         <KpiCard label="Dernière actualisation" value={data ? new Date(data.generatedAt).toLocaleTimeString('fr-FR') : '—'} tint="#F59E0B" />
       </div>
 
-      {error && <div className="card" style={{ padding: 14, marginBottom: 16, color: 'var(--tone-crit-fg)', fontSize: 13 }}>{error}</div>}
-      {loading && !data && <div className="card" style={{ padding: 14, marginBottom: 16, fontSize: 13, color: 'var(--text-faint)' }}>Chargement…</div>}
+      {error && <div className="card home-error-banner">{error}</div>}
+      {loading && !data && <div className="card home-loading-banner">Chargement…</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="home-panel-row">
         <AdminOverviewPanel />
         <MyProjectsOverviewPanel />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="home-panel-row">
         <BlockedFeaturesPanel integrations={data?.integrations} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="home-panel-row">
         <InfraLoadPanel />
         <WorkloadDonutPanel />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="home-panel-row">
         <CriticalHostsPanel />
         <LiveActivityPanel />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="home-panel-row">
         <ServiceAvailabilityPanel />
         <OpenAlertsPanel />
       </div>
