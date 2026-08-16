@@ -5,6 +5,9 @@ import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
 
+const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$|^$/u;
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
 const router = Router();
 router.use(requireAuth);
 
@@ -22,12 +25,28 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, slug } = req.body || {};
+  const { name, slug, icon, color } = req.body || {};
   if (!name || !slug) return res.status(400).json({ ok: false, error: 'Nom et identifiant requis' });
   if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ ok: false, error: "Identifiant invalide (lettres minuscules, chiffres, tirets)" });
-  const org = await orgStore.createOrganization({ name, slug, ownerUserId: req.user.id });
+  if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
+  if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
+  const org = await orgStore.createOrganization({ name, slug, ownerUserId: req.user.id, icon, color });
   logAudit(req, 'organization.create', { orgId: org.id, name });
   res.status(201).json({ ok: true, organization: org });
+}));
+
+router.put('/:id', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant pour modifier cette organisation' });
+  }
+  const { name, icon, color } = req.body || {};
+  if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
+  if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
+  const org = await orgStore.updateOrganization(req.params.id, { name, icon, color });
+  if (!org) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  logAudit(req, 'organization.update', { orgId: org.id, name });
+  res.json({ ok: true, organization: org });
 }));
 
 router.get('/:id/projects', asyncHandler(async (req, res) => {
