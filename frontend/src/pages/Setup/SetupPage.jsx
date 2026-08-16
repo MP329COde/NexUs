@@ -9,7 +9,6 @@ import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationFo
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
 const LANGUAGES = [['fr', 'Français'], ['en', 'English']];
 const DATE_FORMATS = [['dd/MM/yyyy', 'JJ/MM/AAAA'], ['MM/dd/yyyy', 'MM/JJ/AAAA'], ['yyyy-MM-dd', 'AAAA-MM-JJ']];
-const IDENTITY_PROVIDERS = [['authentik-oidc', 'Authentik (OIDC)'], ['generic-oidc', 'OIDC générique'], ['ldap', 'Annuaire LDAP'], ['none', 'Aucun (mot de passe local uniquement)']];
 const GIT_FORGES = [['gitea', 'Gitea'], ['gitlab', 'GitLab'], ['github', 'GitHub']];
 const BRANCHES = ['main', 'master', 'develop'];
 
@@ -72,9 +71,9 @@ const STEPS = [
 
 const DEFAULT_FORM = {
   organisation: { consoleName: 'Nexus Console', instanceUrl: '', timezone: 'Europe/Paris', language: 'fr', dateFormat: 'dd/MM/yyyy', contactEmail: '' },
-  admin: { name: '', username: '', email: '', password: '', confirm: '', mfaRequired: true, backupCodes: true },
-  identity: { provider: 'authentik-oidc', mfaRequired: true, sessionMinutes: 480, minPasswordLength: 14, allowedNetworks: '', logoutOnInactivity: true },
-  git: { forge: 'gitea', baseUrl: '', org: '', token: '', defaultBranch: 'main', autoWebhooks: true, outboundMirrors: false, requireSignedCommits: false },
+  admin: { name: '', username: '', email: '', password: '', confirm: '' },
+  identity: { sessionMinutes: 480, minPasswordLength: 14 },
+  git: { forge: 'gitea', baseUrl: '', org: '', token: '', defaultBranch: 'main' },
   tools: ['wazuh', 'prometheus', 'grafana', 'gitea'],
   toolsConfig: {}
 };
@@ -162,10 +161,7 @@ export default function SetupPage() {
             baseUrl: form.git.baseUrl,
             org: form.git.org,
             token: form.git.token,
-            defaultBranch: form.git.defaultBranch,
-            autoWebhooks: form.git.autoWebhooks,
-            outboundMirrors: form.git.outboundMirrors,
-            requireSignedCommits: form.git.requireSignedCommits
+            defaultBranch: form.git.defaultBranch
           });
           reloadSettings();
         }
@@ -387,31 +383,32 @@ function StepAdmin({ form, set }) {
       <Field label="Confirmation">
         <input className="input" type="password" required value={form.confirm} onChange={(e) => set({ confirm: e.target.value })} autoComplete="new-password" />
       </Field>
-      <Toggle label="Exiger le MFA dès la première connexion" hint="WebAuthn ou TOTP" checked={form.mfaRequired} onChange={(v) => set({ mfaRequired: v })} />
-      <Toggle label="Générer des codes de secours" hint="10 codes à usage unique" checked={form.backupCodes} onChange={(v) => set({ backupCodes: v })} />
+      <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+        Une clé d'accès (passkey WebAuthn) pourra être ajoutée après l'installation, depuis le profil du compte.
+      </p>
     </Card>
   );
 }
 
+// Ne présente que ce que la console applique réellement : durée de session
+// et longueur minimale du mot de passe (voir identityStore.js,
+// getSessionMinutes/getMinPasswordLength, utilisées par auth.routes.js).
+// OIDC/LDAP se configurent après coup dans Paramètres → Connexion & identité,
+// où ils sont honnêtement présentés comme enregistrés/testables mais pas
+// encore un second chemin de connexion actif — pas dupliqué ici pour ne
+// jamais laisser croire qu'un fournisseur SSO est déjà branché.
 function StepIdentity({ form, set }) {
   return (
     <Card>
-      <Field label="Fournisseur d'identité" hint="OIDC ou LDAP pour l'authentification centralisée">
-        <select className="input" value={form.provider} onChange={(e) => set({ provider: e.target.value })}>
-          {IDENTITY_PROVIDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      </Field>
-      <Toggle label="MFA obligatoire" hint="Refuse la connexion sans second facteur" checked={form.mfaRequired} onChange={(v) => set({ mfaRequired: v })} />
       <Field label="Durée de session" hint="minutes">
         <input className="input" type="number" min={5} max={10080} value={form.sessionMinutes} onChange={(e) => set({ sessionMinutes: Number(e.target.value) })} />
       </Field>
       <Field label="Longueur minimale du mot de passe" hint="caractères">
         <input className="input" type="number" min={8} max={128} value={form.minPasswordLength} onChange={(e) => set({ minPasswordLength: Number(e.target.value) })} />
       </Field>
-      <Field label="Réseaux autorisés" hint="Un CIDR par ligne">
-        <textarea className="input" style={{ height: 74, padding: 8, resize: 'vertical' }} placeholder={'10.0.0.0/8\n10.9.0.0/24'} value={form.allowedNetworks} onChange={(e) => set({ allowedNetworks: e.target.value })} />
-      </Field>
-      <Toggle label="Déconnexion sur inactivité" hint="Après 30 minutes sans activité" checked={form.logoutOnInactivity} onChange={(v) => set({ logoutOnInactivity: v })} />
+      <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+        OIDC, LDAP et clés d'accès se configurent après l'installation, dans Paramètres → Connexion & identité et le profil du compte.
+      </p>
     </Card>
   );
 }
@@ -438,9 +435,6 @@ function StepGit({ form, set }) {
           {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
       </Field>
-      <Toggle label="Créer les webhooks automatiquement" hint="Déclenche les pipelines à chaque poussée" checked={form.autoWebhooks} onChange={(v) => set({ autoWebhooks: v })} />
-      <Toggle label="Miroirs sortants" hint="Réplication vers GitHub toutes les heures" checked={form.outboundMirrors} onChange={(v) => set({ outboundMirrors: v })} />
-      <Toggle label="Exiger des commits signés" hint="Refuse les poussées non signées sur main" checked={form.requireSignedCommits} onChange={(v) => set({ requireSignedCommits: v })} />
     </Card>
   );
 }
@@ -582,16 +576,15 @@ function StepServices({ settingsData, reloadSettings }) {
 
 function StepReady({ form, settingsData }) {
   const forgeLabel = GIT_FORGES.find(([v]) => v === form.git.forge)?.[1] || form.git.forge;
-  const idpLabel = IDENTITY_PROVIDERS.find(([v]) => v === form.identity.provider)?.[1] || form.identity.provider;
   const connectedServices = INTEGRATION_ORDER.filter((key) => settingsData?.integrations?.[key]?.configured).length;
   const rows = [
     ['Organisation', form.organisation.consoleName],
     ['Administrateur', `${form.admin.name || '—'} · ${form.admin.email || '—'}`],
-    ['Identité', `${idpLabel} · ${form.identity.mfaRequired ? 'MFA obligatoire' : 'MFA facultatif'}`],
+    ['Identité', `Session ${form.identity.sessionMinutes} min · mot de passe ${form.identity.minPasswordLength} car. min.`],
     ['Forge Git', form.git.baseUrl ? `${forgeLabel} · ${form.git.baseUrl}` : `${forgeLabel} · non renseignée`],
     ['Services connectés', `${connectedServices} sur ${INTEGRATION_ORDER.length}`],
     ['Outils à installer', `${form.tools.length} sur ${TOOL_CATALOG.length}`],
-    ['Rétention audit', '365 jours']
+    ['Journal d\'audit', '1000 dernières actions conservées']
   ];
   return (
     <Card>
