@@ -1,0 +1,149 @@
+.reviews-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.reviews-filter-input {
+  height: 30px;
+  font-size: 12.5px;
+  width: 180px;
+}
+
+.reviews-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.reviews-table-wrap {
+  overflow-x: auto;
+}
+
+.reviews-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.reviews-table-head {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reviews-table-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reviews-table-cell {
+  padding: 10px 16px;
+}
+
+.reviews-cell-title {
+  max-width: 280px;
+}
+
+.reviews-title-link {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.reviews-self-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--tone-warn-fg);
+  margin-top: 2px;
+}
+
+.reviews-repo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reviews-reviewer-badge {
+  margin-right: 4px;
+  cursor: pointer;
+}
+
+.reviews-age {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reviews-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.reviews-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.reviews-schedule-wrap {
+  margin-bottom: 16px;
+}
+
+.reviews-load-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.reviews-load-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reviews-load-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reviews-load-name {
+  width: 140px;
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviews-load-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.reviews-load-bar-fill {
+  height: 100%;
+  background: #3B82F6;
+  border-radius: 999px;
+}
+
+.reviews-load-count {
+  font-size: 12.5px;
+  font-weight: 600;
+  width: 20px;
+  text-align: right;
+}
