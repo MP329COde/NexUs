@@ -3,6 +3,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import DemoNote from '../../components/ui/DemoNote.jsx';
+import TrivyScanPanel from './TrivyScanPanel.jsx';
 
 // Démonstration : aucune intégration de registre d'images (Harbor, GHCR
 // interrogé en détail...) n'existe dans la console.
@@ -19,6 +20,10 @@ export default function ImagesRegistryPage() {
       <PageHeader title="Images & registry" sub="Images publiées, taille, signatures et vulnérabilités détectées." />
       <DemoNote>Aucun registre d'images n'est intégré à la console (Harbor, GHCR...). Tableau illustratif pour valider la mise en page.</DemoNote>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <TrivyScanPanel />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
         <KpiCard label="Images" value={IMAGES.length} tint="#3B82F6" />
         <KpiCard label="Espace utilisé" value="34,2" unit="Go" tint="#8B5CF6" />
@@ -26,7 +31,7 @@ export default function ImagesRegistryPage() {
         <KpiCard label="CVE critiques" value={IMAGES.reduce((s, i) => s + i.cve, 0)} tint="#F43F5E" />
       </div>
 
-      <Panel title="Dépôt d'images" sub="Démonstration" span={12}>
+      <Panel title="Dépôt d'images" sub="Démonstration — aucun registre intégré, indépendant du scanner Trivy ci-dessus" span={12}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>

@@ -217,7 +217,7 @@ export default function ProjectDetailPage() {
         return (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
             <ProjectShortcutsPanel project={p} canManage={isMember} />
-            <ProjectVaultPanel project={p} canManage={isMember} />
+            <ProjectVaultPanel project={p} canManage={isMember} onProjectChanged={project.reload} />
           </div>
         );
       })()}

@@ -15,7 +15,8 @@ const TOOLS = [
   { id: 'nmap', label: 'nmap', bin: 'nmap', versionArgs: ['--version'] },
   { id: 'curl', label: 'curl', bin: 'curl', versionArgs: ['--version'] },
   { id: 'helm', label: 'Helm', bin: 'helm', versionArgs: ['version', '--short'] },
-  { id: 'terraform', label: 'Terraform', bin: 'terraform', versionArgs: ['--version'] }
+  { id: 'terraform', label: 'Terraform', bin: 'terraform', versionArgs: ['--version'] },
+  { id: 'trivy', label: 'Trivy', bin: 'trivy', versionArgs: ['--version'] }
 ];
 
 function which(bin) {

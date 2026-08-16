@@ -11,6 +11,8 @@ import { pool } from '../db/pool.js';
 import { listCertificates } from '../services/integrations/certManagerService.js';
 import { getAgentSummary } from '../services/integrations/wazuhService.js';
 import { listGlobal as listIncidents } from '../store/incidentStore.js';
+import { listLeaks, getLastScanAt } from '../store/secretLeaksStore.js';
+import { runSecretLeakScan } from '../services/secretLeakScanService.js';
 
 // IPs bannies + scans réseau : réservé aux administrateurs.
 const router = Router();
@@ -148,6 +150,21 @@ router.put('/traffic/auto-block', asyncHandler(async (req, res) => {
   const settings = setAutoBlockEnabled(req.body?.enabled);
   logAudit(req, 'security.firewall.autoblock', { enabled: settings.autoBlockEnabled });
   res.json({ ok: true, settings });
+}));
+
+// Scan quotidien (voir services/secretLeakScanService.js, déclenché à 4h par
+// scheduleDailySecretLeakScan dans index.js) des dépôts liés à un projet, à
+// la recherche d'un secret prod/projet connu committé en clair — rotation
+// automatique immédiate en cas de détection. Historique consultable ici ;
+// déclenchement manuel possible entre deux exécutions planifiées.
+router.get('/secret-leaks', (req, res) => {
+  res.json({ ok: true, items: listLeaks(), lastScanAt: getLastScanAt() });
+});
+
+router.post('/secret-leaks/scan', asyncHandler(async (req, res) => {
+  const result = await runSecretLeakScan();
+  logAudit(req, 'security.secretLeakScan.run', result);
+  res.json({ ok: true, ...result, items: listLeaks(), lastScanAt: getLastScanAt() });
 }));
 
 export default router;

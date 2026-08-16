@@ -52,6 +52,31 @@ export function isMember(project, userId) {
   return project.memberIds.includes(userId);
 }
 
+// Mot de passe de coffre-fort propre au projet : verrou supplémentaire pour
+// révéler ses secrets (tier 'project'), distinct du mot de passe du compte
+// utilisateur — "entourer un mot de passe du projet pour accéder à ses mots
+// de passe". Optionnel : tant qu'il n'est pas défini, la révélation retombe
+// sur l'ancien comportement (mot de passe du compte, voir vault.routes.js).
+// Le hash ne doit jamais quitter le store tel quel — projectAccess.js le
+// retire de req.legacyProject avant toute réponse HTTP.
+export function setProjectVaultPassword(id, passwordHash) {
+  const projects = listProjects();
+  const idx = projects.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  projects[idx].vaultPasswordHash = passwordHash;
+  writeStore('projects', projects);
+  return projects[idx];
+}
+
+export function clearProjectVaultPassword(id) {
+  const projects = listProjects();
+  const idx = projects.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  projects[idx].vaultPasswordHash = null;
+  writeStore('projects', projects);
+  return projects[idx];
+}
+
 // --- Tâches (backlog) ---
 
 export function listTasks(projectId) {

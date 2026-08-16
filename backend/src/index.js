@@ -14,6 +14,8 @@ import { scheduleDailyBackups } from './services/backupService.js';
 import { scheduleHourlyStatusSnapshot } from './services/statusHistoryService.js';
 import { scheduleCriticalHostsRefresh } from './services/hostMetricsService.js';
 import { scheduleInfraLoadSampling } from './services/infraLoadService.js';
+import { scheduleVaultRotation } from './services/vaultRotationService.js';
+import { scheduleDailySecretLeakScan } from './services/secretLeakScanService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -26,6 +28,8 @@ scheduleDailyBackups();
 scheduleHourlyStatusSnapshot();
 scheduleCriticalHostsRefresh();
 scheduleInfraLoadSampling();
+scheduleVaultRotation();
+scheduleDailySecretLeakScan();
 
 const app = express();
 
@@ -84,6 +88,9 @@ app.use('/api/proxmox', strictLimiter);
 // plus stricte que le reste pour empêcher d'en déclencher en rafale.
 const scanLimiter = rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/security/scans', scanLimiter);
+// Même contrainte pour un scan Trivy (téléchargement d'image + base de
+// vulnérabilités, jusqu'à 2 minutes) : empêche d'en lancer plusieurs en rafale.
+app.use('/api/image-scans', scanLimiter);
 
 // Point d'entrée public (pas de session, pas de compte derrière la requête
 // pour appliquer les limites globales par utilisateur) : limite par IP pour
