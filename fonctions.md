@@ -20,6 +20,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **haproxy.routes.js** — Statut, backends, serveurs (état runtime + changement d'état admin), frontends (Data Plane API).
 - **hosts.routes.js** — Clé publique SSH console, catalogue d'agents, CRUD hôtes, hôtes critiques, installation d'agent via SSH.
 - **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
+- **notifications.routes.js** — Alertes de sécurité persistantes (admin) : liste, marquage lu/tout lu.
 - **identity.routes.js** — Config d'identité (OIDC/LDAP), test de connexion OIDC.
 - **incidents.routes.js** — Liste globale des incidents.
 - **inventory.routes.js** — CRUD inventaire matériel/logiciel.
@@ -96,6 +97,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **vaultStore.js** — Coffres dev/prod/projet chiffrés AES-256-GCM, **rotation automatique** (`rotationMinutes`, `rotatedAt`, `secretVersion`).
 - **projectsStore.js** — Projets, backlog, **mot de passe de coffre-fort projet** (`vaultPasswordHash`, jamais exposé au client — retiré par `middleware/projectAccess.js`).
 - **banlistStore.js** — Liste d'IPs bannies, normalisation IPv4/IPv6.
+- **notificationsStore.js** — Alertes de sécurité persistantes (verrouillage de compte, bannissement IP auto, secret committé, vulnérabilité critique), visibles par les admins même après reconnexion.
 
 ## Frontend — Pages (`frontend/src/pages/**/*.jsx`)
 
@@ -229,7 +231,6 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Notification persistante (pas seulement l'audit log) quand un compte est verrouillé ou une IP bannie automatiquement.
 - Intégration registre d'images (Harbor/GHCR/Docker Hub) avec scan de vulnérabilités horaire.
 - Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
