@@ -19,6 +19,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **groups.routes.js** — CRUD des groupes d'utilisateurs.
 - **haproxy.routes.js** — Statut, backends, serveurs (état runtime + changement d'état admin), frontends (Data Plane API).
 - **hosts.routes.js** — Clé publique SSH console, catalogue d'agents, CRUD hôtes, hôtes critiques, installation d'agent via SSH.
+- **dockerHub.routes.js** — Consultation du registre public Docker Hub (tags, métadonnées), sans authentification.
 - **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
 - **notifications.routes.js** — Alertes de sécurité persistantes (admin) : liste, marquage lu/tout lu.
 - **identity.routes.js** — Config d'identité (OIDC/LDAP), test de connexion OIDC.
@@ -124,7 +125,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
 - **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
-- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx) pour scanner n'importe quelle image accessible à la demande.
+- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre privé intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx) et **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel).
 - **ReleasesPage.jsx** — Démonstration.
 - **SupplyChainPage.jsx** — Documentation d'un pipeline cible, aucun scanner connecté.
 - **TestsQualityPage.jsx** — Démonstration.
@@ -216,6 +217,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Multi-environnements | Stub | Démonstration |
 | nmap | Complet | Exécution réelle, validation stricte de cible |
 | Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande |
+| Docker Hub (public) | Complet | API v2 publique, sans authentification, recherche de tags en direct |
 | SSH (agents/services) | Complet | Clé unique console, catalogue fermé de scripts |
 
 ## Sécurité des secrets (état détaillé)
@@ -232,7 +234,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Intégration registre d'images (Harbor/GHCR/Docker Hub) avec scan de vulnérabilités horaire.
+- Registre privé (Harbor/GHCR authentifié) — Docker Hub public est fait ; scan de vulnérabilités horaire automatique (le scan Trivy est à la demande pour l'instant, pas planifié).
 - Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Clés d'accès (WebAuthn/passkeys) — la connexion par nom d'utilisateur (sans e-mail) est faite, pas encore les passkeys.
