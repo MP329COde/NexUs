@@ -2,22 +2,22 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import DemoNote from '../../components/ui/DemoNote.jsx';
+import CodeScanPanel from './CodeScanPanel.jsx';
 
-// Aucun scanner de sécurité (SAST, secrets, dépendances, conteneurs, SBOM,
-// signature) n'est intégré à la console — contrairement au reste de
-// Développement, rien ici n'est branché sur un outil réel. Cette page
-// documente honnêtement le pipeline cible et ce qu'il faudrait connecter
-// pour chaque étape, plutôt que d'inventer des résultats de scan.
+// SBOM et signature restent non intégrés — le reste du pipeline (source,
+// SAST, secrets, dépendances/conteneur, déploiement) est désormais réel :
+// Semgrep (CodeScanPanel), le scan de secrets committés (Secrets &
+// variables), Trivy (Images & registry) et Argo CD (Déploiements).
 const STAGES = [
-  { id: 'source', label: 'Source', icon: 'gitBranch', tool: 'Dépôts Git (déjà réel)', note: 'Code source récupéré depuis GitLab/GitHub — voir Dépôts Git.' },
-  { id: 'sast', label: 'SAST', icon: 'terminal', tool: 'ex. Semgrep, CodeQL', note: 'Analyse statique du code à la recherche de vulnérabilités.' },
-  { id: 'secrets', label: 'Scan de secrets', icon: 'lock', tool: 'ex. Gitleaks, TruffleHog', note: 'Détection de clés/mots de passe accidentellement committés.' },
-  { id: 'deps', label: 'Scan de dépendances', icon: 'box', tool: 'ex. Trivy, Snyk, Dependabot', note: 'Vulnérabilités connues (CVE) dans les librairies utilisées.' },
-  { id: 'container', label: 'Scan de conteneur', icon: 'cube', tool: 'ex. Trivy, Grype', note: 'Vulnérabilités dans l\'image construite (OS + dépendances).' },
-  { id: 'sbom', label: 'SBOM', icon: 'layers', tool: 'ex. Syft', note: 'Inventaire logiciel de l\'image (Software Bill of Materials).' },
-  { id: 'signature', label: 'Signature', icon: 'certificate', tool: 'ex. Cosign / Sigstore', note: 'Signature cryptographique de l\'image avant publication.' },
-  { id: 'registry', label: 'Registre', icon: 'image', tool: 'Images & registry (démonstration)', note: 'Publication de l\'image signée dans le registre.' },
-  { id: 'argocd', label: 'Argo CD', icon: 'sync', tool: 'Déploiements (déjà réel)', note: 'Déploiement — voir GitOps Diff sur la fiche de déploiement.' }
+  { id: 'source', label: 'Source', icon: 'gitBranch', tool: 'Dépôts Git (réel)', note: 'Code source récupéré depuis GitLab/GitHub — voir Dépôts Git.', real: true },
+  { id: 'sast', label: 'SAST', icon: 'terminal', tool: 'Semgrep (réel, ci-dessous)', note: 'Analyse statique du code à la recherche de vulnérabilités.', real: true },
+  { id: 'secrets', label: 'Scan de secrets', icon: 'lock', tool: 'Scan quotidien (réel, voir Secrets & variables)', note: 'Détection de clés/mots de passe accidentellement committés.', real: true },
+  { id: 'deps', label: 'Scan de dépendances', icon: 'box', tool: 'Trivy (réel, voir Images & registry)', note: 'Vulnérabilités connues (CVE) dans les librairies utilisées.', real: true },
+  { id: 'container', label: 'Scan de conteneur', icon: 'cube', tool: 'Trivy (réel, voir Images & registry)', note: 'Vulnérabilités dans l\'image construite (OS + dépendances).', real: true },
+  { id: 'sbom', label: 'SBOM', icon: 'layers', tool: 'ex. Syft', note: 'Inventaire logiciel de l\'image (Software Bill of Materials).', real: false },
+  { id: 'signature', label: 'Signature', icon: 'certificate', tool: 'ex. Cosign / Sigstore', note: 'Signature cryptographique de l\'image avant publication.', real: false },
+  { id: 'registry', label: 'Registre', icon: 'image', tool: 'Docker Hub public (réel) — registre privé en démonstration', note: 'Publication de l\'image signée dans le registre.', real: false },
+  { id: 'argocd', label: 'Argo CD', icon: 'sync', tool: 'Déploiements (réel)', note: 'Déploiement — voir GitOps Diff sur la fiche de déploiement.', real: true }
 ];
 
 export default function SupplyChainPage() {
@@ -25,9 +25,13 @@ export default function SupplyChainPage() {
     <>
       <PageHeader title="Supply Chain Security" sub="Pipeline de sécurité de la chaîne d'approvisionnement logicielle, de la source au déploiement." />
       <DemoNote>
-        Aucun scanner de sécurité n'est intégré à la console (pas de SAST, scan de secrets, de dépendances, de conteneur, SBOM ou signature configurés).
-        Cette page documente le pipeline cible et ce qu'il faudrait connecter à chaque étape — aucun résultat de scan n'est inventé.
+        SBOM et signature d'image ne sont pas encore intégrés. Le reste du pipeline est réel : Semgrep (SAST, ci-dessous), scan quotidien de secrets committés,
+        Trivy (dépendances/conteneur) et Docker Hub public — voir les badges "Réel" ci-dessous.
       </DemoNote>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <CodeScanPanel />
+      </div>
 
       <Panel title="Pipeline" sub="Source → build → sécurité → registre → déploiement" span={12} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0, padding: 16 }}>
@@ -36,8 +40,8 @@ export default function SupplyChainPage() {
               <div style={{ width: 160, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', textAlign: 'center' }}>
                 <Icon name={s.icon} size={18} style={{ color: 'var(--text-faint)', marginBottom: 6 }} />
                 <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.label}</div>
-                <div className={`badge badge-${s.id === 'source' || s.id === 'argocd' ? 'ok' : s.id === 'registry' ? 'warn' : 'mut'}`} style={{ marginTop: 6 }}>
-                  <span className="dot" />{s.id === 'source' || s.id === 'argocd' ? 'Réel' : s.id === 'registry' ? 'Démo' : 'Non intégré'}
+                <div className={`badge badge-${s.real ? 'ok' : s.id === 'registry' ? 'warn' : 'mut'}`} style={{ marginTop: 6 }}>
+                  <span className="dot" />{s.real ? 'Réel' : s.id === 'registry' ? 'Partiel' : 'Non intégré'}
                 </div>
               </div>
               {i < STAGES.length - 1 && <Icon name="chevronDown" size={14} style={{ transform: 'rotate(-90deg)', color: 'var(--text-faintest)', flex: 'none', margin: '0 4px' }} />}
@@ -47,7 +51,7 @@ export default function SupplyChainPage() {
       </Panel>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
-        {STAGES.filter((s) => !['source', 'argocd'].includes(s.id)).map((s) => (
+        {STAGES.filter((s) => !['source', 'argocd', 'sast'].includes(s.id)).map((s) => (
           <Panel key={s.id} title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name={s.icon} size={13} style={{ color: 'var(--text-faint)' }} />{s.label}</span>)} span={4}>
             <div style={{ padding: 14, fontSize: 12.5 }}>
               <div className="faint" style={{ marginBottom: 6 }}>{s.note}</div>

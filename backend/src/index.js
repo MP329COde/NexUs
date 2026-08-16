@@ -84,13 +84,22 @@ app.use('/api/terminal', strictLimiter);
 app.use('/api/kubernetes', strictLimiter);
 app.use('/api/proxmox', strictLimiter);
 
-// Un scan nmap est coûteux (jusqu'à 2 min, charge CPU/réseau) : limite bien
-// plus stricte que le reste pour empêcher d'en déclencher en rafale.
-const scanLimiter = rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
-app.use('/api/security/scans', scanLimiter);
-// Même contrainte pour un scan Trivy (téléchargement d'image + base de
-// vulnérabilités, jusqu'à 2 minutes) : empêche d'en lancer plusieurs en rafale.
-app.use('/api/image-scans', scanLimiter);
+// Chaque type de scan coûteux (nmap, Trivy, Semgrep) a sa PROPRE instance de
+// limiteur : express-rate-limit compte par store, donc réutiliser la même
+// instance sur plusieurs chemins revient à leur faire partager un seul
+// budget de 5 requêtes/10 min pour les trois combinés — lancer quelques
+// scans Trivy épuisait alors aussi le quota nmap et Semgrep. Un plafond
+// dédié par outil est ce qui était réellement voulu par le commentaire
+// d'origine ("empêche d'en déclencher en rafale" — par outil, pas au total).
+const makeScanLimiter = () => rateLimit({ windowMs: 10 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
+app.use('/api/security/scans', makeScanLimiter());
+app.use('/api/image-scans', makeScanLimiter());
+// POST uniquement pour le scan de code : la lecture de l'historique (GET) ne
+// doit pas être bridée par la même limite que le déclenchement d'un scan
+// coûteux, sinon consulter des résultats déjà calculés devient impossible
+// pendant 10 min après quelques scans.
+const codeScanLimiter = makeScanLimiter();
+app.use('/api/code-scans', (req, res, next) => (req.method === 'POST' ? codeScanLimiter(req, res, next) : next()));
 
 // Point d'entrée public (pas de session, pas de compte derrière la requête
 // pour appliquer les limites globales par utilisateur) : limite par IP pour
