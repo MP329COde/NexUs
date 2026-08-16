@@ -240,8 +240,8 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- ~~Registre privé~~ — **fait** : service `registry:2` (Docker Distribution) optionnel dans `docker-compose.yml` (profil `registry`, activé via `install.sh`), navigable en direct depuis Images & registry (PrivateRegistryPanel.jsx). Pas Harbor/GHCR à proprement parler (API compatible identique), pas d'UI de gestion des utilisateurs au-delà du compte unique généré à l'installation.
 - Icônes personnalisées pour les organisations (faites pour les projets ; nécessite une migration Postgres pour les organisations, socle relationnel non configuré sur cette instance — non testable ici).
 - Rôles par projet avec granularité fine par ressource (au-delà de viewer/developer/maintainer/owner déjà en place via le socle relationnel).
+- MFA obligatoire, restriction par réseau (CIDR) et déconnexion sur inactivité — retirés de l'assistant de configuration initiale car ils n'étaient reliés à aucune application réelle (voir commit "Retire les réglages décoratifs..."). De vraies pistes si un durcissement de l'authentification est voulu au-delà des passkeys WebAuthn déjà réelles.
 
 Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) — existaient déjà avant cet inventaire.
