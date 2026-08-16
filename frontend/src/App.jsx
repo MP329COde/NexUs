@@ -32,6 +32,7 @@ import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
 import PipelinesPage from './pages/Deployments/PipelinesPage.jsx';
 import EnvironmentsPage from './pages/Deployments/EnvironmentsPage.jsx';
 import ReleasesPage from './pages/Deployments/ReleasesPage.jsx';
+import IacPage from './pages/Deployments/IacPage.jsx';
 import TestsQualityPage from './pages/Deployments/TestsQualityPage.jsx';
 import ContainersPage from './pages/Deployments/ContainersPage.jsx';
 import ImagesRegistryPage from './pages/Deployments/ImagesRegistryPage.jsx';
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
               { path: 'pipelines', element: <PipelinesPage /> },
               { path: 'environments', element: <EnvironmentsPage /> },
               { path: 'releases', element: <ReleasesPage /> },
+              { path: 'iac', element: <IacPage /> },
               { path: 'tests', element: <TestsQualityPage /> },
               { path: 'containers', element: <ContainersPage /> },
               { path: 'images', element: <ImagesRegistryPage /> },

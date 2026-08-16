@@ -31,7 +31,8 @@ const GROUPS = [
     items: [
       { to: '/deployments/pipelines', label: 'Pipelines CI/CD', icon: 'sync' },
       { to: '/deployments/environments', label: 'Environnements', icon: 'server' },
-      { to: '/deployments/releases', label: 'Déploiements', icon: 'box' }
+      { to: '/deployments/releases', label: 'Déploiements', icon: 'box' },
+      { to: '/deployments/iac', label: 'Infrastructure as Code', icon: 'inf' }
     ]
   },
   {

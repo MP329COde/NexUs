@@ -24,6 +24,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
 - **codeScans.routes.js** — Analyse statique de code via Semgrep sur le code source de la plateforme (admin), historique des scans.
 - **iacScans.routes.js** — Analyse IaC (Dockerfiles) via Checkov sur la plateforme (admin), historique des scans.
+- **iac.routes.js** — Infrastructure as Code réelle (admin) : CRUD d'espaces de travail Terraform (`workspaces`), génération des fichiers `.tf`/`terraform.tfvars` (provider `bpg/proxmox`, identifiants issus de l'intégration Proxmox déjà configurée), `plan`/`apply`/`destroy` en exécutant le binaire `terraform` réel sur la machine backend.
 - **notifications.routes.js** — Alertes de sécurité persistantes (admin) : liste, marquage lu/tout lu.
 - **identity.routes.js** — Config d'identité (OIDC/LDAP), test de connexion OIDC.
 - **incidents.routes.js** — Liste globale des incidents.
@@ -62,6 +63,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **deploymentService.js** — Liens de déploiement, agrégation pipeline, sync GitOps via ArgoCD/K8s.
 - **devToolsService.js** — Détection d'outils dev locaux (`which`), inclut désormais Trivy.
 - **trivyService.js** — Scan de vulnérabilités réel via le binaire Trivy (Aqua Security, open source) installé sur la machine backend ; jamais de service tiers hébergé.
+- **terraformService.js** — Infrastructure as Code réelle : génère des espaces de travail Terraform (provider `bpg/proxmox`) dans `data/terraform/<id>/`, exécute le binaire `terraform` réel (`init`/`plan`/`apply`/`destroy`) sur la machine backend — erreur explicite (503) si le binaire n'est pas installé, jamais de résultat simulé.
 - **gitMirrorService.js** — Miroir automatique GitLab→GitHub.
 - **hostMetricsService.js** — Sonde TCP + métriques SSH, rafraîchissement 30s.
 - **infraLoadService.js** — Échantillonnage en mémoire (6h) de la charge Proxmox.
@@ -134,6 +136,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **EnvironmentsPage.jsx** — Réel : environnements du socle relationnel (production/staging créés automatiquement par projet) agrégés tous projets confondus, liaison à une application Argo CD existante, promotion réelle (revision lue sur l'environnement source via l'API Argo CD, synchronisée sur l'environnement cible), historique des promotions (succès/échecs réels, jamais inventés).
 - **ImagesRegistryPage.jsx** — Tableau "Dépôt d'images" du haut de page en démonstration, mais **scanner Trivy réel** (TrivyScanPanel.jsx, à la demande + planifié horaire), **recherche Docker Hub en direct** (DockerHubLookupPanel.jsx, registre public réel), **génération + signature de SBOM réelles** (SbomPanel.jsx, Syft pour le SBOM, cosign/Sigstore pour la signature) et **registre d'images privé réel et optionnel** (PrivateRegistryPanel.jsx, Docker Distribution — service Compose sous profil `registry`, activé via `install.sh`).
 - **ReleasesPage.jsx** — Réel : applications suivies, pipeline complet, diff GitOps (déjà réels) + panneau "Fichiers à corriger" alimenté par le dernier scan Semgrep réel (`/code-scans`), lien vers Supply Chain pour lancer un scan.
+- **IacPage.jsx** — Infrastructure as Code (admin) : déclaration de VM Proxmox (formulaire), génération/consultation du `main.tf`, `terraform plan` (sortie affichée), `apply`/`destroy` avec confirmation typée (`ActionConfirmModal`), via `GET/POST /iac/workspaces*`.
 - **SupplyChainPage.jsx** — Pipeline avec badges honnêtes (Réel/Partiel/Non intégré) ; **CodeScanPanel.jsx** (Semgrep), **IacScanPanel.jsx** (Checkov), **SBOM, signature et registre** (Syft + cosign + registre privé, voir Images & registry) réels. Seule la signature d'*image* (par opposition à la signature du SBOM) reste hors périmètre — nécessiterait de pousser une image via la console elle-même, qu'elle ne construit pas.
 - **TestsQualityPage.jsx** — Réel, recadré : "fiabilité des pipelines" dérivée de l'historique CI réel (`/pipelines/runs`, GitLab+GitHub), pas de "couverture de tests" inventée en l'absence d'un framework de tests/format JUnit intégré. Taux de succès, tendance quotidienne 30j, détail par dépôt.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
