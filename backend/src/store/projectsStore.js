@@ -13,13 +13,21 @@ export function getProject(id) {
   return listProjects().find((p) => p.id === id);
 }
 
-export function createProject({ name, description, tags, memberIds, repoKeys }) {
+// Palette tournante par ordre de création — même logique que les avatars
+// utilisateur (usersStore.js AVATAR_COLORS), pour que chaque nouveau projet
+// ait une couleur par défaut distincte sans que l'utilisateur ait à en
+// choisir une s'il ne s'en soucie pas.
+const PROJECT_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899'];
+
+export function createProject({ name, description, tags, memberIds, repoKeys, icon, color }) {
   const projects = listProjects();
   const project = {
     id: uuid(),
     name,
     description: description || '',
     status: 'active',
+    icon: icon || null, // emoji — null affiche l'icône dossier générique (voir frontend Icon.jsx)
+    color: color || PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
     tags: Array.isArray(tags) ? tags : [],
     memberIds: Array.isArray(memberIds) ? memberIds : [],
     repoKeys: Array.isArray(repoKeys) ? repoKeys : [], // `${provider}:${identifiant}` — voir repoMetaStore.js

@@ -95,10 +95,15 @@ function roleAtLeastForDecide(role) {
   return role === 'maintainer' || role === 'owner';
 }
 
+const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$|^$/u;
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { name, description, tags, memberIds, repoKeys } = req.body || {};
+  const { name, description, tags, memberIds, repoKeys, icon, color } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
-  const project = store.createProject({ name, description, tags, memberIds, repoKeys });
+  if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
+  if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
+  const project = store.createProject({ name, description, tags, memberIds, repoKeys, icon, color });
   // Provisionne aussi le projet dans le socle relationnel quand Postgres est
   // disponible, avec les mêmes membres en rôle "maintainer" par défaut
   // (ajustable ensuite via PUT /:id/members/:userId) et deux environnements
@@ -130,8 +135,10 @@ router.put('/:id', loadProjectAccess(), requireMinRole('maintainer'), asyncHandl
   // Allowlist explicite : req.body ne doit jamais pouvoir écrire des champs
   // internes comme vaultPasswordHash (géré exclusivement par les routes
   // dédiées ci-dessous, avec re-authentification).
-  const { name, description, tags, memberIds, repoKeys, status } = req.body || {};
-  const project = store.updateProject(req.params.id, { name, description, tags, memberIds, repoKeys, status });
+  const { name, description, tags, memberIds, repoKeys, status, icon, color } = req.body || {};
+  if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
+  if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
+  const project = store.updateProject(req.params.id, { name, description, tags, memberIds, repoKeys, status, icon, color });
   if (req.pgProject) {
     await orgStore.updateProjectByLegacyId(req.params.id, { name, description, tags, repoKeys });
   }
