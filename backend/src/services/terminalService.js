@@ -1,6 +1,9 @@
 import { load as loadYaml } from 'js-yaml';
 import { IntegrationError } from './integrations/httpClient.js';
 import * as k8s from './integrations/kubernetesService.js';
+import * as deploymentStore from '../store/deploymentStore.js';
+import * as orgStore from '../store/orgStore.js';
+import { pool } from '../db/pool.js';
 
 // Terminal sécurisé : PAS un shell générique. Une grammaire de commandes
 // fixe et bornée, chacune routée vers une fonction kubernetesService déjà
@@ -51,6 +54,21 @@ function parseFlags(tokens) {
     else positional.push(t);
   }
   return { flags, positional };
+}
+
+// Un namespace est considéré "production" s'il est ciblé par un lien de
+// déploiement rattaché à un environnement Postgres marqué is_production
+// (voir "Organisations et Projets" côté manuel). Sans Postgres configuré,
+// impossible de le vérifier de façon fiable : on ne bloque pas à l'aveugle,
+// cohérent avec le reste de la plateforme en isolation "legacy".
+async function isProductionNamespace(namespace) {
+  if (!namespace || !pool) return false;
+  const links = deploymentStore.listLinks().filter((l) => l.k8sNamespace === namespace && l.environmentId);
+  for (const link of links) {
+    const env = await orgStore.getEnvironment(link.environmentId);
+    if (env?.is_production) return true;
+  }
+  return false;
 }
 
 function splitKindName(token) {
@@ -129,6 +147,13 @@ export async function runCommand(user, line, manifestText) {
         manifest = loadYaml(manifestText);
       } catch (err) {
         throw new IntegrationError(`YAML invalide : ${err.message}`, { status: 400 });
+      }
+      const targetNamespace = manifest?.metadata?.namespace || namespace;
+      if (await isProductionNamespace(targetNamespace)) {
+        throw new IntegrationError(
+          `Application directe refusée : "${targetNamespace}" est un namespace de production. Passez par une revue de code (Développement → Dépôts Git → Manifests → proposer un changement) plutôt qu'une application directe depuis le terminal.`,
+          { status: 403 }
+        );
       }
       return { object: await k8s.applyManifest(manifest) };
     }

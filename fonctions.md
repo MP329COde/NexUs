@@ -79,7 +79,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **serviceCatalog.js** — Catalogue fermé de scripts d'installation de services complets.
 - **sshExecutor.js** — Exécution de scripts catalogués via clé SSH unique console.
 - **statusHistoryService.js** — Relevé horaire de disponibilité des services critiques (30 jours), planifié.
-- **terminalService.js** — Grammaire de commandes fixe routée vers kubernetesService.
+- **terminalService.js** — Grammaire de commandes fixe routée vers kubernetesService. **`apply` refuse tout namespace de production** (environnement Postgres marqué `is_production`, résolu via `deploymentStore`/`orgStore`) : impose de passer par une revue de code (proposition de changement sur le dépôt) plutôt qu'une application directe.
 - **trafficMonitorService.js** — Tampon circulaire du trafic API, détection IPs suspectes.
 - **updateService.js** — Vérification des mises à jour via git.
 - **vaultRotationService.js** — Vérifie toutes les 30s les entrées de coffre dont la rotation (2-5 min) est due et régénère leur secret.
