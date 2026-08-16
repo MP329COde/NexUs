@@ -4,6 +4,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
+import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
@@ -22,6 +23,7 @@ export default function ProxmoxPage() {
   const nodes = useApi(() => api.get('/proxmox/nodes'), [], { pollMs: 20000 });
   const [selectedNode, setSelectedNode] = useState(null);
   const vms = useApi(() => (selectedNode ? api.get(`/proxmox/nodes/${selectedNode}/vms`) : Promise.resolve(null)), [selectedNode], { pollMs: 15000 });
+  const infraLoad = useApi(() => api.get('/status/infra-load'), [], { pollMs: 30000 });
   const notify = useNotify();
   const [pending, setPending] = useState(null);
 
@@ -83,12 +85,14 @@ export default function ProxmoxPage() {
               {items.map((n) => {
                 const cpuPct = Math.round((n.cpu || 0) * 100);
                 const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
+                const diskPct = n.maxdisk ? Math.round((n.disk / n.maxdisk) * 100) : null;
                 return (
                   <div key={n.node} onClick={() => setSelectedNode(n.node)} className="infra-node-row">
-                    <span className="infra-node-name">{n.node}</span>
+                    <span className="infra-node-name">{n.node}<span className="faint" style={{ fontSize: 10.5, display: 'block' }}>{n.maxcpu ? `${n.maxcpu} vCPU` : ''}</span></span>
                     <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} infra-node-badge`}><span className="dot" />{n.status}</span>
                     <GaugeBar label="CPU" pct={cpuPct} />
                     <GaugeBar label="RAM" pct={memPct} />
+                    {diskPct !== null && <GaugeBar label="Disque" pct={diskPct} />}
                     <span className="mono faint infra-node-uptime">{Math.round((n.uptime || 0) / 3600)} h</span>
                   </div>
                 );
@@ -96,6 +100,10 @@ export default function ProxmoxPage() {
             </div>
           )}
         </Panel>
+
+        {selectedNode && (
+          <NodeHistoryPanel node={selectedNode} samples={infraLoad.data?.samples || []} />
+        )}
 
         {selectedNode && (
           <Panel title={`VM & LXC · ${selectedNode}`} span={12}>
@@ -135,6 +143,31 @@ export default function ProxmoxPage() {
         />
       )}
     </>
+  );
+}
+
+// Historique CPU/RAM d'un nœud précis, extrait du même échantillonnage que
+// le graphe agrégé de l'accueil (services/infraLoadService.js, 30s
+// d'intervalle, ~6h conservées en mémoire) — pas de nouvelle intégration,
+// juste le détail par nœud déjà présent dans chaque échantillon.
+function NodeHistoryPanel({ node, samples }) {
+  const nodeSamples = samples.filter((s) => s.nodes?.[node]);
+  const cpuSeries = nodeSamples.map((s) => s.nodes[node].cpuPct);
+  const ramSeries = nodeSamples.map((s) => s.nodes[node].ramPct);
+
+  return (
+    <Panel title={`Charge du nœud · ${node}`} sub="Échantillonnage toutes les 30s, ~6h conservées" span={12}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16 }}>
+        <div>
+          <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>CPU</div>
+          <MiniLineChart values={cpuSeries} height={80} color="#3B82F6" />
+        </div>
+        <div>
+          <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>Mémoire</div>
+          <MiniLineChart values={ramSeries} height={80} color="#8B5CF6" />
+        </div>
+      </div>
+    </Panel>
   );
 }
 

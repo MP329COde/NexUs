@@ -22,7 +22,10 @@ export async function listNodes() {
   const c = client();
   if (!c) throw new IntegrationError('Proxmox non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: '/api2/json/nodes' }, 'Proxmox');
-  return (data.data || []).map((n) => ({ node: n.node, status: n.status, cpu: n.cpu, maxmem: n.maxmem, mem: n.mem, uptime: n.uptime }));
+  return (data.data || []).map((n) => ({
+    node: n.node, status: n.status, cpu: n.cpu, maxcpu: n.maxcpu,
+    maxmem: n.maxmem, mem: n.mem, disk: n.disk, maxdisk: n.maxdisk, uptime: n.uptime
+  }));
 }
 
 export async function listVMs(node) {

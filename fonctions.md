@@ -68,7 +68,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **dastService.js** — DAST réel via le binaire OWASP ZAP (`zap-baseline.py`, open source) sur la machine backend ; cible validée contre les domaines déjà déclarés (`proxyStore`), jamais une URL arbitraire.
 - **gitMirrorService.js** — Miroir automatique GitLab→GitHub.
 - **hostMetricsService.js** — Sonde TCP + métriques SSH, rafraîchissement 30s.
-- **infraLoadService.js** — Échantillonnage en mémoire (6h) de la charge Proxmox.
+- **infraLoadService.js** — Échantillonnage en mémoire (6h) de la charge Proxmox, **détail par nœud** (`nodes: { [node]: { cpuPct, ramPct } }` dans chaque échantillon) en plus de la moyenne globale.
 - **integrationRegistry.js** — Registre central des intégrations disponibles.
 - **jobService.js** — Exécution asynchrone en process, suivi persisté.
 - **networkScanService.js** — Scan nmap sur cible validée strictement.
@@ -96,7 +96,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **integrations/haproxyService.js** — Data Plane API v2/v3 réelle.
 - **integrations/httpClient.js** — Client HTTP axios normalisé + erreur commune.
 - **integrations/kubernetesService.js** — Le plus complet : namespaces, pods, deployments, services, logs, describe, metrics, restart/scale/rollback/purge, exec.
-- **integrations/proxmoxService.js** — API2 JSON réelle.
+- **integrations/proxmoxService.js** — API2 JSON réelle, `listNodes()` expose désormais aussi `maxcpu`/`disk`/`maxdisk`.
 - **integrations/traefikService.js** — API REST réelle, écriture de routes dynamiques.
 - **integrations/wazuhService.js** — API REST avec cache JWT (token 14min).
 
@@ -154,7 +154,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 ### Infrastructure
 
 - **HostsPage.jsx / HostFormDialog.jsx / InstallAgentDialog.jsx** — CRUD hôtes, installation d'agents.
-- **ProxmoxPage.jsx** — Nœuds/VMs Proxmox, actions avec confirmation.
+- **ProxmoxPage.jsx** — Nœuds/VMs Proxmox, actions avec confirmation, jauge disque par nœud, nombre de vCPU, **historique CPU/RAM par nœud** (sparklines, `NodeHistoryPanel`, ~6h via `/status/infra-load`).
 - **InfrastructureLayout.jsx** — Layout de section.
 
 ### Kubernetes
