@@ -8,6 +8,7 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import HostFormDialog from './HostFormDialog.jsx';
 import InstallAgentDialog from './InstallAgentDialog.jsx';
+import './InfrastructureShared.css';
 
 export default function HostsPage() {
   const publicKey = useApi(() => api.get('/hosts/ssh-public-key'), []);
@@ -44,19 +45,19 @@ export default function HostsPage() {
         title="Hôtes & agents"
         sub="Installe des agents d'infrastructure via SSH, depuis un catalogue fermé de scripts — aucune commande arbitraire n'est exécutable depuis l'interface"
         actions={(
-          <button className="btn" onClick={() => setFormOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <button className="btn infra-header-link" onClick={() => setFormOpen(true)}>
             <Icon name="plus" size={15} />Ajouter un hôte
           </button>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="infra-panel-grid">
         <Panel title="Clé publique de la console" sub="À copier dans ~/.ssh/authorized_keys de chaque hôte à gérer (utilisateur configuré ci-dessous)" span={12}>
-          <div style={{ padding: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <code className="mono" style={{ flex: 1, fontSize: 11.5, background: 'var(--border-soft)', padding: 10, borderRadius: 8, wordBreak: 'break-all', display: 'block' }}>
+          <div className="infra-key-panel-body">
+            <code className="mono infra-key-code">
               {publicKey.data?.publicKey || '…'}
             </code>
-            <span className="btn-outline" style={{ height: 34, padding: '0 12px', flex: 'none' }} onClick={copyKey}>Copier</span>
+            <span className="btn-outline infra-key-copy-btn" onClick={copyKey}>Copier</span>
           </div>
         </Panel>
 
@@ -68,31 +69,30 @@ export default function HostsPage() {
             emptyHint="Ajoutez un hôte pour pouvoir y installer un agent depuis le catalogue."
             renderRow={(h) => (
               <tr key={h.id}>
-                <td style={{ fontWeight: 500 }}>{h.name}</td>
+                <td className="infra-cell-name">{h.name}</td>
                 <td className="mono muted">{h.address}:{h.port}</td>
                 <td>
                   <input
-                    className="input"
+                    className="input infra-role-input"
                     defaultValue={h.role || ''}
                     onBlur={(e) => saveRole(h, e.target.value)}
                     placeholder="Rôle"
-                    style={{ height: 26, fontSize: 11.5, padding: '0 8px', width: 150 }}
                   />
                 </td>
                 <td>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <label className="infra-checkbox-label">
                     <input type="checkbox" checked={Boolean(h.critical)} onChange={() => toggleCritical(h)} />
                   </label>
                 </td>
                 <td>
                   {h.lastInstall
                     ? <span className={`badge badge-${h.lastInstall.ok ? 'ok' : 'crit'}`}><span className="dot" />{h.lastInstall.agentId}</span>
-                    : <span className="faint" style={{ fontSize: 12.5 }}>—</span>}
+                    : <span className="faint infra-cell-empty">—</span>}
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => setInstallTarget(h)}>Installer un agent</span>
-                    <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => remove(h.id)}>Retirer</span>
+                  <div className="infra-row-actions">
+                    <span className="btn-outline infra-action-btn" onClick={() => setInstallTarget(h)}>Installer un agent</span>
+                    <span className="btn-outline infra-action-btn infra-action-btn-danger" onClick={() => remove(h.id)}>Retirer</span>
                   </div>
                 </td>
               </tr>

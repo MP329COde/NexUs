@@ -9,6 +9,7 @@ import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './InfrastructureShared.css';
 
 const ACTION_IMPACT = {
   start: { tone: 'warn', label: 'Démarrer', impact: (v) => [`${v.type === 'qemu' ? 'La VM' : 'Le conteneur'} ${v.name} va démarrer.`, 'Les services qu\'il héberge redeviennent joignables dès le démarrage terminé.'] },
@@ -61,39 +62,34 @@ export default function ProxmoxPage() {
         title="Infrastructure"
         sub={status.data?.status?.message}
         actions={baseUrl && (
-          <a href={baseUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>
+          <a href={baseUrl} target="_blank" rel="noreferrer" className="btn-outline infra-header-link">
             <Icon name="externalLink" size={14} />Ouvrir Proxmox
           </a>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="infra-kpi-grid">
         <KpiCard label="Nœuds en ligne" value={onlineCount} unit={`/ ${items.length}`} tint="#10B981" />
         <KpiCard label="CPU moyen" value={avgCpu} unit="%" tint={avgCpu > 80 ? '#F43F5E' : '#3B82F6'} />
         <KpiCard label="Mémoire moyenne" value={avgMem} unit="%" tint={avgMem > 80 ? '#F43F5E' : '#8B5CF6'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="infra-panel-grid">
         <Panel title="Nœuds Proxmox" sub="Cliquez sur un nœud pour voir ses VM et conteneurs" span={12}>
           {items.length === 0 ? (
             <EmptyState title="Aucun nœud" />
           ) : (
-            <div style={{ padding: 6 }}>
+            <div className="infra-node-list">
               {items.map((n) => {
                 const cpuPct = Math.round((n.cpu || 0) * 100);
                 const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
                 return (
-                  <div
-                    key={n.node}
-                    onClick={() => setSelectedNode(n.node)}
-                    className="home-integration-row"
-                    style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '13px 16px', borderBottom: '1px solid var(--border-soft)', cursor: 'pointer' }}
-                  >
-                    <span style={{ fontWeight: 600, fontSize: 13.5, width: 120 }}>{n.node}</span>
-                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'}`} style={{ flex: 'none' }}><span className="dot" />{n.status}</span>
+                  <div key={n.node} onClick={() => setSelectedNode(n.node)} className="infra-node-row">
+                    <span className="infra-node-name">{n.node}</span>
+                    <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} infra-node-badge`}><span className="dot" />{n.status}</span>
                     <GaugeBar label="CPU" pct={cpuPct} />
                     <GaugeBar label="RAM" pct={memPct} />
-                    <span className="mono faint" style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{Math.round((n.uptime || 0) / 3600)} h</span>
+                    <span className="mono faint infra-node-uptime">{Math.round((n.uptime || 0) / 3600)} h</span>
                   </div>
                 );
               })}
@@ -110,14 +106,14 @@ export default function ProxmoxPage() {
               renderRow={(v) => (
                 <tr key={`${v.type}-${v.vmid}`}>
                   <td className="mono">{v.vmid}</td>
-                  <td style={{ fontWeight: 500 }}>{v.name}</td>
+                  <td className="infra-cell-name">{v.name}</td>
                   <td>{v.type}</td>
                   <td><span className={`badge badge-${v.status === 'running' ? 'ok' : 'mut'}`}><span className="dot" />{v.status}</span></td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <span className="btn-outline" style={btnMini} onClick={() => askAction(selectedNode, v, 'start')}>Démarrer</span>
-                      <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => askAction(selectedNode, v, 'shutdown')}>Arrêter</span>
-                      <span className="btn-outline" style={btnMini} onClick={() => askAction(selectedNode, v, 'reboot')}>Redémarrer</span>
+                    <div className="infra-row-actions">
+                      <span className="btn-outline infra-action-btn" onClick={() => askAction(selectedNode, v, 'start')}>Démarrer</span>
+                      <span className="btn-outline infra-action-btn infra-action-btn-danger" onClick={() => askAction(selectedNode, v, 'shutdown')}>Arrêter</span>
+                      <span className="btn-outline infra-action-btn" onClick={() => askAction(selectedNode, v, 'reboot')}>Redémarrer</span>
                     </div>
                   </td>
                 </tr>
@@ -145,14 +141,12 @@ export default function ProxmoxPage() {
 function GaugeBar({ label, pct }) {
   const color = pct > 85 ? 'var(--tone-crit-dot)' : pct > 65 ? 'var(--tone-warn-dot)' : 'var(--tone-ok-dot)';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
-      <span className="faint" style={{ fontSize: 10.5, width: 26, flex: 'none' }}>{label}</span>
-      <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, transition: 'width .3s ease' }} />
+    <div className="infra-gauge">
+      <span className="faint infra-gauge-label">{label}</span>
+      <div className="infra-gauge-track">
+        <div className="infra-gauge-fill" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
       </div>
-      <span className="mono" style={{ fontSize: 11, width: 32, flex: 'none', textAlign: 'right' }}>{pct}%</span>
+      <span className="mono infra-gauge-value">{pct}%</span>
     </div>
   );
 }
-
-const btnMini = { height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center' };
