@@ -6,6 +6,7 @@ import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
 import { banIp, normalizeIp } from '../store/banlistStore.js';
+import { createNotification } from '../store/notificationsStore.js';
 
 const router = Router();
 const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -47,11 +48,23 @@ router.post('/login', asyncHandler(async (req, res) => {
     if (user) {
       const { locked, attempts } = recordLoginFailure(user.id);
       logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', { attempts, locked });
+      if (locked) {
+        createNotification({
+          type: 'auth.login.locked', severity: 'warn', title: 'Compte verrouillé',
+          message: `Le compte ${email} a été verrouillé temporairement après ${attempts} échecs de connexion.`,
+          meta: { email, attempts, ip: normalizeIp(req.ip) }
+        });
+      }
       if (attempts >= AUTO_BAN_ATTEMPTS) {
         const ip = normalizeIp(req.ip);
         try {
           banIp(ip, `Bannissement automatique : ${attempts} échecs de connexion consécutifs ciblant le compte ${email}`, 'system');
           logAudit({ user: { email }, ip: req.ip }, 'auth.login.autoban', { ip, attempts });
+          createNotification({
+            type: 'auth.login.autoban', severity: 'crit', title: 'IP bannie automatiquement',
+            message: `L'adresse ${ip} a été bannie après ${attempts} échecs consécutifs ciblant le compte ${email}.`,
+            meta: { email, attempts, ip }
+          });
         } catch { /* déjà bannie */ }
       }
     } else {

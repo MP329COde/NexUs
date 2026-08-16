@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { scanImage } from '../services/trivyService.js';
 import { listScans, recordScan, getScan } from '../store/imageScansStore.js';
 import { logAudit } from '../services/auditService.js';
+import { createNotification } from '../store/notificationsStore.js';
 
 // Scan de vulnérabilités d'images de conteneurs via Trivy (open source, en
 // local sur la machine backend — voir services/trivyService.js). Réservé
@@ -27,6 +28,15 @@ router.post('/', asyncHandler(async (req, res) => {
   const result = await scanImage(imageRef);
   const entry = recordScan(result);
   logAudit(req, 'security.imageScan.run', { imageRef, total: result.total, counts: result.counts });
+  const critical = result.counts.CRITICAL || 0;
+  const high = result.counts.HIGH || 0;
+  if (critical > 0 || high > 0) {
+    createNotification({
+      type: 'security.imageScan.vulnerable', severity: critical > 0 ? 'crit' : 'warn', title: 'Vulnérabilités trouvées',
+      message: `${imageRef} : ${critical} CRITICAL, ${high} HIGH.`,
+      meta: { imageRef, scanId: entry.id, counts: result.counts }
+    });
+  }
   res.status(201).json({ ok: true, scan: entry });
 }));
 
