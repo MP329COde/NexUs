@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
-import { findUserByEmail, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess } from '../store/usersStore.js';
+import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
@@ -33,13 +33,17 @@ function validateAvatarImage(avatarImage) {
 }
 
 router.post('/login', asyncHandler(async (req, res) => {
-  const { email, password } = req.body || {};
-  const user = email && findUserByEmail(email);
+  // `email` accepté par rétrocompatibilité (formulaires/scripts existants) ;
+  // `identifier` est le nom générique côté API — l'un ou l'autre peut
+  // contenir soit une adresse e-mail, soit un nom de connexion.
+  const { email, identifier, password } = req.body || {};
+  const login = identifier || email;
+  const user = login && findUserByIdentifier(login);
 
   if (user) {
     const lock = getLockStatus(user);
     if (lock.locked) {
-      logAudit({ user: { email }, ip: req.ip }, 'auth.login.locked', {});
+      logAudit({ user: { email: user.email }, ip: req.ip }, 'auth.login.locked', {});
       return res.status(423).json({ ok: false, error: `Compte temporairement verrouillé après plusieurs échecs. Réessayez après ${new Date(lock.lockUntil).toLocaleTimeString('fr-FR')}.` });
     }
   }
@@ -47,28 +51,28 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (!user || user.active === false || !verifyPassword(password || '', user.passwordHash)) {
     if (user) {
       const { locked, attempts } = recordLoginFailure(user.id);
-      logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', { attempts, locked });
+      logAudit({ user: { email: user.email }, ip: req.ip }, 'auth.login.failed', { attempts, locked });
       if (locked) {
         createNotification({
           type: 'auth.login.locked', severity: 'warn', title: 'Compte verrouillé',
-          message: `Le compte ${email} a été verrouillé temporairement après ${attempts} échecs de connexion.`,
-          meta: { email, attempts, ip: normalizeIp(req.ip) }
+          message: `Le compte ${user.email} a été verrouillé temporairement après ${attempts} échecs de connexion.`,
+          meta: { email: user.email, attempts, ip: normalizeIp(req.ip) }
         });
       }
       if (attempts >= AUTO_BAN_ATTEMPTS) {
         const ip = normalizeIp(req.ip);
         try {
-          banIp(ip, `Bannissement automatique : ${attempts} échecs de connexion consécutifs ciblant le compte ${email}`, 'system');
-          logAudit({ user: { email }, ip: req.ip }, 'auth.login.autoban', { ip, attempts });
+          banIp(ip, `Bannissement automatique : ${attempts} échecs de connexion consécutifs ciblant le compte ${user.email}`, 'system');
+          logAudit({ user: { email: user.email }, ip: req.ip }, 'auth.login.autoban', { ip, attempts });
           createNotification({
             type: 'auth.login.autoban', severity: 'crit', title: 'IP bannie automatiquement',
-            message: `L'adresse ${ip} a été bannie après ${attempts} échecs consécutifs ciblant le compte ${email}.`,
-            meta: { email, attempts, ip }
+            message: `L'adresse ${ip} a été bannie après ${attempts} échecs consécutifs ciblant le compte ${user.email}.`,
+            meta: { email: user.email, attempts, ip }
           });
         } catch { /* déjà bannie */ }
       }
     } else {
-      logAudit({ user: { email }, ip: req.ip }, 'auth.login.failed', {});
+      logAudit({ user: { email: login }, ip: req.ip }, 'auth.login.failed', {});
     }
     return res.status(401).json({ ok: false, error: 'Identifiants invalides' });
   }

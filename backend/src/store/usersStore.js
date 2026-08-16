@@ -16,6 +16,19 @@ export function findUserByEmail(email) {
   return listUsers().find((u) => u.email.toLowerCase() === String(email).toLowerCase());
 }
 
+export function findUserByUsername(username) {
+  const needle = String(username).toLowerCase();
+  return listUsers().find((u) => u.username && u.username.toLowerCase() === needle);
+}
+
+// Connexion : accepte indifféremment l'e-mail ou le nom de connexion — le
+// nom d'utilisateur reste optionnel (createUser en dérive un par défaut de
+// l'e-mail, cf. plus bas), donc l'e-mail continue de fonctionner pour tout
+// compte n'en ayant jamais défini un explicitement.
+export function findUserByIdentifier(identifier) {
+  return findUserByEmail(identifier) || findUserByUsername(identifier);
+}
+
 export function findUserById(id) {
   return listUsers().find((u) => u.id === id);
 }
