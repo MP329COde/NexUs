@@ -9,6 +9,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './SecurityPage.css';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -39,13 +40,13 @@ export default function SecurityPage() {
       <PageHeader title="Cybersécurité" sub={status.data?.status?.message || 'Agents, IPs bannies, scans réseau et conformité'} />
 
       {user?.role === 'admin' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <div className="security-panel-row">
           <SecurityOverviewPanel />
         </div>
       )}
 
       {wazuhConfigured && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+        <div className="security-kpi-grid">
           <KpiCard label="Agents actifs" value={s.active ?? '—'} tint="#10B981" />
           <KpiCard label="Déconnectés" value={s.disconnected ?? '—'} tint="#F43F5E" />
           <KpiCard label="Jamais connectés" value={s.never_connected ?? '—'} tint="#94A3B8" />
@@ -61,7 +62,7 @@ export default function SecurityPage() {
             emptyTitle="Aucun agent"
             renderRow={(a) => (
               <tr key={a.id}>
-                <td style={{ fontWeight: 500 }}>{a.name}</td>
+                <td className="security-cell-name">{a.name}</td>
                 <td className="mono muted">{a.ip}</td>
                 <td>{a.os || '—'}</td>
                 <td className="mono faint">{a.version}</td>
@@ -72,13 +73,13 @@ export default function SecurityPage() {
           />
         </Panel>
       ) : (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card security-empty-wrap">
           <EmptyState title="Wazuh n'est pas configuré" hint="Renseignez l'URL du gestionnaire et des identifiants API depuis Paramètres → Wazuh pour superviser vos agents." />
         </div>
       )}
 
       {user?.role === 'admin' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+        <div className="security-panel-row" style={{ marginBottom: 0 }}>
           <BanlistPanel />
           <NetworkScanPanel />
         </div>
@@ -118,18 +119,18 @@ function BanlistPanel() {
 
   return (
     <Panel title="IPs bannies" sub="Bloque l'accès à la console (appliqué immédiatement, toutes les routes)" span={6}>
-      <div style={{ padding: 16 }}>
-        <form onSubmit={ban} style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <input className="input" placeholder="Adresse IPv4 (ex. 203.0.113.5)" required value={ip} onChange={(e) => setIp(e.target.value)} style={{ flex: '1 1 180px' }} />
-          <input className="input" placeholder="Raison (optionnel)" value={reason} onChange={(e) => setReason(e.target.value)} style={{ flex: '1 1 160px' }} />
+      <div className="security-panel-body">
+        <form onSubmit={ban} className="security-form-row">
+          <input className="input security-form-input-wide" placeholder="Adresse IPv4 (ex. 203.0.113.5)" required value={ip} onChange={(e) => setIp(e.target.value)} />
+          <input className="input security-form-input-narrow" placeholder="Raison (optionnel)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <button className="btn" type="submit" disabled={busy}>{busy ? 'Bannissement…' : 'Bannir'}</button>
         </form>
-        {data?.items?.length === 0 && <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 10 }}>Aucune adresse bannie</div>}
+        {data?.items?.length === 0 && <div className="faint security-list-empty">Aucune adresse bannie</div>}
         {data?.items?.map((b) => (
-          <div key={b.ip} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--border-soft)' }}>
-            <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, flex: 'none' }}>{b.ip}</span>
-            <span className="faint" style={{ fontSize: 11.5, flex: 1 }}>{b.reason || '—'}</span>
-            <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => unban(b.ip)}>Débannir</span>
+          <div key={b.ip} className="security-list-row">
+            <span className="mono security-list-ip">{b.ip}</span>
+            <span className="faint security-list-reason">{b.reason || '—'}</span>
+            <span className="btn-outline security-unban-btn" onClick={() => unban(b.ip)}>Débannir</span>
           </div>
         ))}
       </div>
@@ -170,23 +171,23 @@ function NetworkScanPanel() {
 
   return (
     <Panel title="Scans réseau" sub="nmap -sV — découverte d'hôtes et de services sur une plage IPv4" span={6}>
-      <div style={{ padding: 16 }}>
-        <form onSubmit={scan} style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input className="input" placeholder="Cible (ex. 10.0.0.0/24)" required value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: 1 }} />
-          <button className="btn" type="submit" disabled={scanning} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="security-panel-body">
+        <form onSubmit={scan} className="security-scan-form">
+          <input className="input security-scan-input" placeholder="Cible (ex. 10.0.0.0/24)" required value={target} onChange={(e) => setTarget(e.target.value)} />
+          <button className="btn security-scan-btn" type="submit" disabled={scanning}>
             <Icon name="refresh" size={13} className={scanning ? 'spin' : ''} />{scanning ? 'Scan…' : 'Lancer'}
           </button>
         </form>
-        {!last && <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 10 }}>Aucun scan effectué</div>}
+        {!last && <div className="faint security-list-empty">Aucun scan effectué</div>}
         {last && (
           <>
-            <div className="faint" style={{ fontSize: 11, marginBottom: 8 }}>
+            <div className="faint security-scan-meta">
               Dernier scan : {last.target} · {new Date(last.startedAt).toLocaleString('fr-FR')} · {last.hostCount} hôte(s) trouvé(s)
             </div>
             {last.hosts.map((h) => (
-              <div key={h.ip} style={{ padding: '7px 0', borderTop: '1px solid var(--border-soft)' }}>
-                <span className="mono" style={{ fontSize: 12.5, fontWeight: 600 }}>{h.ip}</span>
-                <div className="faint" style={{ fontSize: 11 }}>
+              <div key={h.ip} className="security-scan-host-row">
+                <span className="mono security-scan-host-ip">{h.ip}</span>
+                <div className="faint security-scan-host-ports">
                   {h.ports.map((p) => `${p.port}/${p.service}`).join(', ')}
                 </div>
               </div>
@@ -215,7 +216,7 @@ function SecurityOverviewPanel() {
   if (loading && !data) {
     return (
       <Panel title="Tableau de sécurité" span={12}>
-        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+        <div className="security-overview-loading">Chargement…</div>
       </Panel>
     );
   }
@@ -225,21 +226,21 @@ function SecurityOverviewPanel() {
 
   return (
     <Panel title="Tableau de sécurité" sub="Certificats, incidents ouverts par gravité, agents déconnectés" span={12}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, padding: 16 }}>
+      <div className="security-overview-grid">
         <div>
-          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Incidents ouverts par gravité</div>
+          <div className="faint security-overview-heading">Incidents ouverts par gravité</div>
           {totalOpenIncidents === 0 ? (
-            <div className="faint" style={{ fontSize: 12.5 }}>Aucun incident ouvert</div>
+            <div className="faint security-overview-empty">Aucun incident ouvert</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="security-overview-list">
               {SEVERITY_ROWS.map((r) => {
                 const count = data.incidentsBySeverity[r.key]?.length || 0;
                 if (count === 0) return null;
                 return (
-                  <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={r.key} className="security-overview-row">
                     <span className="dot" style={{ background: r.tint }} />
-                    <span style={{ fontSize: 12.5, flex: 1 }}>{r.label}</span>
-                    <span className="mono" style={{ fontSize: 12.5, fontWeight: 700 }}>{count}</span>
+                    <span className="security-overview-row-label">{r.label}</span>
+                    <span className="mono security-overview-row-count">{count}</span>
                   </div>
                 );
               })}
@@ -248,15 +249,15 @@ function SecurityOverviewPanel() {
         </div>
 
         <div>
-          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Certificats expirant sous 30 jours</div>
+          <div className="faint security-overview-heading">Certificats expirant sous 30 jours</div>
           {data.expiringCertificates.length === 0 ? (
-            <div className="faint" style={{ fontSize: 12.5 }}>Aucun certificat proche de l'expiration</div>
+            <div className="faint security-overview-empty">Aucun certificat proche de l'expiration</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="security-overview-list">
               {data.expiringCertificates.slice(0, 5).map((c) => (
-                <div key={`${c.namespace}/${c.name}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                <div key={`${c.namespace}/${c.name}`} className="security-overview-cert-row">
                   <span className={`badge badge-${c.expiresInDays <= 7 ? 'crit' : 'warn'}`}>{c.expiresInDays} j</span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                  <span className="security-overview-cert-name">{c.name}</span>
                 </div>
               ))}
             </div>
@@ -264,10 +265,10 @@ function SecurityOverviewPanel() {
         </div>
 
         <div>
-          <div className="faint" style={{ fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>Wazuh</div>
-          <div style={{ fontSize: 12.5 }}>
+          <div className="faint security-overview-heading">Wazuh</div>
+          <div className="security-overview-wazuh">
             {data.wazuhDisconnected > 0 ? (
-              <span style={{ color: 'var(--tone-crit-fg)' }}>{data.wazuhDisconnected} agent(s) déconnecté(s)</span>
+              <span className="security-overview-wazuh-alert">{data.wazuhDisconnected} agent(s) déconnecté(s)</span>
             ) : (
               <span className="faint">Aucun agent déconnecté</span>
             )}

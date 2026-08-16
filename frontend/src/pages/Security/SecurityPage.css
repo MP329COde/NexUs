@@ -1,0 +1,175 @@
+.security-panel-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.security-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.security-empty-wrap {
+  margin-bottom: 16px;
+}
+
+.security-cell-name {
+  font-weight: 500;
+}
+
+.security-panel-body {
+  padding: 16px;
+}
+
+.security-form-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.security-form-input-wide {
+  flex: 1 1 180px;
+}
+
+.security-form-input-narrow {
+  flex: 1 1 160px;
+}
+
+.security-list-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 10px;
+}
+
+.security-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.security-list-ip {
+  font-size: 12.5px;
+  font-weight: 600;
+  flex: none;
+}
+
+.security-list-reason {
+  font-size: 11.5px;
+  flex: 1;
+}
+
+.security-unban-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.security-scan-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.security-scan-input {
+  flex: 1;
+}
+
+.security-scan-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.security-scan-meta {
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.security-scan-host-row {
+  padding: 7px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.security-scan-host-ip {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.security-scan-host-ports {
+  font-size: 11px;
+}
+
+.security-overview-loading {
+  padding: 20px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.security-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.security-overview-heading {
+  font-size: 11px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.security-overview-empty {
+  font-size: 12.5px;
+}
+
+.security-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.security-overview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.security-overview-row-label {
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.security-overview-row-count {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.security-overview-cert-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.security-overview-cert-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.security-overview-wazuh {
+  font-size: 12.5px;
+}
+
+.security-overview-wazuh-alert {
+  color: var(--tone-crit-fg);
+}
