@@ -73,6 +73,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **trafficMonitorService.js** — Tampon circulaire du trafic API, détection IPs suspectes.
 - **updateService.js** — Vérification des mises à jour via git.
 - **vaultRotationService.js** — Vérifie toutes les 30s les entrées de coffre dont la rotation (2-5 min) est due et régénère leur secret.
+- **secretLeakScanService.js** — Scan quotidien (4h) des dépôts liés à un projet, rotation automatique immédiate si un secret prod/projet connu est trouvé en clair.
 - **integrations/argocdService.js** — API REST ArgoCD réelle.
 - **integrations/certManagerService.js** — CRD Kubernetes cert-manager.
 - **integrations/githubService.js** — API REST GitHub réelle (repos, runs, PR, arborescence/fichier, commit, branche, PR).
@@ -124,6 +125,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **TestsQualityPage.jsx** — Démonstration.
 - **ToolsAccessPage.jsx** — Intégrations réelles + raccourcis manuels.
 - **SecretsPage.jsx / VaultPanel.jsx** — Coffre dev/prod, triple vérification prod, **champs symboles autorisés/interdits**, **rotation automatique configurable**, compte à rebours de rotation.
+- **SecretLeakScanPanel.jsx** — Historique du **scan quotidien de secrets committés** dans les dépôts liés aux projets (rotation auto en cas de détection), déclenchement manuel.
 - **ProjectVaultPanel.jsx** — Coffre-fort par projet, **mot de passe de coffre-fort dédié** (session déverrouillée tant que la page reste ouverte), rotation.
 - **ProjectShortcutsPanel.jsx** — Raccourcis manuels propres à un projet.
 - **PasswordGeneratorPanel.jsx** — Générateur (aléatoire/passphrase), entropie + estimation de temps de cassage, symboles personnalisés, enregistrement direct en coffre.
@@ -224,12 +226,12 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
-- Scan quotidien des dépôts liés à un projet pour détecter un secret de production committé par erreur, avec rotation automatique déclenchée en cas de détection.
 - Notification persistante (pas seulement l'audit log) quand un compte est verrouillé ou une IP bannie automatiquement.
 - Intégration registre d'images (Harbor/GHCR/Docker Hub) avec scan de vulnérabilités horaire.
-- Intégration scanners de sécurité (Trivy/Semgrep/Checkov) pour Supply Chain Security.
+- Intégration scanners de sécurité (Trivy/Semgrep/Checkov) pour Supply Chain Security (le scan de secrets committés est fait ; l'analyse de dépendances/conteneurs/IaC ne l'est pas).
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Connexion par nom d'utilisateur (sans email) + clés d'accès (WebAuthn/passkeys).
 - Système de demande de permission (utilisateur → admin) avec notification, pour le terminal Kubernetes sécurisé.
-- Redirection directe vers Proxmox/ArgoCD depuis les pages Infrastructure/CI-CD avec la bonne URL.
 - Rôles par projet/organisation avec icônes personnalisées, plusieurs projets par organisation (déjà partiellement en place via le socle relationnel — à vérifier/étendre).
+
+Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) — existaient déjà avant cet inventaire.
