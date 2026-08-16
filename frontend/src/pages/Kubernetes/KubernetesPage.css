@@ -1,0 +1,62 @@
+.k8s-namespace-select {
+  width: 200px;
+}
+
+.k8s-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.k8s-cell-name {
+  font-weight: 500;
+}
+
+.k8s-cell-image {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.k8s-scale-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.k8s-scale-input {
+  width: 64px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.k8s-scale-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.k8s-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.k8s-row-actions-end {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.k8s-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.k8s-action-btn-danger {
+  color: var(--tone-crit-fg);
+}

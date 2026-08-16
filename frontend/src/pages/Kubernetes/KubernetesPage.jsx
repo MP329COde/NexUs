@@ -13,6 +13,7 @@ import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
 import PodLogsDialog from './PodLogsDialog.jsx';
 import PodDetailDialog from './PodDetailDialog.jsx';
 import DiagnosticsModal from './DiagnosticsModal.jsx';
+import './KubernetesPage.css';
 
 export default function KubernetesPage() {
   const [namespace, setNamespace] = useState('');
@@ -183,14 +184,14 @@ export default function KubernetesPage() {
         title="Kubernetes"
         sub={status.data?.status?.message}
         actions={(
-          <select className="input" style={{ width: 200 }} value={namespace} onChange={(e) => setNamespace(e.target.value)}>
+          <select className="input k8s-namespace-select" value={namespace} onChange={(e) => setNamespace(e.target.value)}>
             <option value="">Tous les namespaces</option>
             {namespaces.data?.items.map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
           </select>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="k8s-panel-grid">
         <Panel title="Deployments" sub="Statut des déploiements et actions" span={12}>
           <DataTable
             columns={['Nom', 'Namespace', 'Répliques prêtes', 'Image', 'Actions']}
@@ -200,31 +201,30 @@ export default function KubernetesPage() {
               const key = `${d.namespace}/${d.name}`;
               return (
                 <tr key={key}>
-                  <td style={{ fontWeight: 500 }}>{d.name}</td>
+                  <td className="k8s-cell-name">{d.name}</td>
                   <td className="mono muted">{d.namespace}</td>
                   <td className="mono">{d.ready}/{d.replicas}</td>
-                  <td className="mono faint" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.image}</td>
+                  <td className="mono faint k8s-cell-image">{d.image}</td>
                   <td>
                     {scaling === key ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <div className="k8s-scale-form">
                         <input
-                          className="input" type="number" min={0} max={100} autoFocus
+                          className="input k8s-scale-input" type="number" min={0} max={100} autoFocus
                           value={scaleValue} onChange={(e) => setScaleValue(e.target.value)}
-                          style={{ width: 64, height: 26, fontSize: 12 }}
                         />
-                        <span className="btn" style={{ height: 26, padding: '0 9px', fontSize: 12 }} onClick={() => scale(d.namespace, d.name)}>OK</span>
-                        <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 12 }} onClick={() => setScaling(null)}>Annuler</span>
+                        <span className="btn k8s-scale-btn" onClick={() => scale(d.namespace, d.name)}>OK</span>
+                        <span className="btn-outline k8s-scale-btn" onClick={() => setScaling(null)}>Annuler</span>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span className="btn-outline" style={btnMini} onClick={() => askRestart(d.namespace, d.name, d.replicas)}><Icon name="refresh" size={11} />Redémarrer</span>
-                        <span className="btn-outline" style={btnMini} onClick={() => { setScaling(key); setScaleValue(String(d.replicas)); }}>Scale</span>
-                        <span className="btn-outline" style={btnMini} onClick={() => askRollback(d.namespace, d.name)}>Rollback</span>
-                        <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => askPurge(d.namespace, d.name, d.replicas)}>Purger</span>
-                        <span className="btn-outline" style={btnMini} onClick={() => setDiagnosing({ namespace: d.namespace, name: d.name })}>
+                      <div className="k8s-row-actions">
+                        <span className="btn-outline k8s-action-btn" onClick={() => askRestart(d.namespace, d.name, d.replicas)}><Icon name="refresh" size={11} />Redémarrer</span>
+                        <span className="btn-outline k8s-action-btn" onClick={() => { setScaling(key); setScaleValue(String(d.replicas)); }}>Scale</span>
+                        <span className="btn-outline k8s-action-btn" onClick={() => askRollback(d.namespace, d.name)}>Rollback</span>
+                        <span className="btn-outline k8s-action-btn k8s-action-btn-danger" onClick={() => askPurge(d.namespace, d.name, d.replicas)}>Purger</span>
+                        <span className="btn-outline k8s-action-btn" onClick={() => setDiagnosing({ namespace: d.namespace, name: d.name })}>
                           <Icon name="gauge" size={11} />Diagnostiquer
                         </span>
-                        <span className="btn-outline" style={btnMini} title="Command Center" onClick={() => openPalette({ type: 'deployment', namespace: d.namespace, name: d.name })}>
+                        <span className="btn-outline k8s-action-btn" title="Command Center" onClick={() => openPalette({ type: 'deployment', namespace: d.namespace, name: d.name })}>
                           <Icon name="more" size={13} />
                         </span>
                       </div>
@@ -243,16 +243,16 @@ export default function KubernetesPage() {
             emptyTitle="Aucun pod"
             renderRow={(p) => (
               <tr key={`${p.namespace}/${p.name}`}>
-                <td style={{ fontWeight: 500 }}>{p.name}</td>
+                <td className="k8s-cell-name">{p.name}</td>
                 <td className="mono muted">{p.namespace}</td>
                 <td><span className={`badge badge-${p.phase === 'Running' ? 'ok' : p.phase === 'Pending' ? 'warn' : 'crit'}`}><span className="dot" />{p.phase}</span></td>
                 <td className="mono">{p.restarts}</td>
                 <td className="mono faint">{p.node}</td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <span className="btn-outline" style={btnMini} onClick={() => setLogsPod(p)}>Logs</span>
-                    <span className="btn-outline" style={{ ...btnMini, color: 'var(--tone-crit-fg)' }} onClick={() => askDeletePod(p.namespace, p.name)}>Supprimer</span>
-                    <span className="btn-outline" style={btnMini} title="Command Center" onClick={() => openPalette({ type: 'pod', namespace: p.namespace, name: p.name })}>
+                  <div className="k8s-row-actions-end">
+                    <span className="btn-outline k8s-action-btn" onClick={() => setLogsPod(p)}>Logs</span>
+                    <span className="btn-outline k8s-action-btn k8s-action-btn-danger" onClick={() => askDeletePod(p.namespace, p.name)}>Supprimer</span>
+                    <span className="btn-outline k8s-action-btn" title="Command Center" onClick={() => openPalette({ type: 'pod', namespace: p.namespace, name: p.name })}>
                       <Icon name="more" size={13} />
                     </span>
                   </div>
@@ -282,5 +282,3 @@ export default function KubernetesPage() {
     </>
   );
 }
-
-const btnMini = { height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 5 };
