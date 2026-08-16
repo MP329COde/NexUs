@@ -1,0 +1,143 @@
+/* Partagé par TopologyPage, HAProxyPage, CertificatesPage, FirewallPage —
+   pages plus petites que Network/NetworkPage.css, regroupées pour éviter la
+   prolifération de fichiers CSS quasi vides. */
+
+.net-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.net-cell-name {
+  font-weight: 500;
+}
+
+.net-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.net-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Topology */
+
+.topo-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 20px;
+}
+
+.topo-layer {
+  display: flex;
+  align-items: center;
+}
+
+.topo-layer-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.topo-layer-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.topo-node {
+  padding: 10px 12px;
+  animation: riseIn .3s ease both;
+}
+
+.topo-node-clickable {
+  cursor: pointer;
+}
+
+.topo-node-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.topo-node-meta {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.topo-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  color: var(--text-faintest);
+  font-size: 20px;
+}
+
+/* HAProxy */
+
+.haproxy-row-selectable {
+  cursor: pointer;
+}
+
+.haproxy-row-selected {
+  background: var(--primary-soft);
+}
+
+.haproxy-view-servers {
+  font-size: 12px;
+  color: var(--primary);
+}
+
+/* Certificates */
+
+.cert-cell-domains {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cert-renew-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Firewall */
+
+.firewall-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.firewall-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.firewall-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 20px;
+}
+
+.firewall-ip {
+  font-weight: 600;
+}
+
+.firewall-cell-path {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

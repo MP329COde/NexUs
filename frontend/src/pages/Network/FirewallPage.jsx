@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './NetworkShared.css';
 
 const SUSPECT_STATUS_LABEL = { 401: 'Non authentifié', 403: 'Refusé', 429: 'Limité (rate-limit)' };
 
@@ -45,29 +46,29 @@ export default function FirewallPage() {
         title="Pare-feu"
         sub="Trafic API en temps réel et blocage des adresses suspectes"
         actions={user?.role === 'admin' && (
-          <button className="btn-outline" onClick={toggleAutoBlock} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: autoBlockEnabled ? 'var(--tone-ok-dot)' : 'var(--tone-mut-dot)' }} />
+          <button className="btn-outline firewall-header-toggle" onClick={toggleAutoBlock}>
+            <span className="firewall-toggle-dot" style={{ background: autoBlockEnabled ? 'var(--tone-ok-dot)' : 'var(--tone-mut-dot)' }} />
             Blocage automatique {autoBlockEnabled ? 'activé' : 'désactivé'}
           </button>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="net-panel-grid">
         {user?.role === 'admin' && (
           <Panel title="Adresses suspectes" sub="Trop de requêtes en échec (401/403/429) sur une courte fenêtre" span={12}>
             {suspicious.length === 0 ? (
-              <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 20 }}>Aucune activité suspecte détectée</div>
+              <div className="faint firewall-empty">Aucune activité suspecte détectée</div>
             ) : (
               <DataTable
                 columns={['IP', 'Requêtes suspectes', 'Seuil', 'Statut', '']}
                 rows={suspicious}
                 renderRow={(s) => (
                   <tr key={s.ip}>
-                    <td className="mono" style={{ fontWeight: 600 }}>{s.ip}</td>
+                    <td className="mono firewall-ip">{s.ip}</td>
                     <td>{s.count}</td>
                     <td className="mono muted">{s.threshold}</td>
                     <td><span className={`badge badge-${s.banned ? 'crit' : 'warn'}`}><span className="dot" />{s.banned ? 'Bannie' : 'Sous surveillance'}</span></td>
-                    <td>{!s.banned && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => ban(s.ip)}>Bannir</span>}</td>
+                    <td>{!s.banned && <span className="btn-outline net-action-btn" onClick={() => ban(s.ip)}>Bannir</span>}</td>
                   </tr>
                 )}
               />
@@ -84,7 +85,7 @@ export default function FirewallPage() {
               <tr key={i}>
                 <td className="mono faint">{new Date(t.ts).toLocaleTimeString('fr-FR')}</td>
                 <td className="mono muted">{t.method}</td>
-                <td className="mono" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.path}</td>
+                <td className="mono firewall-cell-path">{t.path}</td>
                 <td className="mono">{t.ip}</td>
                 <td>
                   <span className={`badge badge-${t.status >= 500 ? 'crit' : t.status >= 400 ? 'warn' : 'ok'}`}>

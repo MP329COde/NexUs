@@ -7,6 +7,7 @@ import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './NetworkShared.css';
 
 export default function CertificatesPage() {
   const status = useApi(() => api.get('/certmanager/status'), []);
@@ -52,14 +53,14 @@ export default function CertificatesPage() {
           emptyTitle="Aucun certificat"
           renderRow={(c) => (
             <tr key={`${c.namespace}/${c.name}`}>
-              <td style={{ fontWeight: 500 }}>{c.name}</td>
+              <td className="net-cell-name">{c.name}</td>
               <td className="mono muted">{c.namespace}</td>
-              <td className="mono" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{(c.dnsNames || []).join(', ')}</td>
+              <td className="mono cert-cell-domains">{(c.dnsNames || []).join(', ')}</td>
               <td className="mono faint">{c.secretName}</td>
               <td><span className={`badge badge-${c.ready ? 'ok' : 'warn'}`}><span className="dot" />{c.ready ? 'Prêt' : 'En attente'}</span></td>
               <td className="mono faint">{c.renewalTime ? new Date(c.renewalTime).toLocaleDateString('fr-FR') : '—'}</td>
               <td>
-                <span className="btn-outline" style={{ height: 26, padding: '0 10px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center' }} onClick={() => askRenew(c)}>Renouveler</span>
+                <span className="btn-outline cert-renew-btn" onClick={() => askRenew(c)}>Renouveler</span>
               </td>
             </tr>
           )}

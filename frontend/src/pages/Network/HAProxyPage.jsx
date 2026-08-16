@@ -6,6 +6,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './NetworkShared.css';
 
 const STATES = ['ready', 'drain', 'maint'];
 
@@ -38,18 +39,18 @@ export default function HAProxyPage() {
   return (
     <>
       <PageHeader title="HAProxy" sub={status.data?.status?.message} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="net-panel-grid">
         <Panel title="Backends" sub="Cliquez sur un backend pour voir ses serveurs" span={12}>
           <DataTable
             columns={['Nom', 'Mode', 'Répartition', '']}
             rows={backends.data?.items}
             emptyTitle="Aucun backend"
             renderRow={(b) => (
-              <tr key={b.name} onClick={() => setSelected(b.name)} style={{ cursor: 'pointer', background: selected === b.name ? 'var(--primary-soft)' : undefined }}>
-                <td style={{ fontWeight: 500 }}>{b.name}</td>
+              <tr key={b.name} onClick={() => setSelected(b.name)} className={`haproxy-row-selectable${selected === b.name ? ' haproxy-row-selected' : ''}`}>
+                <td className="net-cell-name">{b.name}</td>
                 <td>{b.mode}</td>
                 <td className="mono muted">{b.balance}</td>
-                <td><span style={{ fontSize: 12, color: 'var(--primary)' }}>Voir les serveurs →</span></td>
+                <td><span className="haproxy-view-servers">Voir les serveurs →</span></td>
               </tr>
             )}
           />
@@ -63,13 +64,13 @@ export default function HAProxyPage() {
               emptyTitle="Aucun serveur"
               renderRow={(s) => (
                 <tr key={s.name}>
-                  <td style={{ fontWeight: 500 }}>{s.name}</td>
+                  <td className="net-cell-name">{s.name}</td>
                   <td><span className={`badge badge-${s.adminState === 'ready' ? 'ok' : s.adminState === 'drain' ? 'warn' : 'crit'}`}><span className="dot" />{s.adminState}</span></td>
                   <td className="mono muted">{s.operationalState}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div className="net-row-actions">
                       {STATES.filter((st) => st !== s.adminState).map((st) => (
-                        <span key={st} className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => setState(selected, s.name, st)}>{st}</span>
+                        <span key={st} className="btn-outline net-action-btn" onClick={() => setState(selected, s.name, st)}>{st}</span>
                       ))}
                     </div>
                   </td>
