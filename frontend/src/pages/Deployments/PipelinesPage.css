@@ -1,0 +1,181 @@
+.pipelines-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.pipelines-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pipelines-chart-body {
+  padding: 14px 16px;
+}
+
+.pipelines-donut-body {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.pipelines-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+}
+
+.pipelines-donut-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pipelines-donut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.pipelines-donut-label {
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.pipelines-donut-value {
+  font-weight: 600;
+}
+
+.pipelines-filter-input {
+  height: 30px;
+  font-size: 12.5px;
+  width: 180px;
+}
+
+.pipelines-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.pipelines-table-wrap {
+  overflow-x: auto;
+}
+
+.pipelines-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.pipelines-table-head {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pipelines-table-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pipelines-table-cell {
+  padding: 9px 16px;
+}
+
+.pipelines-cell-repo {
+  font-weight: 600;
+}
+
+.pipelines-provider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.pipelines-provider-icon {
+  color: var(--text-faint);
+}
+
+.pipelines-status-link {
+  text-decoration: none;
+}
+
+.pipelines-cell-date {
+  color: var(--text-faint);
+}
+
+.pipelines-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pipelines-action-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pipelines-modal-loading,
+.pipelines-modal-empty {
+  font-size: 12.5px;
+}
+
+.pipelines-modal-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.pipelines-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pipelines-job-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pipelines-job-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pipelines-job-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 4px;
+}
+
+.pipelines-job-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pipelines-job-step-icon {
+  flex: none;
+}

@@ -11,6 +11,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './PipelinesPage.css';
 
 const STATUS_TONE = { success: 'ok', failed: 'crit', running: 'info', cancelled: 'mut', other: 'mut' };
 const STATUS_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cours', cancelled: 'Annulé', other: '—' };
@@ -85,28 +86,28 @@ export default function PipelinesPage() {
     <>
       <PageHeader title="Pipelines CI/CD" sub="Exécutions récentes, durées et taux de réussite sur l'ensemble des dépôts." />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="pipelines-kpi-grid">
         <KpiCard label="Exécutions 24h" value={last24h.length} tint="#3B82F6" />
         <KpiCard label="Taux de réussite 7j" value={successRate ?? '—'} unit={successRate !== null ? '%' : ''} tint={successRate === null ? '#94A3B8' : successRate >= 90 ? '#10B981' : '#F59E0B'} />
         <KpiCard label="Durée médiane 7j" value={formatDuration(medianDuration)} tint="#8B5CF6" />
         <KpiCard label="En cours" value={running} tint={running > 0 ? '#3B82F6' : '#10B981'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pipelines-chart-grid">
         <Panel title="Volume des exécutions" sub="Par heure écoulée (24 dernières heures)" span={8}>
-          <div style={{ padding: '14px 16px' }}>
+          <div className="pipelines-chart-body">
             <MiniLineChart values={hourlyBuckets} color="#3B82F6" />
           </div>
         </Panel>
         <Panel title="Résultats" sub="7 derniers jours" span={4}>
-          <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div className="pipelines-donut-body">
             <MiniDonut segments={donutSegments} centerLabel={finished7d.length} centerSub="exécutions" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
+            <div className="pipelines-donut-legend">
               {donutSegments.map((s) => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flex: 'none' }} />
-                  <span style={{ flex: 1, color: 'var(--text-muted)' }}>{s.label}</span>
-                  <span className="mono" style={{ fontWeight: 600 }}>{s.value}</span>
+                <div key={s.label} className="pipelines-donut-legend-row">
+                  <span className="pipelines-donut-dot" style={{ background: s.color }} />
+                  <span className="pipelines-donut-label">{s.label}</span>
+                  <span className="mono pipelines-donut-value">{s.value}</span>
                 </div>
               ))}
             </div>
@@ -118,52 +119,52 @@ export default function PipelinesPage() {
         title="Exécutions récentes"
         sub="Tous dépôts confondus"
         span={12}
-        actions={<input className="input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ height: 30, fontSize: 12.5, width: 180 }} />}
+        actions={<input className="input pipelines-filter-input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} />}
       >
         {filtered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          <div className="pipelines-empty">
             {runs.length === 0 ? 'Aucune exécution (GitLab/GitHub non configurés ou aucun pipeline récent)' : 'Aucune exécution ne correspond au filtre'}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <div className="pipelines-table-wrap">
+            <table className="pipelines-table">
               <thead>
                 <tr>
                   {['Dépôt', 'Branche', 'Fournisseur', 'État', 'Durée', 'Déclenché', ''].map((c) => (
-                    <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                    <th key={c} className="pipelines-table-head">{c}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.slice(0, 60).map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                    <td style={{ padding: '9px 16px', fontWeight: 600 }}>{r.repo}</td>
-                    <td style={{ padding: '9px 16px' }} className="mono muted">{r.branch || '—'}</td>
-                    <td style={{ padding: '9px 16px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}>
-                        <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={12} style={{ color: 'var(--text-faint)' }} />{r.provider}
+                  <tr key={r.id} className="pipelines-table-row">
+                    <td className="pipelines-table-cell pipelines-cell-repo">{r.repo}</td>
+                    <td className="pipelines-table-cell mono muted">{r.branch || '—'}</td>
+                    <td className="pipelines-table-cell">
+                      <span className="pipelines-provider">
+                        <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={12} className="pipelines-provider-icon" />{r.provider}
                       </span>
                     </td>
-                    <td style={{ padding: '9px 16px' }}>
+                    <td className="pipelines-table-cell">
                       {r.webUrl ? (
-                        <a href={r.webUrl} target="_blank" rel="noreferrer" className={`badge badge-${STATUS_TONE[r.status]}`} style={{ textDecoration: 'none' }} title="Voir sur la forge d'origine">
+                        <a href={r.webUrl} target="_blank" rel="noreferrer" className={`badge badge-${STATUS_TONE[r.status]} pipelines-status-link`} title="Voir sur la forge d'origine">
                           <span className="dot" />{STATUS_LABEL[r.status]}
                         </a>
                       ) : (
                         <span className={`badge badge-${STATUS_TONE[r.status]}`}><span className="dot" />{STATUS_LABEL[r.status]}</span>
                       )}
                     </td>
-                    <td style={{ padding: '9px 16px' }} className="mono">{formatDuration(r.durationSeconds)}</td>
-                    <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
-                    <td style={{ padding: '9px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                    <td className="pipelines-table-cell mono">{formatDuration(r.durationSeconds)}</td>
+                    <td className="pipelines-table-cell pipelines-cell-date">{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
+                    <td className="pipelines-table-cell">
+                      <div className="pipelines-row-actions">
                         {r.provider === 'github' && (
-                          <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => setJobsFor(r)}>
+                          <span className="btn-outline pipelines-action-btn" onClick={() => setJobsFor(r)}>
                             <Icon name="layers" size={11} />Jobs
                           </span>
                         )}
                         {r.retryable && user?.role === 'admin' && (
-                          <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => askRetry(r)}>
+                          <span className="btn-outline pipelines-action-btn" onClick={() => askRetry(r)}>
                             <Icon name="refresh" size={11} />Relancer
                           </span>
                         )}
@@ -201,23 +202,23 @@ function JobsModal({ run, onClose }) {
   const jobs = data?.items || [];
   return (
     <Modal title="Jobs de l'exécution" sub={`${run.repo} · ${run.branch || ''}`} onClose={onClose} width={560}>
-      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
-      {!loading && jobs.length === 0 && !error && <div className="faint" style={{ fontSize: 12.5 }}>Aucun job trouvé pour cette exécution.</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {loading && <div className="faint pipelines-modal-loading">Chargement…</div>}
+      {error && <div className="pipelines-modal-error">{error}</div>}
+      {!loading && jobs.length === 0 && !error && <div className="faint pipelines-modal-empty">Aucun job trouvé pour cette exécution.</div>}
+      <div className="pipelines-jobs-list">
         {jobs.map((j) => (
           <div key={j.id}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div className="pipelines-job-header">
               <span className={`badge badge-${STATUS_TONE[j.conclusion === 'success' ? 'success' : j.status === 'in_progress' ? 'running' : j.conclusion ? 'failed' : 'other']}`}>
                 <span className="dot" />{j.status === 'in_progress' ? 'En cours' : (j.conclusion || j.status)}
               </span>
-              <a href={j.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, textDecoration: 'none', color: 'inherit' }}>{j.name}</a>
+              <a href={j.webUrl} target="_blank" rel="noreferrer" className="pipelines-job-name">{j.name}</a>
             </div>
             {j.steps.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingLeft: 4 }}>
+              <div className="pipelines-job-steps">
                 {j.steps.map((s) => (
-                  <div key={s.number} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
-                    <Icon name={STEP_ICON[s.conclusion] || 'clock'} size={12} style={{ color: s.conclusion === 'success' ? 'var(--tone-ok-fg)' : s.conclusion === 'failure' ? 'var(--tone-crit-fg)' : 'var(--text-faint)', flex: 'none' }} />
+                  <div key={s.number} className="pipelines-job-step">
+                    <Icon name={STEP_ICON[s.conclusion] || 'clock'} size={12} className="pipelines-job-step-icon" style={{ color: s.conclusion === 'success' ? 'var(--tone-ok-fg)' : s.conclusion === 'failure' ? 'var(--tone-crit-fg)' : 'var(--text-faint)' }} />
                     {s.name}
                   </div>
                 ))}
