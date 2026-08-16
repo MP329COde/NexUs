@@ -19,6 +19,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **groups.routes.js** — CRUD des groupes d'utilisateurs.
 - **haproxy.routes.js** — Statut, backends, serveurs (état runtime + changement d'état admin), frontends (Data Plane API).
 - **hosts.routes.js** — Clé publique SSH console, catalogue d'agents, CRUD hôtes, hôtes critiques, installation d'agent via SSH.
+- **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
 - **identity.routes.js** — Config d'identité (OIDC/LDAP), test de connexion OIDC.
 - **incidents.routes.js** — Liste globale des incidents.
 - **inventory.routes.js** — CRUD inventaire matériel/logiciel.
@@ -53,7 +54,8 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **auditService.js** — Journalisation des actions admin sensibles (1000 entrées max).
 - **backupService.js** — Sauvegarde/restauration complètes, rétention 14 jours, planifiée quotidiennement (3h).
 - **deploymentService.js** — Liens de déploiement, agrégation pipeline, sync GitOps via ArgoCD/K8s.
-- **devToolsService.js** — Détection d'outils dev locaux (`which`).
+- **devToolsService.js** — Détection d'outils dev locaux (`which`), inclut désormais Trivy.
+- **trivyService.js** — Scan de vulnérabilités réel via le binaire Trivy (Aqua Security, open source) installé sur la machine backend ; jamais de service tiers hébergé.
 - **gitMirrorService.js** — Miroir automatique GitLab→GitHub.
 - **hostMetricsService.js** — Sonde TCP + métriques SSH, rafraîchissement 30s.
 - **infraLoadService.js** — Échantillonnage en mémoire (6h) de la charge Proxmox.
@@ -119,7 +121,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **CodeReviewsPage.jsx** — MR/PR réelles, assignation locale de relecteurs.
 - **ContainersPage.jsx** — Pods Kubernetes réels ; Docker non intégré.
 - **EnvironmentsPage.jsx** — Démonstration (pas de modèle multi-environnements réel).
-- **ImagesRegistryPage.jsx** — Démonstration (aucune intégration registre).
+- **ImagesRegistryPage.jsx** — Tableau de dépôt d'images en démonstration (aucun registre intégré), mais **scanner Trivy réel** (TrivyScanPanel.jsx) pour scanner n'importe quelle image accessible à la demande.
 - **ReleasesPage.jsx** — Démonstration.
 - **SupplyChainPage.jsx** — Documentation d'un pipeline cible, aucun scanner connecté.
 - **TestsQualityPage.jsx** — Démonstration.
@@ -210,6 +212,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | Frameworks de tests | Stub | Page en anticipation |
 | Multi-environnements | Stub | Démonstration |
 | nmap | Complet | Exécution réelle, validation stricte de cible |
+| Trivy | Complet | Binaire local (Aqua Security, open source), scan d'image à la demande |
 | SSH (agents/services) | Complet | Clé unique console, catalogue fermé de scripts |
 
 ## Sécurité des secrets (état détaillé)
@@ -228,7 +231,7 @@ Cette section liste des pistes non implémentées, à prioriser avec l'utilisate
 
 - Notification persistante (pas seulement l'audit log) quand un compte est verrouillé ou une IP bannie automatiquement.
 - Intégration registre d'images (Harbor/GHCR/Docker Hub) avec scan de vulnérabilités horaire.
-- Intégration scanners de sécurité (Trivy/Semgrep/Checkov) pour Supply Chain Security (le scan de secrets committés est fait ; l'analyse de dépendances/conteneurs/IaC ne l'est pas).
+- Scanners de sécurité complémentaires (Semgrep pour l'analyse statique de code, Checkov pour l'IaC) — le scan de secrets committés et le scan de vulnérabilités d'images (Trivy) sont faits.
 - Modèle multi-environnements réel (dev/staging/prod) avec bascule visuelle.
 - Connexion par nom d'utilisateur (sans email) + clés d'accès (WebAuthn/passkeys).
 - Système de demande de permission (utilisateur → admin) avec notification, pour le terminal Kubernetes sécurisé.
