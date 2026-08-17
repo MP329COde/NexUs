@@ -258,6 +258,20 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 Cette section liste des pistes non implémentées, à prioriser avec l'utilisateur avant tout développement :
 
 - MFA obligatoire, restriction par réseau (CIDR) et déconnexion sur inactivité — retirés de l'assistant de configuration initiale car ils n'étaient reliés à aucune application réelle (voir commit "Retire les réglages décoratifs..."). De vraies pistes si un durcissement de l'authentification est voulu au-delà des passkeys WebAuthn déjà réelles.
-- Matrice de permissions par groupe (Paramètres → Groupes & permissions) — enregistrée réellement mais non appliquée : la plupart des routes qu'elle viserait (hosts, sécurité...) sont déjà 100 % réservées aux admins au niveau du routeur, donc la câbler suppose d'abord une décision explicite sur le modèle d'autorisation (faire évoluer le binaire admin/utilisateur actuel), pas un simple branchement.
+- OIDC/LDAP (Connexion & identité) : le formulaire enregistre et teste réellement la connexion au fournisseur, mais ne sert pas encore de second chemin de connexion actif (voir le manuel intégré, section identité) — à finir si l'onboarding d'une organisation via un annuaire existant (Entra ID, Okta, Google Workspace) est voulu plutôt que la création manuelle de comptes.
+- Bitbucket non intégré (GitLab/GitHub/Gitea le sont).
 
-Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) ; icônes personnalisées pour les organisations ; rôles de projet à granularité fine par ressource (coffre-fort).
+### Pistes pour une vraie plateforme "Internal Developer Platform" (audit du 2026-08-17)
+
+Nexus Console couvre bien l'observation/pilotage d'une infrastructure déjà existante (lecture + actions ponctuelles sur K8s/ArgoCD/Traefik/HAProxy/GitLab-GitHub-Gitea, scans de sécurité réels, coffres de secrets). Ce qui manque pour devenir une IDP au sens Backstage/Port/Cortex (self-service développeur, pas seulement pilotage admin) :
+
+- **Golden path / scaffolding** : un assistant "Nouvelle application" qui génère un dépôt depuis un template (repo Git + Dockerfile + pipeline CI + Application Argo CD + entrée catalogue), en un clic pour un développeur — aujourd'hui chaque brique (dépôt, déploiement, Argo CD) se relie manuellement pièce par pièce.
+- **Catalogue de services avec propriétaire et graphe de dépendances** : les "Projets" existent mais restent un regroupement organisationnel, pas un catalogue technique (quel service appelle quel autre, qui le possède, quel est son SLA/sa criticité).
+- **Environnements éphémères par Pull/Merge Request** (preview deployments), avec nettoyage automatique — utile pour les revues visuelles avant merge.
+- **Visibilité coût** par projet/namespace (même approximative, dérivée des requêtes de ressources Kubernetes déjà lisibles).
+- **Notifications sortantes** (Slack/Teams/e-mail) sur incident, échec de pipeline, déploiement — aujourd'hui uniquement des notifications in-app, invisibles si la console n'est pas ouverte.
+- **API/CLI publique documentée** avec jetons d'API par utilisateur, pour scripter la plateforme depuis la CI/CD externe plutôt que seulement depuis le navigateur.
+- **Documentation-as-code (TechDocs)** : le Wiki d'équipe est une page indépendante ; un vrai IDP affiche la doc rendue directement depuis un dossier `docs/` du dépôt de chaque service.
+- **Politique de sécurité réellement bloquante** : le Security Gate (Supply Chain Security) calcule maintenant un vrai verdict à partir des derniers scans Semgrep/ZAP, mais n'empêche pas encore techniquement une synchronisation Argo CD — ce n'est qu'un indicateur visuel, pas encore une porte appliquée avant `provision-argocd-app`/`syncApplication`.
+
+Déjà fait (retiré de cette liste après vérification du code) : redirection directe vers ArgoCD (lien par application, `deploymentService.js`) et vers Proxmox (`ProxmoxPage.jsx`) ; icônes personnalisées pour les organisations ; rôles de projet à granularité fine par ressource (coffre-fort) ; matrice de permissions par groupe (RBAC domaine + niveau, câblée) ; Security Gate rendu réel (calculé sur les derniers scans, plus de chiffres en dur) ; tableau "Dépôt d'images" factice supprimé (doublonnait le vrai registre privé).
