@@ -1,0 +1,151 @@
+.integ-card {
+  padding: 18px;
+}
+
+.integ-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.integ-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.integ-hint {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.integ-guide-wrap {
+  margin-bottom: 14px;
+}
+
+.integ-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.integ-toggle-muted {
+  color: var(--text-muted);
+}
+
+.integ-chevron {
+  transition: transform .15s ease;
+}
+
+.integ-chevron-open {
+  transform: rotate(180deg);
+}
+
+.integ-guide-list {
+  margin: 10px 0 0;
+  padding: 10px 14px 10px 28px;
+  background: var(--border-soft);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  animation: riseIn .2s ease both;
+}
+
+.integ-guide-item-spaced {
+  margin-bottom: 6px;
+}
+
+.integ-history-wrap {
+  margin-bottom: 14px;
+}
+
+.integ-history-body {
+  margin: 10px 0 0;
+  padding: 4px 0;
+  animation: riseIn .2s ease both;
+}
+
+.integ-history-loading,
+.integ-history-empty {
+  font-size: 12px;
+}
+
+.integ-history-entry {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--border-soft);
+  margin-bottom: 6px;
+  font-size: 11.5px;
+}
+
+.integ-history-entry-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+}
+
+.integ-history-entry-head-spaced {
+  margin-bottom: 5px;
+}
+
+.integ-history-change {
+  color: var(--text-faint);
+}
+
+.integ-field {
+  margin-bottom: 10px;
+}
+
+.integ-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.integ-field-input-wrap {
+  margin-top: 5px;
+  font-weight: 400;
+}
+
+.integ-field-hint {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.integ-suggestion {
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--text-faint);
+}
+
+.integ-suggestion-use {
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.integ-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin-bottom: 10px;
+}
+
+.integ-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.integ-test-result {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
