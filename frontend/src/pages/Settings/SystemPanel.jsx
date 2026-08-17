@@ -30,6 +30,8 @@ export default function SystemPanel() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [gitBusy, setGitBusy] = useState(false);
+  const [gitRemoteItems, setGitRemoteItems] = useState(null);
   const fileInputRef = useRef(null);
   const notify = useNotify();
 
@@ -75,6 +77,42 @@ export default function SystemPanel() {
       notify(err.message, { type: 'crit', title: 'Import échoué' });
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function pushToGit() {
+    setGitBusy(true);
+    try {
+      const res = await api.post('/backups/git/push', {});
+      notify(res.message, { type: res.pushed ? 'ok' : 'info' });
+      backups.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Échec du push Git' });
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function checkGitRemote() {
+    setGitBusy(true);
+    try {
+      const res = await api.get('/backups/git/list');
+      setGitRemoteItems(res.items);
+      notify(`${res.items.length} sauvegarde(s) trouvée(s) sur le dépôt distant`, { type: 'ok' });
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Échec de la vérification du dépôt' });
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function importFromGit(file) {
+    try {
+      const res = await api.post(`/backups/git/import/${encodeURIComponent(file)}`, {});
+      notify(`${res.backup.file} importé — utilisez "Restaurer" pour l'appliquer`, { type: 'ok' });
+      backups.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Import échoué' });
     }
   }
 
@@ -150,6 +188,43 @@ export default function SystemPanel() {
             </tr>
           )}
         />
+      </Panel>
+
+      <Panel
+        title="Sauvegarde Git"
+        sub="Copie des sauvegardes vers votre dépôt Git (Paramètres → Intégrations → Sauvegarde Git) — restaurable même si cette machine est perdue"
+        span={12}
+        actions={(
+          <div className="system-backup-actions">
+            <span className="btn-outline system-import-btn" onClick={checkGitRemote}>
+              <Icon name="refresh" size={13} className={gitBusy ? 'spin' : ''} />Vérifier le dépôt distant
+            </span>
+            <span className="btn-outline system-import-btn" onClick={pushToGit}>
+              <Icon name="gitBranch" size={13} className={gitBusy ? 'spin' : ''} />Pousser maintenant
+            </span>
+          </div>
+        )}
+      >
+        {gitRemoteItems === null ? (
+          <p className="faint system-note">Cliquez sur « Vérifier le dépôt distant » pour lister les sauvegardes déjà poussées, ou « Pousser maintenant » pour en créer une nouvelle et l'envoyer.</p>
+        ) : gitRemoteItems.length === 0 ? (
+          <p className="faint system-note">Aucune sauvegarde trouvée sur le dépôt distant pour le moment.</p>
+        ) : (
+          <DataTable
+            columns={['Fichier', 'Taille', 'Modifiée le', '']}
+            rows={gitRemoteItems}
+            renderRow={(b) => (
+              <tr key={b.file}>
+                <td className="mono system-cell-file">{b.file}</td>
+                <td className="mono muted">{formatSize(b.sizeBytes)}</td>
+                <td className="mono faint">{new Date(b.mtime).toLocaleString('fr-FR')}</td>
+                <td>
+                  <span className="btn-outline system-action-btn" onClick={() => importFromGit(b.file)}>Importer</span>
+                </td>
+              </tr>
+            )}
+          />
+        )}
       </Panel>
 
       {restoreTarget && (

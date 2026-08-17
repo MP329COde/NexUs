@@ -13,6 +13,7 @@ import * as privateRegistryService from './integrations/privateRegistryService.j
 import * as notificationWebhookService from './integrations/notificationWebhookService.js';
 import * as ovhService from './integrations/ovhService.js';
 import * as duckdnsService from './integrations/duckdnsService.js';
+import * as gitBackupService from './gitBackupService.js';
 
 // Point d'entrée unique listant les intégrations disponibles: utilisé par
 // l'agrégateur de statut (dashboard) et pouvant accueillir de futures intégrations
@@ -32,11 +33,12 @@ export const integrations = {
   registry: { label: 'Registre privé', service: privateRegistryService, domain: 'dev' },
   notificationsWebhook: { label: 'Notifications sortantes', service: notificationWebhookService, domain: 'mon' },
   ovh: { label: 'OVH (DNS)', service: ovhService, domain: 'net' },
-  duckdns: { label: 'DuckDNS', service: duckdnsService, domain: 'net' }
+  duckdns: { label: 'DuckDNS', service: duckdnsService, domain: 'net' },
+  gitBackup: { label: 'Sauvegarde Git', service: gitBackupService, domain: 'settings' }
 };
 
 export {
   kubernetesService, argocdService, haproxyService, gitlabService, githubService, giteaService,
   proxmoxService, traefikService, certManagerService, grafanaService, wazuhService,
-  privateRegistryService, notificationWebhookService, ovhService, duckdnsService
+  privateRegistryService, notificationWebhookService, ovhService, duckdnsService, gitBackupService
 };

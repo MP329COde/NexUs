@@ -218,7 +218,23 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'token', label: 'Token DuckDNS', type: 'password', secret: true }
     ]
+  },
+  gitBackup: {
+    label: 'Sauvegarde Git',
+    hint: 'Pousse les sauvegardes de la console (base + intégrations chiffrées) vers un dépôt Git vous appartenant — restaurable en cas de problème avec la machine.',
+    guide: [
+      "Créez un dépôt Git dédié, vide, de préférence privé (GitHub, GitLab, Gitea... tout serveur compatible HTTPS + token).",
+      "GitHub : Settings → Developer settings → Personal access tokens → scope « repo ».",
+      "GitLab : avatar → Edit profile → Access Tokens → scope « write_repository ».",
+      "Gitea : icône de profil → Paramètres → Applications → portée repo.",
+      "L'URL du dépôt est celle en HTTPS (ex: https://github.com/vous/nexus-backups.git), jamais l'URL SSH."
+    ],
+    fields: [
+      { key: 'remoteUrl', label: 'URL du dépôt (HTTPS)', placeholder: 'https://github.com/vous/nexus-backups.git' },
+      { key: 'branch', label: 'Branche', placeholder: 'main' },
+      { key: 'token', label: "Token d'accès", type: 'password', secret: true, hint: 'Jamais écrit en clair sur disque — utilisé en mémoire à chaque envoi.' }
+    ]
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];

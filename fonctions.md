@@ -7,7 +7,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **argocd.routes.js** — Statut ArgoCD, liste des applications, détail d'une application (sync status).
 - **audit.routes.js** — Consultation du journal d'audit (liste + export CSV).
 - **auth.routes.js** — Connexion (e-mail **ou nom d'utilisateur**)/déconnexion, session (`/me`), profil, mot de passe, onboarding première connexion. Verrouillage de compte après échecs répétés + bannissement IP automatique en cas d'attaque ciblée (voir `usersStore.js`).
-- **backups.routes.js** — Liste, création, import, téléchargement, restauration, suppression de sauvegardes.
+- **backups.routes.js** — Liste, création, import, téléchargement, restauration, suppression de sauvegardes ; **sauvegarde Git** (`POST /git/push` : crée une sauvegarde et la pousse vers le dépôt configuré, `GET /git/list` : liste les sauvegardes du dépôt distant, `POST /git/import/:file` : les rapatrie localement pour restauration via le circuit habituel avec ré-authentification).
 - **certmanager.routes.js** — Statut cert-manager, liste des certificats (CRD Kubernetes), renouvellement forcé.
 - **console.routes.js** — Info console minimale (authentifiée).
 - **deployments.routes.js** — CRUD de liens de déploiement (projet↔dépôt↔cible), pipeline associé, sync GitOps, diff, historique, rollback, **provisionnement direct de l'application Argo CD** (`POST /:id/provision-argocd-app` : crée/met à jour l'Application dans Argo CD depuis le dépôt déjà lié — repo résolu automatiquement, sync automatisée par défaut — sans passer par l'interface Argo CD).
@@ -63,6 +63,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **agentCatalog.js** — Catalogue fermé de scripts d'installation d'agents.
 - **auditService.js** — Journalisation des actions admin sensibles (1000 entrées max).
 - **backupService.js** — Sauvegarde/restauration complètes, rétention 14 jours, planifiée quotidiennement (3h).
+- **gitBackupService.js** — Pousse les sauvegardes vers un dépôt Git du propriétaire (GitHub/GitLab/Gitea/tout HTTPS), token jamais écrit en clair sur disque (URL authentifiée construite en mémoire à chaque `git push`, jamais persistée dans `.git/config`), token redacté de tout message d'erreur remonté. `pullAndList()`/`importFromRepo()` permettent de retrouver et réimporter une sauvegarde depuis une machine différente de celle d'origine.
 - **deploymentService.js** — Liens de déploiement, agrégation pipeline, sync GitOps via ArgoCD/K8s.
 - **devToolsService.js** — Détection d'outils dev locaux (`which`), inclut désormais Trivy.
 - **trivyService.js** — Scan de vulnérabilités réel via le binaire Trivy (Aqua Security, open source) installé sur la machine backend ; jamais de service tiers hébergé.
@@ -204,7 +205,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **UsersPanel.jsx / GroupsPanel.jsx** — CRUD utilisateurs et groupes, **file d'approbation des demandes d'accès terminal**.
 - **InventoryPanel.jsx** — Inventaire matériel/logiciel.
 - **AuditPanel.jsx** — Journal d'audit centralisé.
-- **SystemPanel.jsx** — Version, mise à jour, overview.
+- **SystemPanel.jsx** — Version, mise à jour, overview, sauvegardes locales, **panneau « Sauvegarde Git »** (pousser maintenant, lister les sauvegardes du dépôt distant, les réimporter pour restauration).
 - **PlatformPanel.jsx** — Paramètres généraux, **restriction de la Vue générale aux administrateurs** (masque le lien de nav + bloque l'accès direct par URL pour les non-admins).
 - **InfrastructureStatusPanel.jsx** — Statut de chaque intégration.
 - **RestoreBackupDialog.jsx** — Import/restauration de sauvegarde.

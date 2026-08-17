@@ -18,7 +18,8 @@ export const SECRET_FIELDS = {
   registry: ['password'],
   notificationsWebhook: ['url'],
   ovh: ['appSecret', 'consumerKey'],
-  duckdns: ['token']
+  duckdns: ['token'],
+  gitBackup: ['token']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -91,7 +92,8 @@ function isConfigured(key, entry) {
     registry: ['baseUrl'],
     notificationsWebhook: ['url'],
     ovh: ['appKey', 'appSecret', 'consumerKey'],
-    duckdns: ['token']
+    duckdns: ['token'],
+    gitBackup: ['remoteUrl', 'token']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

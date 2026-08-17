@@ -5,7 +5,7 @@ import { logger } from '../utils/logger.js';
 import { dataDir } from '../config/paths.js';
 import { dumpRelationalCore, restoreRelationalCore, relationalCoreConfigured } from './pgDumpService.js';
 
-const backupDir = path.join(dataDir, 'backups');
+export const backupDir = path.join(dataDir, 'backups');
 fs.mkdirSync(backupDir, { recursive: true });
 
 const RETENTION = 14; // conserve les 14 dernières sauvegardes (~2 semaines en cadence quotidienne)

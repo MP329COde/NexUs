@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { createBackup, listBackups, getBackupPath, deleteBackup, importBackup, restoreBackup } from '../services/backupService.js';
+import { pushBackup, pullAndList, importFromRepo } from '../services/gitBackupService.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
@@ -29,6 +30,32 @@ router.post('/import', asyncHandler(async (req, res) => {
   const buffer = Buffer.from(dataBase64, 'base64');
   const backup = importBackup(buffer, filename);
   logAudit(req, 'backup.import', { file: backup.file });
+  res.status(201).json({ ok: true, backup });
+}));
+
+// Crée une sauvegarde puis la pousse immédiatement vers le dépôt Git
+// configuré (Paramètres → Sauvegarde Git) : action distincte de la
+// sauvegarde locale ci-dessus, déclenchée explicitement.
+router.post('/git/push', asyncHandler(async (req, res) => {
+  const result = await pushBackup();
+  logAudit(req, 'backup.git.push', { pushed: result.pushed, file: result.backup?.file });
+  res.json(result);
+}));
+
+// Récupère la liste des sauvegardes disponibles sur le dépôt distant (utile
+// notamment depuis une nouvelle machine, pour reprendre après un problème
+// avec la machine d'origine).
+router.get('/git/list', asyncHandler(async (req, res) => {
+  const items = await pullAndList();
+  res.json({ ok: true, items });
+}));
+
+// Importe une sauvegarde du dépôt dans le stockage local — la restauration
+// elle-même repasse par POST /:file/restore ci-dessous (ré-authentification
+// par mot de passe), jamais raccourcie ici.
+router.post('/git/import/:file', asyncHandler(async (req, res) => {
+  const backup = importFromRepo(req.params.file);
+  logAudit(req, 'backup.git.import', { file: backup.file });
   res.status(201).json({ ok: true, backup });
 }));
 
