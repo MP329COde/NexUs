@@ -11,6 +11,42 @@
   margin-bottom: 16px;
 }
 
+.projects-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.projects-search-input {
+  max-width: 320px;
+}
+
+.projects-status-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--border-soft);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.projects-status-tab {
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.projects-status-tab-active {
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
 .projects-form-row {
   display: flex;
   gap: 10px;

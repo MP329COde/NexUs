@@ -31,6 +31,16 @@
   text-decoration: none;
 }
 
+.pd-header-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-status-select {
+  width: auto;
+}
+
 .pd-grid-row {
   display: grid;
   grid-template-columns: repeat(12, 1fr);

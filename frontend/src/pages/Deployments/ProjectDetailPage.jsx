@@ -14,6 +14,8 @@ import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
 const STATUS_ORDER = ['todo', 'in_progress', 'review', 'done'];
+const PROJECT_STATUS_LABELS = { active: 'Actif', paused: 'En pause', archived: 'Archivé' };
+const PROJECT_STATUS_ORDER = ['active', 'paused', 'archived'];
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -66,6 +68,15 @@ export default function ProjectDetailPage() {
     await api.del(`/projects/${id}/tasks/${taskId}`);
     tasks.reload();
   }
+  async function setStatus(status) {
+    try {
+      await api.put(`/projects/${id}`, { status });
+      notify('Statut du projet mis à jour', { type: 'ok' });
+      project.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
   async function toggleRepo(key) {
     const repoKeys = p.repoKeys.includes(key) ? p.repoKeys.filter((k) => k !== key) : [...p.repoKeys, key];
     try {
@@ -93,7 +104,18 @@ export default function ProjectDetailPage() {
           </span>
         )}
         sub={p.description || 'Fiche projet'}
-        actions={<Link to="/deployments/projects" className="btn-outline pd-back-link">← Tous les projets</Link>}
+        actions={(
+          <div className="pd-header-actions-row">
+            {(user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)) ? (
+              <select className="input pd-status-select" value={p.status || 'active'} onChange={(e) => setStatus(e.target.value)}>
+                {PROJECT_STATUS_ORDER.map((s) => <option key={s} value={s}>{PROJECT_STATUS_LABELS[s]}</option>)}
+              </select>
+            ) : (
+              <span className={`badge badge-${p.status === 'active' ? 'ok' : p.status === 'paused' ? 'warn' : 'mut'}`}><span className="dot" />{PROJECT_STATUS_LABELS[p.status] || p.status}</span>
+            )}
+            <Link to="/deployments/projects" className="btn-outline pd-back-link">← Tous les projets</Link>
+          </div>
+        )}
       />
 
       <div className="pd-grid-row">

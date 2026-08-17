@@ -42,7 +42,17 @@ export function updateProject(id, payload) {
   const projects = listProjects();
   const idx = projects.findIndex((p) => p.id === id);
   if (idx === -1) return null;
-  projects[idx] = { ...projects[idx], ...payload };
+  // Les appelants (routes/projects.routes.js) déstructurent req.body avec un
+  // allowlist explicite puis passent l'objet tel quel : un champ absent du
+  // corps de la requête devient `undefined`, pas simplement "non fourni".
+  // Un spread naïf ({...existant, ...payload}) écrase alors silencieusement
+  // ce champ (repoKeys, memberIds...) à `undefined` pour toute mise à jour
+  // partielle (ex: changer uniquement le statut) — trouvé en testant
+  // réellement le nouveau sélecteur de statut du projet, qui a fait
+  // disparaître repoKeys et fait planter la fiche projet (`.length` sur
+  // undefined). Ne fusionner que les valeurs réellement fournies.
+  const defined = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+  projects[idx] = { ...projects[idx], ...defined };
   writeStore('projects', projects);
   return projects[idx];
 }

@@ -13,6 +13,12 @@ import './ProjectsPage.css';
 const EMPTY_FORM = { name: '', description: '', memberIds: [], icon: '', color: '' };
 const PROJECT_EMOJIS = ['📦', '🚀', '⚙️', '🛰️', '🔧', '🧩', '🗄️', '🌐', '🔥', '🧠', '🛡️', '📊'];
 const PROJECT_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899', '#475569'];
+const STATUS_FILTERS = [
+  { value: '', label: 'Tous' },
+  { value: 'active', label: 'Actifs' },
+  { value: 'paused', label: 'En pause' },
+  { value: 'archived', label: 'Archivés' }
+];
 
 // "Projets" : fiches projet réelles (store projectsStore.js). Visibilité
 // appliquée côté serveur (GET /projects) — un compte Utilisateur ne voit ici
@@ -25,9 +31,16 @@ export default function ProjectsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
-  const projects = data?.items || [];
+  const allProjects = data?.items || [];
   const allUsers = users.data?.items || [];
+
+  const q = search.trim().toLowerCase();
+  const projects = allProjects
+    .filter((p) => !statusFilter || p.status === statusFilter)
+    .filter((p) => !q || p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
 
   async function createProject(e) {
     e.preventDefault();
@@ -62,9 +75,24 @@ export default function ProjectsPage() {
       />
 
       <div className="projects-kpi-grid">
-        <KpiCard label="Projets visibles" value={projects.length} tint="#3B82F6" />
-        <KpiCard label="Actifs" value={projects.filter((p) => p.status === 'active').length} tint="#10B981" />
-        <KpiCard label="Membre de" value={projects.filter((p) => p.memberIds.includes(user?.id)).length} tint="#8B5CF6" />
+        <KpiCard label="Projets visibles" value={allProjects.length} tint="#3B82F6" />
+        <KpiCard label="Actifs" value={allProjects.filter((p) => p.status === 'active').length} tint="#10B981" />
+        <KpiCard label="Membre de" value={allProjects.filter((p) => p.memberIds.includes(user?.id)).length} tint="#8B5CF6" />
+      </div>
+
+      <div className="projects-filters-row">
+        <input className="input projects-search-input" placeholder="Rechercher un projet…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="projects-status-tabs">
+          {STATUS_FILTERS.map((f) => (
+            <span
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`projects-status-tab${statusFilter === f.value ? ' projects-status-tab-active' : ''}`}
+            >
+              {f.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {formOpen && (
@@ -124,7 +152,9 @@ export default function ProjectsPage() {
       <div className="projects-grid">
         {projects.length === 0 ? (
           <div className="card projects-empty">
-            {user?.role === 'admin' ? 'Aucun projet créé.' : "Vous n'êtes membre d'aucun projet — contactez un administrateur."}
+            {allProjects.length === 0
+              ? (user?.role === 'admin' ? 'Aucun projet créé.' : "Vous n'êtes membre d'aucun projet — contactez un administrateur.")
+              : 'Aucun projet ne correspond à ce filtre.'}
           </div>
         ) : projects.map((p) => (
           <Link key={p.id} to={`/deployments/projects/${p.id}`} className="card projects-card">
