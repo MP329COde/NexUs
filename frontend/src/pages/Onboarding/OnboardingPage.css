@@ -1,0 +1,63 @@
+.onb-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 20px;
+}
+
+.onb-card {
+  width: 400px;
+  padding: 30px;
+}
+
+.onb-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.onb-brand-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.onb-intro {
+  margin: 0 0 22px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.onb-row {
+  display: flex;
+  gap: 10px;
+}
+
+.onb-row-field {
+  flex: 1;
+}
+
+.onb-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin: 4px 0 14px;
+}
+
+.onb-submit-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.onb-field {
+  margin-bottom: 12px;
+}
+
+.onb-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
