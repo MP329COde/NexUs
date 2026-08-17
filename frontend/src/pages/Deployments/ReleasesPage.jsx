@@ -12,6 +12,7 @@ import DeploymentFormDialog from './DeploymentFormDialog.jsx';
 import PipelineView from './PipelineView.jsx';
 import GitOpsDiffPanel from './GitOpsDiffPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
+import './ReleasesPage.css';
 
 export default function ReleasesPage() {
   const { user } = useAuth();
@@ -40,13 +41,13 @@ export default function ReleasesPage() {
         title="Déploiements"
         sub="Suivi du workflow Git → CI/CD → Argo CD → Kubernetes → reverse proxy, par application."
         actions={(
-          <button className="btn" onClick={() => setFormOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <button className="btn rlp-header-btn" onClick={() => setFormOpen(true)}>
             <Icon name="plus" size={15} />Lier une application
           </button>
         )}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="rlp-kpi-grid">
         <KpiCard label="Applications suivies" value={apps.length} tint="#3B82F6" />
         <KpiCard label="Pipeline complet" value={fullyLinked} unit={`/ ${apps.length}`} tint="#10B981" />
         <KpiCard label="Environnement" value={isAdmin ? 'Prod + Dev' : 'Développement'} tint="#8B5CF6" />
@@ -59,13 +60,13 @@ export default function ReleasesPage() {
           emptyTitle="Aucune application liée"
           emptyHint="Reliez un projet GitLab ou GitHub, une application Argo CD et un déploiement Kubernetes pour suivre le pipeline complet."
           renderRow={(l) => (
-            <tr key={l.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(l.id)}>
-              <td style={{ fontWeight: 500 }}>{l.name}</td>
+            <tr key={l.id} className="rlp-row-clickable" onClick={() => setSelected(l.id)}>
+              <td className="rlp-cell-name">{l.name}</td>
               <td className="mono muted">{l.gitProvider === 'github' ? (l.githubOwner && l.githubRepo ? `${l.githubOwner}/${l.githubRepo}` : '—') : (l.gitlabProjectId || '—')}</td>
               <td className="mono muted">{l.argocdAppName || '—'}</td>
               <td className="mono muted">{l.k8sNamespace && l.k8sDeployment ? `${l.k8sNamespace}/${l.k8sDeployment}` : '—'}</td>
               <td onClick={(e) => e.stopPropagation()}>
-                {isAdmin && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => remove(l.id)}>Retirer</span>}
+                {isAdmin && <span className="btn-outline rlp-remove-btn" onClick={() => remove(l.id)}>Retirer</span>}
               </td>
             </tr>
           )}
@@ -73,14 +74,14 @@ export default function ReleasesPage() {
       </Panel>
 
       {selected && (
-        <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="rlp-detail-stack">
           <PipelineView linkId={selected} span={12} />
           <GitOpsDiffPanel linkId={selected} span={12} />
         </div>
       )}
 
       {!isAdmin && (
-        <div className="card" style={{ padding: 14, marginBottom: 16, fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="card rlp-user-note">
           Compte Utilisateur : accès en lecture et pipeline complet ; les actions de retrait/administration sont réservées aux administrateurs.
         </div>
       )}
@@ -91,21 +92,21 @@ export default function ReleasesPage() {
           sub={lastScan ? `Dernier scan Semgrep (${lastScan.target}) — ${new Date(lastScan.scannedAt).toLocaleString('fr-FR')}` : 'Analyse statique de la plateforme (Semgrep)'}
           span={12}
           style={{ marginBottom: 16 }}
-          actions={<Link to="/deployments/supply-chain" className="btn-outline" style={{ fontSize: 11.5, padding: '4px 10px', textDecoration: 'none' }}>Lancer/voir un scan</Link>}
+          actions={<Link to="/deployments/supply-chain" className="btn-outline rlp-scan-link">Lancer/voir un scan</Link>}
         >
           {!lastScan ? (
-            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+            <div className="rlp-scan-empty">
               Aucun scan encore lancé. Cette liste vient de Semgrep (SAST réel, code source de la plateforme elle-même) — voir Supply Chain pour l'exécuter.
             </div>
           ) : lastScan.total === 0 ? (
-            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--tone-ok-fg)' }}>Aucun problème détecté au dernier scan.</div>
+            <div className="rlp-scan-ok">Aucun problème détecté au dernier scan.</div>
           ) : (
-            <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="rlp-scan-list">
               {lastScan.findings.slice(0, 8).map((f, i) => (
-                <div key={`${f.file}:${f.line}:${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
-                  <Icon name="alertTriangle" size={14} style={{ color: `var(--tone-${f.severity === 'ERROR' ? 'crit' : f.severity === 'WARNING' ? 'warn' : 'mut'}-fg)`, flex: 'none' }} />
-                  <span className="mono" style={{ fontSize: 12, flex: 1 }}>{f.file}:{f.line}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>{f.message}</span>
+                <div key={`${f.file}:${f.line}:${i}`} className="rlp-scan-item">
+                  <Icon name="alertTriangle" size={14} className="rlp-scan-item-icon" style={{ color: `var(--tone-${f.severity === 'ERROR' ? 'crit' : f.severity === 'WARNING' ? 'warn' : 'mut'}-fg)` }} />
+                  <span className="mono rlp-scan-item-path">{f.file}:{f.line}</span>
+                  <span className="rlp-scan-item-message">{f.message}</span>
                 </div>
               ))}
             </div>
