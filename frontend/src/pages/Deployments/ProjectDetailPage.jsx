@@ -344,7 +344,7 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
       title="Incidents"
       sub={openCount > 0 ? `${openCount} incident(s) ouvert(s)` : 'Aucun incident ouvert'}
       span={12}
-      actions={canCreate && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setOpen(true)}>Déclarer</span>}
+      actions={canCreate && <span className="btn-outline pd-header-action-btn" onClick={() => setOpen(true)}>Déclarer</span>}
     >
       {incidents.length === 0 ? (
         <div className="pd-empty">Aucun incident déclaré sur ce projet.</div>
@@ -362,7 +362,7 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
               )}
               <span className="faint pd-row-date">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
               {inc.status !== 'resolved' && canResolve && (
-                <span className="btn-outline" className="pd-action-btn" onClick={() => setResolving(inc)}>Résoudre</span>
+                <span className="btn-outline pd-action-btn" onClick={() => setResolving(inc)}>Résoudre</span>
               )}
             </div>
           ))}
@@ -441,7 +441,7 @@ function ChangesPanel({ changes, environments, projectId, role, onChanged }) {
       title="Changements"
       sub={pendingCount > 0 ? `${pendingCount} en attente d'approbation` : 'Aucun changement en attente'}
       span={12}
-      actions={canPropose && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setProposing(true)}>Proposer</span>}
+      actions={canPropose && <span className="btn-outline pd-header-action-btn" onClick={() => setProposing(true)}>Proposer</span>}
     >
       {changes.length === 0 ? (
         <div className="pd-empty">Aucun changement proposé sur ce projet.</div>
@@ -455,7 +455,7 @@ function ChangesPanel({ changes, environments, projectId, role, onChanged }) {
               {c.impact && <span className="faint pd-row-date">{c.impact}</span>}
               {c.status === 'pending' && canDecide && (
                 <>
-                  <span className="btn-outline" className="pd-action-btn" onClick={() => decide(c, 'approved')}>
+                  <span className="btn-outline pd-action-btn" onClick={() => decide(c, 'approved')}>
                     {busyId === c.id ? '…' : 'Approuver'}
                   </span>
                   <span className="btn-outline pd-action-btn pd-action-btn-danger" onClick={() => decide(c, 'rejected')}>
@@ -464,7 +464,7 @@ function ChangesPanel({ changes, environments, projectId, role, onChanged }) {
                 </>
               )}
               {c.status === 'approved' && canDecide && (
-                <span className="btn-outline" className="pd-action-btn" onClick={() => execute(c)}>
+                <span className="btn-outline pd-action-btn" onClick={() => execute(c)}>
                   {busyId === c.id ? '…' : 'Marquer exécuté'}
                 </span>
               )}
@@ -706,7 +706,7 @@ function MaintenanceWindowsPanel({ windows, environments, projectId, role, onCha
       title="Fenêtres de maintenance"
       sub={activeCount > 0 ? `${activeCount} en cours` : 'Aucune maintenance en cours'}
       span={12}
-      actions={canManage && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setCreating(true)}>Planifier</span>}
+      actions={canManage && <span className="btn-outline pd-header-action-btn" onClick={() => setCreating(true)}>Planifier</span>}
     >
       {windows.length === 0 ? (
         <div className="pd-empty">Aucune fenêtre de maintenance planifiée sur ce projet.</div>
@@ -912,7 +912,7 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
       title="Équipe"
       sub={migrated ? `${items.length} membre(s) — rôles granulaires` : `${legacyMemberIds.length} membre(s)`}
       span={4}
-      actions={migrated && canManage && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setAdding(true)}>Ajouter</span>}
+      actions={migrated && canManage && <span className="btn-outline pd-header-action-btn" onClick={() => setAdding(true)}>Ajouter</span>}
     >
       <div className="pd-team-body">
         {migrated ? (
@@ -966,7 +966,7 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
               {allUsers.filter((u) => !items.some((m) => m.user_id === u.id)).map((u) => (
                 <div key={u.id} className="pd-team-add-row">
                   <span className="pd-team-add-name">{u.name}</span>
-                  <span className="btn-outline" className="pd-action-btn" onClick={async () => { await setRole(u.id, 'developer'); setAdding(false); }}>
+                  <span className="btn-outline pd-action-btn" onClick={async () => { await setRole(u.id, 'developer'); setAdding(false); }}>
                     Ajouter (Développeur)
                   </span>
                 </div>
@@ -1062,7 +1062,7 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
                   <div key={link.id} className="pd-env-link-row">
                     <Icon name="box" size={12} className="pd-repo-link-icon" />
                     <span className="pd-env-link-name">{link.name}</span>
-                    <span className="btn-outline" className="pd-action-btn" onClick={() => setPipelineLink(link)}>Chemin réseau</span>
+                    <span className="btn-outline pd-action-btn" onClick={() => setPipelineLink(link)}>Chemin réseau</span>
                     {link.argocdAppName ? (
                       canSync ? (
                         <button className="btn-outline pd-action-btn" disabled={busyId === link.id} onClick={() => sync(link)}>
@@ -1267,7 +1267,7 @@ function RepoPicker({ allRepos, linkedKeys, onToggle }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <span className="btn-outline" className="pd-header-action-btn" onClick={() => setOpen(true)}>Rattacher</span>
+      <span className="btn-outline pd-header-action-btn" onClick={() => setOpen(true)}>Rattacher</span>
       {open && (
         <Modal title="Rattacher des dépôts" sub="Cochez les dépôts liés à ce projet" onClose={() => setOpen(false)} width={380}>
           {allRepos.length === 0 ? (
@@ -1328,21 +1328,21 @@ function ApiPreviewPanel({ project, canEdit, onSaved }) {
 
         {namespace ? (
           <div className="pd-api-pod-row">
-            <select className="input" value={podName} onChange={(e) => setPodName(e.target.value)} className="pd-api-pod-select">
+            <select className="input pd-api-pod-select" value={podName} onChange={(e) => setPodName(e.target.value)}>
               <option value="">Sélectionner un pod…</option>
               {(pods.data?.items || []).map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
             <button className={live ? 'btn' : 'btn-outline'} onClick={() => setLive((v) => !v)} disabled={!podName}>
               {live ? 'Arrêter le direct' : 'Voir les logs en direct'}
             </button>
-            {live && <span className="badge badge-ok"><span className="dot" className="pd-api-live-dot" />LIVE — tant que la page reste ouverte</span>}
+            {live && <span className="badge badge-ok"><span className="dot pd-api-live-dot" />LIVE — tant que la page reste ouverte</span>}
           </div>
         ) : (
           <div className="faint pd-api-no-namespace">Aucun namespace Kubernetes rattaché à ce projet.</div>
         )}
 
         {logs !== null && (
-          <pre className="mono" className="pd-api-logs">
+          <pre className="mono pd-api-logs">
             {logs || '(aucun log)'}
           </pre>
         )}
