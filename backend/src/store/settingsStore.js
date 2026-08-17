@@ -15,7 +15,8 @@ export const SECRET_FIELDS = {
   certManager: [],
   grafana: ['apiKey'],
   wazuh: ['password'],
-  registry: ['password']
+  registry: ['password'],
+  notificationsWebhook: ['url']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -85,7 +86,8 @@ function isConfigured(key, entry) {
     certManager: [],
     grafana: ['baseUrl'],
     wazuh: ['baseUrl'],
-    registry: ['baseUrl']
+    registry: ['baseUrl'],
+    notificationsWebhook: ['url']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

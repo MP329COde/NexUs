@@ -177,7 +177,20 @@ export const INTEGRATION_FORMS = {
       { key: 'username', label: "Nom d'utilisateur" },
       { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
     ]
+  },
+  notificationsWebhook: {
+    label: 'Notifications sortantes',
+    hint: 'Relaie vers Slack, Discord ou Microsoft Teams chaque alerte de sécurité que la console génère déjà (verrouillage de compte, IP bannie, secret committé, vulnérabilité critique...) — plus besoin d\'avoir la console ouverte pour les voir.',
+    guide: [
+      "Slack : Créez une app (api.slack.com/apps) → Incoming Webhooks → activez-les → « Add New Webhook to Workspace » → copiez l'URL (https://hooks.slack.com/services/...).",
+      "Discord : Paramètres du salon → Intégrations → Webhooks → Nouveau webhook → copiez l'URL du webhook.",
+      "Microsoft Teams : dans le canal, « ... » → Connecteurs → Incoming Webhook → configurez-le → copiez l'URL générée.",
+      "Le format du message (Slack/Discord) est détecté automatiquement depuis l'URL — rien d'autre à choisir."
+    ],
+    fields: [
+      { key: 'url', label: 'URL du webhook', type: 'password', secret: true, placeholder: 'https://hooks.slack.com/services/…' }
+    ]
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook'];

@@ -3,7 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS, SECRET_FIELDS } from '../store/settingsStore.js';
-import { integrations } from '../services/integrationRegistry.js';
+import { integrations, notificationWebhookService } from '../services/integrationRegistry.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
 import { logAudit } from '../services/auditService.js';
 
@@ -54,6 +54,13 @@ router.put('/:key', asyncHandler(async (req, res) => {
 
 router.post('/:key/test', asyncHandler(async (req, res) => {
   assertKey(req.params.key);
+  // Notifications sortantes : "Tester" doit réellement poster un message
+  // (sendTestMessage), à la différence de getStatus() ici volontairement
+  // sans effet de bord car interrogée en continu par le tableau de bord —
+  // voir le commentaire dans notificationWebhookService.js.
+  if (req.params.key === 'notificationsWebhook') {
+    return res.json({ ok: true, status: await notificationWebhookService.sendTestMessage() });
+  }
   const entry = integrations[req.params.key];
   if (!entry) {
     return res.status(400).json({ ok: false, error: 'Test de connexion non disponible pour cette intégration' });

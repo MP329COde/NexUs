@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { readStore, writeStore } from './jsonStore.js';
+import { sendWebhookNotification } from '../services/integrations/notificationWebhookService.js';
 
 // Notifications persistantes côté serveur pour les événements de sécurité
 // qu'un admin doit voir même s'il n'était pas connecté au moment des faits
@@ -23,6 +24,10 @@ export function createNotification({ type, severity = 'info', title, message, me
   };
   notifications.unshift(entry);
   writeStore('notifications', notifications.slice(0, MAX_NOTIFICATIONS));
+  // Best-effort, jamais attendu : un événement de sécurité doit être
+  // persisté même si le webhook sortant (Slack/Discord/Teams) est lent,
+  // mal configuré, ou temporairement injoignable.
+  sendWebhookNotification({ title, message, severity }).catch(() => {});
   return entry;
 }
 
