@@ -41,6 +41,12 @@
   width: auto;
 }
 
+.pd-delete-btn {
+  color: var(--tone-crit-fg);
+  display: flex;
+  align-items: center;
+}
+
 .pd-grid-row {
   display: grid;
   grid-template-columns: repeat(12, 1fr);

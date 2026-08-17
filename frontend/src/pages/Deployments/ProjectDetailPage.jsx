@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
@@ -19,6 +19,7 @@ const PROJECT_STATUS_ORDER = ['active', 'paused', 'archived'];
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const notify = useNotify();
   const project = useApi(() => api.get(`/projects/${id}`), [id]);
@@ -68,6 +69,16 @@ export default function ProjectDetailPage() {
     await api.del(`/projects/${id}/tasks/${taskId}`);
     tasks.reload();
   }
+  async function deleteProject() {
+    if (!confirm(`Supprimer définitivement le projet "${p.name}" ? Cette action est irréversible.`)) return;
+    try {
+      await api.del(`/projects/${id}`);
+      notify('Projet supprimé', { type: 'info' });
+      navigate('/deployments/projects');
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
   async function setStatus(status) {
     try {
       await api.put(`/projects/${id}`, { status });
@@ -112,6 +123,11 @@ export default function ProjectDetailPage() {
               </select>
             ) : (
               <span className={`badge badge-${p.status === 'active' ? 'ok' : p.status === 'paused' ? 'warn' : 'mut'}`}><span className="dot" />{PROJECT_STATUS_LABELS[p.status] || p.status}</span>
+            )}
+            {(user?.role === 'admin' || projectRole === 'owner') && (
+              <span className="btn-outline pd-delete-btn" onClick={deleteProject} title="Supprimer le projet">
+                <Icon name="trash" size={13} />
+              </span>
             )}
             <Link to="/deployments/projects" className="btn-outline pd-back-link">← Tous les projets</Link>
           </div>
