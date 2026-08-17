@@ -4,6 +4,7 @@ import KpiCard from '../../components/ui/KpiCard.jsx';
 import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './TestsQualityPage.css';
 
 // Aucun framework de tests (Jest/Vitest/pytest...) ni format de rapport
 // (JUnit XML...) n'est intégré à la console — impossible d'afficher un
@@ -53,7 +54,7 @@ export default function TestsQualityPage() {
     <>
       <PageHeader title="Tests & qualité" sub="Fiabilité des pipelines CI (GitLab + GitHub), dérivée des exécutions réelles — pas de framework de tests intégré." />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
+      <div className="tqp-kpi-grid">
         <KpiCard label="Exécutions (historique)" value={total} tint="#3B82F6" note={loading ? 'Chargement…' : undefined} />
         <KpiCard label="Échecs (historique)" value={failed} tint={failed > 0 ? '#F43F5E' : '#10B981'} />
         <KpiCard label="Taux de succès" value={successRate ?? '—'} unit={successRate !== null ? '%' : ''} tint="#10B981" />
@@ -61,11 +62,11 @@ export default function TestsQualityPage() {
       </div>
 
       <Panel title="Fiabilité des pipelines" sub="Taux de succès quotidien réel (jours avec au moins une exécution)" span={12} style={{ marginBottom: 16 }}>
-        <div style={{ padding: '14px 16px' }}>
+        <div className="tqp-chart-body">
           {trend.length >= 2 ? (
             <MiniLineChart values={trend} color="#3B82F6" />
           ) : (
-            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+            <div className="tqp-chart-empty">
               Pas assez d'historique de pipelines pour tracer une tendance (ou aucune forge Git configurée — voir Paramètres).
             </div>
           )}
@@ -74,24 +75,24 @@ export default function TestsQualityPage() {
 
       <Panel title="Fiabilité par dépôt" sub="Basé sur l'historique d'exécutions récupéré" span={12}>
         {repoRows.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune exécution disponible</div>
+          <div className="tqp-table-empty">Aucune exécution disponible</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <div className="tqp-table-wrap">
+            <table className="tqp-table">
               <thead>
                 <tr>
                   {['Dépôt', 'Exécutions', 'Échecs', 'Taux de succès'].map((c) => (
-                    <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                    <th key={c} className="tqp-th">{c}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {repoRows.map((r) => (
-                  <tr key={r.repo} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                    <td className="mono" style={{ padding: '10px 16px' }}>{r.repo}</td>
-                    <td style={{ padding: '10px 16px' }}>{r.total}</td>
-                    <td style={{ padding: '10px 16px', color: r.failed > 0 ? 'var(--tone-crit-fg)' : undefined }}>{r.failed}</td>
-                    <td style={{ padding: '10px 16px', fontWeight: 600, color: r.rate >= 90 ? 'var(--tone-ok-fg)' : r.rate >= 70 ? 'var(--tone-warn-fg)' : 'var(--tone-crit-fg)' }}>{r.rate}%</td>
+                  <tr key={r.repo} className="tqp-row">
+                    <td className="mono tqp-td">{r.repo}</td>
+                    <td className="tqp-td">{r.total}</td>
+                    <td className="tqp-td" style={{ color: r.failed > 0 ? 'var(--tone-crit-fg)' : undefined }}>{r.failed}</td>
+                    <td className="tqp-td-rate" style={{ color: r.rate >= 90 ? 'var(--tone-ok-fg)' : r.rate >= 70 ? 'var(--tone-warn-fg)' : 'var(--tone-crit-fg)' }}>{r.rate}%</td>
                   </tr>
                 ))}
               </tbody>

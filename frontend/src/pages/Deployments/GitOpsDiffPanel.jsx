@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './GitOpsDiffPanel.css';
 
 // GitOps Diff : ce qu'Argo CD a déjà calculé lui-même (managed-resources) —
 // pour chaque ressource qu'il gère, l'état déclaré par Git (targetState) et
@@ -29,40 +30,40 @@ export default function GitOpsDiffPanel({ linkId, span }) {
       sub="Git (déclaré) vs Kubernetes (réel), calculé par Argo CD"
       span={span}
       actions={outOfSync.length > 0 && user?.role === 'admin' && (
-        <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--tone-warn-fg)' }} onClick={() => setConfirmSync(true)}>
+        <span className="btn-outline gdp-sync-btn" onClick={() => setConfirmSync(true)}>
           <Icon name="sync" size={13} />Synchroniser {outOfSync.length} ressource(s)
         </span>
       )}
     >
-      <div style={{ padding: 16 }}>
-        {loading && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
-        {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
-        {!loading && !error && items.length === 0 && <div className="faint" style={{ fontSize: 12.5 }}>Aucune ressource gérée par Argo CD pour cette application.</div>}
+      <div className="gdp-body">
+        {loading && <div className="faint gdp-loading">Chargement…</div>}
+        {error && <div className="gdp-error">{error}</div>}
+        {!loading && !error && items.length === 0 && <div className="faint gdp-empty">Aucune ressource gérée par Argo CD pour cette application.</div>}
 
         {!loading && items.length > 0 && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 12.5 }}>
+            <div className="gdp-status-row">
               <span className={`badge badge-${outOfSync.length === 0 ? 'ok' : 'warn'}`}>
                 <span className="dot" />{outOfSync.length === 0 ? 'Synchronisé' : `${outOfSync.length} / ${items.length} hors synchronisation`}
               </span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="gdp-list">
               {items.map((r) => {
                 const key = `${r.kind}/${r.namespace}/${r.name}`;
                 const isOpen = expanded === key;
                 return (
-                  <div key={key} style={{ border: '1px solid var(--border-soft)', borderRadius: 8, overflow: 'hidden' }}>
+                  <div key={key} className="gdp-item">
                     <div
                       onClick={() => setExpanded(isOpen ? null : key)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', background: 'var(--surface-2, var(--bg))' }}
+                      className="gdp-item-head"
                     >
-                      <span className={`badge badge-${r.outOfSync ? 'warn' : 'ok'}`} style={{ flex: 'none' }}>{r.outOfSync ? 'Hors sync' : 'OK'}</span>
-                      <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{r.kind}</span>
-                      <span className="mono faint" style={{ fontSize: 12, flex: 1 }}>{r.namespace ? `${r.namespace}/` : ''}{r.name}</span>
-                      <Icon name="chevronDown" size={13} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease', color: 'var(--text-faint)' }} />
+                      <span className={`badge badge-${r.outOfSync ? 'warn' : 'ok'} gdp-item-badge`}>{r.outOfSync ? 'Hors sync' : 'OK'}</span>
+                      <span className="mono gdp-item-kind">{r.kind}</span>
+                      <span className="mono faint gdp-item-name">{r.namespace ? `${r.namespace}/` : ''}{r.name}</span>
+                      <Icon name="chevronDown" size={13} className={`gdp-item-chevron${isOpen ? ' gdp-item-chevron-open' : ''}`} />
                     </div>
                     {isOpen && (
-                      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-soft)' }}>
+                      <div className="gdp-item-body">
                         <DiffView
                           oldText={JSON.stringify(r.liveState, null, 2)}
                           newText={JSON.stringify(r.targetState, null, 2)}
