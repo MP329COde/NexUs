@@ -231,6 +231,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 | cert-manager | Complet (dépendant) | Via CRD Kubernetes |
 | Docker | Absent | Jamais intégré |
 | Registre d'images privé | Complet (optionnel) | Service `registry:2` (Docker Distribution), profil Compose `registry`, activé via `install.sh` |
+| Notifications sortantes (Slack/Discord/Teams) | Complet | Webhook, branché sur toutes les notifications de sécurité serveur (verrouillage compte, IP bannie, secret committé, CVE critique, alertes K8s...) via `createNotification()` |
 | Scanners sécurité (SAST/SCA) | Complet | Semgrep + Checkov, voir ci-dessous |
 | Frameworks de tests | Stub | Page en anticipation |
 | Multi-environnements | Complet | Environnements réels (socle relationnel) + promotion via Argo CD |
@@ -269,7 +270,6 @@ Nexus Console couvre bien l'observation/pilotage d'une infrastructure déjà exi
 - **Catalogue de services avec propriétaire et graphe de dépendances** : les "Projets" existent mais restent un regroupement organisationnel, pas un catalogue technique (quel service appelle quel autre, qui le possède, quel est son SLA/sa criticité).
 - **Environnements éphémères par Pull/Merge Request** (preview deployments), avec nettoyage automatique — utile pour les revues visuelles avant merge.
 - **Visibilité coût** par projet/namespace (même approximative, dérivée des requêtes de ressources Kubernetes déjà lisibles).
-- **Notifications sortantes** (Slack/Teams/e-mail) sur incident, échec de pipeline, déploiement — aujourd'hui uniquement des notifications in-app, invisibles si la console n'est pas ouverte.
 - **API/CLI publique documentée** avec jetons d'API par utilisateur, pour scripter la plateforme depuis la CI/CD externe plutôt que seulement depuis le navigateur.
 - **Documentation-as-code (TechDocs)** : le Wiki d'équipe est une page indépendante ; un vrai IDP affiche la doc rendue directement depuis un dossier `docs/` du dépôt de chaque service.
 - ~~Politique de sécurité réellement bloquante~~ — fait : `environmentPromotionService.js` refuse désormais (422) une promotion vers un environnement de production si le dernier scan Semgrep contient une ERROR ou le dernier scan ZAP une alerte High, avant tout appel à Argo CD (pas seulement l'indicateur visuel de Supply Chain Security). Non testé en conditions réelles faute de socle relationnel (Postgres) configuré dans cet environnement de développement — vérifié par lecture de code et correspondance exacte des clés `counts.ERROR`/`counts.High` avec `semgrepService.js`/`dastService.js`.
