@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './TerminalPage.css';
 
 const VERB_HELP = {
   get: 'get pods|deployments|services [-n <namespace>]',
@@ -90,26 +91,26 @@ export default function TerminalPage() {
       />
 
       {!perms.loading && !tier && (
-        <div className="card" style={{ padding: 30, textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
-          <Icon name="lock" size={22} style={{ color: 'var(--text-faint)', marginBottom: 8 }} />
-          <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>Aucun accès au terminal</div>
+        <div className="card term-noaccess-card">
+          <Icon name="lock" size={22} className="term-noaccess-icon" />
+          <div className="term-noaccess-title">Aucun accès au terminal</div>
           {accessRequest.data?.pending ? (
-            <div className="faint" style={{ fontSize: 12.5 }}>
+            <div className="faint term-noaccess-pending">
               Demande de palier <strong>{TIER_LABEL[accessRequest.data.pending.requestedTier]}</strong> envoyée le {new Date(accessRequest.data.pending.createdAt).toLocaleString('fr-FR')} — en attente d'un administrateur.
             </div>
           ) : (
-            <form onSubmit={submitAccessRequest} style={{ textAlign: 'left', marginTop: 14 }}>
-              <div className="faint" style={{ fontSize: 12.5, marginBottom: 12, textAlign: 'center' }}>
+            <form onSubmit={submitAccessRequest} className="term-request-form">
+              <div className="faint term-request-intro">
                 Demandez un palier — un administrateur recevra une notification et pourra l'approuver depuis Paramètres → Utilisateurs.
               </div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Palier souhaité</label>
-              <select className="input" value={requestedTier} onChange={(e) => setRequestedTier(e.target.value)} style={{ marginBottom: 10 }}>
+              <label className="term-request-label">Palier souhaité</label>
+              <select className="input term-request-select" value={requestedTier} onChange={(e) => setRequestedTier(e.target.value)}>
                 <option value="developer">Developer — lecture seule (get, logs, describe)</option>
                 <option value="maintainer">Maintainer — lecture + scale/restart</option>
               </select>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Motif (optionnel)</label>
-              <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ex. débogage du déploiement api-gateway" style={{ marginBottom: 14 }} />
-              <button className="btn" type="submit" disabled={requesting} style={{ width: '100%' }}>
+              <label className="term-request-label">Motif (optionnel)</label>
+              <input className="input term-request-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ex. débogage du déploiement api-gateway" />
+              <button className="btn term-request-submit" type="submit" disabled={requesting}>
                 {requesting ? 'Envoi…' : "Demander l'accès"}
               </button>
             </form>
@@ -118,50 +119,48 @@ export default function TerminalPage() {
       )}
 
       {tier && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+        <div className="term-grid">
           <Panel title="Session" sub={`Verbes autorisés : ${verbs.join(', ')}`} span={9}>
-            <div ref={scrollRef} className="mono" style={{ height: 380, overflowY: 'auto', padding: 14, fontSize: 12, lineHeight: 1.7, background: 'var(--surface-2, var(--bg))' }}>
+            <div ref={scrollRef} className="mono term-session">
               {history.length === 0 && <div className="faint">Tapez une commande ci-dessous — {VERB_HELP[verbs[0]]}</div>}
               {history.map((h, i) => (
-                <div key={i} style={{ marginBottom: 14 }}>
-                  <div style={{ color: 'var(--primary)', fontWeight: 600 }}>$ {h.command}</div>
-                  {h.error && <div style={{ color: 'var(--tone-crit-fg)', whiteSpace: 'pre-wrap' }}>{h.error}</div>}
+                <div key={i} className="term-entry">
+                  <div className="term-entry-cmd">$ {h.command}</div>
+                  {h.error && <div className="term-entry-error">{h.error}</div>}
                   {h.result && <ResultView result={h.result} />}
                 </div>
               ))}
             </div>
-            <form onSubmit={run} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderTop: '1px solid var(--border-soft)' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <span className="mono" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-faint)' }}>$</span>
+            <form onSubmit={run} className="term-form">
+              <div className="term-form-row">
+                <span className="mono term-form-prompt">$</span>
                 <input
-                  className="input mono" autoFocus
+                  className="input mono term-form-input" autoFocus
                   value={command} onChange={(e) => setCommand(e.target.value)}
                   placeholder="get pods -n default"
-                  style={{ flex: 1, fontSize: 12.5 }}
                 />
                 <button className="btn" type="submit" disabled={busy || !command.trim()}>{busy ? '…' : 'Exécuter'}</button>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer' }}>
+              <label className="term-manifest-toggle">
                 <input type="checkbox" checked={showManifest} onChange={(e) => setShowManifest(e.target.checked)} />
                 Joindre un manifest (pour "apply")
               </label>
               {showManifest && (
                 <textarea
-                  className="input mono"
+                  className="input mono term-manifest-textarea"
                   value={manifest} onChange={(e) => setManifest(e.target.value)}
                   placeholder={'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: exemple\n  namespace: default\ndata:\n  cle: valeur'}
-                  style={{ minHeight: 120, fontSize: 11.5, resize: 'vertical' }}
                 />
               )}
             </form>
           </Panel>
 
           <Panel title="Aide-mémoire" sub="Syntaxe par verbe" span={3}>
-            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="term-help-list">
               {Object.entries(VERB_HELP).map(([verb, syntax]) => (
-                <div key={verb} style={{ opacity: verbs.includes(verb) ? 1 : .35 }}>
-                  <div className="mono" style={{ fontSize: 11.5, fontWeight: 700 }}>{verb}</div>
-                  <div className="mono faint" style={{ fontSize: 10.5 }}>{syntax}</div>
+                <div key={verb} className={verbs.includes(verb) ? '' : 'term-help-item-disabled'}>
+                  <div className="mono term-help-verb">{verb}</div>
+                  <div className="mono faint term-help-syntax">{syntax}</div>
                 </div>
               ))}
             </div>
@@ -175,12 +174,12 @@ export default function TerminalPage() {
 function ResultView({ result }) {
   if (result.rows) {
     return (
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}>
+      <table className="term-result-table">
         <tbody>
           {result.rows.length === 0 && <tr><td className="faint">(vide)</td></tr>}
           {result.rows.map((r, i) => (
             <tr key={i}>
-              <td style={{ paddingRight: 12 }}>{Object.values(r).slice(0, 5).join('  ')}</td>
+              <td className="term-result-cell">{Object.values(r).slice(0, 5).join('  ')}</td>
             </tr>
           ))}
         </tbody>
@@ -188,22 +187,22 @@ function ResultView({ result }) {
     );
   }
   if (result.text !== undefined) {
-    return <pre style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{result.text || '(vide)'}</pre>;
+    return <pre className="term-result-pre">{result.text || '(vide)'}</pre>;
   }
   if (result.stdout !== undefined) {
     return (
-      <div style={{ marginTop: 4 }}>
-        {result.stdout && <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{result.stdout}</pre>}
-        {result.stderr && <pre style={{ margin: 0, color: 'var(--tone-warn-fg)', whiteSpace: 'pre-wrap' }}>{result.stderr}</pre>}
+      <div className="term-result-stdout">
+        {result.stdout && <pre className="term-result-stdout-pre">{result.stdout}</pre>}
+        {result.stderr && <pre className="term-result-stderr-pre">{result.stderr}</pre>}
         <div className="faint">status: {result.status}</div>
       </div>
     );
   }
   if (result.object) {
-    return <pre style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{JSON.stringify(result.object, null, 2)}</pre>;
+    return <pre className="term-result-object-pre">{JSON.stringify(result.object, null, 2)}</pre>;
   }
   if (result.message) {
-    return <div style={{ color: 'var(--tone-ok-fg)' }}>{result.message}</div>;
+    return <div className="term-result-message">{result.message}</div>;
   }
-  return <pre style={{ margin: '4px 0 0' }}>{JSON.stringify(result, null, 2)}</pre>;
+  return <pre className="term-result-fallback-pre">{JSON.stringify(result, null, 2)}</pre>;
 }
