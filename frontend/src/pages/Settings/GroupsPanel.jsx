@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './GroupsPanel.css';
 
 const DOMAIN_LABELS = {
   infrastructure: 'Infrastructure', network: 'Réseaux', security: 'Sécurité', automation: 'Automatisation',
@@ -63,8 +64,8 @@ export default function GroupsPanel() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
-      <div style={{ gridColumn: 'span 12' }}>
+    <div className="groups-grid">
+      <div className="groups-note-col">
         <DemoNote>
           Les groupes ci-dessous sont de vrais rôles composables : un compte peut appartenir à plusieurs groupes à la fois, et
           reçoit l'union de leurs permissions (ex. « Développeur » + « Monitoring » donne accès aux deux, sans donner accès au Terminal
@@ -74,10 +75,10 @@ export default function GroupsPanel() {
         </DemoNote>
       </div>
       <Panel title="Créer un groupe" span={4}>
-        <form onSubmit={createGroup} style={{ padding: 16 }}>
+        <form onSubmit={createGroup} className="groups-form-body">
           <Field label="Nom"><input className="input" required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Description"><input className="input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} /></Field>
-          <button className="btn" type="submit" disabled={busy} style={{ width: '100%' }}>{busy ? 'Création…' : 'Créer le groupe'}</button>
+          <button className="btn groups-submit-btn" type="submit" disabled={busy}>{busy ? 'Création…' : 'Créer le groupe'}</button>
         </form>
       </Panel>
 
@@ -89,19 +90,18 @@ export default function GroupsPanel() {
           renderRow={(g) => (
             <tr key={g.id}>
               <td>
-                <div style={{ fontWeight: 500 }}>{g.name}</div>
-                {g.description && <div className="faint" style={{ fontSize: 11.5 }}>{g.description}</div>}
+                <div className="groups-cell-name">{g.name}</div>
+                {g.description && <div className="faint groups-cell-desc">{g.description}</div>}
               </td>
               <td>
-                <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11.5 }} onClick={() => setEditing(editing === g.id ? null : g.id)}>
+                <span className="btn-outline groups-members-btn" onClick={() => setEditing(editing === g.id ? null : g.id)}>
                   {g.memberIds.length} membre{g.memberIds.length > 1 ? 's' : ''}
                 </span>
               </td>
               {domains.map((domain) => (
                 <td key={domain}>
                   <select
-                    className="input"
-                    style={{ height: 26, padding: '0 6px', fontSize: 11.5, width: 'auto' }}
+                    className="input groups-permission-select"
                     value={g.permissions[domain] || 'none'}
                     onChange={(e) => setPermission(g, domain, e.target.value)}
                   >
@@ -110,7 +110,7 @@ export default function GroupsPanel() {
                 </td>
               ))}
               <td>
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => removeGroup(g)}>
+                <span className="btn-outline groups-remove-btn" onClick={() => removeGroup(g)}>
                   <Icon name="trash" size={13} />
                 </span>
               </td>
@@ -121,15 +121,14 @@ export default function GroupsPanel() {
 
       {editing && (
         <Panel title={`Membres — ${data.items.find((g) => g.id === editing)?.name}`} span={12}>
-          <div style={{ padding: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div className="groups-members-body">
             {users.data?.items.map((u) => {
               const group = data.items.find((g) => g.id === editing);
               const active = group?.memberIds.includes(u.id);
               return (
                 <span
                   key={u.id}
-                  className={active ? 'btn' : 'btn-outline'}
-                  style={{ height: 30, padding: '0 12px', fontSize: 12.5 }}
+                  className={`${active ? 'btn' : 'btn-outline'} groups-member-chip`}
                   onClick={() => toggleMember(group, u.id)}
                 >
                   {u.name}
@@ -141,7 +140,7 @@ export default function GroupsPanel() {
       )}
 
       <Panel title="Niveaux de droits" span={12}>
-        <div style={{ padding: '10px 16px', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="groups-levels-body">
           {levels.map((lvl) => (
             <span key={lvl} className={`badge badge-${LEVEL_TONE[lvl]}`}><span className="dot" />{LEVEL_LABELS[lvl]}</span>
           ))}
@@ -153,8 +152,8 @@ export default function GroupsPanel() {
 
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+    <div className="groups-field">
+      <label className="groups-field-label">{label}</label>
       {children}
     </div>
   );
