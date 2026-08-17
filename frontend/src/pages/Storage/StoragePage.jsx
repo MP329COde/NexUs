@@ -49,7 +49,7 @@ export default function StoragePage() {
 
   return (
     <>
-      <PageHeader title="Stockage" sub="Volumes, NAS, pools ZFS et sauvegardes — suivi déclaratif, mis à jour manuellement" />
+      <PageHeader title="Stockage" sub="Volumes, NAS, pools ZFS déclaratifs, sauvegardes, et état réel du stockage Proxmox si configuré" />
 
       <div className="storage-kpi-grid">
         <KpiCard label="Volumes suivis" value={volumes.length} tint="#3B82F6" />
