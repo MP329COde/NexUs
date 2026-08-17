@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from './Modal.jsx';
 import Icon from './Icon.jsx';
+import './ActionConfirmModal.css';
 
 // Confirmation standardisée pour toute action qui modifie une ressource
 // réelle (redémarrage, rollback, purge, bascule VM...) : la popup nomme la
@@ -43,12 +44,12 @@ export default function ActionConfirmModal({ title, sub, impact = [], tone = 'wa
       )}
     >
       {impact.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 8, background: `var(--tone-${tone}-soft, var(--primary-soft))`, marginBottom: requireTypedConfirmation ? 14 : 0 }}>
-          <Icon name="alertTriangle" size={16} style={{ color: `var(--tone-${tone}-fg)`, flex: 'none', marginTop: 1 }} />
-          <div style={{ fontSize: 12.5 }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Aperçu de l'impact</div>
-            <ul style={{ margin: 0, paddingLeft: 16 }}>
-              {impact.map((line, i) => <li key={i} style={{ marginBottom: 2 }}>{line}</li>)}
+        <div className={`acm-impact ${requireTypedConfirmation ? 'acm-impact-with-confirm' : ''}`} style={{ background: `var(--tone-${tone}-soft, var(--primary-soft))` }}>
+          <Icon name="alertTriangle" size={16} className="acm-impact-icon" style={{ color: `var(--tone-${tone}-fg)` }} />
+          <div className="acm-impact-body">
+            <div className="acm-impact-title">Aperçu de l'impact</div>
+            <ul className="acm-impact-list">
+              {impact.map((line, i) => <li key={i} className="acm-impact-list-item">{line}</li>)}
             </ul>
           </div>
         </div>
@@ -56,14 +57,14 @@ export default function ActionConfirmModal({ title, sub, impact = [], tone = 'wa
 
       {requireTypedConfirmation && (
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>
+          <label className="acm-confirm-label">
             Tapez <strong className="mono">{requireTypedConfirmation}</strong> pour confirmer
           </label>
           <input className="input" autoFocus autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
         </div>
       )}
 
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)', marginTop: 10 }}>{error}</div>}
+      {error && <div className="acm-error">{error}</div>}
     </Modal>
   );
 }

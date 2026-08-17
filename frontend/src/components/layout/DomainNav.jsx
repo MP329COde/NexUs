@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { DOMAINS } from '../../config/domains.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Icon from '../ui/Icon.jsx';
+import './DomainNav.css';
 
 const ADMIN_DOT_SEEN_KEY = 'nexus.adminDot.seen';
 
@@ -35,57 +36,34 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
   return (
     <>
       <nav
-        className={`app-domain-nav${mobileOpen ? ' open' : ''}`}
-        style={{
-          flex: 'none',
-          width,
-          height: '100%',
-          background: 'var(--surface)',
-          borderRight: '1px solid var(--border)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '10px 8px',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          transition: 'width .18s ease, transform .2s ease'
-        }}
+        className={`app-domain-nav domnav-nav${mobileOpen ? ' open' : ''}`}
+        style={{ width }}
       >
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, alignItems: effectiveCollapsed ? 'center' : 'stretch' }}>
+        <div className={`domnav-list${effectiveCollapsed ? ' domnav-list-collapsed' : ''}`}>
           {visible.map((d) => (
             <NavLink
               key={d.id}
               to={d.path}
               title={effectiveCollapsed ? d.label : undefined}
               onClick={() => { onCloseMobile(); if (d.id === 'adm') dismissAdminDot(); }}
-              className="domain-nav-item"
+              className={`domain-nav-item domnav-item${effectiveCollapsed ? ' domnav-item-collapsed' : ''}`}
               style={({ isActive }) => ({
-                width: effectiveCollapsed ? 44 : '100%',
-                height: effectiveCollapsed ? 44 : 40,
-                borderRadius: 11,
-                display: 'flex',
-                flexDirection: effectiveCollapsed ? 'column' : 'row',
-                alignItems: 'center',
-                justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
-                gap: effectiveCollapsed ? 3 : 10,
-                padding: effectiveCollapsed ? 0 : '0 11px',
-                textDecoration: 'none',
                 background: isActive ? 'var(--primary-soft)' : 'transparent',
-                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                transition: 'all .15s ease'
+                color: isActive ? 'var(--primary)' : 'var(--text-muted)'
               })}
             >
-              <span style={{ position: 'relative', display: 'flex', flex: 'none' }}>
+              <span className="domnav-icon-wrap">
                 <Icon name={d.id} size={19} strokeWidth={1.7} />
                 {d.id === 'adm' && !adminDotSeen && (
                   <span
                     title="Accès administrateur"
-                    style={{ position: 'absolute', top: -2, right: -3, width: 6, height: 6, borderRadius: '50%', background: 'var(--tone-crit-dot)' }}
+                    className="domnav-admin-dot"
                   />
                 )}
               </span>
               {effectiveCollapsed
-                ? <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.02em' }}>{d.code}</span>
-                : <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>{d.label}</span>}
+                ? <span className="domnav-code">{d.code}</span>
+                : <span className="domnav-label">{d.label}</span>}
             </NavLink>
           ))}
         </div>
@@ -93,11 +71,7 @@ export default function DomainNav({ collapsed, onToggleCollapsed, mobileOpen, on
         <button
           onClick={onToggleCollapsed}
           title={collapsed ? 'Déployer la barre latérale' : 'Réduire la barre latérale'}
-          className="desktop-only"
-          style={{
-            flex: 'none', marginTop: 8, height: 36, borderRadius: 9, border: '1px solid var(--border)',
-            background: 'transparent', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-          }}
+          className="desktop-only domnav-toggle-btn"
         >
           <Icon name={collapsed ? 'chevronsRight' : 'chevronsLeft'} size={16} />
         </button>
