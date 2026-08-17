@@ -1,6 +1,29 @@
 import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, listPromotions as listPromotionsStore, listEnvironments } from '../store/orgStore.js';
 import { getApplication, syncApplication } from './integrations/argocdService.js';
 import { IntegrationError } from './integrations/httpClient.js';
+import { listScans as listCodeScans } from '../store/codeScansStore.js';
+import { listScans as listDastScans } from '../store/dastScansStore.js';
+
+// Security Gate réel (pas seulement l'indicateur visuel de Supply Chain
+// Security) : bloque une promotion vers un environnement de production si
+// le dernier scan Semgrep contient au moins une ERROR ou le dernier scan
+// OWASP ZAP au moins une alerte High — mêmes seuils que le panneau affiché
+// à l'admin, appliqués ici avant l'appel réel à Argo CD plutôt qu'après
+// coup. Silencieux (ne bloque rien) si aucun scan n'a jamais été lancé :
+// on ne pénalise pas une instance qui n'a pas encore de scanner configuré.
+function checkSecurityGate() {
+  const lastCode = listCodeScans()[0];
+  const lastDast = listDastScans()[0];
+  const semgrepErrors = lastCode?.counts?.ERROR ?? 0;
+  const zapHigh = lastDast?.counts?.High ?? 0;
+  if (semgrepErrors > 0) {
+    return `Security Gate : ${semgrepErrors} erreur(s) Semgrep sur le dernier scan de code (voir Supply Chain Security).`;
+  }
+  if (zapHigh > 0) {
+    return `Security Gate : ${zapHigh} alerte(s) à risque élevé sur le dernier scan OWASP ZAP (voir Supply Chain Security).`;
+  }
+  return null;
+}
 
 // Promotion réelle entre environnements : jamais de "version" inventée. Un
 // environnement doit être lié à une application Argo CD existante (voir
@@ -43,6 +66,17 @@ export async function promote({ projectId, fromEnvironmentId, toEnvironmentId, t
   const toEnv = await getEnvironment(toEnvironmentId);
   if (!toEnv || toEnv.project_id !== projectId) throw Object.assign(new Error('Environnement cible introuvable'), { status: 404 });
   if (!toEnv.argocd_app) throw Object.assign(new Error('Environnement cible non lié à une application Argo CD'), { status: 409 });
+
+  if (toEnv.is_production) {
+    const gateError = checkSecurityGate();
+    if (gateError) {
+      await recordPromotion({
+        projectId, fromEnvironmentId: fromEnvironmentId || null, toEnvironmentId,
+        argocdApp: toEnv.argocd_app, revision: null, status: 'blocked', message: gateError, triggeredBy
+      });
+      throw Object.assign(new Error(gateError), { status: 422 });
+    }
+  }
 
   let revision;
   if (fromEnvironmentId) {
