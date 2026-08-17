@@ -4,6 +4,8 @@ import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
+import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
+import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import './MonitoringPage.css';
@@ -18,7 +20,9 @@ export default function MonitoringPage() {
   const status = useApi(() => api.get('/grafana/status'), [], { pollMs: 30000 });
   const dashboards = useApi(() => api.get('/grafana/dashboards'), [], { pollMs: 60000 });
   const alerts = useApi(() => api.get('/grafana/alerts'), [], { pollMs: 15000 });
+  const infraLoad = useApi(() => api.get('/status/infra-load'), [], { pollMs: 30000 });
   const [severityFilter, setSeverityFilter] = useState('');
+  const [alertSearch, setAlertSearch] = useState('');
   const [nodes, setNodes] = useState(null);
 
   // Les hôtes (nœuds Proxmox) sont chargés en best-effort : cette page reste
@@ -50,7 +54,18 @@ export default function MonitoringPage() {
   const allAlerts = alerts.data?.items || [];
   const critCount = allAlerts.filter((a) => a.severity === 'critical').length;
   const warnCount = allAlerts.filter((a) => a.severity === 'warning').length;
-  const filteredAlerts = severityFilter ? allAlerts.filter((a) => a.severity === severityFilter) : allAlerts;
+  const bySeverity = severityFilter ? allAlerts.filter((a) => a.severity === severityFilter) : allAlerts;
+  const q = alertSearch.trim().toLowerCase();
+  const filteredAlerts = q ? bySeverity.filter((a) => a.name.toLowerCase().includes(q)) : bySeverity;
+
+  const sortedNodes = nodes ? [...nodes].sort((a, b) => {
+    const worstA = Math.max(a.cpu || 0, (a.mem || 0) / (a.maxmem || 1));
+    const worstB = Math.max(b.cpu || 0, (b.mem || 0) / (b.maxmem || 1));
+    return worstB - worstA;
+  }) : null;
+  const samples = infraLoad.data?.samples || [];
+  const cpuSeries = samples.map((s) => s.cpuPct);
+  const ramSeries = samples.map((s) => s.ramPct);
 
   return (
     <>
@@ -69,16 +84,25 @@ export default function MonitoringPage() {
           sub="Grafana, temps réel"
           span={12}
           actions={(
-            <div className="monitoring-severity-tabs">
-              {SEVERITY_FILTERS.map((f) => (
-                <span
-                  key={f.value}
-                  onClick={() => setSeverityFilter(f.value)}
-                  className={`monitoring-severity-tab${severityFilter === f.value ? ' monitoring-severity-tab-active' : ''}`}
-                >
-                  {f.label}
-                </span>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                className="input"
+                placeholder="Filtrer par nom…"
+                value={alertSearch}
+                onChange={(e) => setAlertSearch(e.target.value)}
+                style={{ height: 28, fontSize: 12, width: 160 }}
+              />
+              <div className="monitoring-severity-tabs">
+                {SEVERITY_FILTERS.map((f) => (
+                  <span
+                    key={f.value}
+                    onClick={() => setSeverityFilter(f.value)}
+                    className={`monitoring-severity-tab${severityFilter === f.value ? ' monitoring-severity-tab-active' : ''}`}
+                  >
+                    {f.label}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         >
@@ -97,14 +121,31 @@ export default function MonitoringPage() {
           />
         </Panel>
 
-        {nodes && nodes.length > 0 && (
-          <Panel title="Hôtes" sub="Charge en direct (nœuds Proxmox)" span={12}>
+        {samples.length > 1 && (
+          <Panel title="Tendance de charge" sub="CPU / RAM moyens, échantillonnés toutes les 30s (~6h)" span={12}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16 }}>
+              <div>
+                <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>CPU</div>
+                <MiniLineChart values={cpuSeries} height={70} color="#3B82F6" />
+              </div>
+              <div>
+                <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>Mémoire</div>
+                <MiniLineChart values={ramSeries} height={70} color="#8B5CF6" />
+              </div>
+            </div>
+          </Panel>
+        )}
+
+        {sortedNodes && sortedNodes.length > 0 && (
+          <Panel title="Hôtes" sub="Charge en direct (nœuds Proxmox), triés par charge la plus élevée d'abord" span={12}>
             <div className="monitoring-host-list">
-              {nodes.map((n) => {
+              {sortedNodes.map((n) => {
                 const cpuPct = Math.round((n.cpu || 0) * 100);
                 const memPct = Math.round(((n.mem || 0) / (n.maxmem || 1)) * 100);
+                const worrying = cpuPct > 85 || memPct > 85;
                 return (
                   <div key={n.node} className="monitoring-host-row">
+                    {worrying && <Icon name="alertTriangle" size={13} style={{ color: 'var(--tone-crit-fg)', flex: 'none' }} />}
                     <span className="monitoring-host-name">{n.node}</span>
                     <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} monitoring-host-badge`}><span className="dot" />{n.status}</span>
                     <MiniGauge label="CPU" pct={cpuPct} />

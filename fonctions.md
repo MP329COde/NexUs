@@ -177,7 +177,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Monitoring / Stockage / Sécurité / autres
 
-- **MonitoringPage.jsx** — Statut/dashboards/alertes Grafana.
+- **MonitoringPage.jsx** — Statut/dashboards/alertes Grafana, **filtre texte sur les alertes** (en plus du filtre par sévérité), **tendance de charge CPU/RAM** (sparklines ~6h, `/status/infra-load`), **hôtes triés par charge la plus élevée d'abord** avec icône d'alerte au-delà de 85%.
 - **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, pas d'intégration réelle).
 - **NetworkServicesPage.jsx** — Réseaux internes : VLAN/sous-réseaux, DHCP, DNS interne, VPN (4 onglets, CRUD déclaratif, local, pas d'intégration réelle).
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
