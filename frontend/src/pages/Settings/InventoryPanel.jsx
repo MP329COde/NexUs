@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './InventoryPanel.css';
 
 const CATEGORY_LABELS = { serveur: 'Serveur', stockage: 'Stockage', réseau: 'Réseau', poste: 'Poste', autre: 'Autre' };
 const STATE_LABELS = { en_service: 'En service', en_maintenance: 'En maintenance', hors_service: 'Hors service', stock: 'En stock' };
@@ -50,15 +51,15 @@ export default function InventoryPanel() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
-      <div style={{ gridColumn: 'span 12', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14 }}>
+    <div className="inventory-grid">
+      <div className="inventory-kpi-row">
         <KpiMini label="Actifs" value={items.length} />
         <KpiMini label="Garantie < 1 an" value={warrantyExpiringSoon} tone="warn" />
         <KpiMini label="Valeur estimée" value={`${totalValue.toLocaleString('fr-FR')} €`} />
       </div>
 
       <Panel title="Ajouter un actif" span={4}>
-        <form onSubmit={createAsset} style={{ padding: 16 }}>
+        <form onSubmit={createAsset} className="inventory-form-body">
           <Field label="Nom"><input className="input" required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label="Catégorie">
             <select className="input" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
@@ -69,7 +70,7 @@ export default function InventoryPanel() {
           <Field label="Acquis le"><input className="input" type="date" value={form.acquiredAt} onChange={(e) => setForm((f) => ({ ...f, acquiredAt: e.target.value }))} /></Field>
           <Field label="Garantie jusqu'au"><input className="input" type="date" value={form.warrantyUntil} onChange={(e) => setForm((f) => ({ ...f, warrantyUntil: e.target.value }))} /></Field>
           <Field label="Valeur estimée (€)"><input className="input" type="number" min="0" value={form.estimatedValue} onChange={(e) => setForm((f) => ({ ...f, estimatedValue: e.target.value }))} /></Field>
-          <button className="btn" type="submit" disabled={busy} style={{ width: '100%' }}>{busy ? 'Ajout…' : "Ajouter l'actif"}</button>
+          <button className="btn inventory-submit-btn" type="submit" disabled={busy}>{busy ? 'Ajout…' : "Ajouter l'actif"}</button>
         </form>
       </Panel>
 
@@ -80,14 +81,13 @@ export default function InventoryPanel() {
           emptyTitle="Aucun actif suivi"
           renderRow={(a) => (
             <tr key={a.id}>
-              <td style={{ fontWeight: 500 }}>{a.name}</td>
+              <td className="inventory-cell-name">{a.name}</td>
               <td className="muted">{CATEGORY_LABELS[a.category]}</td>
               <td className="mono faint">{a.serialNumber || '—'}</td>
               <td className="mono faint">{a.warrantyUntil ? new Date(a.warrantyUntil).toLocaleDateString('fr-FR') : '—'}</td>
               <td>
                 <select
-                  className="input"
-                  style={{ height: 26, padding: '0 6px', fontSize: 11.5, width: 'auto' }}
+                  className="input inventory-state-select"
                   value={a.state}
                   onChange={(e) => setState(a, e.target.value)}
                 >
@@ -95,7 +95,7 @@ export default function InventoryPanel() {
                 </select>
               </td>
               <td>
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => removeAsset(a)}>
+                <span className="btn-outline inventory-remove-btn" onClick={() => removeAsset(a)}>
                   <Icon name="trash" size={13} />
                 </span>
               </td>
@@ -109,8 +109,8 @@ export default function InventoryPanel() {
 
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+    <div className="inventory-field">
+      <label className="inventory-field-label">{label}</label>
       {children}
     </div>
   );
@@ -118,9 +118,9 @@ function Field({ label, children }) {
 
 function KpiMini({ label, value, tone }) {
   return (
-    <div className="card" style={{ padding: '12px 14px' }}>
-      <div className="faint" style={{ fontSize: 11 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2, color: tone ? `var(--tone-${tone}-fg)` : 'inherit' }}>{value}</div>
+    <div className="card inventory-kpi-card">
+      <div className="faint inventory-kpi-label">{label}</div>
+      <div className="inventory-kpi-value" style={{ color: tone ? `var(--tone-${tone}-fg)` : 'inherit' }}>{value}</div>
     </div>
   );
 }
