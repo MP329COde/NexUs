@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './WikiPage.css';
 
 // Wiki d'équipe : pages de texte éditables par tout membre de l'organisation
 // sélectionnée, avec historique des révisions (voir routes/wiki.routes.js).
@@ -60,7 +61,7 @@ export default function WikiPage() {
         title="Wiki d'équipe"
         sub="Base de connaissance partagée par organisation : procédures, décisions techniques, onboarding."
         actions={(
-          <select className="input" value={orgId} onChange={(e) => setOrgId(e.target.value)} style={{ height: 32, fontSize: 12.5, width: 220 }}>
+          <select className="input wiki-org-select" value={orgId} onChange={(e) => setOrgId(e.target.value)}>
             {organizations.length === 0 && <option value="">Aucune organisation</option>}
             {organizations.map((o) => <option key={o.id} value={o.id}>{o.icon ? `${o.icon} ` : ''}{o.name}</option>)}
           </select>
@@ -68,33 +69,28 @@ export default function WikiPage() {
       />
 
       {organizations.length === 0 ? (
-        <div className="card" style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="card wiki-no-org">
           Aucune organisation — créez-en une dans Organisations pour démarrer un wiki.
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        <div className="wiki-layout">
           <Panel title="Pages" style={{ width: 260, flex: 'none' }} actions={(
-            <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setCreating(true)}>
+            <span className="btn-outline wiki-sidebar-new-btn" onClick={() => setCreating(true)}>
               <Icon name="plus" size={12} />Nouvelle
             </span>
           )}>
-            <div style={{ padding: '0 12px 10px' }}>
-              <input className="input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} style={{ height: 30, fontSize: 12.5, width: '100%' }} />
+            <div className="wiki-search-wrap">
+              <input className="input wiki-search-input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             {items.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-faint)' }}>Aucune page</div>
+              <div className="wiki-pages-empty">Aucune page</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px 8px' }}>
+              <div className="wiki-pages-list">
                 {items.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => setSelectedId(p.id)}
-                    style={{
-                      padding: '8px 10px', borderRadius: 8, fontSize: 12.5, cursor: 'pointer',
-                      fontWeight: selectedId === p.id ? 600 : 500,
-                      color: selectedId === p.id ? 'var(--primary)' : 'var(--text-muted)',
-                      background: selectedId === p.id ? 'var(--primary-soft)' : 'transparent'
-                    }}
+                    className={`wiki-page-item${selectedId === p.id ? ' wiki-page-item-active' : ''}`}
                   >
                     {p.title}
                   </div>
@@ -103,11 +99,11 @@ export default function WikiPage() {
             )}
           </Panel>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="wiki-detail-wrap">
             {selectedId ? (
               <WikiPageDetail id={selectedId} onDeleted={() => deletePage(selectedId)} onHistory={() => setHistoryFor(selectedId)} onSaved={pages.reload} />
             ) : (
-              <div className="card" style={{ padding: 40, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+              <div className="card wiki-detail-empty">
                 Sélectionnez une page, ou créez-en une nouvelle.
               </div>
             )}
@@ -125,9 +121,9 @@ function CreatePageModal({ onCreate, onClose }) {
   const [title, setTitle] = useState('');
   return (
     <Modal title="Nouvelle page" onClose={onClose} width={420}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="wiki-modal-form">
         <input className="input" placeholder="Titre de la page" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="wiki-modal-actions">
           <span className="btn-outline" onClick={onClose}>Annuler</span>
           <button className="btn" disabled={!title.trim()} onClick={() => onCreate(title.trim())}>Créer</button>
         </div>
@@ -163,52 +159,51 @@ function WikiPageDetail({ id, onDeleted, onHistory, onSaved }) {
     }
   }
 
-  if (loading) return <div className="card faint" style={{ padding: 30, fontSize: 12.5 }}>Chargement…</div>;
-  if (error) return <div className="card" style={{ padding: 30, fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>;
+  if (loading) return <div className="card faint wiki-detail-loading">Chargement…</div>;
+  if (error) return <div className="card wiki-detail-error">{error}</div>;
   const page = data?.page;
   if (!page) return null;
 
   return (
-    <div className="card" style={{ padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
+    <div className="card wiki-detail-card">
+      <div className="wiki-detail-header">
         {editing ? (
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} style={{ fontSize: 15, fontWeight: 700, flex: 1 }} />
+          <input className="input wiki-title-input" value={title} onChange={(e) => setTitle(e.target.value)} />
         ) : (
-          <div style={{ fontSize: 17, fontWeight: 700 }}>{page.title}</div>
+          <div className="wiki-title-display">{page.title}</div>
         )}
-        <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
-          <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={onHistory}>
+        <div className="wiki-detail-actions">
+          <span className="btn-outline wiki-detail-action-btn" onClick={onHistory}>
             <Icon name="clock" size={12} />Historique
           </span>
           {editing ? (
             <>
-              <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center' }} onClick={() => { setEditing(false); setTitle(page.title); setContent(page.content || ''); }}>Annuler</span>
-              <button className="btn" style={{ height: 28, padding: '0 12px', fontSize: 11.5 }} disabled={busy || !title.trim()} onClick={save}>Enregistrer</button>
+              <span className="btn-outline wiki-detail-action-btn-plain" onClick={() => { setEditing(false); setTitle(page.title); setContent(page.content || ''); }}>Annuler</span>
+              <button className="btn wiki-detail-save-btn" disabled={busy || !title.trim()} onClick={save}>Enregistrer</button>
             </>
           ) : (
             <>
-              <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setEditing(true)}>
+              <span className="btn-outline wiki-detail-action-btn" onClick={() => setEditing(true)}>
                 <Icon name="edit" size={12} />Modifier
               </span>
-              <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--tone-crit-fg)' }} onClick={onDeleted}>
+              <span className="btn-outline wiki-detail-action-btn wiki-detail-danger" onClick={onDeleted}>
                 <Icon name="trash" size={12} />Supprimer
               </span>
             </>
           )}
         </div>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 14 }}>
+      <div className="wiki-detail-meta">
         Modifiée le {new Date(page.updated_at).toLocaleString('fr-FR')}
       </div>
       {editing ? (
         <textarea
-          className="input"
+          className="input wiki-detail-textarea"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          style={{ width: '100%', minHeight: 340, fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', resize: 'vertical' }}
         />
       ) : (
-        <div style={{ fontSize: 13.5, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+        <div className="wiki-detail-content">
           {page.content || <span className="faint">Page vide — cliquez sur « Modifier » pour rédiger du contenu.</span>}
         </div>
       )}
@@ -221,11 +216,11 @@ function HistoryModal({ pageId, onClose }) {
   const items = data?.items || [];
   return (
     <Modal title="Historique des modifications" onClose={onClose} width={480}>
-      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
-      {items.length === 0 && !loading && <div className="faint" style={{ fontSize: 12.5 }}>Aucune révision précédente — cette page n'a jamais été modifiée depuis sa création.</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {loading && <div className="faint wiki-history-loading">Chargement…</div>}
+      {items.length === 0 && !loading && <div className="faint wiki-history-empty">Aucune révision précédente — cette page n'a jamais été modifiée depuis sa création.</div>}
+      <div className="wiki-history-list">
         {items.map((r) => (
-          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2, var(--bg))' }}>
+          <div key={r.id} className="wiki-history-row">
             <span>{r.title}</span>
             <span className="faint">{new Date(r.edited_at).toLocaleString('fr-FR')}</span>
           </div>
