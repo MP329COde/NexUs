@@ -5,6 +5,7 @@ import DemoNote from '../../components/ui/DemoNote.jsx';
 import CodeScanPanel from './CodeScanPanel.jsx';
 import IacScanPanel from './IacScanPanel.jsx';
 import DastScanPanel from './DastScanPanel.jsx';
+import './SupplyChainPage.css';
 
 // Tout le pipeline (source, SAST, secrets, dépendances/conteneur, IaC, SBOM,
 // signature, registre, déploiement) est désormais réel : Semgrep
@@ -35,41 +36,41 @@ export default function SupplyChainPage() {
         Syft (SBOM), signature cosign du SBOM, Checkov (IaC) et registre privé (optionnel, activé via install.sh) — voir les badges "Réel" ci-dessous.
       </DemoNote>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="scp-panel-row">
         <CodeScanPanel />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="scp-panel-row">
         <IacScanPanel />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="scp-panel-row">
         <DastScanPanel />
       </div>
 
       <Panel title="Pipeline" sub="Source → build → sécurité → registre → déploiement" span={12} style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0, padding: 16 }}>
+        <div className="scp-pipeline-row">
           {STAGES.map((s, i) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: 160, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', textAlign: 'center' }}>
-                <Icon name={s.icon} size={18} style={{ color: 'var(--text-faint)', marginBottom: 6 }} />
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.label}</div>
-                <div className={`badge badge-${s.real ? 'ok' : s.id === 'registry' ? 'warn' : 'mut'}`} style={{ marginTop: 6 }}>
+            <div key={s.id} className="scp-stage-item">
+              <div className="scp-stage-card">
+                <Icon name={s.icon} size={18} className="scp-stage-icon" />
+                <div className="scp-stage-label">{s.label}</div>
+                <div className={`badge badge-${s.real ? 'ok' : s.id === 'registry' ? 'warn' : 'mut'} scp-stage-badge`}>
                   <span className="dot" />{s.real ? 'Réel' : s.id === 'registry' ? 'Partiel' : 'Non intégré'}
                 </div>
               </div>
-              {i < STAGES.length - 1 && <Icon name="chevronDown" size={14} style={{ transform: 'rotate(-90deg)', color: 'var(--text-faintest)', flex: 'none', margin: '0 4px' }} />}
+              {i < STAGES.length - 1 && <Icon name="chevronDown" size={14} className="scp-stage-arrow" />}
             </div>
           ))}
         </div>
       </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="scp-panel-row">
         {STAGES.filter((s) => !['source', 'argocd', 'sast', 'dast', 'iac', 'sbom'].includes(s.id)).map((s) => (
-          <Panel key={s.id} title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name={s.icon} size={13} style={{ color: 'var(--text-faint)' }} />{s.label}</span>)} span={4}>
-            <div style={{ padding: 14, fontSize: 12.5 }}>
-              <div className="faint" style={{ marginBottom: 6 }}>{s.note}</div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-faintest)' }}>Outil à intégrer : {s.tool}</div>
+          <Panel key={s.id} title={(<span className="scp-stub-title"><Icon name={s.icon} size={13} className="scp-stub-title-icon" />{s.label}</span>)} span={4}>
+            <div className="scp-stub-body">
+              <div className="faint scp-stub-note">{s.note}</div>
+              <div className="mono scp-stub-tool">Outil à intégrer : {s.tool}</div>
             </div>
           </Panel>
         ))}
@@ -77,16 +78,16 @@ export default function SupplyChainPage() {
 
       <Panel title="Security Gate" sub="Décision automatique à l'entrée d'Argo CD — démonstration" span={12}>
         <DemoNote>Exemple de ce que produirait un Security Gate une fois les scanners ci-dessus connectés — seuils et résultat illustratifs, pas calculés.</DemoNote>
-        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 20, fontSize: 12.5 }}>
+        <div className="scp-gate-body">
+          <div className="scp-gate-counts">
             <span>Critical : <strong className="mono">0</strong></span>
             <span>High : <strong className="mono">0</strong></span>
             <span>Medium : <strong className="mono">4</strong></span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 10, borderRadius: 8, background: 'var(--tone-ok-soft, var(--primary-soft))', color: 'var(--tone-ok-fg)', fontSize: 12.5, fontWeight: 600 }}>
+          <div className="scp-gate-verdict">
             <Icon name="check" size={15} />Déploiement autorisé — aucune vulnérabilité critique ou élevée
           </div>
-          <div className="faint" style={{ fontSize: 11.5 }}>
+          <div className="faint scp-gate-rule">
             Règle type : bloquer le déploiement (refuser la synchronisation Argo CD) si au moins une vulnérabilité "Critical" est détectée par le scan de conteneur ou de dépendances.
           </div>
         </div>

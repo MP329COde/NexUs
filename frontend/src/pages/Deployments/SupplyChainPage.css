@@ -1,0 +1,104 @@
+.scp-panel-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.scp-pipeline-panel {
+  margin-bottom: 16px;
+}
+
+.scp-pipeline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 16px;
+}
+
+.scp-stage-item {
+  display: flex;
+  align-items: center;
+}
+
+.scp-stage-card {
+  width: 160px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  text-align: center;
+}
+
+.scp-stage-icon {
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.scp-stage-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.scp-stage-badge {
+  margin-top: 6px;
+}
+
+.scp-stage-arrow {
+  transform: rotate(-90deg);
+  color: var(--text-faintest);
+  flex: none;
+  margin: 0 4px;
+}
+
+.scp-stub-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.scp-stub-title-icon {
+  color: var(--text-faint);
+}
+
+.scp-stub-body {
+  padding: 14px;
+  font-size: 12.5px;
+}
+
+.scp-stub-note {
+  margin-bottom: 6px;
+}
+
+.scp-stub-tool {
+  font-size: 11px;
+  color: var(--text-faintest);
+}
+
+.scp-gate-body {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scp-gate-counts {
+  display: flex;
+  gap: 20px;
+  font-size: 12.5px;
+}
+
+.scp-gate-verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--tone-ok-soft, var(--primary-soft));
+  color: var(--tone-ok-fg);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.scp-gate-rule {
+  font-size: 11.5px;
+}
