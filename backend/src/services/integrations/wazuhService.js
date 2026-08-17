@@ -55,3 +55,40 @@ export async function getAgentSummary() {
   const data = await request(c.http, { method: 'GET', url: '/agents/summary/status' }, 'Wazuh');
   return data.data;
 }
+
+// SCA (Security Configuration Assessment) : audits de conformité (CIS
+// Benchmarks et équivalents) exécutés localement par chaque agent Wazuh,
+// remontés au gestionnaire — reste sur l'API du gestionnaire (port 55000,
+// déjà authentifiée ci-dessus), contrairement aux alertes brutes qui vivent
+// dans l'indexeur Wazuh (OpenSearch, intégration séparée non couverte ici).
+export async function listAgentSCA(agentId) {
+  const c = await authenticatedClient();
+  if (!c) throw new IntegrationError('Wazuh non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/sca/${encodeURIComponent(agentId)}` }, 'Wazuh');
+  return (data.data.affected_items || []).map((p) => ({
+    policyId: p.policy_id,
+    name: p.name,
+    description: p.description,
+    pass: p.pass,
+    fail: p.fail,
+    invalid: p.invalid,
+    score: p.score,
+    endScan: p.end_scan
+  }));
+}
+
+// Agrège la conformité SCA sur tous les agents actifs : borné à 25 agents
+// (un appel HTTP par agent) pour éviter qu'un grand parc ne ralentisse la
+// page Sécurité — au-delà, `agentsScanned < agentsTotal` signale la
+// troncature plutôt que de la cacher silencieusement.
+export async function getSCASummary() {
+  const c = await authenticatedClient();
+  if (!c) throw new IntegrationError('Wazuh non configuré', { status: 409 });
+  const agents = (await listAgents()).filter((a) => a.status === 'active');
+  const sample = agents.slice(0, 25);
+  const perAgent = await Promise.all(sample.map(async (a) => {
+    const policies = await listAgentSCA(a.id).catch(() => []);
+    return { agentId: a.id, agentName: a.name, policies };
+  }));
+  return { agentsTotal: agents.length, agentsScanned: sample.length, agents: perAgent };
+}

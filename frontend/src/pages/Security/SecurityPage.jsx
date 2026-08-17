@@ -31,6 +31,7 @@ export default function SecurityPage() {
   const status = useApi(() => api.get('/wazuh/status'), [], { pollMs: 30000 });
   const agents = useApi(() => api.get('/wazuh/agents'), [], { pollMs: 20000 });
   const summary = useApi(() => api.get('/wazuh/summary'), [], { pollMs: 20000 });
+  const sca = useApi(() => api.get('/wazuh/sca-summary'), [], { pollMs: 60000 });
 
   const s = summary.data?.summary?.connection || {};
   const wazuhConfigured = status.data?.status?.configured;
@@ -78,6 +79,8 @@ export default function SecurityPage() {
         </div>
       )}
 
+      {wazuhConfigured && <SCAPanel data={sca.data} />}
+
       {user?.role === 'admin' && (
         <div className="security-panel-row" style={{ marginBottom: 0 }}>
           <BanlistPanel />
@@ -85,6 +88,53 @@ export default function SecurityPage() {
         </div>
       )}
     </>
+  );
+}
+
+// Conformité (Security Configuration Assessment) : audits CIS Benchmarks
+// remontés par chaque agent Wazuh actif, agrégés depuis /wazuh/sca-summary
+// (services/integrations/wazuhService.js). Contrairement au tableau
+// "Agents Wazuh" ci-dessus (statut de connexion), ceci reflète l'état réel
+// de durcissement de chaque hôte — c'était le manque signalé ("vraie
+// intégration Wazuh").
+function SCAPanel({ data }) {
+  const agents = data?.agents || [];
+  const allPolicies = agents.flatMap((a) => a.policies.map((p) => ({ ...p, agentName: a.agentName })));
+
+  return (
+    <Panel
+      title="Conformité (SCA)"
+      sub={data ? `${data.agentsScanned} / ${data.agentsTotal} agent(s) actif(s) analysé(s)${data.agentsScanned < data.agentsTotal ? ' — limité à 25 par cycle' : ''}` : 'Chargement…'}
+      span={12}
+      style={{ marginBottom: 16 }}
+    >
+      {allPolicies.length === 0 ? (
+        <div className="faint security-list-empty">Aucun audit de conformité (SCA) remonté par les agents actifs pour le moment.</div>
+      ) : (
+        <DataTable
+          columns={['Agent', 'Politique', 'Score', 'Réussis', 'Échoués', 'Dernier scan']}
+          rows={allPolicies}
+          renderRow={(p, i) => {
+            const total = (p.pass || 0) + (p.fail || 0);
+            const pct = total ? Math.round((p.pass / total) * 100) : null;
+            return (
+              <tr key={`${p.agentName}-${p.policyId}-${i}`}>
+                <td className="security-cell-name">{p.agentName}</td>
+                <td>{p.name}</td>
+                <td>
+                  {pct !== null
+                    ? <span className={`badge badge-${pct >= 80 ? 'ok' : pct >= 50 ? 'warn' : 'crit'}`}><span className="dot" />{pct}%</span>
+                    : '—'}
+                </td>
+                <td className="mono muted">{p.pass ?? '—'}</td>
+                <td className="mono muted">{p.fail ?? '—'}</td>
+                <td className="mono faint">{p.endScan ? new Date(p.endScan).toLocaleString('fr-FR') : '—'}</td>
+              </tr>
+            );
+          }}
+        />
+      )}
+    </Panel>
   );
 }
 
