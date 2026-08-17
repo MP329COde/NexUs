@@ -10,6 +10,7 @@ import Icon from '../ui/Icon.jsx';
 import Avatar from '../ui/Avatar.jsx';
 import BrandMark from '../ui/BrandMark.jsx';
 import { toneFromScore, toneLabel, buildDomainRows } from '../../lib/health.js';
+import './Header.css';
 
 const TONE_ICON = { ok: 'check', warn: 'alertTriangle', crit: 'xCircle', info: 'info' };
 const DOMAIN_ICON = { k8s: 'k8s', dev: 'dev', net: 'net', inf: 'inf', mon: 'mon', sec: 'sec', sto: 'inf' };
@@ -53,78 +54,77 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
   const activeAlerts = integrations.filter((e) => e.configured && !e.ok).length;
 
   return (
-    <header style={{ flex: 'none', height: 56, display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'relative', zIndex: 30 }}>
-      <button onClick={onOpenNav} title="Ouvrir la navigation" className="icon-btn mobile-only" style={{ flex: 'none' }}>
+    <header className="header-bar">
+      <button onClick={onOpenNav} title="Ouvrir la navigation" className="icon-btn mobile-only header-nav-btn">
         <Icon name="menu" size={18} />
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 'none' }}>
+      <div className="header-brand">
         <BrandMark size={28} />
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>{consoleData?.name || 'Nexus Console'}</span>
-          <span className="mono header-brand-sub" style={{ fontSize: 11, color: 'var(--text-faint)' }}>homelab.local</span>
+        <div className="header-brand-text">
+          <span className="header-brand-name">{consoleData?.name || 'Nexus Console'}</span>
+          <span className="mono header-brand-sub header-brand-domain">homelab.local</span>
         </div>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{title}</span>
+      <div className="header-title-wrap">
+        <span className="header-title">{title}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ position: 'relative' }} ref={health.ref}>
+      <div className="header-actions">
+        <div className="header-popover-anchor" ref={health.ref}>
           <div
             onClick={() => { setHealthMenu((v) => !v); setUserMenu(false); setNotifMenu(false); }}
             title="Santé globale de l'infrastructure"
             className={`badge badge-${tone} header-health-badge`}
-            style={{ height: 30, cursor: 'pointer' }}
           >
-            <span className="dot" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} />
+            <span className="dot header-health-dot" />
             Santé globale
             <span className="mono">{score === null ? '—' : `${score} %`}</span>
           </div>
 
           {health.visible && (
-            <div className="card" style={{ position: 'absolute', top: 44, left: 0, width: 420, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${health.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+            <div className={`card header-popover-card ${health.closing ? 'header-popover-closing' : 'header-popover-opening'}`}>
+              <div className="header-health-summary">
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>Résumé de l'infrastructure</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 2 }}>Moyenne pondérée des {domainRows.length} domaines supervisés</div>
+                  <div className="header-health-summary-title">Résumé de l'infrastructure</div>
+                  <div className="header-health-summary-sub">Moyenne pondérée des {domainRows.length} domaines supervisés</div>
                 </div>
-                <div style={{ textAlign: 'right', flex: 'none' }}>
-                  <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: `var(--tone-${tone}-fg)`, lineHeight: 1.1 }}>{score === null ? '—' : `${score} %`}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>{toneLabel(score)}</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)' }}>
-                <div style={{ flex: 1, padding: '10px 16px', borderRight: '1px solid var(--border-soft)' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Domaines sains</div>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>{healthyDomains} / {domainRows.length}</div>
-                </div>
-                <div style={{ flex: 1, padding: '10px 16px' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Alertes actives</div>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 700, marginTop: 3, color: activeAlerts > 0 ? 'var(--tone-crit-fg)' : 'inherit' }}>{activeAlerts}</div>
+                <div className="header-health-summary-score">
+                  <div className="mono header-health-summary-score-value" style={{ color: `var(--tone-${tone}-fg)` }}>{score === null ? '—' : `${score} %`}</div>
+                  <div className="header-health-summary-score-label">{toneLabel(score)}</div>
                 </div>
               </div>
 
-              <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+              <div className="header-health-kpis">
+                <div className="header-health-kpi">
+                  <div className="header-health-kpi-label">Domaines sains</div>
+                  <div className="mono header-health-kpi-value">{healthyDomains} / {domainRows.length}</div>
+                </div>
+                <div className="header-health-kpi">
+                  <div className="header-health-kpi-label">Alertes actives</div>
+                  <div className={`mono header-health-kpi-value ${activeAlerts > 0 ? 'header-health-kpi-value-crit' : ''}`}>{activeAlerts}</div>
+                </div>
+              </div>
+
+              <div className="header-health-list">
                 {domainRows.map((d) => (
                   <div
                     key={d.id}
                     onClick={() => { navigate(d.path); health.close(); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: '1px solid var(--border-soft)', cursor: 'pointer' }}
+                    className="header-health-row"
                   >
-                    <Icon name={DOMAIN_ICON[d.id] || 'info'} size={15} style={{ flex: 'none', color: 'var(--text-faint)' }} />
-                    <span style={{ fontSize: 12.5, fontWeight: 500, width: 130, flex: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
-                    <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
+                    <Icon name={DOMAIN_ICON[d.id] || 'info'} size={15} className="header-health-row-icon" />
+                    <span className="header-health-row-label">{d.label}</span>
+                    <div className="header-health-row-bar">
                       {d.score !== null && (
-                        <div style={{ width: `${d.score}%`, height: '100%', borderRadius: 999, background: `var(--tone-${d.tone}-dot)` }} />
+                        <div className="header-health-row-bar-fill" style={{ width: `${d.score}%`, background: `var(--tone-${d.tone}-dot)` }} />
                       )}
                     </div>
-                    <span className="mono" style={{ fontSize: 12, fontWeight: 600, width: 34, flex: 'none', textAlign: 'right', color: d.score === null ? 'var(--text-faint)' : `var(--tone-${d.tone}-fg)` }}>
+                    <span className={`mono header-health-row-score ${d.score === null ? 'header-health-row-score-muted' : ''}`} style={d.score !== null ? { color: `var(--tone-${d.tone}-fg)` } : undefined}>
                       {d.score === null ? '—' : `${d.score}%`}
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-faint)', width: 110, flex: 'none', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span className="header-health-row-detail">
                       {d.entries.length === 0 ? 'Aucune intégration' : `${d.healthy.length} / ${d.configured.length} services`}
                     </span>
                   </div>
@@ -138,20 +138,12 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           onClick={onOpenSearch}
           title={`Command Center — recherche et actions (${SEARCH_SHORTCUT} ou ${IS_MAC ? '⌘⇧F' : 'Ctrl Shift F'})`}
           className="header-search-bar"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px 0 10px',
-            borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-inset, var(--bg))',
-            color: 'var(--text-faint)', cursor: 'pointer', width: 220,
-          }}
         >
-          <Icon name="search" size={14} style={{ flex: 'none' }} />
-          <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <Icon name="search" size={14} className="header-search-icon" />
+          <span className="header-search-text">
             Command Center...
           </span>
-          <span
-            className="header-search-label mono"
-            style={{ flex: 'none', fontSize: 10.5, fontWeight: 600, color: 'var(--text-faint)', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 5px', lineHeight: 1 }}
-          >
+          <span className="header-search-label mono">
             {SEARCH_SHORTCUT}
           </span>
         </button>
@@ -168,47 +160,47 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           <Icon name={resolved === 'dark' ? 'sun' : 'moon'} size={16} />
         </button>
 
-        <div style={{ position: 'relative' }} ref={notif.ref}>
-          <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn" style={{ position: 'relative' }}>
+        <div className="header-popover-anchor" ref={notif.ref}>
+          <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn header-notif-btn">
             <Icon name="bell" size={16} />
-            {(history.length > 0 || unreadCount > 0) && <span style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: 'var(--tone-crit-dot)', border: '2px solid var(--surface)' }} />}
+            {(history.length > 0 || unreadCount > 0) && <span className="header-notif-dot" />}
           </button>
           {notif.visible && (
-            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 340, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${notif.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
+            <div className={`card header-popover-card header-popover-card-right header-popover-card-narrow ${notif.closing ? 'header-popover-closing' : 'header-popover-opening'}`}>
               {isAdmin && (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>Alertes de sécurité{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
-                    {unreadCount > 0 && <span onClick={markAllServerRead} style={{ fontSize: 11.5, color: 'var(--text-faint)', cursor: 'pointer' }}>Tout marquer lu</span>}
+                  <div className="header-panel-head">
+                    <span className="header-panel-head-title">Alertes de sécurité{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
+                    {unreadCount > 0 && <span onClick={markAllServerRead} className="header-panel-head-action">Tout marquer lu</span>}
                   </div>
-                  <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                    {serverItems.length === 0 && <div style={{ padding: 16, fontSize: 12, color: 'var(--text-faint)', textAlign: 'center' }}>Aucune alerte</div>}
+                  <div className="header-panel-list">
+                    {serverItems.length === 0 && <div className="header-panel-empty">Aucune alerte</div>}
                     {serverItems.map((n) => (
-                      <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 15px', borderBottom: '1px solid var(--border-soft)', background: n.read ? 'transparent' : 'var(--border-soft)' }}>
-                        <span style={{ color: `var(--tone-${n.severity}-fg)`, flex: 'none', marginTop: 1 }}><Icon name={TONE_ICON[n.severity] || 'info'} size={15} /></span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          {n.title && <div style={{ fontSize: 12.5, fontWeight: 600 }}>{n.title}</div>}
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{n.message}</div>
-                          <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faintest)', marginTop: 2 }}>{new Date(n.createdAt).toLocaleString('fr-FR')}</div>
+                      <div key={n.id} className={`header-notif-item ${!n.read ? 'header-notif-item-unread' : ''}`}>
+                        <span className="header-notif-item-icon" style={{ color: `var(--tone-${n.severity}-fg)` }}><Icon name={TONE_ICON[n.severity] || 'info'} size={15} /></span>
+                        <div className="header-notif-item-body">
+                          {n.title && <div className="header-notif-item-title">{n.title}</div>}
+                          <div className="header-notif-item-message">{n.message}</div>
+                          <div className="mono header-notif-item-time">{new Date(n.createdAt).toLocaleString('fr-FR')}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Activité de la session</span>
-                {history.length > 0 && <span onClick={clearHistory} style={{ fontSize: 11.5, color: 'var(--text-faint)', cursor: 'pointer' }}>Effacer</span>}
+              <div className="header-panel-head">
+                <span className="header-panel-head-title">Activité de la session</span>
+                {history.length > 0 && <span onClick={clearHistory} className="header-panel-head-action">Effacer</span>}
               </div>
-              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                {history.length === 0 && <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)', textAlign: 'center' }}>Aucune notification récente</div>}
+              <div className="header-panel-list">
+                {history.length === 0 && <div className="header-panel-empty header-panel-empty-lg">Aucune notification récente</div>}
                 {history.map((n) => (
-                  <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                    <span style={{ color: `var(--tone-${n.type}-fg)`, flex: 'none', marginTop: 1 }}><Icon name={TONE_ICON[n.type]} size={15} /></span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {n.title && <div style={{ fontSize: 12.5, fontWeight: 600 }}>{n.title}</div>}
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{n.message}</div>
-                      <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faintest)', marginTop: 2 }}>{new Date(n.time).toLocaleTimeString('fr-FR')}</div>
+                  <div key={n.id} className="header-notif-item">
+                    <span className="header-notif-item-icon" style={{ color: `var(--tone-${n.type}-fg)` }}><Icon name={TONE_ICON[n.type]} size={15} /></span>
+                    <div className="header-notif-item-body">
+                      {n.title && <div className="header-notif-item-title">{n.title}</div>}
+                      <div className="header-notif-item-message">{n.message}</div>
+                      <div className="mono header-notif-item-time">{new Date(n.time).toLocaleTimeString('fr-FR')}</div>
                     </div>
                   </div>
                 ))}
@@ -217,49 +209,49 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           )}
         </div>
 
-        <div style={{ position: 'relative' }} ref={userP.ref}>
-          <div onClick={() => { setUserMenu((v) => !v); setNotifMenu(false); }} title={user?.name} style={{ cursor: 'pointer' }}>
+        <div className="header-popover-anchor" ref={userP.ref}>
+          <div onClick={() => { setUserMenu((v) => !v); setNotifMenu(false); }} title={user?.name} className="header-user-trigger">
             <Avatar user={user} size={32} />
           </div>
           {userP.visible && (
-            <div className="card" style={{ position: 'absolute', top: 44, right: 0, width: 280, boxShadow: 'var(--shadow-pop)', zIndex: 60, overflow: 'hidden', animation: `${userP.closing ? 'popOut' : 'popIn'} .13s ease both` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 15px', borderBottom: '1px solid var(--border-soft)' }}>
+            <div className={`card header-popover-card header-popover-card-right header-popover-card-user ${userP.closing ? 'header-popover-closing' : 'header-popover-opening'}`}>
+              <div className="header-user-head">
                 <Avatar user={user} size={36} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user?.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+                <div className="header-user-head-info">
+                  <div className="header-user-head-name">{user?.name}</div>
+                  <div className="header-user-head-email">{user?.email}</div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', borderBottom: '1px solid var(--border-soft)' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>Rôle</span>
+              <div className="header-user-role-row">
+                <span className="header-user-role-label">Rôle</span>
                 <span className={`badge badge-${user?.role === 'admin' ? 'vio' : 'mut'}`}>
                   <span className="dot" />{user?.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
                 </span>
               </div>
 
-              <div style={{ padding: 6, borderBottom: '1px solid var(--border-soft)' }}>
-                <Link to="/account" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+              <div className="header-user-menu-group">
+                <Link to="/account" onClick={() => setUserMenu(false)} className="header-user-menu-link">
                   <Icon name="edit" size={15} />Mon profil
                 </Link>
                 {user?.role === 'admin' && (
-                  <Link to="/settings" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+                  <Link to="/settings" onClick={() => setUserMenu(false)} className="header-user-menu-link">
                     <Icon name="layers" size={15} />Paramètres du compte
                   </Link>
                 )}
-                <Link to="/account" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+                <Link to="/account" onClick={() => setUserMenu(false)} className="header-user-menu-link">
                   <Icon name="sun" size={15} />Préférences &amp; thème
                 </Link>
-                <Link to="/setup" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+                <Link to="/setup" onClick={() => setUserMenu(false)} className="header-user-menu-link">
                   <Icon name="plus" size={15} />Configuration initiale
                 </Link>
-                <Link to="/account" onClick={() => setUserMenu(false)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
+                <Link to="/account" onClick={() => setUserMenu(false)} className="header-user-menu-link">
                   <Icon name="lock" size={15} />Clés API &amp; sessions
                 </Link>
               </div>
 
-              <div style={{ padding: 6 }}>
-                <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--tone-crit-fg)' }}>
+              <div className="header-user-menu-group header-user-menu-group-last">
+                <div onClick={logout} className="header-user-menu-link header-user-menu-link-danger">
                   <Icon name="logout" size={15} />Se déconnecter
                 </div>
               </div>
