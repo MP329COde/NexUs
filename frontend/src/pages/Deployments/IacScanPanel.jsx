@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './ScanPanels.css';
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('fr-FR');
@@ -41,51 +42,51 @@ export default function IacScanPanel() {
       sub="Checkov, open source — bonnes pratiques de sécurité sur les Dockerfiles réels de la plateforme"
       span={12}
       actions={
-        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: scanning ? 'default' : 'pointer', opacity: scanning ? 0.6 : 1 }} onClick={scanning ? undefined : runScan}>
+        <span className={`btn-outline scanp-run-btn${scanning ? ' scanp-run-btn-disabled' : ''}`} onClick={scanning ? undefined : runScan}>
           <Icon name={scanning ? 'refresh' : 'layers'} size={13} />{scanning ? 'Scan en cours…' : 'Lancer un scan'}
         </span>
       }
     >
-      <div style={{ display: 'flex', minHeight: 140 }}>
-        <div style={{ width: 220, flex: 'none', borderRight: '1px solid var(--border-soft)', maxHeight: 300, overflowY: 'auto' }}>
+      <div className="scanp-body" style={{ minHeight: 140 }}>
+        <div className="scanp-list" style={{ maxHeight: 300 }}>
           {loading ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Chargement…</div>
+            <div className="faint scanp-list-msg">Chargement…</div>
           ) : scans.length === 0 ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Aucun scan encore lancé</div>
+            <div className="faint scanp-list-msg">Aucun scan encore lancé</div>
           ) : (
             scans.map((s) => (
               <div
                 key={s.id} onClick={() => setOpenScan(s.id)}
-                style={{ padding: '9px 12px', cursor: 'pointer', background: active?.id === s.id ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
+                className={`scanp-list-item${active?.id === s.id ? ' scanp-list-item-active' : ''}`}
               >
-                <div style={{ fontSize: 11.5, fontWeight: 600 }}>{s.total} finding(s)</div>
-                <div className="faint" style={{ fontSize: 10.5 }}>{formatDate(s.scannedAt)}</div>
+                <div className="scanp-list-item-title">{s.total} finding(s)</div>
+                <div className="faint scanp-list-item-date">{formatDate(s.scannedAt)}</div>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ flex: 1, padding: 16 }}>
+        <div className="scanp-results">
           {!active ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', paddingTop: 30 }}>Lancez un scan pour voir les résultats ici.</div>
+            <div className="faint scanp-results-empty" style={{ paddingTop: 30 }}>Lancez un scan pour voir les résultats ici.</div>
           ) : active.total === 0 ? (
             <span className="badge badge-ok"><span className="dot" />Aucun problème détecté</span>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div className="scanp-table-wrap">
+              <table className="scanp-table">
                 <thead>
                   <tr>
                     {['Check', 'Fichier', 'Description'].map((c) => (
-                      <th key={c} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                      <th key={c} className="scanp-th">{c}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {active.findings.map((f, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                      <td style={{ padding: '6px 10px' }} className="mono">{f.checkId}</td>
-                      <td style={{ padding: '6px 10px' }} className="mono muted">{f.file}{f.lines ? `:${f.lines[0]}` : ''}</td>
-                      <td style={{ padding: '6px 10px' }}>{f.name}</td>
+                    <tr key={i} className="scanp-row">
+                      <td className="scanp-td mono">{f.checkId}</td>
+                      <td className="scanp-td mono muted">{f.file}{f.lines ? `:${f.lines[0]}` : ''}</td>
+                      <td className="scanp-td">{f.name}</td>
                     </tr>
                   ))}
                 </tbody>

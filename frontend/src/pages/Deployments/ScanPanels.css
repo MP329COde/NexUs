@@ -147,3 +147,69 @@
   font-size: 11px;
   margin-top: 8px;
 }
+
+.scanp-schedule-row {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scanp-schedule-note {
+  font-size: 11.5px;
+}
+
+.scanp-simple-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.scanp-leak-list {
+  padding: 6px;
+}
+
+.scanp-leak-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scanp-leak-icon {
+  color: var(--tone-crit-fg);
+  flex: none;
+}
+
+.scanp-leak-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanp-leak-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.scanp-leak-tier {
+  font-weight: 400;
+}
+
+.scanp-leak-path {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanp-leak-badge {
+  flex: none;
+}
+
+.scanp-leak-time {
+  font-size: 10.5px;
+  flex: none;
+}
