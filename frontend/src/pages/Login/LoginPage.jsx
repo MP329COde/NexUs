@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { api } from '../../lib/apiClient.js';
 import LoginVisual from './LoginVisual.jsx';
 import BrandMark from '../../components/ui/BrandMark.jsx';
+import './LoginPage.css';
 
 export default function LoginPage() {
   const { user, login, setUserFromSession } = useAuth();
@@ -49,43 +50,43 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', background: 'var(--bg)' }}>
-      <div style={{ flex: '1 1 440px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <form onSubmit={onSubmit} style={{ width: '100%', maxWidth: 340, animation: 'riseIn .4s ease both' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+    <div className="login-page">
+      <div className="login-form-col">
+        <form onSubmit={onSubmit} className="login-form">
+          <div className="login-brand-row">
             <BrandMark size={32} />
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Nexus Console</div>
-              <div className="mono faint" style={{ fontSize: 11 }}>homelab.local</div>
+              <div className="login-brand-name">Nexus Console</div>
+              <div className="mono faint login-brand-domain">homelab.local</div>
             </div>
           </div>
-          <p className="faint" style={{ fontSize: 13, margin: '4px 0 26px' }}>Connectez-vous pour accéder à votre infrastructure.</p>
+          <p className="faint login-intro">Connectez-vous pour accéder à votre infrastructure.</p>
 
-          <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, marginBottom: 6 }}>E-mail ou nom de connexion</label>
-          <input className="input" type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: 14 }} autoFocus />
+          <label className="login-field-label">E-mail ou nom de connexion</label>
+          <input className="input login-field-email" type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
 
-          <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, marginBottom: 6 }}>Mot de passe</label>
-          <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginBottom: 18 }} />
+          <label className="login-field-label">Mot de passe</label>
+          <input className="input login-field-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
 
-          {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)', marginBottom: 14 }}>{error}</div>}
+          {error && <div className="login-error">{error}</div>}
 
-          <button className="btn" type="submit" disabled={busy} style={{ width: '100%' }}>
+          <button className="btn login-submit-btn" type="submit" disabled={busy}>
             {busy ? 'Connexion…' : 'Se connecter'}
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0' }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
-            <span className="faint" style={{ fontSize: 11 }}>ou</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+          <div className="login-divider-row">
+            <div className="login-divider-line" />
+            <span className="faint login-divider-label">ou</span>
+            <div className="login-divider-line" />
           </div>
 
-          <button className="btn-outline" type="button" onClick={onPasskey} disabled={passkeyBusy} style={{ width: '100%', height: 36 }}>
+          <button className="btn-outline login-passkey-btn" type="button" onClick={onPasskey} disabled={passkeyBusy}>
             {passkeyBusy ? 'En attente de la clé d\'accès…' : 'Se connecter avec une clé d\'accès'}
           </button>
         </form>
       </div>
 
-      <div className="login-visual" style={{ flex: '1 1 55%' }}>
+      <div className="login-visual login-visual-col">
         <LoginVisual />
       </div>
     </div>

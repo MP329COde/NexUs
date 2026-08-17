@@ -1,0 +1,91 @@
+.login-page {
+  height: 100vh;
+  display: flex;
+  background: var(--bg);
+}
+
+.login-form-col {
+  flex: 1 1 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 340px;
+  animation: riseIn .4s ease both;
+}
+
+.login-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.login-brand-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.login-brand-domain {
+  font-size: 11px;
+}
+
+.login-intro {
+  font-size: 13px;
+  margin: 4px 0 26px;
+}
+
+.login-field-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.login-field-email {
+  margin-bottom: 14px;
+}
+
+.login-field-password {
+  margin-bottom: 18px;
+}
+
+.login-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin-bottom: 14px;
+}
+
+.login-submit-btn {
+  width: 100%;
+}
+
+.login-divider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.login-divider-label {
+  font-size: 11px;
+}
+
+.login-passkey-btn {
+  width: 100%;
+  height: 36px;
+}
+
+.login-visual-col {
+  flex: 1 1 55%;
+}
