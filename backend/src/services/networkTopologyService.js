@@ -80,6 +80,27 @@ export async function getTopology() {
         label: 'Infrastructure Proxmox',
         nodes: nodes.map((n) => ({ id: `pve-${n.node}`, label: n.node, meta: `${Math.round((n.cpu || 0) * 100)}% CPU`, tone: n.status === 'online' ? 'ok' : 'crit', linkTo: '/infrastructure' }))
       });
+
+      // Dernière couche : les VM/LXC réels de chaque nœud, pas seulement les
+      // nœuds Proxmox eux-mêmes — c'est la "vraie topologie des VMs" demandée,
+      // au lieu de s'arrêter au niveau hyperviseur. Interrogé nœud par nœud
+      // (l'API Proxmox n'a pas d'endpoint global "toutes les VM") et limité
+      // pour rester lisible sur un cluster chargé.
+      const vmsByNode = await Promise.all(nodes.map((n) => safe(() => proxmox.listVMs(n.node)).then((vms) => ({ node: n.node, vms: vms || [] }))));
+      const allVms = vmsByNode.flatMap(({ node, vms }) => vms.map((v) => ({ ...v, node })));
+      if (allVms.length) {
+        layers.push({
+          id: 'proxmox-vms',
+          label: `Machines virtuelles & conteneurs (${allVms.length})`,
+          nodes: allVms.slice(0, 40).map((v) => ({
+            id: `vm-${v.node}-${v.vmid}`,
+            label: v.name || `${v.type}/${v.vmid}`,
+            meta: `${v.node} · ${v.type.toUpperCase()} #${v.vmid}`,
+            tone: v.status === 'running' ? 'ok' : v.status === 'stopped' ? 'mut' : 'warn',
+            linkTo: '/infrastructure'
+          }))
+        });
+      }
     }
   }
 

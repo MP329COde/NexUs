@@ -190,7 +190,35 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'url', label: 'URL du webhook', type: 'password', secret: true, placeholder: 'https://hooks.slack.com/services/…' }
     ]
+  },
+  ovh: {
+    label: 'OVH (DNS)',
+    hint: 'Gestion des zones DNS de vos domaines OVH — permet de pointer un domaine vers cette infrastructure directement depuis Réseaux → Proxies & domaines.',
+    guide: [
+      "Créez une application API sur https://api.ovh.com/createApp/ (choisissez la région correspondant à votre compte : Europe = ovh-eu, Amérique du Nord = ovh-ca, US = ovh-us).",
+      "Notez l'Application Key et l'Application Secret générés.",
+      "Générez un Consumer Key avec les droits nécessaires sur https://api.ovh.com/createToken/ (ou via l'API) : GET/PUT/POST sur /domain/zone/*, méthode simple : cochez GET, PUT, POST pour la route /domain/zone/*.",
+      "Validez la demande de Consumer Key en suivant le lien de confirmation envoyé — il expire après un délai court."
+    ],
+    fields: [
+      { key: 'endpoint', label: 'Région', type: 'select', options: [{ value: 'ovh-eu', label: 'Europe (ovh-eu)' }, { value: 'ovh-ca', label: 'Amérique du Nord (ovh-ca)' }, { value: 'ovh-us', label: 'États-Unis (ovh-us)' }] },
+      { key: 'appKey', label: 'Application Key' },
+      { key: 'appSecret', label: 'Application Secret', type: 'password', secret: true },
+      { key: 'consumerKey', label: 'Consumer Key', type: 'password', secret: true, hint: 'Généré et validé via api.ovh.com/createToken/.' }
+    ]
+  },
+  duckdns: {
+    label: 'DuckDNS',
+    hint: 'DNS dynamique gratuit pour les sous-domaines *.duckdns.org — pratique derrière une IP publique qui change (accès domicile/labo).',
+    guide: [
+      "Connectez-vous sur https://www.duckdns.org (via GitHub/Google/Reddit/Twitter).",
+      "Créez un ou plusieurs sous-domaines depuis la page d'accueil du compte.",
+      "Copiez le token affiché en haut de page (un seul token pour tous vos sous-domaines DuckDNS)."
+    ],
+    fields: [
+      { key: 'token', label: 'Token DuckDNS', type: 'password', secret: true }
+    ]
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns'];

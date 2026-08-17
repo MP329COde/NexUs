@@ -16,7 +16,9 @@ export const SECRET_FIELDS = {
   grafana: ['apiKey'],
   wazuh: ['password'],
   registry: ['password'],
-  notificationsWebhook: ['url']
+  notificationsWebhook: ['url'],
+  ovh: ['appSecret', 'consumerKey'],
+  duckdns: ['token']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -87,7 +89,9 @@ function isConfigured(key, entry) {
     grafana: ['baseUrl'],
     wazuh: ['baseUrl'],
     registry: ['baseUrl'],
-    notificationsWebhook: ['url']
+    notificationsWebhook: ['url'],
+    ovh: ['appKey', 'appSecret', 'consumerKey'],
+    duckdns: ['token']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

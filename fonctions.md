@@ -12,6 +12,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **console.routes.js** — Info console minimale (authentifiée).
 - **deployments.routes.js** — CRUD de liens de déploiement (projet↔dépôt↔cible), pipeline associé, sync GitOps, diff, historique, rollback, **provisionnement direct de l'application Argo CD** (`POST /:id/provision-argocd-app` : crée/met à jour l'Application dans Argo CD depuis le dépôt déjà lié — repo résolu automatiquement, sync automatisée par défaut — sans passer par l'interface Argo CD).
 - **devtools.routes.js** — Détection des outils dev présents sur la machine backend (git, docker, kubectl, node...).
+- **dns.routes.js** — Liste des zones OVH (`GET /ovh/zones`) et synchronisation DNS réelle d'un domaine (`POST /sync`, admin) : détecte le fournisseur (DuckDNS pour `*.duckdns.org`, sinon zone OVH correspondante) et crée/met à jour l'enregistrement A vers l'adresse cible fournie — sans que l'admin ait à choisir explicitement le fournisseur.
 - **domains.routes.js** — Liste des domaines gérés.
 - **github.routes.js** — Statut, dépôts, workflow runs, pull requests GitHub.
 - **gitea.routes.js** — Statut, dépôts, pull requests Gitea (lecture + approbation ; pas d'éditeur GitOps arborescence/commit, contrairement à GitLab/GitHub).
@@ -32,7 +33,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **inventory.routes.js** — CRUD inventaire matériel/logiciel.
 - **jobs.routes.js** — Liste (admin) et suivi d'un job asynchrone.
 - **kubernetes.routes.js** — Namespaces, pods, deployments, services, logs/describe/metrics/owners de pod, restart/scale/rollback/purge deployment, suppression de pod, **remontée vers le lien de déploiement** (`GET /deployments/:namespace/:name/links` : dépôt Git et application Argo CD qui déploient cette ressource, s'il existe un lien correspondant dans `deploymentStore`).
-- **networkTopology.routes.js** — Topologie réseau agrégée (proxies, HAProxy, Traefik, Proxmox, K8s).
+- **networkTopology.routes.js** — Topologie réseau agrégée (proxies, HAProxy, Traefik, Proxmox — nœuds **et** VM/LXC réels de chaque nœud —, K8s), construite uniquement à partir des intégrations réellement configurées.
 - **organizations.routes.js** — Liste/création d'organisations, projets d'une organisation.
 - **pipelines.routes.js** — Vue agrégée des runs CI (GitLab+GitHub), relance d'un run, **détail jobs/étapes d'un run** (`GET /runs/:id/jobs`, GitHub Actions uniquement).
 - **projects.routes.js** — CRUD projets (allowlist stricte des champs modifiables), membres, environnements, espace de travail, webhook & rotation secret, déploiements liés, jobs, incidents, changements, fenêtres de maintenance, tâches, raccourcis, coffre-fort projet, **mot de passe de coffre-fort projet** (`PUT`/`DELETE /:id/vault-password`), **scans de sécurité par projet** (`GET`/`POST /:id/security-scans` : SAST/SCA/IaC réels sur les dépôts liés, maintainer+).
@@ -73,7 +74,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **integrationRegistry.js** — Registre central des intégrations disponibles.
 - **jobService.js** — Exécution asynchrone en process, suivi persisté.
 - **networkScanService.js** — Scan nmap sur cible validée strictement.
-- **networkTopologyService.js** — Agrégation topologie depuis les intégrations configurées.
+- **networkTopologyService.js** — Agrégation topologie depuis les intégrations configurées, y compris les VM/LXC réels de chaque nœud Proxmox (`proxmox.listVMs`).
 - **pgDumpService.js** — Export/import JSON du socle relationnel Postgres.
 - **pipelineNormalizer.js** — Normalisation commune des runs CI GitLab/GitHub Actions.
 - **projectWorkspaceService.js** — Agrégation de l'état des dépôts liés à un projet.
@@ -100,6 +101,8 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **integrations/proxmoxService.js** — API2 JSON réelle, `listNodes()` expose désormais aussi `maxcpu`/`disk`/`maxdisk`.
 - **integrations/traefikService.js** — API REST réelle, écriture de routes dynamiques.
 - **integrations/wazuhService.js** — API REST avec cache JWT (token 14min).
+- **integrations/ovhService.js** — API OVH réelle (gestion de zones DNS) : authentification signée (application key/secret + consumer key, calcul du décalage d'horloge via `/auth/time`), `listZones`/`listRecords`/`upsertRecord` (crée ou met à jour l'enregistrement A puis rafraîchit la zone).
+- **integrations/duckdnsService.js** — API DuckDNS réelle (`GET /update`), met à jour un sous-domaine `*.duckdns.org` vers une IP donnée (ou laisse DuckDNS détecter l'IP publique sortante si aucune n'est fournie).
 
 Toutes les intégrations suivent le même patron : `notConfigured()` si non paramétrées côté Paramètres, sinon appel API réel — aucune donnée simulée/mockée.
 
@@ -168,11 +171,11 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Réseau
 
-- **NetworkPage.jsx / ProxyFormDialog.jsx / AttachFrontendDialog.jsx** — Proxies et domaines.
+- **NetworkPage.jsx / ProxyFormDialog.jsx / AttachFrontendDialog.jsx** — Proxies et domaines, **action « DNS » par domaine** (modale « Pointer ce domaine ») qui appelle `POST /dns/sync` : détecte OVH ou DuckDNS selon le domaine/la configuration, crée/met à jour l'enregistrement réel.
 - **HAProxyPage.jsx** — Backends/frontends/servers en direct.
 - **CertificatesPage.jsx** — Certificats cert-manager, renouvellement.
 - **FirewallPage.jsx** — Trafic API temps réel, IPs suspectes, blocage.
-- **TopologyPage.jsx** — Topologie depuis les intégrations configurées.
+- **TopologyPage.jsx** — Topologie depuis les intégrations configurées, **couche « Machines virtuelles & conteneurs »** listant les VM/LXC réels de chaque nœud Proxmox (pas seulement les nœuds eux-mêmes).
 - **NetworkLayout.jsx** — Layout de section.
 
 ### Monitoring / Stockage / Sécurité / autres

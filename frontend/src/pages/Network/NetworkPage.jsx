@@ -16,7 +16,24 @@ export default function NetworkPage() {
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [attaching, setAttaching] = useState(null);
+  const [dnsDomain, setDnsDomain] = useState(null);
+  const [dnsTarget, setDnsTarget] = useState('');
+  const [dnsBusy, setDnsBusy] = useState(false);
   const notify = useNotify();
+
+  async function syncDns(e) {
+    e.preventDefault();
+    setDnsBusy(true);
+    try {
+      const res = await api.post('/dns/sync', { domain: dnsDomain, target: dnsTarget });
+      notify(res.message, { type: 'ok', title: 'DNS mis à jour' });
+      setDnsDomain(null);
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Échec de la mise à jour DNS' });
+    } finally {
+      setDnsBusy(false);
+    }
+  }
 
   async function apply(id) {
     try {
@@ -100,9 +117,9 @@ export default function NetworkPage() {
           />
         </Panel>
 
-        <Panel title="Domaines" sub="Vue agrégée domaine → proxy → certificat" span={12}>
+        <Panel title="Domaines" sub="Vue agrégée domaine → proxy → certificat — DNS via OVH ou DuckDNS (Paramètres)" span={12}>
           <DataTable
-            columns={['Domaine', 'Proxy', 'TLS', 'Certificat']}
+            columns={['Domaine', 'Proxy', 'TLS', 'Certificat', 'Actions']}
             rows={domains.data?.items}
             emptyTitle="Aucun domaine suivi"
             renderRow={(d) => (
@@ -115,11 +132,33 @@ export default function NetworkPage() {
                     ? <span className={`badge badge-${d.certificate.ready ? 'ok' : 'warn'}`}><span className="dot" />{d.certificate.name}</span>
                     : <span className="faint network-cert-empty">—</span>}
                 </td>
+                <td>
+                  <span className="btn-outline network-action-btn" onClick={() => { setDnsDomain(d.domain); setDnsTarget(''); }}><Icon name="globe" size={13} />DNS</span>
+                </td>
               </tr>
             )}
           />
         </Panel>
       </div>
+
+      {dnsDomain && (
+        <div className="pfd-overlay" onClick={() => setDnsDomain(null)}>
+          <form className="card pfd-card" onClick={(e) => e.stopPropagation()} onSubmit={syncDns}>
+            <div className="pfd-title">Pointer {dnsDomain}</div>
+            <div className="pfd-field">
+              <label className="pfd-field-label">Adresse cible (IP publique ou hôte)</label>
+              <input className="input" required autoFocus placeholder="203.0.113.10" value={dnsTarget} onChange={(e) => setDnsTarget(e.target.value)} />
+            </div>
+            <div className="faint" style={{ marginBottom: 12 }}>
+              Utilise OVH (zone DNS classique) ou DuckDNS (domaines *.duckdns.org) selon le fournisseur configuré dans Paramètres → Intégrations.
+            </div>
+            <div className="pfd-actions">
+              <span className="btn-outline" onClick={() => setDnsDomain(null)}>Annuler</span>
+              <button className="btn" type="submit" disabled={dnsBusy}>{dnsBusy ? 'Envoi…' : 'Mettre à jour le DNS'}</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {formOpen && (
         <ProxyFormDialog

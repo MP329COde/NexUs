@@ -18,7 +18,7 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
 
   useEffect(() => {
     const values = {};
-    for (const f of schema.fields) values[f.key] = f.secret ? '' : (initial?.[f.key] ?? (f.type === 'checkbox' ? false : ''));
+    for (const f of schema.fields) values[f.key] = f.secret ? '' : (initial?.[f.key] ?? (f.type === 'checkbox' ? false : f.type === 'select' ? (f.options?.[0]?.value ?? '') : ''));
     setForm(values);
   }, [initial, schema.fields]);
 
@@ -162,6 +162,10 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
                 <div className="integ-field-input-wrap">
                   {f.type === 'checkbox' ? (
                     <input type="checkbox" checked={Boolean(form[f.key])} onChange={(e) => set(f.key, e.target.checked)} />
+                  ) : f.type === 'select' ? (
+                    <select className="input" value={form[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}>
+                      {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                   ) : (
                     <input
                       className="input"
