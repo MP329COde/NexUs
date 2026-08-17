@@ -133,8 +133,8 @@ export const MANUAL_SECTIONS = [
     blocks: [
       { type: 'p', text: "Cinq onglets, Topologie en page d'arrivée :" },
       { type: 'ul', items: [
-        'Topologie : schéma reconstitué automatiquement à partir de ce qui est réellement configuré (proxies, HAProxy, Traefik, Kubernetes, Proxmox) — rien n\'est illustré tant qu\'aucune donnée réelle n\'est disponible. Cliquez sur un nœud pour aller directement le gérer.',
-        'Proxies & domaines : créez un reverse proxy (domaine → service:port), Appliquez-le (écrit la configuration sur Traefik ou HAProxy selon le moteur choisi), Testez la connexion HTTP, ou Supprimez-le. Cochez Important pour qu\'il apparaisse dans la carte « Disponibilité 24h » de l\'accueil (relevé horaire réel de la même URL testée manuellement).',
+        'Topologie : schéma reconstitué automatiquement à partir de ce qui est réellement configuré (proxies, HAProxy, Traefik, Kubernetes, Proxmox — nœuds ET machines virtuelles/conteneurs LXC réels de chaque nœud) — rien n\'est illustré tant qu\'aucune donnée réelle n\'est disponible. Cliquez sur un nœud pour aller directement le gérer.',
+        'Proxies & domaines : créez un reverse proxy (domaine → service:port), Appliquez-le (écrit la configuration sur Traefik ou HAProxy selon le moteur choisi), Testez la connexion HTTP, ou Supprimez-le. Cochez Important pour qu\'il apparaisse dans la carte « Disponibilité 24h » de l\'accueil (relevé horaire réel de la même URL testée manuellement). Bouton DNS par domaine : pointe le domaine vers une adresse cible en écrivant réellement l\'enregistrement chez le fournisseur DNS configuré (OVH pour une zone classique, DuckDNS pour un domaine *.duckdns.org — voir Paramètres → Intégrations).',
         'HAProxy : liste des backends et bascule d\'état des serveurs en temps réel (ready / drain / maint).',
         'Certificats : statut de renouvellement des certificats cert-manager (dépend de l\'intégration Kubernetes).',
         'Pare-feu : trafic API de la console en temps réel (rafraîchi toutes les 5 s) et détection des adresses qui accumulent des requêtes en échec (401/403/429). Réservé aux administrateurs pour la détection et le blocage ; le trafic récent reste visible par tous.'
@@ -181,8 +181,10 @@ export const MANUAL_SECTIONS = [
     group: 'Modules opérationnels',
     title: 'Organisations et Projets',
     blocks: [
-      { type: 'p', text: "Au-delà du rôle global Administrateur/Utilisateur, chaque projet a son propre modèle de permissions à quatre niveaux, du moins au plus privilégié : viewer (lecture seule) < developer (déclarer un incident, proposer un changement, créer des tâches) < maintainer (approuver un changement, gérer les membres, relancer un job) < owner (approuver un changement production, supprimer le projet)." },
+      { type: 'p', text: "Au-delà du rôle global Administrateur/Utilisateur, chaque projet a son propre modèle de permissions à quatre niveaux, du moins au plus privilégié : viewer (lecture seule) < developer (déclarer un incident, proposer un changement, créer des tâches) < maintainer (approuver un changement, gérer les membres, relancer un job) < owner (approuver un changement production, supprimer le projet). Un membre peut être retiré du projet directement depuis le panneau Équipe (icône ✕)." },
       { type: 'note', text: "Un administrateur de plateforme garde toujours un accès owner implicite à tous les projets. Un owner/admin d'organisation a de même un accès owner implicite à tous les projets de son organisation." },
+      { type: 'p', text: "Une organisation a elle-même des membres (distincts des membres d'un projet précis) : owner/admin/member, gérés depuis Organisations → icône « Membres » sur chaque carte. Ajouter un membre se fait depuis la liste complète des comptes (réservé aux administrateurs de plateforme). Le dernier propriétaire d'une organisation ne peut pas être rétrogradé ni retiré, pour éviter une organisation sans propriétaire." },
+      { type: 'p', text: "Le statut d'un projet (Actif / En pause / Archivé) se change depuis un sélecteur en haut de sa fiche, réservé owner/maintainer. La suppression d'un projet ou d'une organisation est irréversible et réservée à leur owner — supprimer une organisation qui contient encore des projets exige une confirmation renforcée explicite." },
       { type: 'p', text: "Organisations → Projets → Environnements : un projet appartient à une organisation et peut avoir plusieurs environnements (dev, staging, production...). Un environnement marqué production exige le rôle owner pour toute action dessus (synchronisation, rollback, approbation d'un changement le ciblant) — un maintainer peut proposer ou exécuter, mais pas approuver." },
       { type: 'p', text: "Incidents : suivi d'un problème survenu (gravité, état, ressource affectée), avec un lien optionnel vers un runbook externe (wiki, Confluence) affiché directement sur la fiche. Clore un incident exige de documenter sa résolution — impossible de le fermer silencieusement." },
       { type: 'p', text: "Changements contrôlés : une modification planifiée (pas un problème), avec impact attendu, décision et exécution distinctes. Proposer est ouvert à developer+ ; approuver/rejeter exige maintainer+ (owner si l'environnement visé est en production) ; exécuter reste bloqué tant que le changement n'est pas approuvé." },
@@ -196,7 +198,8 @@ export const MANUAL_SECTIONS = [
     group: 'Modules opérationnels',
     title: 'Monitoring et Cybersécurité',
     blocks: [
-      { type: 'p', text: "Monitoring affiche les alertes actives (filtrables par sévérité), les tableaux de bord Grafana, et — si Proxmox est aussi configuré — la charge CPU/RAM en direct de chaque hôte. Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact." },
+      { type: 'p', text: "Monitoring affiche les alertes actives (filtrables par sévérité), les tableaux de bord Grafana, et — si Proxmox est aussi configuré — la charge CPU/RAM en direct de chaque hôte. Si Grafana n'est pas encore configuré, un bouton « Installer Grafana automatiquement » propose de déployer un conteneur Grafana officiel sur un hôte déjà géré (Infrastructure → Hôtes), avec aperçu du script exécuté avant confirmation." },
+      { type: 'p', text: "Cybersécurité affiche les agents Wazuh (actifs/déconnectés) et leur dernier contact, ainsi qu'un panneau « Conformité (SCA) » : audits de configuration (CIS Benchmarks) réellement remontés par chaque agent actif, avec score de réussite par politique." },
       { type: 'p', text: "Deux outils supplémentaires, réservés aux administrateurs, apparaissent en bas de la page Cybersécurité :" },
       { type: 'ul', items: [
         'IPs bannies : bloque une adresse IPv4 à l\'entrée de la console (toutes les routes, avant même l\'authentification). Impossible de bannir sa propre adresse — la console refuse pour éviter un verrouillage accidentel.',
@@ -209,10 +212,11 @@ export const MANUAL_SECTIONS = [
     group: 'Modules opérationnels',
     title: 'Stockage',
     blocks: [
-      { type: 'p', text: "Suivi déclaratif de vos volumes, NAS, pools ZFS et partages : ce n'est pas une intégration qui interroge un outil de stockage en direct, mais une liste que vous tenez à jour manuellement (nom, type, hôte, capacité et espace utilisé en Go)." },
+      { type: 'p', text: "Suivi déclaratif de vos volumes, NAS, pools ZFS et partages : une liste que vous tenez à jour manuellement (nom, type, hôte, capacité et espace utilisé en Go) — utile pour du stockage hors Proxmox." },
       { type: 'p', text: "Chaque volume affiche une barre de progression colorée selon le taux de remplissage (vert en dessous de 65 %, orange entre 65 et 85 %, rouge au-delà de 85 %) et une icône d'alerte au-delà de 85 %." },
+      { type: 'p', text: "Si Proxmox est configuré, un panneau « Stockage Proxmox » distinct affiche l'état réel de chaque stockage (dir, lvmthin, zfspool, nfs...) par nœud — used/avail rapportés directement par l'API, rafraîchi toutes les 30 s, pas de saisie manuelle." },
       { type: 'p', text: "Le panneau « Sauvegardes de la console » (administrateurs uniquement) résume les sauvegardes de la base Nexus elle-même (nexus.db) — nombre conservé, taille totale, date de la plus récente — avec un lien direct vers Paramètres → Système pour les gérer." },
-      { type: 'note', text: "Rien n'est mesuré automatiquement ici : si la capacité ou l'utilisation affichée est fausse, c'est qu'elle n'a pas été mise à jour depuis le dernier changement réel sur le volume concerné." }
+      { type: 'note', text: "Le suivi déclaratif (volumes/NAS/pools/partages) n'est pas mesuré automatiquement : si la capacité affichée est fausse, c'est qu'elle n'a pas été mise à jour depuis le dernier changement réel. Le panneau « Stockage Proxmox », lui, reflète toujours l'état réel." }
     ]
   },
   {
@@ -327,7 +331,8 @@ export const MANUAL_SECTIONS = [
       { type: 'ul', items: [
         'Version : commit/branche actuels, et Vérifier les mises à jour (compare avec origin en lecture seule — la console ne s\'auto-met-à-jour et ne redémarre jamais elle-même).',
         'Sauvegardes : copie horodatée de la base, planifiée chaque nuit à 3h (14 dernières conservées), ou déclenchée manuellement. Téléchargez un fichier .db, ou Importez-en un pour le rendre disponible à la restauration.',
-        'Restaurer une sauvegarde remplace toutes les données actuelles — une sauvegarde de sécurité de l\'état courant est créée automatiquement avant, et votre mot de passe est redemandé pour confirmer.'
+        'Restaurer une sauvegarde remplace toutes les données actuelles — une sauvegarde de sécurité de l\'état courant est créée automatiquement avant, et votre mot de passe est redemandé pour confirmer.',
+        'Sauvegarde Git : pousse les sauvegardes vers un dépôt Git vous appartenant (GitHub/GitLab/Gitea...), configuré dans Paramètres → Intégrations → Sauvegarde Git (URL HTTPS + token, jamais écrit en clair sur disque). « Vérifier le dépôt distant » liste les sauvegardes déjà présentes et permet de les réimporter (utile pour restaurer depuis une machine différente de celle d\'origine) ; « Pousser maintenant » en crée une nouvelle et l\'envoie.'
       ] },
       { type: 'p', text: "Paramètres → Journal liste les 200 dernières actions administratives sensibles (connexions, gestion des comptes, proxies, hôtes, sauvegardes, configuration des intégrations) avec l'auteur et l'horodatage." }
     ]

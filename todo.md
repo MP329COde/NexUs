@@ -42,6 +42,8 @@ et documentée dans `fonctions.md` une fois réellement faite.
 
 - [x] Retrait d'un membre d'un projet : même manque que pour la suppression de projet — `DELETE /projects/:id/members/:userId` existait côté backend mais jamais appelé côté frontend (seul le changement de rôle l'était, pas de moyen de retirer quelqu'un). Ajouté (icône ✕ à côté de chaque membre dans le panneau Équipe). Vérifié via Playwright de bout en bout (ajout d'Alice, retrait, vérifié disparue).
 
+- [x] Manuel utilisateur (`frontend/src/pages/Manual/manualContent.js`) mis à jour pour refléter toutes les fonctionnalités ajoutées cette session : DNS OVH/DuckDNS et VMs dans la topologie (Réseaux), auto-installation Grafana (Monitoring), conformité SCA Wazuh (Cybersécurité), panneau Stockage Proxmox — **une phrase y était devenue activement fausse** ("ce n'est pas une intégration qui interroge un outil de stockage en direct") depuis l'ajout du panneau réel, corrigée. Ajout aussi : membres d'organisation, suppression projet/organisation, retrait de membre, sauvegarde Git. Vérifié rendu réel sur /manual via Playwright.
+
 ## Environnement de développement (contexte pour la prochaine session)
 Un Postgres local a été démarré pour cette session (conteneur Docker `nexus-dev-postgres`,
 port 5433, volume éphémère non persistant — les données y seront perdues si le conteneur
