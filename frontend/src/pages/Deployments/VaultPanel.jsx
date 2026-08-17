@@ -7,6 +7,7 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import RotationCountdown from '../../components/vault/RotationCountdown.jsx';
+import './VaultPanel.css';
 
 const EMPTY_DEV_FORM = { label: '', username: '', secret: '', url: '', notes: '' };
 const EMPTY_PROD_FORM = { label: '', username: '', url: '', notes: '', rotationMinutes: '' };
@@ -143,34 +144,34 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
 
   return (
     <Panel title={title} sub={sub} span={canManage ? 6 : 12}>
-      <div style={{ padding: 6 }}>
-        {items.length === 0 && <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 16 }}>Aucune entrée</div>}
+      <div className="vault-list">
+        {items.length === 0 && <div className="faint vault-empty">Aucune entrée</div>}
         {items.map((entry) => (
-          <div key={entry.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 13 }}>{entry.label}</div>
-                <div className="faint" style={{ fontSize: 11 }}>{entry.username || '—'}</div>
+          <div key={entry.id} className="vault-row">
+            <div className="vault-row-main">
+              <div className="vault-row-info">
+                <div className="vault-row-label">{entry.label}</div>
+                <div className="faint vault-row-username">{entry.username || '—'}</div>
                 {entry.url && (
-                  <div className="mono" style={{ fontSize: 10.5, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{entry.url}</div>
+                  <div className="mono vault-row-url">{entry.url}</div>
                 )}
               </div>
               {entry.url && (
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => openAccess(entry)} title="Ouvrir un accès direct">
+                <span className="btn-outline vault-action-btn" onClick={() => openAccess(entry)} title="Ouvrir un accès direct">
                   <Icon name={accessIcon(entry.url)} size={12} /> Ouvrir
                 </span>
               )}
               {revealed[entry.id] === undefined ? (
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => startReveal(entry)}>
+                <span className="btn-outline vault-action-btn" onClick={() => startReveal(entry)}>
                   <Icon name="shield" size={12} /> Révéler
                 </span>
               ) : (
                 <>
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id].secret)}>
+                  <span className="btn-outline vault-action-btn" onClick={() => copy(revealed[entry.id].secret)}>
                     <Icon name="copy" size={12} /> Copier
                   </span>
                   <span
-                    className="btn-outline" title="Masquer" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }}
+                    className="btn-outline vault-action-btn-icon" title="Masquer"
                     onClick={() => { setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; }); delete sessionPasswordsRef.current[entry.id]; }}
                   >
                     <Icon name="eyeOff" size={12} />
@@ -179,10 +180,10 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
               )}
               {canManage && (
                 <>
-                  <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }} onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
+                  <span className="btn-outline vault-action-btn-icon" onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
                     <Icon name="edit" size={12} />
                   </span>
-                  <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => remove(entry)}>
+                  <span className="btn-outline vault-action-btn-icon vault-action-btn-danger" onClick={() => remove(entry)}>
                     <Icon name="trash" size={12} />
                   </span>
                 </>
@@ -190,7 +191,7 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
             </div>
 
             {revealed[entry.id] !== undefined && (
-              <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="mono vault-revealed">
                 <span>{revealed[entry.id].secret}</span>
                 {revealed[entry.id].rotatesAt && (
                   <RotationCountdown rotatesAt={revealed[entry.id].rotatesAt} onDue={() => silentRefresh(entry)} />
@@ -203,20 +204,20 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
 
       {editing && (
         <Modal title={`Modifier « ${editing.label} »`} sub="Le secret lui-même ne peut pas être changé ici — supprimez puis recréez l'entrée." onClose={() => setEditing(null)} width={420}>
-          <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={saveEdit} className="vault-modal-form">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="vault-field-label">Nom</label>
               <input className="input" required value={editing.label} onChange={(e) => setEditing((s) => ({ ...s, label: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Utilisateur</label>
+              <label className="vault-field-label">Utilisateur</label>
               <input className="input" value={editing.username} onChange={(e) => setEditing((s) => ({ ...s, username: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès</label>
+              <label className="vault-field-label">URL / hôte d'accès</label>
               <input className="input" value={editing.url} onChange={(e) => setEditing((s) => ({ ...s, url: e.target.value }))} placeholder="ssh://user@10.0.0.12" />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="vault-modal-actions">
               <span className="btn-outline" onClick={() => setEditing(null)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
             </div>
@@ -226,13 +227,12 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
 
       {revealing && !tripleVerify && (
         <Modal title={`Révéler « ${revealing.label} »`} sub="Ré-authentification requise" onClose={() => { setRevealing(null); setStepUpPassword(''); }} width={380}>
-          <form onSubmit={(e) => { e.preventDefault(); doReveal(revealing, stepUpPassword); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={(e) => { e.preventDefault(); doReveal(revealing, stepUpPassword); }} className="vault-modal-form">
             <input
-              className="input" type="password" autoFocus autoComplete="off" placeholder="Votre mot de passe"
+              className="input vault-stepup-input" type="password" autoFocus autoComplete="off" placeholder="Votre mot de passe"
               value={stepUpPassword} onChange={(e) => setStepUpPassword(e.target.value)}
-              style={{ height: 34, fontSize: 12.5 }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="vault-modal-actions">
               <span className="btn-outline" onClick={() => { setRevealing(null); setStepUpPassword(''); }}>Annuler</span>
               <button className="btn" type="submit">Confirmer</button>
             </div>
@@ -244,20 +244,20 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
         <Modal title={`Révéler « ${revealing.label} »`} sub={`Secret de production — étape ${revealStep} / 3`} onClose={() => setRevealing(null)} width={420}>
           {revealStep === 1 && (
             <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 8, background: 'var(--tone-crit-soft, var(--primary-soft))', marginBottom: 4 }}>
-                <Icon name="alertTriangle" size={16} style={{ color: 'var(--tone-crit-fg)', flex: 'none', marginTop: 1 }} />
-                <p style={{ fontSize: 12.5, margin: 0 }}>Ceci est un secret de <strong>production</strong>. Ne le révélez que si vous en avez réellement besoin maintenant.</p>
+              <div className="vault-warning-box">
+                <Icon name="alertTriangle" size={16} className="vault-warning-icon" />
+                <p className="vault-warning-text">Ceci est un secret de <strong>production</strong>. Ne le révélez que si vous en avez réellement besoin maintenant.</p>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <div className="vault-modal-actions-spaced">
                 <span className="btn-outline" onClick={() => setRevealing(null)}>Annuler</span>
                 <button className="btn" onClick={() => setRevealStep(2)}>Continuer</button>
               </div>
             </>
           )}
           {revealStep === 2 && (
-            <form onSubmit={(e) => { e.preventDefault(); setRevealStep(3); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input className="input" type="password" autoFocus autoComplete="off" placeholder="Votre mot de passe" value={stepUpPassword} onChange={(e) => setStepUpPassword(e.target.value)} style={{ height: 34, fontSize: 12.5 }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <form onSubmit={(e) => { e.preventDefault(); setRevealStep(3); }} className="vault-modal-form">
+              <input className="input vault-stepup-input" type="password" autoFocus autoComplete="off" placeholder="Votre mot de passe" value={stepUpPassword} onChange={(e) => setStepUpPassword(e.target.value)} />
+              <div className="vault-modal-actions">
                 <span className="btn-outline" onClick={() => setRevealing(null)}>Annuler</span>
                 <button className="btn" type="submit">Suivant</button>
               </div>
@@ -265,11 +265,11 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
           )}
           {revealStep === 3 && (
             <form onSubmit={(e) => { e.preventDefault(); doReveal(revealing, stepUpPassword); }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, marginBottom: 4, cursor: 'pointer' }}>
+              <label className="vault-confirm-checkbox">
                 <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)} />
                 Je confirme accéder à ce secret de production pour une raison légitime.
               </label>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <div className="vault-modal-actions-spaced">
                 <span className="btn-outline" onClick={() => setRevealing(null)}>Annuler</span>
                 <button className="btn" type="submit" disabled={!confirmChecked}>Révéler définitivement</button>
               </div>
@@ -279,18 +279,18 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
       )}
 
       {canManage && (
-        <form onSubmit={create} autoComplete="off" style={{ padding: 16, borderTop: '1px solid var(--border-soft)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input className="input" autoComplete="off" placeholder="Nom (ex. VM test devops-1)" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={{ flex: '1 1 160px' }} />
-          <input className="input" autoComplete="off" placeholder="Utilisateur (optionnel)" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} style={{ flex: '1 1 130px' }} />
+        <form onSubmit={create} autoComplete="off" className="vault-create-form">
+          <input className="input vault-create-field-label" autoComplete="off" placeholder="Nom (ex. VM test devops-1)" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} />
+          <input className="input vault-create-field-username" autoComplete="off" placeholder="Utilisateur (optionnel)" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
           {tier === 'dev' && (
-            <input className="input" type="password" autoComplete="new-password" placeholder="Mot de passe" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} style={{ flex: '1 1 140px' }} />
+            <input className="input vault-create-field-secret" type="password" autoComplete="new-password" placeholder="Mot de passe" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} />
           )}
-          <input className="input" autoComplete="off" placeholder="URL d'accès (optionnel) — ssh://…" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} style={{ flex: '1 1 200px' }} />
+          <input className="input vault-create-field-url" autoComplete="off" placeholder="URL d'accès (optionnel) — ssh://…" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} />
           {tier === 'prod' && (
             <select
-              className="input" value={form.rotationMinutes}
+              className="input vault-create-field-rotation" value={form.rotationMinutes}
               onChange={(e) => setForm((f) => ({ ...f, rotationMinutes: e.target.value }))}
-              style={{ flex: '1 1 170px' }} title="Rotation automatique du secret"
+              title="Rotation automatique du secret"
             >
               <option value="">Pas de rotation auto</option>
               <option value="2">Rotation toutes les 2 min</option>
@@ -299,7 +299,7 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
               <option value="5">Rotation toutes les 5 min</option>
             </select>
           )}
-          <button className="btn" type="submit" disabled={busy} style={{ flex: 'none' }}>
+          <button className="btn vault-create-submit" type="submit" disabled={busy}>
             {busy ? 'Ajout…' : tier === 'prod' ? 'Générer & ajouter' : 'Ajouter'}
           </button>
         </form>

@@ -1,0 +1,164 @@
+.vault-list {
+  padding: 6px;
+}
+
+.vault-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 16px;
+}
+
+.vault-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.vault-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vault-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vault-row-label {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.vault-row-username {
+  font-size: 11px;
+}
+
+.vault-row-url {
+  font-size: 10.5px;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.vault-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.vault-action-btn-icon {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+
+.vault-action-btn-danger {
+  color: var(--tone-crit-fg);
+}
+
+.vault-revealed {
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 6px 8px;
+  background: var(--border-soft);
+  border-radius: 6px;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vault-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vault-field-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.vault-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vault-stepup-input {
+  height: 34px;
+  font-size: 12.5px;
+}
+
+.vault-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--tone-crit-soft, var(--primary-soft));
+  margin-bottom: 4px;
+}
+
+.vault-warning-icon {
+  color: var(--tone-crit-fg);
+  flex: none;
+  margin-top: 1px;
+}
+
+.vault-warning-text {
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.vault-modal-actions-spaced {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.vault-confirm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.vault-create-form {
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vault-create-field-label {
+  flex: 1 1 160px;
+}
+
+.vault-create-field-username {
+  flex: 1 1 130px;
+}
+
+.vault-create-field-secret {
+  flex: 1 1 140px;
+}
+
+.vault-create-field-url {
+  flex: 1 1 200px;
+}
+
+.vault-create-field-rotation {
+  flex: 1 1 170px;
+}
+
+.vault-create-submit {
+  flex: none;
+}
