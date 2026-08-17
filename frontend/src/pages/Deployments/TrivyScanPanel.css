@@ -1,0 +1,130 @@
+.trivy-form {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.trivy-form-input {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.trivy-body {
+  display: flex;
+  min-height: 200px;
+}
+
+.trivy-sidebar {
+  width: 220px;
+  flex: none;
+  border-right: 1px solid var(--border-soft);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.trivy-sidebar-empty {
+  padding: 16px;
+  font-size: 12px;
+}
+
+.trivy-scan-row {
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.trivy-scan-row-active {
+  background: var(--border-soft);
+}
+
+.trivy-scan-ref {
+  font-size: 11.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trivy-scan-date {
+  font-size: 10.5px;
+}
+
+.trivy-detail {
+  flex: 1;
+  padding: 16px;
+}
+
+.trivy-detail-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding-top: 40px;
+}
+
+.trivy-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.trivy-detail-icon {
+  color: var(--text-faint);
+}
+
+.trivy-detail-ref {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.trivy-detail-os {
+  font-size: 11px;
+}
+
+.trivy-scheduled-badge {
+  font-size: 10px;
+}
+
+.trivy-severity-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.trivy-findings-wrap {
+  overflow-x: auto;
+}
+
+.trivy-findings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.trivy-findings-head {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.trivy-findings-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.trivy-findings-cell {
+  padding: 6px 10px;
+}
+
+.trivy-findings-severity-badge {
+  font-size: 10px;
+}
+
+.trivy-more {
+  font-size: 11px;
+  margin-top: 8px;
+}

@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './TrivyScanPanel.css';
 
 const SEVERITY_TONE = { CRITICAL: 'crit', HIGH: 'crit', MEDIUM: 'warn', LOW: 'mut', UNKNOWN: 'mut' };
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
@@ -52,76 +53,75 @@ export default function TrivyScanPanel() {
       sub="Scan de vulnérabilités réel (Aqua Security, open source) sur n'importe quelle image accessible — indépendant du tableau de démonstration ci-dessous"
       span={12}
     >
-      <form onSubmit={runScan} style={{ display: 'flex', gap: 8, padding: 16, borderBottom: '1px solid var(--border-soft)' }}>
+      <form onSubmit={runScan} className="trivy-form">
         <input
-          className="input mono" placeholder="ex. nginx:1.27, alpine:3.19, ghcr.io/org/image:tag"
+          className="input mono trivy-form-input" placeholder="ex. nginx:1.27, alpine:3.19, ghcr.io/org/image:tag"
           value={imageRef} onChange={(e) => setImageRef(e.target.value)}
-          style={{ flex: 1, fontSize: 12.5 }}
         />
         <button className="btn" type="submit" disabled={scanning || !imageRef.trim()}>
           {scanning ? 'Scan en cours (jusqu\'à 2 min)…' : 'Scanner'}
         </button>
       </form>
 
-      <div style={{ display: 'flex', minHeight: 200 }}>
-        <div style={{ width: 220, flex: 'none', borderRight: '1px solid var(--border-soft)', maxHeight: 360, overflowY: 'auto' }}>
+      <div className="trivy-body">
+        <div className="trivy-sidebar">
           {loading ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Chargement…</div>
+            <div className="faint trivy-sidebar-empty">Chargement…</div>
           ) : scans.length === 0 ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Aucun scan encore lancé</div>
+            <div className="faint trivy-sidebar-empty">Aucun scan encore lancé</div>
           ) : (
             scans.map((s) => (
               <div
                 key={s.id} onClick={() => setOpenScan(s.id)}
-                style={{ padding: '9px 12px', cursor: 'pointer', background: active?.id === s.id ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
+                className={`trivy-scan-row${active?.id === s.id ? ' trivy-scan-row-active' : ''}`}
               >
-                <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.imageRef}</div>
-                <div className="faint" style={{ fontSize: 10.5 }}>{formatDate(s.scannedAt)}{s.trigger === 'scheduled' ? ' · planifié' : ''}</div>
+                <div className="mono trivy-scan-ref">{s.imageRef}</div>
+                <div className="faint trivy-scan-date">{formatDate(s.scannedAt)}{s.trigger === 'scheduled' ? ' · planifié' : ''}</div>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ flex: 1, padding: 16 }}>
+        <div className="trivy-detail">
           {!active ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', paddingTop: 40 }}>Lancez un scan pour voir les résultats ici.</div>
+            <div className="faint trivy-detail-empty">Lancez un scan pour voir les résultats ici.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <Icon name="image" size={15} style={{ color: 'var(--text-faint)' }} />
-                <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{active.imageRef}</span>
-                {active.osFamily && <span className="faint" style={{ fontSize: 11 }}>{active.osFamily} {active.osVersion}</span>}
-                {active.trigger === 'scheduled' && <span className="badge badge-mut" style={{ fontSize: 10 }}>Scan planifié (horaire)</span>}
+              <div className="trivy-detail-header">
+                <Icon name="image" size={15} className="trivy-detail-icon" />
+                <span className="mono trivy-detail-ref">{active.imageRef}</span>
+                {active.osFamily && <span className="faint trivy-detail-os">{active.osFamily} {active.osVersion}</span>}
+                {active.trigger === 'scheduled' && <span className="badge badge-mut trivy-scheduled-badge">Scan planifié (horaire)</span>}
               </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div className="trivy-severity-row">
                 {SEVERITY_ORDER.filter((sev) => active.counts[sev] > 0).map((sev) => (
                   <span key={sev} className={`badge badge-${SEVERITY_TONE[sev]}`}><span className="dot" />{active.counts[sev]} {sev}</span>
                 ))}
                 {active.total === 0 && <span className="badge badge-ok"><span className="dot" />Aucune vulnérabilité détectée</span>}
               </div>
               {active.findings.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <div className="trivy-findings-wrap">
+                  <table className="trivy-findings-table">
                     <thead>
                       <tr>
                         {['CVE', 'Sévérité', 'Paquet', 'Installé', 'Corrigé'].map((c) => (
-                          <th key={c} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                          <th key={c} className="trivy-findings-head">{c}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {active.findings.slice(0, 30).map((f, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                          <td style={{ padding: '6px 10px' }} className="mono">{f.id}</td>
-                          <td style={{ padding: '6px 10px' }}><span className={`badge badge-${SEVERITY_TONE[f.severity]}`} style={{ fontSize: 10 }}>{f.severity}</span></td>
-                          <td style={{ padding: '6px 10px' }} className="mono muted">{f.package}</td>
-                          <td style={{ padding: '6px 10px' }} className="mono muted">{f.installedVersion}</td>
-                          <td style={{ padding: '6px 10px' }} className="mono muted">{f.fixedVersion || '—'}</td>
+                        <tr key={i} className="trivy-findings-row">
+                          <td className="trivy-findings-cell mono">{f.id}</td>
+                          <td className="trivy-findings-cell"><span className={`badge badge-${SEVERITY_TONE[f.severity]} trivy-findings-severity-badge`}>{f.severity}</span></td>
+                          <td className="trivy-findings-cell mono muted">{f.package}</td>
+                          <td className="trivy-findings-cell mono muted">{f.installedVersion}</td>
+                          <td className="trivy-findings-cell mono muted">{f.fixedVersion || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {active.total > 30 && <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>+ {active.total - 30} autre(s), non affiché(es)</div>}
+                  {active.total > 30 && <div className="faint trivy-more">+ {active.total - 30} autre(s), non affiché(es)</div>}
                 </div>
               )}
             </>
