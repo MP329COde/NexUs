@@ -1,0 +1,107 @@
+.iad-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.iad-card {
+  width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.iad-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.iad-subtitle {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.iad-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.iad-catalog-item {
+  height: auto;
+  padding: 12px;
+  text-align: left;
+  display: block;
+}
+
+.iad-catalog-item-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.iad-catalog-item-desc {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.iad-script-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.iad-script-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.iad-script-pre {
+  font-size: 11px;
+  background: var(--border-soft);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 260px;
+}
+
+.iad-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.iad-actions-single {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.iad-result-badge {
+  margin-bottom: 10px;
+}
+
+.iad-result-stdout {
+  font-size: 11px;
+  background: var(--border-soft);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+.iad-result-stderr {
+  font-size: 11px;
+  color: var(--tone-crit-fg);
+  background: var(--tone-crit-bg);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 160px;
+  margin-top: 8px;
+}

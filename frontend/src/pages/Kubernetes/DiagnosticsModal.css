@@ -1,0 +1,101 @@
+.diag-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diag-loading {
+  font-size: 12.5px;
+}
+
+.diag-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.diag-links {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.diag-link-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.diag-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.diag-detections {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diag-detection-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.diag-detection-value {
+  font-weight: 500;
+}
+
+.diag-detection-value-warn {
+  color: var(--tone-warn-fg);
+  font-weight: 600;
+}
+
+.diag-ok-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--tone-ok-soft, var(--primary-soft));
+  font-size: 12.5px;
+  color: var(--tone-ok-fg);
+}
+
+.diag-finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diag-finding-cause {
+  margin-bottom: 10px;
+}
+
+.diag-finding-cause-text {
+  font-size: 12.5px;
+}
+
+.diag-finding-recommendation {
+  font-size: 12.5px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-2, var(--bg));
+}
+
+.diag-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-faintest);
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 4px;
+}

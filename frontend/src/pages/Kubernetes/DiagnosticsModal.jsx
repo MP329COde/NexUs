@@ -3,6 +3,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { runDiagnostics } from '../../lib/diagnostics.js';
+import './DiagnosticsModal.css';
 
 // Diagnostic automatique : agrège des signaux réels déjà présents dans le
 // cluster (pods prêts, redémarrages, usage vs limites) et applique des
@@ -22,7 +23,7 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
   return (
     <Modal
       title={(
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="diag-title">
           <Icon name={worst === 'ok' ? 'check' : 'alertTriangle'} size={16} style={{ color: `var(--tone-${worst}-fg)` }} />
           {name}
         </span>
@@ -31,18 +32,18 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
       onClose={onClose}
       width={520}
     >
-      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Analyse en cours…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {loading && <div className="faint diag-loading">Analyse en cours…</div>}
+      {error && <div className="diag-error">{error}</div>}
 
       {link && (link.argocdWebUrl || gitWebUrl) && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="diag-links">
           {gitWebUrl && (
-            <a href={gitWebUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+            <a href={gitWebUrl} target="_blank" rel="noreferrer" className="btn-outline diag-link-btn">
               <Icon name="gitBranch" size={12} />Dépôt Git
             </a>
           )}
           {link.argocdWebUrl && (
-            <a href={link.argocdWebUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+            <a href={link.argocdWebUrl} target="_blank" rel="noreferrer" className="btn-outline diag-link-btn">
               <Icon name="argocd" size={12} />Application Argo CD
             </a>
           )}
@@ -50,36 +51,36 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
       )}
 
       {result && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="diag-body">
           <div>
             <SectionTitle>Détection</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="diag-detections">
               {result.detections.map((d, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                <div key={i} className="diag-detection-row">
                   <span className="faint">{d.label}</span>
-                  <span className="mono" style={{ color: d.warn ? 'var(--tone-warn-fg)' : 'inherit', fontWeight: d.warn ? 600 : 500 }}>{d.value}</span>
+                  <span className={`mono ${d.warn ? 'diag-detection-value-warn' : 'diag-detection-value'}`}>{d.value}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {result.findings.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8, background: 'var(--tone-ok-soft, var(--primary-soft))', fontSize: 12.5, color: 'var(--tone-ok-fg)' }}>
+            <div className="diag-ok-banner">
               <Icon name="check" size={15} />Aucune anomalie détectée sur les signaux disponibles.
             </div>
           ) : (
             result.findings.map((f, i) => (
               <div key={i}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div className="diag-finding-head">
                   <span className={`badge badge-${f.severity}`}><span className="dot" />{f.severity === 'crit' ? 'Critique' : 'Avertissement'}</span>
                 </div>
-                <div style={{ marginBottom: 10 }}>
+                <div className="diag-finding-cause">
                   <SectionTitle>Cause probable</SectionTitle>
-                  <div style={{ fontSize: 12.5 }}>{f.cause}</div>
+                  <div className="diag-finding-cause-text">{f.cause}</div>
                 </div>
                 <div>
                   <SectionTitle>Recommandation</SectionTitle>
-                  <div style={{ fontSize: 12.5, padding: 10, borderRadius: 8, background: 'var(--surface-2, var(--bg))' }}>{f.recommendation}</div>
+                  <div className="diag-finding-recommendation">{f.recommendation}</div>
                 </div>
               </div>
             ))
@@ -92,7 +93,7 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
 
 function SectionTitle({ children }) {
   return (
-    <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faintest)', marginBottom: 6, borderBottom: '1px solid var(--border-soft)', paddingBottom: 4 }}>
+    <div className="diag-section-title">
       {children}
     </div>
   );

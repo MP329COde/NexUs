@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
+import './HostFormDialog.css';
 
 export default function HostFormDialog({ onClose, onSaved }) {
   const [form, setForm] = useState({ name: '', address: '', port: 22, sshUser: 'root', role: '', critical: false });
@@ -25,33 +26,33 @@ export default function HostFormDialog({ onClose, onSaved }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onClose}>
-      <form className="card" style={{ width: 400, padding: 22 }} onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Ajouter un hôte</div>
+    <div className="hfd-overlay" onClick={onClose}>
+      <form className="card hfd-card" onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
+        <div className="hfd-title">Ajouter un hôte</div>
 
         <Field label="Nom"><input className="input" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="srv-monitoring" /></Field>
         <Field label="Adresse"><input className="input" required value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="10.0.0.20" /></Field>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1 }}><Field label="Port SSH"><input className="input" type="number" value={form.port} onChange={(e) => set('port', e.target.value)} /></Field></div>
-          <div style={{ flex: 1 }}><Field label="Utilisateur SSH"><input className="input" value={form.sshUser} onChange={(e) => set('sshUser', e.target.value)} /></Field></div>
+        <div className="hfd-row">
+          <div className="hfd-row-field"><Field label="Port SSH"><input className="input" type="number" value={form.port} onChange={(e) => set('port', e.target.value)} /></Field></div>
+          <div className="hfd-row-field"><Field label="Utilisateur SSH"><input className="input" value={form.sshUser} onChange={(e) => set('sshUser', e.target.value)} /></Field></div>
         </div>
 
         <Field label="Rôle" hint="Affiché dans la carte « Hôtes critiques » de l'accueil, ex. « Hyperviseur Proxmox »">
           <input className="input" value={form.role} onChange={(e) => set('role', e.target.value)} placeholder="Hyperviseur Proxmox" />
         </Field>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 14, cursor: 'pointer' }}>
+        <label className="hfd-checkbox-label">
           <input type="checkbox" checked={form.critical} onChange={(e) => set('critical', e.target.checked)} />
           Hôte critique — affiché sur la page d'accueil pour tous les administrateurs
         </label>
 
-        <p className="faint" style={{ fontSize: 11.5, margin: '4px 0 12px' }}>
+        <p className="faint hfd-hint">
           Assurez-vous d'avoir copié la clé publique de la console dans le fichier authorized_keys de cet utilisateur avant d'installer un agent.
         </p>
 
-        {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)', marginBottom: 10 }}>{error}</div>}
+        {error && <div className="hfd-error">{error}</div>}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+        <div className="hfd-actions">
           <span className="btn-outline" onClick={onClose}>Annuler</span>
           <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
         </div>
@@ -62,8 +63,8 @@ export default function HostFormDialog({ onClose, onSaved }) {
 
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+    <div className="hfd-field">
+      <label className="hfd-field-label">{label}</label>
       {children}
     </div>
   );
