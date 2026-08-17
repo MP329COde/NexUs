@@ -1,11 +1,8 @@
 import { diffLines } from '../../lib/textDiff.js';
+import './DiffView.css';
 
-const ROW_STYLE = {
-  same: { color: 'var(--text-muted)' },
-  add: { background: 'var(--tone-ok-soft, rgba(16,185,129,.12))', color: 'var(--tone-ok-fg)' },
-  del: { background: 'var(--tone-crit-soft, rgba(244,63,94,.12))', color: 'var(--tone-crit-fg)' }
-};
-const PREFIX = { same: '  ', add: '+ ', del: '- ' };
+const ROW_CLASS = { same: 'diffview-row-same', add: 'diffview-row-add', del: 'diffview-row-del' };
+const PREFIX = { same: '  ', add: '+ ', del: '- ' };
 
 // Diff unifié (+/-) entre deux textes, ligne à ligne. `contextOnly` masque
 // les lignes identiques au-delà de `context` lignes autour d'un changement,
@@ -15,16 +12,16 @@ export default function DiffView({ oldText, newText, context = 2 }) {
   const visible = context === null ? rows.map((r, i) => ({ ...r, idx: i })) : filterContext(rows, context);
 
   if (rows.every((r) => r.type === 'same')) {
-    return <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 16 }}>Aucune différence</div>;
+    return <div className="faint diffview-empty">Aucune différence</div>;
   }
 
   return (
-    <pre className="mono" style={{ margin: 0, fontSize: 12, lineHeight: 1.6, overflowX: 'auto' }}>
+    <pre className="mono diffview-pre">
       {visible.map((r, i) => (
         r.gap ? (
-          <div key={`gap-${i}`} className="faint" style={{ padding: '2px 0' }}>⋯</div>
+          <div key={`gap-${i}`} className="faint diffview-gap">⋯</div>
         ) : (
-          <div key={i} style={{ ...ROW_STYLE[r.type], padding: '0 4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <div key={i} className={`diffview-row ${ROW_CLASS[r.type]}`}>
             {PREFIX[r.type]}{r.line}
           </div>
         )

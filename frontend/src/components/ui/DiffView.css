@@ -1,0 +1,36 @@
+.diffview-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 16px;
+}
+
+.diffview-pre {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.diffview-gap {
+  padding: 2px 0;
+}
+
+.diffview-row {
+  padding: 0 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diffview-row-same {
+  color: var(--text-muted);
+}
+
+.diffview-row-add {
+  background: var(--tone-ok-soft, rgba(16, 185, 129, .12));
+  color: var(--tone-ok-fg);
+}
+
+.diffview-row-del {
+  background: var(--tone-crit-soft, rgba(244, 63, 94, .12));
+  color: var(--tone-crit-fg);
+}

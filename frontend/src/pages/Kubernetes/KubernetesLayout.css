@@ -1,0 +1,37 @@
+.k8s-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.k8s-layout-nav {
+  flex: none;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.k8s-layout-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.k8s-layout-nav-link-active {
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.k8s-layout-content {
+  flex: 1;
+  min-width: 0;
+}

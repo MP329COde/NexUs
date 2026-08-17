@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { api } from '../../lib/apiClient.js';
+import './PodLogsDialog.css';
 
 export default function PodLogsDialog({ pod, onClose }) {
   const [logs, setLogs] = useState(null);
@@ -30,15 +31,15 @@ export default function PodLogsDialog({ pod, onClose }) {
       onClose={onClose}
       width={860}
       headerActions={(
-        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={load}>
+        <span className="btn-outline pld-refresh-btn" onClick={load}>
           <Icon name="refresh" size={12} className={loading ? 'spin' : ''} />Rafraîchir
         </span>
       )}
     >
-      {loading && !logs && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {loading && !logs && <div className="faint pld-loading">Chargement…</div>}
+      {error && <div className="pld-error">{error}</div>}
       {logs !== null && (
-        <pre className="mono" style={{ fontSize: 11.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, color: 'var(--text-muted)' }}>
+        <pre className="mono pld-logs">
           {logs || '(aucun log)'}
         </pre>
       )}
