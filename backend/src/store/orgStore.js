@@ -52,10 +52,6 @@ export async function getOrgRole(orgId, userId) {
   return rows[0]?.role || null;
 }
 
-// icon/color toujours réécrits (jamais COALESCE) : un champ vide envoyé
-// depuis le frontend signifie "revenir à l'icône générique", exactement
-// comme pour les projets (store/projectsStore.js) — pas de distinction
-// entre "non fourni" et "explicitement vidé" à gérer côté client.
 export async function updateOrganization(orgId, { name, icon, color }) {
   // icon n'était pas protégé par COALESCE (contrairement à name/color) : une
   // mise à jour ne renseignant pas l'icône (ex. juste renommer l'organisation)
@@ -80,6 +76,42 @@ export async function countOrgProjects(orgId) {
 
 export async function deleteOrganization(orgId) {
   const { rowCount } = await query('DELETE FROM organizations WHERE id = $1', [orgId]);
+  return rowCount > 0;
+}
+
+// --- Membres d'organisation --- (absent jusqu'ici : une organisation ne
+// pouvait avoir que son créateur comme membre, aucun moyen d'y ajouter un
+// collègue — bloquant pour tout usage à plusieurs. Distinct de listMembers()
+// plus bas, qui liste les membres d'un PROJET, pas d'une organisation.)
+// Pas de jointure SQL vers une table "users" : les comptes vivent dans le
+// store SQLite historique (usersStore.js), pas dans Postgres — même
+// convention que listMembers() (projets) ci-dessous, résolu côté frontend
+// via GET /users (déjà comment fait ProjectDetailPage.jsx).
+export async function listOrgMembers(orgId) {
+  const { rows } = await query(
+    'SELECT user_id, role FROM org_members WHERE org_id = $1 ORDER BY created_at',
+    [orgId]
+  );
+  return rows;
+}
+
+export async function addOrgMember(orgId, userId, role = 'member') {
+  const { rows } = await query(
+    `INSERT INTO org_members (org_id, user_id, role) VALUES ($1, $2, $3)
+     ON CONFLICT (org_id, user_id) DO UPDATE SET role = excluded.role
+     RETURNING *`,
+    [orgId, userId, role]
+  );
+  return rows[0];
+}
+
+export async function countOrgOwners(orgId) {
+  const { rows } = await query(`SELECT COUNT(*)::int AS n FROM org_members WHERE org_id = $1 AND role = 'owner'`, [orgId]);
+  return rows[0].n;
+}
+
+export async function removeOrgMember(orgId, userId) {
+  const { rowCount } = await query('DELETE FROM org_members WHERE org_id = $1 AND user_id = $2', [orgId, userId]);
   return rowCount > 0;
 }
 

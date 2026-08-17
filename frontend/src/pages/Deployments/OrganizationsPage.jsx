@@ -5,6 +5,8 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import OrgMembersModal from './OrgMembersModal.jsx';
 import './OrganizationsPage.css';
 
 const ORG_EMOJIS = ['🏢', '🚀', '⚙️', '🛰️', '🔧', '🧩', '🗄️', '🌐', '🔥', '🧠', '🛡️', '📊'];
@@ -17,6 +19,7 @@ const ORG_COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA
 // n'est pas membre). Icône/couleur personnalisées comme pour les projets.
 export default function OrganizationsPage() {
   const { data, error, reload } = useApi(() => api.get('/organizations'), []);
+  const { user } = useAuth();
   const notify = useNotify();
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState('');
@@ -25,6 +28,7 @@ export default function OrganizationsPage() {
   const [color, setColor] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [managingMembers, setManagingMembers] = useState(null);
 
   const organizations = data?.items || [];
   const configured = !error || !String(error).includes('DATABASE_URL');
@@ -190,7 +194,12 @@ export default function OrganizationsPage() {
               <span className="org-card-actions">
                 <span className="badge badge-vio">{org.my_role}</span>
                 {(org.my_role === 'owner' || org.my_role === 'admin') && (
-                  <span className="btn-outline org-card-edit-btn" onClick={() => setEditing(org)}>
+                  <span className="btn-outline org-card-edit-btn" onClick={() => setManagingMembers(org)} title="Gérer les membres">
+                    <Icon name="users" size={12} />
+                  </span>
+                )}
+                {(org.my_role === 'owner' || org.my_role === 'admin') && (
+                  <span className="btn-outline org-card-edit-btn" onClick={() => setEditing(org)} title="Icône et couleur">
                     <Icon name="edit" size={12} />
                   </span>
                 )}
@@ -205,6 +214,15 @@ export default function OrganizationsPage() {
           </div>
         ))}
       </div>
+
+      {managingMembers && (
+        <OrgMembersModal
+          org={managingMembers}
+          currentUserId={user?.id}
+          canManageUsers={user?.role === 'admin'}
+          onClose={() => setManagingMembers(null)}
+        />
+      )}
     </>
   );
 }

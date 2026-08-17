@@ -1,0 +1,41 @@
+.omm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.omm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omm-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.omm-role-select {
+  width: auto;
+}
+
+.omm-remove-btn {
+  height: 28px;
+  width: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tone-crit-fg);
+}
+
+.omm-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.omm-add-select {
+  flex: 1;
+}
