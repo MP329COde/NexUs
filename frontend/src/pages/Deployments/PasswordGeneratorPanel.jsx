@@ -8,6 +8,7 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { PASSPHRASE_WORDS } from '../../lib/passphraseWords.js';
 import { entropyBitsForRandom, entropyBitsForPassphrase, strengthLabel, crackTimeLabel } from '../../lib/passwordStrength.js';
+import './PasswordGeneratorPanel.css';
 
 const CHARSETS = {
   lower: 'abcdefghijklmnopqrstuvwxyz',
@@ -103,98 +104,96 @@ export default function PasswordGeneratorPanel({ onSaved }) {
 
   return (
     <Panel title="Générateur de mots de passe" sub="Local au navigateur — jamais envoyé au serveur" span={6}>
-      <div style={{ padding: 16 }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid var(--border-soft)' }}>
+      <div className="pwgen-body">
+        <div className="pwgen-tabs">
           {[['random', 'Caractères aléatoires'], ['passphrase', 'Phrase de passe']].map(([id, label]) => (
             <div
               key={id}
               onClick={() => { setMode(id); setValue(id === 'random' ? regenRandom() : generatePassphrase(wordCount, separator, capitalize, appendNumber)); }}
-              style={{ padding: '7px 4px', marginRight: 14, fontSize: 12.5, fontWeight: mode === id ? 600 : 500, color: mode === id ? 'var(--primary)' : 'var(--text-muted)', borderBottom: mode === id ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}
+              className={`pwgen-tab${mode === id ? ' pwgen-tab-active' : ''}`}
             >
               {label}
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <input className="input mono" readOnly value={value} style={{ flex: 1, fontSize: 13 }} />
-          <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }} onClick={() => copy()}><Icon name="copy" size={13} />Copier</span>
-          <span className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }} onClick={regenerate}><Icon name="refresh" size={13} />Régénérer</span>
+        <div className="pwgen-value-row">
+          <input className="input mono pwgen-value-input" readOnly value={value} />
+          <span className="btn-outline pwgen-value-btn" onClick={() => copy()}><Icon name="copy" size={13} />Copier</span>
+          <span className="btn-outline pwgen-value-btn" onClick={regenerate}><Icon name="refresh" size={13} />Régénérer</span>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 5 }}>
-            <span style={{ color: `var(--tone-${strength.tone}-fg)`, fontWeight: 600 }}>{strength.label} · {Math.round(bits)} bits</span>
+        <div className="pwgen-strength-wrap">
+          <div className="pwgen-strength-row">
+            <span className="pwgen-strength-label" style={{ color: `var(--tone-${strength.tone}-fg)` }}>{strength.label} · {Math.round(bits)} bits</span>
             <span className="faint">temps de cassage estimé : {crackTime}</span>
           </div>
-          <div style={{ height: 5, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(100, (bits / 100) * 100)}%`, height: '100%', background: `var(--tone-${strength.tone}-fg)`, borderRadius: 999, transition: 'width .2s ease' }} />
+          <div className="pwgen-strength-track">
+            <div className="pwgen-strength-fill" style={{ width: `${Math.min(100, (bits / 100) * 100)}%`, background: `var(--tone-${strength.tone}-fg)` }} />
           </div>
         </div>
 
         {mode === 'random' ? (
           <>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: 'var(--text-muted)' }}>Longueur : {length}</label>
+            <label className="pwgen-field-label">Longueur : {length}</label>
             <input
               type="range" min={12} max={128} value={length}
               onChange={(e) => { const l = Number(e.target.value); setLength(l); setValue(regenRandom(l)); }}
-              style={{ width: '100%', marginBottom: 14 }}
+              className="pwgen-range"
             />
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12.5, marginBottom: 10 }}>
+            <div className="pwgen-checkbox-row">
               {[['lower', 'a-z'], ['upper', 'A-Z'], ['digits', '0-9'], ['symbols', 'Symboles']].map(([key, label]) => (
-                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <label key={key} className="pwgen-checkbox">
                   <input type="checkbox" checked={opts[key]} onChange={() => toggle(key)} />{label}
                 </label>
               ))}
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer', marginBottom: 10 }}>
+            <label className="pwgen-checkbox pwgen-checkbox-spaced">
               <input type="checkbox" checked={excludeAmbiguous} onChange={(e) => { setExcludeAmbiguous(e.target.checked); setValue(regenRandom(length, opts, e.target.checked)); }} />
               Exclure les caractères ambigus (0, O, 1, l, I)
             </label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-              <div style={{ flex: '1 1 160px' }}>
-                <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>Symboles autorisés en plus</label>
+            <div className="pwgen-extra-fields">
+              <div className="pwgen-extra-field">
+                <label className="pwgen-extra-label">Symboles autorisés en plus</label>
                 <input
-                  className="input mono" placeholder="ex. €§~"
+                  className="input mono pwgen-extra-input" placeholder="ex. €§~"
                   value={extraChars}
                   onChange={(e) => { setExtraChars(e.target.value); setValue(regenRandom(length, opts, excludeAmbiguous, e.target.value)); }}
-                  style={{ height: 30, fontSize: 12.5 }}
                 />
               </div>
-              <div style={{ flex: '1 1 160px' }}>
-                <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>Caractères interdits</label>
+              <div className="pwgen-extra-field">
+                <label className="pwgen-extra-label">Caractères interdits</label>
                 <input
-                  className="input mono" placeholder={'ex. "\'`;'}
+                  className="input mono pwgen-extra-input" placeholder={'ex. "\'`;'}
                   value={excludeChars}
                   onChange={(e) => { setExcludeChars(e.target.value); setValue(regenRandom(length, opts, excludeAmbiguous, extraChars, e.target.value)); }}
-                  style={{ height: 30, fontSize: 12.5 }}
                 />
               </div>
             </div>
           </>
         ) : (
           <>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: 'var(--text-muted)' }}>Nombre de mots : {wordCount}</label>
+            <label className="pwgen-field-label">Nombre de mots : {wordCount}</label>
             <input
               type="range" min={3} max={8} value={wordCount}
               onChange={(e) => { const w = Number(e.target.value); setWordCount(w); setValue(generatePassphrase(w, separator, capitalize, appendNumber)); }}
-              style={{ width: '100%', marginBottom: 14 }}
+              className="pwgen-range"
             />
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, marginBottom: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="pwgen-passphrase-options">
+              <label className="pwgen-separator-label">
                 Séparateur
-                <select className="input" value={separator} onChange={(e) => { setSeparator(e.target.value); setValue(generatePassphrase(wordCount, e.target.value, capitalize, appendNumber)); }} style={{ height: 28, width: 70, fontSize: 12.5 }}>
+                <select className="input pwgen-separator-select" value={separator} onChange={(e) => { setSeparator(e.target.value); setValue(generatePassphrase(wordCount, e.target.value, capitalize, appendNumber)); }}>
                   <option value="-">-</option>
                   <option value="_">_</option>
                   <option value=".">.</option>
                   <option value="">(aucun)</option>
                 </select>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <label className="pwgen-checkbox">
                 <input type="checkbox" checked={capitalize} onChange={(e) => { setCapitalize(e.target.checked); setValue(generatePassphrase(wordCount, separator, e.target.checked, appendNumber)); }} />
                 Majuscules
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <label className="pwgen-checkbox">
                 <input type="checkbox" checked={appendNumber} onChange={(e) => { setAppendNumber(e.target.checked); setValue(generatePassphrase(wordCount, separator, capitalize, e.target.checked)); }} />
                 Ajouter un nombre
               </label>
@@ -202,22 +201,22 @@ export default function PasswordGeneratorPanel({ onSaved }) {
           </>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4, marginBottom: history.length ? 14 : 0 }}>
-          <span className="btn" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => setSaveOpen(true)}>
+        <div className={`pwgen-save-row${history.length ? ' pwgen-save-row-with-history' : ''}`}>
+          <span className="btn pwgen-save-btn" onClick={() => setSaveOpen(true)}>
             <Icon name="lock" size={13} />Enregistrer dans un coffre-fort
           </span>
         </div>
 
         {history.length > 0 && (
-          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: 'var(--text-faintest)', marginBottom: 6 }}>
+          <div className="pwgen-history">
+            <div className="pwgen-history-heading">
               Historique de cette session
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="pwgen-history-list">
               {history.map((h, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="mono faint" style={{ flex: 1, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h}</span>
-                  <Icon name="copy" size={12} style={{ color: 'var(--text-faint)', cursor: 'pointer', flex: 'none' }} onClick={() => copy(h)} />
+                <div key={i} className="pwgen-history-row">
+                  <span className="mono faint pwgen-history-value">{h}</span>
+                  <Icon name="copy" size={12} className="pwgen-history-copy" onClick={() => copy(h)} />
                 </div>
               ))}
             </div>
@@ -267,31 +266,31 @@ function SaveToVaultModal({ value, isAdmin, onClose, onSaved }) {
 
   return (
     <Modal title="Enregistrer dans un coffre-fort" sub="Le mot de passe généré sera chiffré au repos" onClose={onClose} width={440}>
-      <form onSubmit={save} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <form onSubmit={save} autoComplete="off" className="pwgen-modal-form">
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Destination</label>
+          <label className="pwgen-modal-label">Destination</label>
           <select className="input" value={currentTarget} onChange={(e) => setTarget(e.target.value)}>
             {isAdmin && <option value="dev">Mots de passe dev (globaux)</option>}
             {projectItems.map((p) => <option key={p.id} value={p.id}>Coffre-fort — {p.name}</option>)}
           </select>
           {!isAdmin && projectItems.length === 0 && (
-            <div className="faint" style={{ fontSize: 11.5, marginTop: 5 }}>Vous n'êtes membre d'aucun projet.</div>
+            <div className="faint pwgen-modal-hint">Vous n'êtes membre d'aucun projet.</div>
           )}
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+          <label className="pwgen-modal-label">Nom</label>
           <input className="input" autoComplete="off" required value={label} onChange={(e) => setLabel(e.target.value)} placeholder="VM test devops-1" />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Utilisateur (optionnel)</label>
+          <label className="pwgen-modal-label">Utilisateur (optionnel)</label>
           <input className="input" autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès (optionnel)</label>
+          <label className="pwgen-modal-label">URL / hôte d'accès (optionnel)</label>
           <input className="input" autoComplete="off" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="ssh://user@10.0.0.12 ou https://vm-test.homelab.local" />
         </div>
-        <div className="mono" style={{ fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all' }}>{value}</div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="mono pwgen-modal-value">{value}</div>
+        <div className="pwgen-modal-actions">
           <span className="btn-outline" onClick={onClose}>Annuler</span>
           <button className="btn" type="submit" disabled={busy || !currentTarget}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
         </div>
