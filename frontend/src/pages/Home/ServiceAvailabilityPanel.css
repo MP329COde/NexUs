@@ -1,0 +1,103 @@
+.sap-legend-anchor {
+  position: relative;
+}
+
+.sap-legend-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.sap-legend-card {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  width: 220px;
+  padding: 10px;
+  z-index: 60;
+  box-shadow: var(--shadow-pop);
+}
+
+.sap-legend-opening {
+  animation: popIn .13s ease both;
+}
+
+.sap-legend-closing {
+  animation: popOut .13s ease both;
+}
+
+.sap-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.sap-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sap-legend-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sap-legend-hint {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-left: auto;
+}
+
+.sap-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.sap-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sap-service-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sap-service-name {
+  width: 90px;
+  flex: none;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sap-hourly-track {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+}
+
+.sap-hourly-cell {
+  flex: 1;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.sap-axis-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-faintest);
+  margin-top: 2px;
+}

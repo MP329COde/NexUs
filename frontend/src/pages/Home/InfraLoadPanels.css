@@ -1,0 +1,148 @@
+.ilp-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.ilp-live-badge {
+  height: 22px;
+}
+
+.ilp-live-dot {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+.ilp-chart-body {
+  padding: 14px 16px 16px;
+}
+
+.ilp-svg {
+  width: 100%;
+  display: block;
+}
+
+.ilp-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.ilp-legend-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faintest);
+}
+
+.ilp-legend-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ilp-legend-swatch {
+  width: 8px;
+  height: 2px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.ilp-legend-label {
+  color: var(--text-muted);
+}
+
+.ilp-legend-value {
+  font-weight: 600;
+}
+
+.wdp-body {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.wdp-donut-wrap {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  flex: none;
+}
+
+.wdp-donut-svg {
+  transform: rotate(-90deg);
+}
+
+.wdp-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.wdp-donut-center-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.wdp-donut-center-label {
+  font-size: 9.5px;
+  color: var(--text-faint);
+}
+
+.wdp-legend {
+  flex: 1;
+  min-width: 0;
+}
+
+.wdp-legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wdp-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.wdp-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.wdp-legend-label {
+  flex: 1;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wdp-legend-count {
+  font-weight: 600;
+  width: 26px;
+  text-align: right;
+}
+
+.wdp-legend-pct {
+  font-size: 10.5px;
+  color: var(--text-faintest);
+  width: 32px;
+  text-align: right;
+}
+
+.wdp-empty {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  padding-bottom: 14px;
+}

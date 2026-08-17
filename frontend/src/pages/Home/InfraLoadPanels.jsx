@@ -1,6 +1,7 @@
 import Panel from '../../components/ui/Panel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './InfraLoadPanels.css';
 
 const CPU_COLOR = '#3B82F6';
 const RAM_COLOR = '#8B5CF6';
@@ -23,7 +24,7 @@ export function InfraLoadPanel() {
   if (samples.length === 0) {
     return (
       <Panel title="Charge de l'infrastructure" sub="CPU et mémoire agrégés" span={8}>
-        <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="ilp-empty">
           Non configuré — nécessite l'intégration Proxmox (Paramètres → Intégrations)
         </div>
       </Panel>
@@ -42,20 +43,20 @@ export function InfraLoadPanel() {
       sub="CPU et mémoire agrégés des nœuds Proxmox en ligne"
       span={8}
       actions={(
-        <span className="badge badge-ok" style={{ height: 22 }}>
-          <span className="dot" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} />LIVE
+        <span className="badge badge-ok ilp-live-badge">
+          <span className="dot ilp-live-dot" />LIVE
         </span>
       )}
     >
-      <div style={{ padding: '14px 16px 16px' }}>
-        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height, display: 'block' }} preserveAspectRatio="none">
+      <div className="ilp-chart-body">
+        <svg viewBox={`0 0 ${width} ${height}`} className="ilp-svg" style={{ height }} preserveAspectRatio="none">
           <path d={buildPath(cpuValues, width, height, 100)} fill="none" stroke={CPU_COLOR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           <path d={buildPath(ramValues, width, height, 100)} fill="none" stroke={RAM_COLOR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 10, fontSize: 12 }}>
+        <div className="ilp-legend-row">
           <LegendDot color={CPU_COLOR} label="CPU" value={`${lastCpu} %`} />
           <LegendDot color={RAM_COLOR} label="RAM" value={`${lastRam} %`} />
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-faintest)' }} className="mono">
+          <span className="ilp-legend-time mono">
             {spanMinutes < 1 ? 'quelques secondes' : `-${spanMinutes} min`} → maintenant
           </span>
         </div>
@@ -66,10 +67,10 @@ export function InfraLoadPanel() {
 
 function LegendDot({ color, label, value }) {
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ width: 8, height: 2, borderRadius: 2, background: color, display: 'inline-block' }} />
-      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span className="mono" style={{ fontWeight: 600 }}>{value}</span>
+    <span className="ilp-legend-dot">
+      <span className="ilp-legend-swatch" style={{ background: color }} />
+      <span className="ilp-legend-label">{label}</span>
+      <span className="mono ilp-legend-value">{value}</span>
     </span>
   );
 }
@@ -104,9 +105,9 @@ export function WorkloadDonutPanel() {
 
   return (
     <Panel title="Répartition des charges" sub="Par type de workload" span={4}>
-      <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 18 }}>
-        <div style={{ position: 'relative', width: 116, height: 116, flex: 'none' }}>
-          <svg width={116} height={116} viewBox="0 0 116 116" style={{ transform: 'rotate(-90deg)' }}>
+      <div className="wdp-body">
+        <div className="wdp-donut-wrap">
+          <svg width={116} height={116} viewBox="0 0 116 116" className="wdp-donut-svg">
             {arcs.length === 0 ? (
               <circle cx={58} cy={58} r={r} fill="none" stroke="var(--border-soft)" strokeWidth={14} />
             ) : arcs.map((a) => (
@@ -119,19 +120,19 @@ export function WorkloadDonutPanel() {
               />
             ))}
           </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>{total || '—'}</span>
-            <span style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>workloads</span>
+          <div className="wdp-donut-center">
+            <span className="mono wdp-donut-center-value">{total || '—'}</span>
+            <span className="wdp-donut-center-label">workloads</span>
           </div>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div className="wdp-legend">
+          <div className="wdp-legend-list">
             {WORKLOAD_SEGMENTS.map((seg) => (
-              <div key={seg.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, flex: 'none' }} />
-                <span style={{ flex: 1, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{seg.label}</span>
-                <span className="mono" style={{ fontWeight: 600, width: 26, textAlign: 'right' }}>{counts[seg.key] === null ? '—' : counts[seg.key]}</span>
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-faintest)', width: 32, textAlign: 'right' }}>
+              <div key={seg.key} className="wdp-legend-row">
+                <span className="wdp-legend-swatch" style={{ background: seg.color }} />
+                <span className="wdp-legend-label">{seg.label}</span>
+                <span className="mono wdp-legend-count">{counts[seg.key] === null ? '—' : counts[seg.key]}</span>
+                <span className="mono wdp-legend-pct">
                   {counts[seg.key] && total ? `${Math.round((counts[seg.key] / total) * 100)}%` : ''}
                 </span>
               </div>
@@ -140,7 +141,7 @@ export function WorkloadDonutPanel() {
         </div>
       </div>
       {total === 0 && (
-        <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text-faint)', paddingBottom: 14 }}>
+        <div className="wdp-empty">
           Aucune donnée (Proxmox et Kubernetes non configurés)
         </div>
       )}

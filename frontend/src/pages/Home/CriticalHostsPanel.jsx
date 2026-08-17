@@ -3,6 +3,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './CriticalHostsPanel.css';
 
 function normalize(s) {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -24,7 +25,7 @@ export default function CriticalHostsPanel() {
   if (user?.role !== 'admin') {
     return (
       <Panel title="Hôtes critiques" sub="Nœuds portant des services de production" span={8}>
-        <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Réservé aux administrateurs</div>
+        <div className="chp-empty">Réservé aux administrateurs</div>
       </Panel>
     );
   }
@@ -39,32 +40,32 @@ export default function CriticalHostsPanel() {
       sub="Nœuds portant des services de production"
       span={8}
       actions={(
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input className="input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ height: 28, fontSize: 12, width: 140 }} />
-          <span className="mono faint" style={{ fontSize: 11.5, flex: 'none' }}>{items.length} / {all.length}</span>
+        <div className="chp-actions">
+          <input className="input chp-filter-input" placeholder="Filtrer…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <span className="mono faint chp-count">{items.length} / {all.length}</span>
         </div>
       )}
     >
       {all.length === 0 ? (
-        <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="chp-empty">
           Aucun hôte marqué critique — cochez « Hôte critique » depuis Infrastructure → Hôtes & agents.
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+        <div className="chp-table-wrap">
+          <table className="chp-table">
             <thead>
               <tr>
                 {['Hôte', 'Rôle', 'État', 'CPU', 'RAM', 'Uptime'].map((c) => (
-                  <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                  <th key={c} className="chp-th">{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {items.map((h) => (
-                <tr key={h.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                  <td style={{ padding: '10px 16px', fontWeight: 600 }} className="mono">{h.name}</td>
-                  <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{h.role || '—'}</td>
-                  <td style={{ padding: '10px 16px' }}>
+                <tr key={h.id} className="chp-row">
+                  <td className="chp-td chp-td-name mono">{h.name}</td>
+                  <td className="chp-td chp-td-role">{h.role || '—'}</td>
+                  <td className="chp-td">
                     {h.reachable === null || h.reachable === undefined ? (
                       <span className="badge badge-mut"><span className="dot" />En attente</span>
                     ) : h.reachable ? (
@@ -73,13 +74,13 @@ export default function CriticalHostsPanel() {
                       <span className="badge badge-crit"><span className="dot" />Injoignable</span>
                     )}
                   </td>
-                  <td style={{ padding: '10px 16px', width: 140 }}>
+                  <td className="chp-td chp-td-stat">
                     <StatBar value={h.cpuPct} />
                   </td>
-                  <td style={{ padding: '10px 16px', width: 140 }}>
+                  <td className="chp-td chp-td-stat">
                     <StatBar value={h.ramPct} critical />
                   </td>
-                  <td style={{ padding: '10px 16px' }} className="mono muted">{formatUptime(h.uptimeSeconds)}</td>
+                  <td className="chp-td mono muted">{formatUptime(h.uptimeSeconds)}</td>
                 </tr>
               ))}
             </tbody>
@@ -91,14 +92,14 @@ export default function CriticalHostsPanel() {
 }
 
 function StatBar({ value, critical }) {
-  if (value === undefined || value === null) return <span className="faint mono" style={{ fontSize: 11.5 }}>—</span>;
+  if (value === undefined || value === null) return <span className="faint mono chp-stat-empty">—</span>;
   const color = value > 85 ? 'var(--tone-crit-dot)' : value > 65 ? 'var(--tone-warn-dot)' : critical ? '#3B82F6' : '#3B82F6';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ flex: 1, height: 5, borderRadius: 999, background: 'var(--border-soft)', overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(value, 100)}%`, height: '100%', borderRadius: 999, background: color }} />
+    <div className="chp-stat-bar-row">
+      <div className="chp-stat-track">
+        <div className="chp-stat-fill" style={{ width: `${Math.min(value, 100)}%`, background: color }} />
       </div>
-      <span className="mono" style={{ fontSize: 11.5, width: 30, textAlign: 'right' }}>{value}%</span>
+      <span className="mono chp-stat-value">{value}%</span>
     </div>
   );
 }
