@@ -30,6 +30,16 @@ et documentée dans `fonctions.md` une fois réellement faite.
 - [x] Dev/Wiki : Postgres local démarré (conteneur `nexus-dev-postgres`, `DATABASE_URL` ajouté à `backend/.env`, backend redémarré, migrations appliquées) pour pouvoir enfin tester Organisations/Wiki/Projets réellement. Un vrai bug trouvé et corrigé au passage : le champ « Identifiant » du formulaire Nouvelle organisation (`pattern="[a-z0-9-]+"`) cassait la validation native du navigateur dans Chrome récent (mode unicode-sets, le tiret final non échappé lève une exception "Invalid character class") — corrigé en `pattern="[a-z0-9\-]+"` (`frontend/src/pages/Deployments/OrganizationsPage.jsx`). Vérifié via Playwright de bout en bout : création d'organisation, Wiki (page créée, éditée, contenu sauvegardé, supprimée) — tout fonctionne réellement. Navigation Développement déjà bien structurée par sections (Gestion/Code/Livraison/Qualité/Exécution/Sécurité), pas de dispersion constatée après audit — reste à creuser si l'utilisateur pointe un endroit précis. **Constat additionnel** : aucune route `DELETE /organizations/:id` n'existe (impossible de supprimer une organisation créée par erreur, même en admin) — signalé mais non corrigé dans cette session (pas demandé explicitement, portée à confirmer).
 - [x] Mobile : audit complet à 390px (téléphone) et 768px (tablette) via Playwright. Deux vrais bugs trouvés et corrigés : (1) le header — barre de recherche fixe à 220px poussait le bouton thème, les notifications et l'avatar hors écran, inaccessibles sans scroll horizontal (bloqué) ; recherche réduite à une icône sous 480px. (2) Les sous-navigations latérales à largeur fixe (`DeploymentsLayout` 210px, `KubernetesLayout`/`NetworkLayout` 190px) débordaient et cachaient tout le contenu principal ; transformées en bandeau d'icônes défilable horizontalement au-dessus du contenu sous 860px. `frontend/src/styles/global.css`, `frontend/src/pages/Network/NetworkLayout.jsx` (converti en classes CSS au passage). Modales, Command Center, tableaux (scroll horizontal) et tiroir de navigation principal déjà corrects, vérifiés sans changement nécessaire.
 
+## Environnement de développement (contexte pour la prochaine session)
+Un Postgres local a été démarré pour cette session (conteneur Docker `nexus-dev-postgres`,
+port 5433, volume éphémère non persistant — les données y seront perdues si le conteneur
+est supprimé) et `backend/.env` pointe désormais dessus (`DATABASE_URL`). Le backend a été
+redémarré manuellement (`node src/index.js` en arrière-plan, PID variable, log dans
+`/tmp/nexus-backend.log`) — ce n'est pas un service supervisé, il ne redémarrera pas seul
+après un reboot de la machine. Si ce conteneur a disparu à la prochaine session, relancer :
+`docker run -d --name nexus-dev-postgres -e POSTGRES_DB=nexus -e POSTGRES_USER=nexus -e POSTGRES_PASSWORD=devpassword -p 5433:5432 postgres:16-alpine`
+puis redémarrer le backend (les migrations s'appliquent automatiquement au démarrage).
+
 ## Déjà vérifié comme fait (pas de todo)
 Connexion par nom d'utilisateur, passkeys WebAuthn, secrets jamais en clair par défaut,
 générateur de mot de passe avancé (entropie, temps de cassage, symboles perso, passphrase),
