@@ -3,6 +3,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './PodDetailDialog.css';
 
 const TABS = [
   { id: 'describe', label: 'Décrire', icon: 'terminal' },
@@ -19,12 +20,12 @@ export default function PodDetailDialog({ pod, initialTab = 'describe', onClose 
 
   return (
     <Modal title={pod.name} sub={`${pod.namespace} · détail du pod`} onClose={onClose} width={640}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid var(--border-soft)' }}>
+      <div className="pdd-tabs">
         {TABS.map((t) => (
           <div
             key={t.id}
             onClick={() => setTab(t.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 4px', marginRight: 14, fontSize: 12.5, fontWeight: tab === t.id ? 600 : 500, color: tab === t.id ? 'var(--primary)' : 'var(--text-muted)', borderBottom: tab === t.id ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}
+            className={`pdd-tab${tab === t.id ? ' pdd-tab-active' : ''}`}
           >
             <Icon name={t.icon} size={13} />{t.label}
           </div>
@@ -39,23 +40,23 @@ export default function PodDetailDialog({ pod, initialTab = 'describe', onClose 
 
 function DescribeTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/pods/${pod.namespace}/${pod.name}/describe`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>;
-  if (error) return <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>;
+  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
+  if (error) return <div className="pdd-error">{error}</div>;
   const p = data?.pod;
   if (!p) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12.5 }}>
+    <div className="pdd-describe">
       <Row label="Nœud" value={p.node} />
       <Row label="IP du pod" value={p.podIP} />
       <Row label="Phase" value={p.phase} />
       <Row label="Démarré" value={p.startedAt ? new Date(p.startedAt).toLocaleString('fr-FR') : '—'} />
       <div>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Conteneurs</div>
+        <div className="pdd-section-title">Conteneurs</div>
         {p.containers.map((c) => (
-          <div key={c.name} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-soft)', marginBottom: 6 }}>
-            <div className="mono" style={{ fontWeight: 600 }}>{c.name}</div>
-            <div className="mono faint" style={{ fontSize: 11 }}>{c.image}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11 }}>
+          <div key={c.name} className="pdd-container-card">
+            <div className="mono pdd-container-name">{c.name}</div>
+            <div className="mono faint pdd-container-image">{c.image}</div>
+            <div className="pdd-container-meta">
               <span className={`badge badge-${c.ready ? 'ok' : 'crit'}`}><span className="dot" />{c.ready ? 'Prêt' : 'Non prêt'}</span>
               <span className="faint">redémarrages : {c.restartCount}</span>
               {c.state && <span className="faint">état : {c.state}</span>}
@@ -65,10 +66,10 @@ function DescribeTab({ pod }) {
       </div>
       {p.conditions.length > 0 && (
         <div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Conditions</div>
+          <div className="pdd-section-title">Conditions</div>
           {p.conditions.map((c, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, fontSize: 11.5, marginBottom: 3 }}>
-              <span className={`badge badge-${c.status === 'True' ? 'ok' : 'mut'}`} style={{ flex: 'none' }}>{c.type}</span>
+            <div key={i} className="pdd-condition-row">
+              <span className={`badge badge-${c.status === 'True' ? 'ok' : 'mut'} pdd-condition-badge`}>{c.type}</span>
               <span className="faint">{c.message || c.reason || '—'}</span>
             </div>
           ))}
@@ -76,8 +77,8 @@ function DescribeTab({ pod }) {
       )}
       {Object.keys(p.labels).length > 0 && (
         <div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Labels</div>
-          <div className="mono faint" style={{ fontSize: 11 }}>{Object.entries(p.labels).map(([k, v]) => `${k}=${v}`).join('  ')}</div>
+          <div className="pdd-section-title">Labels</div>
+          <div className="mono faint pdd-labels">{Object.entries(p.labels).map(([k, v]) => `${k}=${v}`).join('  ')}</div>
         </div>
       )}
     </div>
@@ -86,18 +87,18 @@ function DescribeTab({ pod }) {
 
 function EventsTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/events?namespace=${pod.namespace}&involvedObject=${pod.name}`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>;
-  if (error) return <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>;
+  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
+  if (error) return <div className="pdd-error">{error}</div>;
   const items = data?.items || [];
-  if (items.length === 0) return <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 20 }}>Aucun événement récent pour ce pod</div>;
+  if (items.length === 0) return <div className="faint pdd-empty-events">Aucun événement récent pour ce pod</div>;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div className="pdd-events-list">
       {items.map((e, i) => (
-        <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
-          <span className={`badge badge-${e.type === 'Warning' ? 'warn' : 'mut'}`} style={{ flex: 'none' }}>{e.reason}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12 }}>{e.message}</div>
-            <div className="faint mono" style={{ fontSize: 10.5 }}>{e.count > 1 ? `×${e.count} · ` : ''}{e.lastTimestamp ? new Date(e.lastTimestamp).toLocaleString('fr-FR') : '—'}</div>
+        <div key={i} className="pdd-event-row">
+          <span className={`badge badge-${e.type === 'Warning' ? 'warn' : 'mut'} pdd-event-badge`}>{e.reason}</span>
+          <div className="pdd-event-body">
+            <div className="pdd-event-message">{e.message}</div>
+            <div className="faint mono pdd-event-time">{e.count > 1 ? `×${e.count} · ` : ''}{e.lastTimestamp ? new Date(e.lastTimestamp).toLocaleString('fr-FR') : '—'}</div>
           </div>
         </div>
       ))}
@@ -107,23 +108,23 @@ function EventsTab({ pod }) {
 
 function MetricsTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/pods/${pod.namespace}/${pod.name}/metrics`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>;
+  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
   if (error) {
     return (
-      <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 20 }}>
+      <div className="faint pdd-metrics-error">
         Métriques non disponibles — metrics-server n'est probablement pas installé sur ce cluster.
-        <div className="mono" style={{ fontSize: 11, marginTop: 6, color: 'var(--tone-crit-fg)' }}>{error}</div>
+        <div className="mono pdd-metrics-error-detail">{error}</div>
       </div>
     );
   }
   const containers = data?.metrics?.containers || [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="pdd-metrics-list">
       {containers.map((c) => (
-        <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
-          <span className="mono" style={{ fontWeight: 600, fontSize: 12, flex: 1 }}>{c.name}</span>
-          <span className="mono faint" style={{ fontSize: 11.5 }}>CPU {c.cpu || '—'}</span>
-          <span className="mono faint" style={{ fontSize: 11.5 }}>Mémoire {c.memory || '—'}</span>
+        <div key={c.name} className="pdd-metrics-row">
+          <span className="mono pdd-metrics-name">{c.name}</span>
+          <span className="mono faint pdd-metrics-value">CPU {c.cpu || '—'}</span>
+          <span className="mono faint pdd-metrics-value">Mémoire {c.memory || '—'}</span>
         </div>
       ))}
     </div>
@@ -132,8 +133,8 @@ function MetricsTab({ pod }) {
 
 function Row({ label, value }) {
   return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      <span className="faint" style={{ width: 90, flex: 'none' }}>{label}</span>
+    <div className="pdd-row">
+      <span className="faint pdd-row-label">{label}</span>
       <span className="mono">{value || '—'}</span>
     </div>
   );
