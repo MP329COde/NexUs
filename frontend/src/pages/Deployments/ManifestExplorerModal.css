@@ -1,0 +1,221 @@
+.mem-body {
+  display: flex;
+  gap: 16px;
+  min-height: 360px;
+}
+
+.mem-tree {
+  width: 220px;
+  flex: none;
+  border-right: 1px solid var(--border-soft);
+  padding-right: 12px;
+  overflow-y: auto;
+}
+
+.mem-tree-path-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+}
+
+.mem-tree-up-btn {
+  height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.mem-tree-up-icon {
+  transform: rotate(90deg);
+}
+
+.mem-tree-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mem-tree-loading {
+  font-size: 12px;
+}
+
+.mem-tree-error {
+  font-size: 11.5px;
+  color: var(--tone-crit-fg);
+}
+
+.mem-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.mem-tree-item-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.mem-tree-item-icon {
+  color: var(--text-faint);
+}
+
+.mem-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mem-content-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 30px;
+}
+
+.mem-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.mem-tab {
+  padding: 6px 4px;
+  margin-right: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.mem-tab-active {
+  font-weight: 600;
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+}
+
+.mem-tabs-spacer {
+  flex: 1;
+}
+
+.mem-changed-badge {
+  align-self: center;
+}
+
+.mem-editor {
+  flex: 1;
+  min-height: 260px;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.mem-view-box {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.mem-lint {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--tone-warn-soft, var(--primary-soft));
+}
+
+.mem-lint-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tone-warn-fg);
+  margin-bottom: 4px;
+}
+
+.mem-lint-issue {
+  font-size: 11px;
+  color: var(--tone-warn-fg);
+}
+
+.mem-propose-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.mem-propose-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.mem-propose-btn-disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.pcm-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pcm-result-text {
+  font-size: 12.5px;
+}
+
+.pcm-result-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.pcm-result-note {
+  font-size: 11.5px;
+}
+
+.pcm-result-close-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pcm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pcm-field-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.pcm-form-note {
+  font-size: 11.5px;
+}
+
+.pcm-form-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.pcm-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
