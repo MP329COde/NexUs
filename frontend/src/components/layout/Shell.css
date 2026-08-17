@@ -1,0 +1,28 @@
+.shell-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.shell-nav-wrap {
+  height: 100%;
+}
+
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.shell-route-page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 24px 28px 56px;
+}

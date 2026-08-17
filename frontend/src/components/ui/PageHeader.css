@@ -1,0 +1,35 @@
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-header-text {
+  min-width: 220px;
+  flex: 1 1 320px;
+}
+
+.page-header-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.022em;
+}
+
+.page-header-sub {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  flex-wrap: wrap;
+}

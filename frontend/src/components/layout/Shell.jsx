@@ -4,6 +4,7 @@ import Header from './Header.jsx';
 import DomainNav from './DomainNav.jsx';
 import CommandPalette from '../search/CommandPalette.jsx';
 import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
+import './Shell.css';
 
 const COLLAPSE_KEY = 'nexus-nav-collapsed';
 
@@ -43,12 +44,12 @@ export default function Shell() {
   }
 
   return (
-    <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-shell shell-root">
       <div className="no-print">
         <Header title={title} onOpenSearch={() => openPalette()} onOpenNav={() => setMobileNavOpen(true)} />
       </div>
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <div className="no-print" style={{ height: '100%' }}>
+      <div className="shell-body">
+        <div className="no-print shell-nav-wrap">
           <DomainNav
             collapsed={collapsed}
             onToggleCollapsed={toggleCollapsed}
@@ -56,8 +57,8 @@ export default function Shell() {
             onCloseMobile={() => setMobileNavOpen(false)}
           />
         </div>
-        <main className="app-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-          <div key={location.pathname} className="route-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 28px 56px' }}>
+        <main className="app-main shell-main">
+          <div key={location.pathname} className="route-page shell-route-page">
             <Outlet />
           </div>
         </main>

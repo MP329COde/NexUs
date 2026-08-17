@@ -1,0 +1,27 @@
+.minidonut-wrap {
+  position: relative;
+  flex: none;
+}
+
+.minidonut-svg {
+  transform: rotate(-90deg);
+}
+
+.minidonut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.minidonut-center-label {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.minidonut-center-sub {
+  font-size: 9.5px;
+  color: var(--text-faint);
+}

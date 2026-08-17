@@ -88,7 +88,7 @@ export default function ProxmoxPage() {
                 const diskPct = n.maxdisk ? Math.round((n.disk / n.maxdisk) * 100) : null;
                 return (
                   <div key={n.node} onClick={() => setSelectedNode(n.node)} className="infra-node-row">
-                    <span className="infra-node-name">{n.node}<span className="faint" style={{ fontSize: 10.5, display: 'block' }}>{n.maxcpu ? `${n.maxcpu} vCPU` : ''}</span></span>
+                    <span className="infra-node-name">{n.node}<span className="faint infra-node-cpu-count">{n.maxcpu ? `${n.maxcpu} vCPU` : ''}</span></span>
                     <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} infra-node-badge`}><span className="dot" />{n.status}</span>
                     <GaugeBar label="CPU" pct={cpuPct} />
                     <GaugeBar label="RAM" pct={memPct} />
@@ -157,13 +157,13 @@ function NodeHistoryPanel({ node, samples }) {
 
   return (
     <Panel title={`Charge du nœud · ${node}`} sub="Échantillonnage toutes les 30s, ~6h conservées" span={12}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16 }}>
+      <div className="infra-history-grid">
         <div>
-          <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>CPU</div>
+          <div className="faint infra-history-label">CPU</div>
           <MiniLineChart values={cpuSeries} height={80} color="#3B82F6" />
         </div>
         <div>
-          <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>Mémoire</div>
+          <div className="faint infra-history-label">Mémoire</div>
           <MiniLineChart values={ramSeries} height={80} color="#8B5CF6" />
         </div>
       </div>

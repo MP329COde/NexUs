@@ -1,3 +1,5 @@
+import './MiniDonut.css';
+
 // Donut SVG léger et sans dépendance (même technique que WorkloadDonutPanel
 // de la page d'accueil), réutilisé pour les répartitions par statut.
 export default function MiniDonut({ segments, size = 116, centerLabel, centerSub }) {
@@ -14,8 +16,8 @@ export default function MiniDonut({ segments, size = 116, centerLabel, centerSub
   }) : [];
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, flex: 'none' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+    <div className="minidonut-wrap" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="minidonut-svg">
         {arcs.length === 0 ? (
           <circle cx={c} cy={c} r={r} fill="none" stroke="var(--border-soft)" strokeWidth={14} />
         ) : arcs.map((a) => (
@@ -23,9 +25,9 @@ export default function MiniDonut({ segments, size = 116, centerLabel, centerSub
         ))}
       </svg>
       {(centerLabel !== undefined) && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>{centerLabel}</span>
-          {centerSub && <span style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>{centerSub}</span>}
+        <div className="minidonut-center">
+          <span className="mono minidonut-center-label">{centerLabel}</span>
+          {centerSub && <span className="minidonut-center-sub">{centerSub}</span>}
         </div>
       )}
     </div>
