@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './GitServicesPanel.css';
 
 const FORGES = [
   { key: 'gitlab', label: 'GitLab' },
@@ -45,17 +46,17 @@ export default function GitServicesPanel() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+    <div className="gitsvc-grid">
       <Panel title="Forge principale" sub="Source de vérité des dépôts et pipelines" span={6}>
-        <div style={{ padding: 16 }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="gitsvc-panel-body">
+          <div className="gitsvc-forge-tabs">
             {FORGES.map((f) => (
-              <span key={f.key} className={defaultForge === f.key ? 'btn' : 'btn-outline'} style={{ padding: '0 14px', height: 32, display: 'inline-flex', alignItems: 'center' }} onClick={() => save(f.key)}>
+              <span key={f.key} className={`${defaultForge === f.key ? 'btn' : 'btn-outline'} gitsvc-forge-tab`} onClick={() => save(f.key)}>
                 {f.label}
               </span>
             ))}
           </div>
-          <p className="faint" style={{ fontSize: 11.5 }}>
+          <p className="faint gitsvc-hint">
             Détermine quelle forge est utilisée par défaut pour créer des sauvegardes/miroirs de dépôts et lier de nouveaux projets
             depuis Développement. Les identifiants de chaque forge se configurent dans Intégrations & outils.
           </p>
@@ -63,14 +64,14 @@ export default function GitServicesPanel() {
       </Panel>
 
       <Panel title="Forges déclarées" sub="Portée et santé" span={6}>
-        <div style={{ padding: 6 }}>
+        <div className="gitsvc-list">
           {FORGES.map((f) => {
             const integ = data?.integrations?.[f.key];
             return (
-              <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{f.label}</span>
+              <div key={f.key} className="gitsvc-row">
+                <span className="gitsvc-row-label">{f.label}</span>
                 <StatusBadge tone={toneFromStatus(integ)} label={integ?.configured ? 'Configuré' : 'Non configuré'} />
-                <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => test(f.key)}>
+                <span className="btn-outline gitsvc-test-btn" onClick={() => test(f.key)}>
                   <Icon name="refresh" size={12} className={testing === f.key ? 'spin' : ''} />Tester
                 </span>
               </div>
@@ -80,7 +81,7 @@ export default function GitServicesPanel() {
       </Panel>
 
       <Panel title="Miroirs sortants" sub="Réplication automatique entre forges" span={12}>
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="gitsvc-empty">
           Aucun miroir configuré — fonctionnalité à venir. Les jetons GitLab/GitHub déjà renseignés dans Intégrations & outils
           serviront de base à la réplication automatique une fois développée.
         </div>
