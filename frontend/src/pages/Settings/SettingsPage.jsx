@@ -14,6 +14,7 @@ import IdentityPanel from './IdentityPanel.jsx';
 import GitServicesPanel from './GitServicesPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
 import AuditPanel from './AuditPanel.jsx';
+import './SettingsPage.css';
 
 // domain/level : permission RBAC (voir store/groupsStore.js) requise pour
 // voir l'onglet — un compte "admin" de plateforme passe toujours (bypass
@@ -52,12 +53,12 @@ export default function SettingsPage() {
         title="Paramètres d'administration"
         sub="Utilisateurs, permissions, plateforme et intégrations. Réservé aux administrateurs — les secrets sont chiffrés au repos et ne sont jamais renvoyés au navigateur."
         actions={(
-          <div style={{ display: 'flex', background: 'var(--border-soft)', borderRadius: 9, padding: 3, gap: 2, overflowX: 'auto', maxWidth: '100%' }}>
+          <div className="settings-tabs">
             {visibleTabs.map((t) => (
               <div
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                style={{ padding: '5px 14px', borderRadius: 7, fontSize: 12.5, fontWeight: tab === t.id ? 600 : 500, color: tab === t.id ? 'var(--text)' : 'var(--text-muted)', background: tab === t.id ? 'var(--surface)' : 'transparent', boxShadow: tab === t.id ? 'var(--shadow-card)' : 'none', cursor: 'pointer', transition: 'all .15s ease', whiteSpace: 'nowrap' }}
+                className={`settings-tab${tab === t.id ? ' settings-tab-active' : ''}`}
               >
                 {t.label}
               </div>
@@ -67,14 +68,14 @@ export default function SettingsPage() {
       />
 
       {!tab && (
-        <div className="faint" style={{ padding: 16, fontSize: 13 }}>
+        <div className="faint settings-no-tab">
           Aucune permission ne vous donne accès à un onglet des paramètres d'administration.
         </div>
       )}
 
       {tab === 'integrations' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(360px,1fr))', gap: 16 }}>
-          <div style={{ gridColumn: '1 / -1' }}><InfrastructureStatusPanel /></div>
+        <div className="settings-integrations-grid">
+          <div className="settings-integrations-full"><InfrastructureStatusPanel /></div>
           {INTEGRATION_ORDER.map((key) => (
             <IntegrationPanel
               key={key}
