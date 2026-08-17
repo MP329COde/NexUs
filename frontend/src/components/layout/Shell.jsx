@@ -4,6 +4,7 @@ import Header from './Header.jsx';
 import DomainNav from './DomainNav.jsx';
 import CommandPalette from '../search/CommandPalette.jsx';
 import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
+import { NavPrefsProvider } from '../../context/NavPrefsContext.jsx';
 import './Shell.css';
 
 const COLLAPSE_KEY = 'nexus-nav-collapsed';
@@ -52,6 +53,7 @@ export default function Shell() {
   }
 
   return (
+    <NavPrefsProvider>
     <div className="app-shell shell-root">
       <div className="no-print">
         <Header title={title} onOpenSearch={() => openPalette()} onOpenNav={() => setMobileNavOpen(true)} />
@@ -73,5 +75,6 @@ export default function Shell() {
       </div>
       <CommandPalette open={searchOpen} onClose={closePalette} context={searchContext} />
     </div>
+    </NavPrefsProvider>
   );
 }

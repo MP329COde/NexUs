@@ -218,6 +218,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **components/ui/Avatar.jsx** — Avatar utilisateur à trois niveaux (image importée > emoji > initiales), utilisé par Header.jsx et AccountPage.jsx.
 - **components/layout/DomainNav.jsx** — Navigation par domaines ; le point rouge "accès administrateur" sur Paramètres disparaît définitivement dès le premier clic (persisté en localStorage), au lieu d'être affiché en permanence.
 - **components/layout/RequireHomeAccess.jsx** — Garde de route pour la Vue générale quand `homeRestrictedToAdmins` est actif.
+- **context/NavPrefsContext.jsx / components/layout/NavCustomizeModal.jsx** — Personnalisation de la navigation (barre latérale ⇄ en-tête), 100% locale au navigateur (localStorage `nexus-nav-prefs`) : masquer/afficher un domaine, le réordonner, le déplacer dans l'en-tête, ajouter des liens personnalisés (icône = emoji, URL externe ou chemin interne). État partagé via contexte React (`NavPrefsProvider`, monté dans `Shell.jsx`) — un hook dupliqué entre `DomainNav.jsx` et `Header.jsx` sans état partagé les désynchronisait silencieusement (trouvé en testant réellement le déplacement d'un élément vers l'en-tête).
 - **components/layout/Shell.jsx** — Titre de l'onglet navigateur dérivé de `handle.title` (route active la plus profonde, `App.jsx`) : "Nexus Console" seul sur la Vue générale, "Nexus Console - <page>" partout ailleurs (ex. "Nexus Console - Wiki d'équipe") — toujours synchronisé avec le titre affiché dans le header, une seule source de vérité.
 
 ## Intégrations externes

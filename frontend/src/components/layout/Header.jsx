@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { useClosablePopover } from '../../hooks/useClosablePopover.js';
+import { useNavItems } from '../../context/NavPrefsContext.jsx';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../ui/Icon.jsx';
 import Avatar from '../ui/Avatar.jsx';
@@ -21,6 +22,7 @@ const SEARCH_SHORTCUT = IS_MAC ? '⌘K' : 'Ctrl K';
 export default function Header({ title, onOpenSearch, onOpenNav }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const nav = useNavItems();
   const { resolved, toggle } = useTheme();
   const { history, clearHistory } = useNotifications();
   const [userMenu, setUserMenu] = useState(false);
@@ -133,6 +135,23 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
             </div>
           )}
         </div>
+
+        {nav.headerItems.length > 0 && (
+          <div className="header-custom-nav">
+            {nav.headerItems.map((d) => {
+              const isExternal = d.isCustom && /^https?:\/\//.test(d.url || '');
+              return isExternal ? (
+                <a key={d.id} href={d.url} target="_blank" rel="noreferrer" title={d.label} className="icon-btn header-custom-nav-btn">
+                  {d.isCustom ? <span className="header-custom-nav-emoji">{d.icon}</span> : <Icon name={d.id} size={16} />}
+                </a>
+              ) : (
+                <Link key={d.id} to={d.isCustom ? d.url : d.path} title={d.label} className="icon-btn header-custom-nav-btn">
+                  {d.isCustom ? <span className="header-custom-nav-emoji">{d.icon}</span> : <Icon name={d.id} size={16} />}
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
         <button
           onClick={onOpenSearch}

@@ -431,3 +431,21 @@
 .header-user-menu-link-danger {
   color: var(--tone-crit-fg);
 }
+
+.header-custom-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  border-right: 1px solid var(--border-soft);
+  margin-right: 4px;
+}
+
+.header-custom-nav-btn {
+  text-decoration: none;
+}
+
+.header-custom-nav-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
