@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import Panel from '../../components/ui/Panel.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './BlockedFeaturesPanel.css';
 
 // Liste, grisées, les intégrations non configurées ou en échec — avec leur
 // raison exacte et un lien direct vers le réglage à corriger — pour répondre
@@ -14,18 +15,18 @@ export default function BlockedFeaturesPanel({ integrations }) {
 
   return (
     <Panel title="Fonctionnalités bloquées" sub={`${blocked.length} intégration(s) à corriger`} span={12}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10, padding: 16 }}>
+      <div className="bfp-grid">
         {blocked.map((i) => (
-          <div key={i.key} style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--border-soft)', opacity: 0.75 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Icon name="alertTriangle" size={14} style={{ color: 'var(--tone-warn-fg)' }} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{i.label}</span>
+          <div key={i.key} className="bfp-card">
+            <div className="bfp-card-head">
+              <Icon name="alertTriangle" size={14} className="bfp-card-icon" />
+              <span className="bfp-card-label">{i.label}</span>
             </div>
-            <div className="faint" style={{ fontSize: 12, marginBottom: 8 }}>
+            <div className="faint bfp-card-reason">
               {!i.configured ? 'Non configurée' : (i.message || 'Intégration en échec')}
             </div>
             {user?.role === 'admin' && (
-              <Link to="/settings" className="btn-outline" style={{ fontSize: 11, padding: '4px 10px', display: 'inline-flex', textDecoration: 'none' }}>
+              <Link to="/settings" className="btn-outline bfp-card-fix-link">
                 Configurer
               </Link>
             )}

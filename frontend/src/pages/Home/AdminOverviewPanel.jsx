@@ -2,6 +2,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './AdminOverviewPanel.css';
 
 // Vue destinée au responsable système (GET /api/system/overview, réservé
 // aux admins côté backend) : ce que le reste du dashboard n'agrège pas —
@@ -16,7 +17,7 @@ export default function AdminOverviewPanel() {
   if (loading && !data) {
     return (
       <Panel title="Vue d'ensemble administrateur" span={12}>
-        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+        <div className="aop-loading">Chargement…</div>
       </Panel>
     );
   }
@@ -38,24 +39,24 @@ export default function AdminOverviewPanel() {
       span={12}
     >
       {!data.relationalCoreConfigured && (
-        <div className="faint" style={{ padding: '10px 16px', fontSize: 11.5, borderBottom: '1px solid var(--border-soft)' }}>
+        <div className="faint aop-relational-note">
           Socle relationnel non configuré (DATABASE_URL) : incidents et jobs ne sont pas suivis sur cette instance.
         </div>
       )}
       {data.jobs.running.length > 0 && (
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon name="refresh" size={13} className="spin" style={{ color: 'var(--text-faint)' }} />
-          <span style={{ fontSize: 12.5 }}>{data.jobs.running.length} opération(s) en cours</span>
+        <div className="aop-running-row">
+          <Icon name="refresh" size={13} className="spin aop-running-icon" />
+          <span className="aop-running-text">{data.jobs.running.length} opération(s) en cours</span>
         </div>
       )}
       {problems.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Rien à signaler</div>
+        <div className="aop-empty">Rien à signaler</div>
       ) : (
-        <div style={{ padding: 6 }}>
+        <div className="aop-list">
           {problems.map((p) => (
-            <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px' }}>
-              <Icon name="alertTriangle" size={13} style={{ color: `var(--tone-${p.tier}-dot)`, flex: 'none' }} />
-              <span style={{ fontSize: 12.5, flex: 1 }}>{p.label}</span>
+            <div key={p.key} className="aop-item">
+              <Icon name="alertTriangle" size={13} className="aop-item-icon" style={{ color: `var(--tone-${p.tier}-dot)` }} />
+              <span className="aop-item-label">{p.label}</span>
             </div>
           ))}
         </div>

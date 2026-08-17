@@ -2,6 +2,7 @@ import Panel from '../../components/ui/Panel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './LiveActivityPanel.css';
 
 const ACTION_LABELS = {
   'auth.login': 'Connexion', 'auth.login.failed': 'Échec de connexion', 'auth.onboarding.completed': 'Compte finalisé',
@@ -41,7 +42,7 @@ export default function LiveActivityPanel() {
   if (!isAdmin) {
     return (
       <Panel title="Activité en direct" sub="Derniers événements du parc" span={4}>
-        <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Réservé aux administrateurs</div>
+        <div className="lap-empty">Réservé aux administrateurs</div>
       </Panel>
     );
   }
@@ -68,15 +69,15 @@ export default function LiveActivityPanel() {
   return (
     <Panel title="Activité en direct" sub="Derniers événements du parc" span={4}>
       {events.length === 0 ? (
-        <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun événement récent</div>
+        <div className="lap-empty">Aucun événement récent</div>
       ) : (
-        <div style={{ padding: 6 }}>
+        <div className="lap-list">
           {events.map((e) => (
-            <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 10px' }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: `var(--tone-${e.tone}-dot)`, flex: 'none', marginTop: 4 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500 }}>{e.label}</div>
-                <div className="mono faint" style={{ fontSize: 10.5, marginTop: 1 }}>{e.source} · {relativeTime(e.at)}</div>
+            <div key={e.id} className="lap-item">
+              <span className="lap-item-dot" style={{ background: `var(--tone-${e.tone}-dot)` }} />
+              <div className="lap-item-body">
+                <div className="lap-item-label">{e.label}</div>
+                <div className="mono faint lap-item-meta">{e.source} · {relativeTime(e.at)}</div>
               </div>
             </div>
           ))}

@@ -1,0 +1,55 @@
+.oap-loading {
+  padding: 20px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.oap-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.oap-list {
+  padding: 6px;
+}
+
+.oap-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oap-item-icon {
+  flex: none;
+}
+
+.oap-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.oap-item-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oap-item-sub {
+  font-size: 10.5px;
+  margin-top: 1px;
+}
+
+.oap-item-tier {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 5px;
+  padding: 2px 7px;
+}

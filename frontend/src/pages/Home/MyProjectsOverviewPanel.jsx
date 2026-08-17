@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import './MyProjectsOverviewPanel.css';
 
 // Équivalent de AdminOverviewPanel pour un compte non-admin : n'agrège que ce
 // qui concerne SES propres projets (GET /projects/mine/overview, filtré
@@ -19,7 +20,7 @@ export default function MyProjectsOverviewPanel() {
   if (loading && !data) {
     return (
       <Panel title="Mes projets" span={12}>
-        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+        <div className="mpo-loading">Chargement…</div>
       </Panel>
     );
   }
@@ -28,7 +29,7 @@ export default function MyProjectsOverviewPanel() {
   if (data.projects.length === 0) {
     return (
       <Panel title="Mes projets" span={12}>
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="mpo-empty">
           Vous n'êtes membre d'aucun projet pour le moment.
         </div>
       </Panel>
@@ -48,13 +49,13 @@ export default function MyProjectsOverviewPanel() {
       span={12}
     >
       {items.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Rien à signaler sur vos projets.</div>
+        <div className="mpo-empty">Rien à signaler sur vos projets.</div>
       ) : (
-        <div style={{ padding: 6 }}>
+        <div className="mpo-list">
           {items.map((it) => (
-            <Link key={it.key} to={it.to} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none', color: 'inherit' }}>
-              <Icon name={it.icon} size={13} style={{ color: `var(--tone-${it.tone}-dot)`, flex: 'none' }} />
-              <span style={{ fontSize: 12.5, flex: 1 }}>{it.label}</span>
+            <Link key={it.key} to={it.to} className="mpo-item">
+              <Icon name={it.icon} size={13} className="mpo-item-icon" style={{ color: `var(--tone-${it.tone}-dot)` }} />
+              <span className="mpo-item-label">{it.label}</span>
             </Link>
           ))}
         </div>

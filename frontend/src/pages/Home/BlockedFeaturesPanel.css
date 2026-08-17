@@ -1,0 +1,42 @@
+.bfp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.bfp-card {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--border-soft);
+  opacity: .75;
+}
+
+.bfp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.bfp-card-icon {
+  color: var(--tone-warn-fg);
+}
+
+.bfp-card-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bfp-card-reason {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.bfp-card-fix-link {
+  font-size: 11px;
+  padding: 4px 10px;
+  display: inline-flex;
+  text-decoration: none;
+}
