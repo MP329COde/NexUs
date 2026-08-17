@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './ReviewSchedulePanel.css';
 
 const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
@@ -59,25 +60,25 @@ export default function ReviewSchedulePanel({ reviewerNames }) {
       sub="Créneaux récurrents de revue de code"
       span={12}
       actions={user?.role === 'admin' && (
-        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }} onClick={openNew}>
+        <span className="btn-outline rvs-add-btn" onClick={openNew}>
           <Icon name="plus" size={12} />Planifier un créneau
         </span>
       )}
     >
       {sorted.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun créneau de revue planifié</div>
+        <div className="rvs-empty">Aucun créneau de revue planifié</div>
       ) : (
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="rvs-list">
           {sorted.map((s) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 9, background: 'var(--border-soft)' }}>
-              <span className="badge badge-info" style={{ flex: 'none' }}>{WEEKDAY_LABELS[s.weekday]}</span>
-              <span className="mono" style={{ fontSize: 12.5, flex: 'none' }}>{s.startTime}–{s.endTime}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>{s.label}</span>
-              <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>
+            <div key={s.id} className="rvs-row">
+              <span className="badge badge-info rvs-row-day">{WEEKDAY_LABELS[s.weekday]}</span>
+              <span className="mono rvs-row-time">{s.startTime}–{s.endTime}</span>
+              <span className="rvs-row-label">{s.label}</span>
+              <span className="rvs-row-reviewers">
                 {s.reviewerIds.length ? s.reviewerIds.map((id) => reviewerNames[id] || 'Inconnu').join(', ') : 'Aucun relecteur désigné'}
               </span>
               {user?.role === 'admin' && (
-                <span className="btn-outline" style={{ height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flex: 'none' }} onClick={() => remove(s.id)}>
+                <span className="btn-outline rvs-row-delete" onClick={() => remove(s.id)}>
                   <Icon name="trash" size={12} />
                 </span>
               )}
@@ -87,28 +88,27 @@ export default function ReviewSchedulePanel({ reviewerNames }) {
       )}
 
       {form && (
-        <form onSubmit={save} style={{ padding: 16, borderTop: '1px solid var(--border-soft)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
+        <form onSubmit={save} className="rvs-form">
           <input className="input" placeholder="Nom du créneau" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
           <select className="input" value={form.weekday} onChange={(e) => setForm({ ...form, weekday: Number(e.target.value) })}>
             {WEEKDAY_LABELS.map((l, i) => <option key={i} value={i}>{l}</option>)}
           </select>
           <input className="input" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
           <input className="input" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-          <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="rvs-form-reviewers">
             {Object.entries(reviewerNames).map(([id, name]) => (
               <span
                 key={id}
                 onClick={() => toggleReviewer(id)}
-                className={form.reviewerIds.includes(id) ? 'btn' : 'btn-outline'}
-                style={{ height: 26, padding: '0 10px', fontSize: 11.5, cursor: 'pointer' }}
+                className={`rvs-reviewer-chip ${form.reviewerIds.includes(id) ? 'btn' : 'btn-outline'}`}
               >
                 {name}
               </span>
             ))}
           </div>
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+          <div className="rvs-form-actions">
             <button className="btn" type="submit">Enregistrer</button>
-            <span className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', padding: '0 12px', cursor: 'pointer' }} onClick={() => setForm(null)}>Annuler</span>
+            <span className="btn-outline rvs-cancel-btn" onClick={() => setForm(null)}>Annuler</span>
           </div>
         </form>
       )}

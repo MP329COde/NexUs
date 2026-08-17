@@ -1,0 +1,97 @@
+.rvs-add-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.rvs-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.rvs-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rvs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--border-soft);
+}
+
+.rvs-row-day {
+  flex: none;
+}
+
+.rvs-row-time {
+  font-size: 12.5px;
+  flex: none;
+}
+
+.rvs-row-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.rvs-row-reviewers {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.rvs-row-delete {
+  height: 24px;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+}
+
+.rvs-form {
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.rvs-form-reviewers {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rvs-reviewer-chip {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.rvs-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.rvs-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  cursor: pointer;
+}

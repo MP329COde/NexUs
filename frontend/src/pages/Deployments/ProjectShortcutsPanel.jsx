@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './ProjectShortcutsPanel.css';
 
 const EMPTY_FORM = { label: '', url: '', category: 'Accès direct' };
 
@@ -48,31 +49,31 @@ export default function ProjectShortcutsPanel({ project, canManage }) {
 
   return (
     <Panel
-      title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="externalLink" size={13} style={{ color: 'var(--text-faint)' }} />Redirections du projet</span>)}
+      title={(<span className="psp-title"><Icon name="externalLink" size={13} className="psp-title-icon" />Redirections du projet</span>)}
       sub="Accès direct aux services externes propres à ce projet"
       span={12}
       actions={canManage && (
-        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setFormOpen(true)}>
+        <span className="btn-outline psp-add-btn" onClick={() => setFormOpen(true)}>
           <Icon name="plus" size={13} />Ajouter une redirection
         </span>
       )}
     >
       {items.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune redirection créée pour ce projet</div>
+        <div className="psp-empty">Aucune redirection créée pour ce projet</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10, padding: 14 }}>
+        <div className="psp-grid">
           {items.map((s) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', position: 'relative' }}>
-              <span style={{ width: 30, height: 30, borderRadius: 8, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+            <div key={s.id} className="psp-card">
+              <span className="psp-card-icon">
                 <Icon name="terminal" size={14} />
               </span>
-              <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => open(s)}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</div>
-                <div className="mono faint" style={{ fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url.replace(/^https?:\/\//, '')}</div>
+              <div className="psp-card-info" onClick={() => open(s)}>
+                <div className="psp-card-label">{s.label}</div>
+                <div className="mono faint psp-card-url">{s.url.replace(/^https?:\/\//, '')}</div>
               </div>
-              <Icon name="externalLink" size={13} style={{ color: 'var(--text-faint)', flex: 'none', cursor: 'pointer' }} onClick={() => open(s)} />
+              <Icon name="externalLink" size={13} className="psp-card-external-icon" onClick={() => open(s)} />
               {canManage && (
-                <span onClick={() => remove(s.id)} title="Retirer" style={{ position: 'absolute', top: 4, right: 4, color: 'var(--text-faintest)', cursor: 'pointer' }}>
+                <span onClick={() => remove(s.id)} title="Retirer" className="psp-card-remove">
                   <Icon name="x" size={12} />
                 </span>
               )}
@@ -83,16 +84,16 @@ export default function ProjectShortcutsPanel({ project, canManage }) {
 
       {formOpen && (
         <Modal title="Ajouter une redirection" sub={`Propre au projet « ${project.name} »`} onClose={() => setFormOpen(false)} width={440}>
-          <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={create} className="psp-form">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="psp-field-label">Nom</label>
               <input className="input" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Staging api-gateway" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL</label>
+              <label className="psp-field-label">URL</label>
               <input className="input" required type="url" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} placeholder="https://staging.api-gateway.homelab.local" />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="psp-form-actions">
               <span className="btn-outline" onClick={() => setFormOpen(false)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Ajout…' : 'Ajouter'}</button>
             </div>

@@ -1,0 +1,108 @@
+.psp-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.psp-title-icon {
+  color: var(--text-faint);
+}
+
+.psp-add-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.psp-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.psp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.psp-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  position: relative;
+}
+
+.psp-card-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.psp-card-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.psp-card-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psp-card-url {
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psp-card-external-icon {
+  color: var(--text-faint);
+  flex: none;
+  cursor: pointer;
+}
+
+.psp-card-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--text-faintest);
+  cursor: pointer;
+}
+
+.psp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.psp-field-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.psp-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
