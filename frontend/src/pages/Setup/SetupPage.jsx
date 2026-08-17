@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import InstallScreen from './InstallScreen.jsx';
 import IntegrationPanel from '../Settings/IntegrationPanel.jsx';
 import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
+import './SetupPage.css';
 
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
 const LANGUAGES = [['fr', 'Français'], ['en', 'English']];
@@ -218,21 +219,21 @@ export default function SetupPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#0B1120' }}>
-      <aside style={{ width: 280, flex: 'none', display: 'flex', flexDirection: 'column', padding: '20px 16px', color: '#E7ECF5' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 4px 24px' }}>
+    <div className="setup-page">
+      <aside className="setup-sidebar">
+        <div className="setup-brand-row">
           <BrandMark size={28} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Nexus Console</span>
+          <span className="setup-brand-name">Nexus Console</span>
         </div>
 
-        <div style={{ padding: '0 4px', marginBottom: 18 }}>
-          <div style={{ fontWeight: 700, fontSize: 17 }}>Configuration initiale</div>
-          <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.5, color: '#6B7A9C' }}>
+        <div className="setup-sidebar-heading">
+          <div className="setup-sidebar-title">Configuration initiale</div>
+          <p className="setup-sidebar-desc">
             Sept étapes pour ouvrir la console : organisation, administrateur, identité, Git, services à connecter et outils.
           </p>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav className="setup-steps-nav">
           {STEPS.map((s, i) => {
             const state = i === step ? 'current' : i < step ? 'done' : 'pending';
             return (
@@ -240,23 +241,12 @@ export default function SetupPage() {
                 key={s.key}
                 type="button"
                 onClick={() => (i <= step ? goTo(i) : null)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px',
-                  background: 'transparent', border: 'none', textAlign: 'left',
-                  cursor: i <= step ? 'pointer' : 'default'
-                }}
+                className={`setup-step-btn${i <= step ? ' setup-step-btn-clickable' : ''}`}
               >
-                <span style={{
-                  width: 22, height: 22, borderRadius: '50%', flex: 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                  background: state === 'done' ? '#10B981' : state === 'current' ? '#2563EB' : 'transparent',
-                  border: state === 'pending' ? '1px solid #2A3552' : 'none',
-                  color: state === 'pending' ? '#6B7A9C' : '#fff'
-                }}>
+                <span className={`setup-step-badge setup-step-badge-${state}`}>
                   {state === 'done' ? <Icon name="check" size={12} /> : i + 1}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: state === 'current' ? 600 : 500, color: state === 'pending' ? '#6B7A9C' : '#E7ECF5' }}>
+                <span className={`setup-step-label${state === 'current' ? ' setup-step-label-current' : ''}${state === 'pending' ? ' setup-step-label-pending' : ''}`}>
                   {s.label}
                 </span>
               </button>
@@ -264,14 +254,14 @@ export default function SetupPage() {
           })}
         </nav>
 
-        <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <div style={{ height: 3, borderRadius: 2, background: '#1A2338', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${((step + 1) / STEPS.length) * 100}%`, background: '#10B981', transition: 'width .2s ease' }} />
+        <div className="setup-progress-wrap">
+          <div className="setup-progress-track">
+            <div className="setup-progress-fill" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: '#6B7A9C' }}>
+          <div className="setup-progress-meta">
             <span>étape {step + 1} / {STEPS.length}</span>
             {step < STEPS.length - 1 && (
-              <button type="button" onClick={skipAll} style={{ background: 'none', border: 'none', color: '#6B7A9C', cursor: 'pointer', fontSize: 11, padding: 0 }}>
+              <button type="button" onClick={skipAll} className="setup-skip-all-btn">
                 passer
               </button>
             )}
@@ -279,14 +269,14 @@ export default function SetupPage() {
         </div>
       </aside>
 
-      <main style={{ ...LIGHT_VARS, flex: 1, background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <div style={{ padding: '32px 40px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{current.title}</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>{current.sub}</p>
+      <main className="setup-main" style={LIGHT_VARS}>
+        <div className="setup-main-header">
+          <h1 className="setup-main-title">{current.title}</h1>
+          <p className="setup-main-sub">{current.sub}</p>
         </div>
 
-        <div style={{ flex: 1, padding: '28px 40px', overflowY: 'auto' }}>
-          <div style={{ maxWidth: current.key === 'tools' || current.key === 'services' ? 1100 : 620 }}>
+        <div className="setup-main-body">
+          <div className={`setup-main-body-inner${current.key === 'tools' || current.key === 'services' ? ' setup-main-body-inner-wide' : ''}`}>
             {current.key === 'organisation' && <StepOrganisation form={form.organisation} set={(p) => setSection('organisation', p)} />}
             {current.key === 'admin' && <StepAdmin form={form.admin} set={(p) => setSection('admin', p)} />}
             {current.key === 'identity' && <StepIdentity form={form.identity} set={(p) => setSection('identity', p)} />}
@@ -294,7 +284,7 @@ export default function SetupPage() {
             {current.key === 'services' && (
               accountCreated
                 ? <StepServices settingsData={settingsData} reloadSettings={reloadSettings} />
-                : <Card><p className="faint" style={{ margin: 0, fontSize: 12.5 }}>Le compte administrateur doit être créé avant de pouvoir connecter un service (retournez à l'étape précédente).</p></Card>
+                : <Card><p className="faint setup-services-blocked-note">Le compte administrateur doit être créé avant de pouvoir connecter un service (retournez à l'étape précédente).</p></Card>
             )}
             {current.key === 'tools' && (
               <StepTools selected={form.tools} onToggle={toggleTool} toolsConfig={form.toolsConfig} setToolConfig={setToolConfig} />
@@ -302,22 +292,22 @@ export default function SetupPage() {
             {current.key === 'ready' && <StepReady form={form} settingsData={settingsData} />}
 
             {error && (
-              <div style={{ marginTop: 16, fontSize: 12.5, color: 'var(--tone-crit-fg)', background: 'var(--tone-crit-bg)', border: '1px solid var(--tone-crit-br)', borderRadius: 8, padding: '10px 12px' }}>
+              <div className="setup-form-error">
                 {error}
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ padding: '16px 40px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="setup-footer">
           <div>
             {step > 0 && (
               <button type="button" className="btn-outline" onClick={() => goTo(step - 1)}>Retour</button>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="setup-footer-actions">
             {current.key !== 'ready' && current.key !== 'admin' && (
-              <button type="button" onClick={skip} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 12.5 }}>
+              <button type="button" onClick={skip} className="setup-later-btn">
                 Configurer plus tard
               </button>
             )}
@@ -365,7 +355,7 @@ function StepOrganisation({ form, set }) {
 function StepAdmin({ form, set }) {
   return (
     <Card>
-      <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--text-faint)' }}>
+      <p className="setup-admin-intro">
         Aucun administrateur n'existe encore. Créez le premier compte pour terminer l'installation.
       </p>
       <Field label="Nom complet" hint="Premier compte administrateur de l'instance">
@@ -383,7 +373,7 @@ function StepAdmin({ form, set }) {
       <Field label="Confirmation">
         <input className="input" type="password" required value={form.confirm} onChange={(e) => set({ confirm: e.target.value })} autoComplete="new-password" />
       </Field>
-      <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+      <p className="setup-admin-note">
         Une clé d'accès (passkey WebAuthn) pourra être ajoutée après l'installation, depuis le profil du compte.
       </p>
     </Card>
@@ -406,7 +396,7 @@ function StepIdentity({ form, set }) {
       <Field label="Longueur minimale du mot de passe" hint="caractères">
         <input className="input" type="number" min={8} max={128} value={form.minPasswordLength} onChange={(e) => set({ minPasswordLength: Number(e.target.value) })} />
       </Field>
-      <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+      <p className="setup-identity-note">
         OIDC, LDAP et clés d'accès se configurent après l'installation, dans Paramètres → Connexion & identité et le profil du compte.
       </p>
     </Card>
@@ -443,33 +433,25 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
   const selectedTools = TOOL_CATALOG.filter((t) => selected.includes(t.id));
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+      <div className="setup-tools-grid">
         {TOOL_CATALOG.map((tool) => {
           const checked = selected.includes(tool.id);
           return (
             <label
               key={tool.id}
-              className="card"
-              style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, cursor: 'pointer', position: 'relative',
-                borderColor: checked ? 'var(--primary)' : 'var(--border)',
-                background: checked ? 'var(--primary-soft)' : 'var(--surface)'
-              }}
+              className={`card setup-tool-card${checked ? ' setup-tool-card-checked' : ''}`}
             >
-              <input type="checkbox" checked={checked} onChange={() => onToggle(tool.id)} style={{ marginTop: 2 }} />
-              <span style={{ flex: 1, paddingRight: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{tool.label}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.category}</div>
+              <input type="checkbox" checked={checked} onChange={() => onToggle(tool.id)} className="setup-tool-checkbox" />
+              <span className="setup-tool-info">
+                <div className="setup-tool-label">{tool.label}</div>
+                <div className="setup-tool-category">{tool.category}</div>
               </span>
               <button
                 type="button"
                 title={`Ouvrir le site officiel de ${tool.label}`}
                 aria-label={`Ouvrir le site officiel de ${tool.label}`}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(tool.url, '_blank', 'noopener,noreferrer'); }}
-                style={{
-                  position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-faint)', padding: 2, display: 'flex'
-                }}
+                className="setup-tool-link-btn"
               >
                 <Icon name="externalLink" size={14} />
               </button>
@@ -479,14 +461,14 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
       </div>
 
       {selectedTools.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Configuration des outils sélectionnés</div>
-          <p className="faint" style={{ fontSize: 11.5, margin: '0 0 12px' }}>
+        <div className="setup-tools-config">
+          <div className="setup-tools-config-title">Configuration des outils sélectionnés</div>
+          <p className="faint setup-tools-config-desc">
             Renseignez la machine cible pour installer automatiquement un outil à l'ouverture de la
             console, ou laissez « Installer automatiquement » désactivé pour le configurer plus tard
             manuellement depuis Paramètres.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="setup-tools-config-list">
             {selectedTools.map((tool) => (
               <ToolConfigRow
                 key={tool.id}
@@ -505,24 +487,24 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
 function ToolConfigRow({ tool, cfg, setCfg }) {
   if (!tool.installable) {
     return (
-      <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div className="card setup-tool-row-noninstall">
         <div>
-          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tool.label}</div>
-          <div className="faint" style={{ fontSize: 11 }}>
+          <div className="setup-tool-row-title">{tool.label}</div>
+          <div className="faint setup-tool-row-desc">
             Installation automatique indisponible pour cet outil (déploiement multi-conteneurs ou
             service en ligne) — à configurer manuellement depuis Paramètres une fois la console ouverte.
           </div>
         </div>
-        <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, whiteSpace: 'nowrap', flex: 'none' }}>
+        <a href={tool.url} target="_blank" rel="noopener noreferrer" className="setup-tool-row-doclink">
           Documentation officielle
         </a>
       </div>
     );
   }
   return (
-    <div className="card" style={{ padding: '12px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: cfg.autoInstall ? 12 : 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tool.label}</div>
+    <div className="card setup-tool-row">
+      <div className={`setup-tool-row-head${cfg.autoInstall ? ' setup-tool-row-head-expanded' : ''}`}>
+        <div className="setup-tool-row-title-sm">{tool.label}</div>
         <Toggle
           label="Installer automatiquement"
           hint="Déploie l'image Docker officielle sur la machine indiquée via la clé SSH de la console"
@@ -531,7 +513,7 @@ function ToolConfigRow({ tool, cfg, setCfg }) {
         />
       </div>
       {cfg.autoInstall && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10 }}>
+        <div className="setup-tool-row-fields">
           <Field label="Adresse IP / hôte" hint="Machine cible, doit accepter la clé SSH de la console">
             <input className="input" placeholder="10.0.0.42" value={cfg.address} onChange={(e) => setCfg({ address: e.target.value })} />
           </Field>
@@ -553,12 +535,12 @@ function ToolConfigRow({ tool, cfg, setCfg }) {
 function StepServices({ settingsData, reloadSettings }) {
   return (
     <div>
-      <p className="faint" style={{ fontSize: 12.5, margin: '0 0 14px', lineHeight: 1.5 }}>
+      <p className="faint setup-services-intro">
         Connectez dès maintenant les outils déjà installés sur votre infrastructure, et testez chaque
         connexion avant d'ouvrir la console. Rien n'est obligatoire ici : chaque service reste
         configurable et testable plus tard depuis Paramètres → Intégrations &amp; outils.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
+      <div className="setup-services-grid">
         {INTEGRATION_ORDER.map((key) => (
           <IntegrationPanel
             key={key}
@@ -589,9 +571,9 @@ function StepReady({ form, settingsData }) {
   return (
     <Card>
       {rows.map(([label, value]) => (
-        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-soft)', fontSize: 13 }}>
+        <div key={label} className="setup-ready-row">
           <span className="faint">{label}</span>
-          <span style={{ fontWeight: 600 }}>{value}</span>
+          <span className="setup-ready-row-value">{value}</span>
         </div>
       ))}
     </Card>
@@ -599,45 +581,39 @@ function StepReady({ form, settingsData }) {
 }
 
 function Card({ children }) {
-  return <div className="card" style={{ padding: 20 }}>{children}</div>;
+  return <div className="card setup-card">{children}</div>;
 }
 
 function Field({ label, hint, children }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="setup-field">
       {/* Le contrôle est imbriqué dans <label> (association implicite) plutôt
           que relié par un id généré : ça reste accessible (lecteurs d'écran,
           clic sur le libellé) sans faire courir de risque de collision d'id
           entre les six étapes du formulaire. */}
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>
+      <label className="setup-field-label">
         {label}
-        <div style={{ marginTop: 5, fontWeight: 400 }}>{children}</div>
+        <div className="setup-field-control">{children}</div>
       </label>
-      {hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{hint}</div>}
+      {hint && <div className="faint setup-field-hint">{hint}</div>}
     </div>
   );
 }
 
 function Toggle({ label, hint, checked, onChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
+    <div className="setup-toggle-row">
       <div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
-        {hint && <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>{hint}</div>}
+        <div className="setup-toggle-label">{label}</div>
+        {hint && <div className="faint setup-toggle-hint">{hint}</div>}
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         aria-pressed={checked}
-        style={{
-          flex: 'none', width: 40, height: 22, borderRadius: 11, border: 'none', position: 'relative',
-          background: checked ? 'var(--primary)' : 'var(--border)', cursor: 'pointer', transition: 'background .15s ease'
-        }}
+        className={`setup-toggle-btn${checked ? ' setup-toggle-btn-on' : ''}`}
       >
-        <span style={{
-          position: 'absolute', top: 2, left: checked ? 20 : 2, width: 18, height: 18, borderRadius: '50%',
-          background: '#fff', transition: 'left .15s ease', boxShadow: '0 1px 2px rgba(0,0,0,.25)'
-        }} />
+        <span className={`setup-toggle-knob${checked ? ' setup-toggle-knob-on' : ''}`} />
       </button>
     </div>
   );
