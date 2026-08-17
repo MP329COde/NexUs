@@ -9,7 +9,6 @@ import LiveActivityPanel from './LiveActivityPanel.jsx';
 import ServiceAvailabilityPanel from './ServiceAvailabilityPanel.jsx';
 import OpenAlertsPanel from './OpenAlertsPanel.jsx';
 import AdminOverviewPanel from './AdminOverviewPanel.jsx';
-import BlockedFeaturesPanel from './BlockedFeaturesPanel.jsx';
 import MyProjectsOverviewPanel from './MyProjectsOverviewPanel.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
@@ -82,10 +81,6 @@ export default function HomePage() {
       <div className="home-panel-row">
         <AdminOverviewPanel />
         <MyProjectsOverviewPanel />
-      </div>
-
-      <div className="home-panel-row">
-        <BlockedFeaturesPanel integrations={data?.integrations} />
       </div>
 
       <div className="home-panel-row">

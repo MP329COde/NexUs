@@ -244,9 +244,16 @@ export default function UsersPanel() {
 
       <Panel title="Créer un utilisateur" span={4}>
         <form onSubmit={invite} className="users-create-form">
-          <Field label="E-mail"><input className="input" type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></Field>
-          <Field label="Nom"><input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
-          <Field label="Mot de passe initial"><input className="input" type="password" required minLength={8} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} /></Field>
+          {/* autoComplete="off" + name unique par champ : sans ça, le
+              navigateur propose/pré-remplit ce formulaire "Créer un
+              utilisateur" avec les identifiants ENREGISTRÉS DE L'ADMIN
+              CONNECTÉ (déjà en session sur ce domaine) — un admin distrait
+              pouvait créer un compte avec sa propre adresse/mot de passe
+              sans s'en rendre compte. Trouvé en testant réellement ce
+              formulaire. Même convention que IntegrationPanel.jsx. */}
+          <Field label="E-mail"><input className="input" type="email" name="new-user-email" autoComplete="off" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></Field>
+          <Field label="Nom"><input className="input" name="new-user-name" autoComplete="off" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
+          <Field label="Mot de passe initial"><input className="input" type="password" name="new-user-password" autoComplete="new-password" required minLength={8} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} /></Field>
           <Field label="Type de compte" hint="Rôle technique binaire — un administrateur a toujours accès complet, quels que soient les rôles/permissions ci-dessous">
             <select className="input" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
               <option value="user">Utilisateur</option>

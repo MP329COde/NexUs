@@ -121,7 +121,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Accueil
 
-- **HomePage.jsx** — Tableau de bord principal.
+- **HomePage.jsx** — Tableau de bord principal. Panneau « Fonctionnalités bloquées » retiré (composant `BlockedFeaturesPanel.jsx` supprimé, plus référencé nulle part) — demandé explicitement, la Vue générale n'affiche plus la liste des intégrations non configurées.
 - **AdminOverviewPanel.jsx** — Vue admin : intégrations en erreur, incidents ouverts, jobs en échec, fraîcheur backup.
 - **MyProjectsOverviewPanel.jsx** — Équivalent non-admin, filtré sur les projets de l'utilisateur.
 - **CriticalHostsPanel.jsx** — Hôtes critiques (sonde TCP + métriques SSH), admin uniquement.
@@ -204,7 +204,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 - **IntegrationPanel.jsx** — Configuration/test de chaque intégration.
 - **GitServicesPanel.jsx** — Configuration GitLab/GitHub.
 - **IdentityPanel.jsx** — Configuration OIDC/LDAP.
-- **UsersPanel.jsx / GroupsPanel.jsx** — CRUD utilisateurs et groupes, **file d'approbation des demandes d'accès terminal**.
+- **UsersPanel.jsx / GroupsPanel.jsx** — CRUD utilisateurs et groupes, **file d'approbation des demandes d'accès terminal**. **Rôles réels par utilisateur vérifiés de bout en bout** (création d'un groupe avec une permission précise sur un seul domaine, assignation à un compte de test, connexion effective avec ce compte) : un niveau insuffisant (`write` sur `hosts`, qui exige `admin`) bloque bien l'accès (redirection + onglet absent de la nav), le niveau suffisant l'autorise — confirmé granulaire et réellement appliqué, pas cosmétique. Bug corrigé : le formulaire « Créer un utilisateur » n'avait ni `name` ni `autoComplete` sur les champs e-mail/mot de passe — le navigateur y pré-remplissait les identifiants **de l'admin actuellement connecté**, risque réel de créer un compte avec les mauvais identifiants sans s'en rendre compte.
 - **InventoryPanel.jsx** — Inventaire matériel/logiciel.
 - **AuditPanel.jsx** — Journal d'audit centralisé.
 - **SystemPanel.jsx** — Version, mise à jour, overview, sauvegardes locales, **panneau « Sauvegarde Git »** (pousser maintenant, lister les sauvegardes du dépôt distant, les réimporter pour restauration).
