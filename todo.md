@@ -40,6 +40,8 @@ et documentée dans `fonctions.md` une fois réellement faite.
 
 - [x] Suppression de projet : `DELETE /projects/:id` existait déjà côté backend (owner uniquement) mais **aucun bouton dans l'interface** — ajouté dans l'en-tête de la fiche projet (redirige vers la liste après suppression). Vérifié via Playwright de bout en bout. Environnements auto-provisionnés (production/staging) vérifiés fonctionnels pour un nouveau projet maintenant que Postgres est actif.
 
+- [x] Retrait d'un membre d'un projet : même manque que pour la suppression de projet — `DELETE /projects/:id/members/:userId` existait côté backend mais jamais appelé côté frontend (seul le changement de rôle l'était, pas de moyen de retirer quelqu'un). Ajouté (icône ✕ à côté de chaque membre dans le panneau Équipe). Vérifié via Playwright de bout en bout (ajout d'Alice, retrait, vérifié disparue).
+
 ## Environnement de développement (contexte pour la prochaine session)
 Un Postgres local a été démarré pour cette session (conteneur Docker `nexus-dev-postgres`,
 port 5433, volume éphémère non persistant — les données y seront perdues si le conteneur

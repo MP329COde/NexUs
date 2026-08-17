@@ -935,6 +935,16 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
   // global — utile pour un viewer/developer qui doit consulter ou éditer des
   // secrets sans être promu maintainer sur tout le reste (voir
   // orgStore.hasResourceAccess, vault.routes.js).
+  async function removeMember(userId) {
+    if (!confirm('Retirer ce membre du projet ?')) return;
+    try {
+      await api.del(`/projects/${projectId}/members/${userId}`);
+      notify('Membre retiré', { type: 'info' });
+      onChanged();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
   async function setVaultGrant(userId, level) {
     try {
       await api.put(`/projects/${projectId}/resource-grants/${userId}/vault`, { level: level || undefined });
@@ -968,6 +978,9 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
                       >
                         {Object.entries(TEAM_ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
+                      <span onClick={() => removeMember(m.user_id)} className="pd-team-remove-icon" title="Retirer du projet">
+                        <Icon name="x" size={11} />
+                      </span>
                     </label>
                     {roleAtLeast(m.role, 'developer') ? null : (
                       <select

@@ -311,6 +311,16 @@
   cursor: pointer;
 }
 
+.pd-team-remove-icon {
+  cursor: pointer;
+  display: flex;
+  opacity: 0.7;
+}
+
+.pd-team-remove-icon:hover {
+  opacity: 1;
+}
+
 .pd-team-vault-grant {
   font-size: 10px;
   height: 20px;
