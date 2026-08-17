@@ -7,6 +7,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './IacPage.css';
 
 // Infrastructure as Code : chaque ligne est une VM Proxmox déclarée depuis
 // Nexus et matérialisée en vrais fichiers Terraform (provider bpg/proxmox),
@@ -39,7 +40,7 @@ export default function IacPage() {
         title="Infrastructure as Code"
         sub="Machines déclarées depuis la console, provisionnées via Terraform réel (provider Proxmox)."
         actions={(
-          <span className="btn" onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="btn iac-header-action" onClick={() => setCreating(true)}>
             <Icon name="plus" size={13} />Déclarer une VM
           </span>
         )}
@@ -47,35 +48,35 @@ export default function IacPage() {
 
       <Panel title="Espaces de travail" span={12}>
         {items.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          <div className="iac-empty">
             Aucune infrastructure déclarée — « Déclarer une VM » génère un espace de travail Terraform prêt à planifier.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <div className="iac-table-wrap">
+            <table className="iac-table">
               <thead>
                 <tr>
                   {['Nom', 'Nœud Proxmox', 'VM ID', 'Ressources', 'Dernier plan', 'Dernier apply', ''].map((c) => (
-                    <th key={c} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                    <th key={c} className="iac-table-head">{c}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {items.map((ws) => (
-                  <tr key={ws.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                    <td style={{ padding: '9px 16px', fontWeight: 600 }}>{ws.name}<div className="faint">{ws.vmName}</div></td>
-                    <td style={{ padding: '9px 16px' }} className="mono muted">{ws.node}</td>
-                    <td style={{ padding: '9px 16px' }} className="mono muted">{ws.vmId}</td>
-                    <td style={{ padding: '9px 16px' }} className="mono muted">{ws.cores} vCPU · {ws.memoryMb} Mo · {ws.diskGb} Go</td>
-                    <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{ws.lastPlanAt ? `${new Date(ws.lastPlanAt).toLocaleString('fr-FR')} · ${ws.lastPlanSummary}` : '—'}</td>
-                    <td style={{ padding: '9px 16px', color: 'var(--text-faint)' }}>{ws.lastApplyAt ? new Date(ws.lastApplyAt).toLocaleString('fr-FR') : '—'}</td>
-                    <td style={{ padding: '9px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => setViewing(ws)}>.tf</span>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => setPlanFor(ws)}>Plan</span>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, color: 'var(--tone-warn-fg)' }} onClick={() => setConfirmAction({ type: 'apply', ws })}>Apply</span>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, color: 'var(--tone-crit-fg)' }} onClick={() => setConfirmAction({ type: 'destroy', ws })}>Destroy</span>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => deleteWorkspace(ws)}><Icon name="trash" size={11} /></span>
+                  <tr key={ws.id} className="iac-table-row">
+                    <td className="iac-table-cell iac-cell-name">{ws.name}<div className="faint">{ws.vmName}</div></td>
+                    <td className="iac-table-cell mono muted">{ws.node}</td>
+                    <td className="iac-table-cell mono muted">{ws.vmId}</td>
+                    <td className="iac-table-cell mono muted">{ws.cores} vCPU · {ws.memoryMb} Mo · {ws.diskGb} Go</td>
+                    <td className="iac-table-cell iac-cell-muted">{ws.lastPlanAt ? `${new Date(ws.lastPlanAt).toLocaleString('fr-FR')} · ${ws.lastPlanSummary}` : '—'}</td>
+                    <td className="iac-table-cell iac-cell-muted">{ws.lastApplyAt ? new Date(ws.lastApplyAt).toLocaleString('fr-FR') : '—'}</td>
+                    <td className="iac-table-cell">
+                      <div className="iac-row-actions">
+                        <span className="btn-outline iac-action-btn" onClick={() => setViewing(ws)}>.tf</span>
+                        <span className="btn-outline iac-action-btn" onClick={() => setPlanFor(ws)}>Plan</span>
+                        <span className="btn-outline iac-action-btn iac-action-btn-warn" onClick={() => setConfirmAction({ type: 'apply', ws })}>Apply</span>
+                        <span className="btn-outline iac-action-btn iac-action-btn-danger" onClick={() => setConfirmAction({ type: 'destroy', ws })}>Destroy</span>
+                        <span className="btn-outline iac-action-btn" onClick={() => deleteWorkspace(ws)}><Icon name="trash" size={11} /></span>
                       </div>
                     </td>
                   </tr>
@@ -159,23 +160,23 @@ function CreateWorkspaceModal({ onClose, onCreated }) {
 
   return (
     <Modal title="Déclarer une VM" sub="Génère un espace de travail Terraform (provider Proxmox)" onClose={onClose} width={460}>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <form onSubmit={submit} className="iac-modal-form">
         <Field label="Nom (Nexus)"><input className="input" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="dev-app-preview" /></Field>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Field label="Nœud Proxmox" style={{ flex: 1 }}><input className="input" required value={form.node} onChange={(e) => set('node', e.target.value)} placeholder="pve1" /></Field>
-          <Field label="VM ID" style={{ flex: 1 }}><input className="input mono" type="number" required value={form.vmId} onChange={(e) => set('vmId', e.target.value)} placeholder="9001" /></Field>
+        <div className="iac-form-row">
+          <Field label="Nœud Proxmox" className="iac-form-field"><input className="input" required value={form.node} onChange={(e) => set('node', e.target.value)} placeholder="pve1" /></Field>
+          <Field label="VM ID" className="iac-form-field"><input className="input mono" type="number" required value={form.vmId} onChange={(e) => set('vmId', e.target.value)} placeholder="9001" /></Field>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Field label="Nom de la VM" style={{ flex: 1 }}><input className="input" required value={form.vmName} onChange={(e) => set('vmName', e.target.value)} placeholder="dev-app-preview" /></Field>
-          <Field label="Template à cloner (VM ID)" style={{ flex: 1 }}><input className="input mono" type="number" required value={form.templateVmId} onChange={(e) => set('templateVmId', e.target.value)} placeholder="9000" /></Field>
+        <div className="iac-form-row">
+          <Field label="Nom de la VM" className="iac-form-field"><input className="input" required value={form.vmName} onChange={(e) => set('vmName', e.target.value)} placeholder="dev-app-preview" /></Field>
+          <Field label="Template à cloner (VM ID)" className="iac-form-field"><input className="input mono" type="number" required value={form.templateVmId} onChange={(e) => set('templateVmId', e.target.value)} placeholder="9000" /></Field>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Field label="vCPU" style={{ flex: 1 }}><input className="input mono" type="number" value={form.cores} onChange={(e) => set('cores', e.target.value)} /></Field>
-          <Field label="Mémoire (Mo)" style={{ flex: 1 }}><input className="input mono" type="number" value={form.memoryMb} onChange={(e) => set('memoryMb', e.target.value)} /></Field>
-          <Field label="Disque (Go)" style={{ flex: 1 }}><input className="input mono" type="number" value={form.diskGb} onChange={(e) => set('diskGb', e.target.value)} /></Field>
+        <div className="iac-form-row">
+          <Field label="vCPU" className="iac-form-field"><input className="input mono" type="number" value={form.cores} onChange={(e) => set('cores', e.target.value)} /></Field>
+          <Field label="Mémoire (Mo)" className="iac-form-field"><input className="input mono" type="number" value={form.memoryMb} onChange={(e) => set('memoryMb', e.target.value)} /></Field>
+          <Field label="Disque (Go)" className="iac-form-field"><input className="input mono" type="number" value={form.diskGb} onChange={(e) => set('diskGb', e.target.value)} /></Field>
         </div>
-        {error && <div style={{ fontSize: 12, color: 'var(--tone-crit-fg)' }}>{error}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        {error && <div className="iac-form-error">{error}</div>}
+        <div className="iac-form-actions">
           <span className="btn-outline" onClick={onClose}>Annuler</span>
           <button className="btn" type="submit" disabled={busy}>{busy ? 'Génération…' : 'Générer'}</button>
         </div>
@@ -184,10 +185,10 @@ function CreateWorkspaceModal({ onClose, onCreated }) {
   );
 }
 
-function Field({ label, children, style }) {
+function Field({ label, children, className }) {
   return (
-    <div style={style}>
-      <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>{label}</label>
+    <div className={className}>
+      <label className="iac-field-label">{label}</label>
       {children}
     </div>
   );
@@ -197,9 +198,9 @@ function ViewTfModal({ ws, onClose }) {
   const { data, loading, error } = useApi(() => api.get(`/iac/workspaces/${ws.id}/main.tf`), [ws.id]);
   return (
     <Modal title="main.tf" sub={ws.name} onClose={onClose} width={620}>
-      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
-      {data && <pre className="mono" style={{ margin: 0, padding: 14, borderRadius: 8, background: 'var(--surface-2, var(--bg))', fontSize: 12, lineHeight: 1.6, overflowX: 'auto', maxHeight: 460 }}>{data.content}</pre>}
+      {loading && <div className="faint iac-modal-loading">Chargement…</div>}
+      {error && <div className="iac-modal-error">{error}</div>}
+      {data && <pre className="mono iac-tf-pre">{data.content}</pre>}
     </Modal>
   );
 }
@@ -227,14 +228,14 @@ function PlanModal({ ws, onClose, onDone }) {
 
   return (
     <Modal title="terraform plan" sub={ws.name} onClose={onClose} width={620}>
-      {busy && <div className="faint" style={{ fontSize: 12.5 }}>Exécution de "terraform plan"…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {busy && <div className="faint iac-modal-loading">Exécution de "terraform plan"…</div>}
+      {error && <div className="iac-modal-error">{error}</div>}
       {result && (
         <>
-          <div style={{ marginBottom: 10 }}>
+          <div className="iac-plan-badge-wrap">
             <span className={`badge badge-${result.hasChanges ? 'warn' : 'ok'}`}><span className="dot" />{result.hasChanges ? 'Changements détectés' : 'Aucun changement'}</span>
           </div>
-          <pre className="mono" style={{ margin: 0, padding: 14, borderRadius: 8, background: 'var(--surface-2, var(--bg))', fontSize: 11.5, lineHeight: 1.6, overflowX: 'auto', maxHeight: 420, whiteSpace: 'pre-wrap' }}>{result.output}</pre>
+          <pre className="mono iac-plan-pre">{result.output}</pre>
         </>
       )}
     </Modal>

@@ -1,0 +1,137 @@
+.iac-header-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iac-empty {
+  padding: 30px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.iac-table-wrap {
+  overflow-x: auto;
+}
+
+.iac-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.iac-table-head {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.iac-table-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.iac-table-cell {
+  padding: 9px 16px;
+}
+
+.iac-cell-name {
+  font-weight: 600;
+}
+
+.iac-cell-muted {
+  color: var(--text-faint);
+}
+
+.iac-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.iac-action-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.iac-action-btn-warn {
+  color: var(--tone-warn-fg);
+}
+
+.iac-action-btn-danger {
+  color: var(--tone-crit-fg);
+}
+
+.iac-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.iac-form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.iac-form-field {
+  flex: 1;
+}
+
+.iac-field-label {
+  display: block;
+  font-size: 11.5px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.iac-form-error {
+  font-size: 12px;
+  color: var(--tone-crit-fg);
+}
+
+.iac-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.iac-modal-loading,
+.iac-modal-error {
+  font-size: 12.5px;
+}
+
+.iac-modal-error {
+  color: var(--tone-crit-fg);
+}
+
+.iac-tf-pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface-2, var(--bg));
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 460px;
+}
+
+.iac-plan-badge-wrap {
+  margin-bottom: 10px;
+}
+
+.iac-plan-pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface-2, var(--bg));
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 420px;
+  white-space: pre-wrap;
+}
