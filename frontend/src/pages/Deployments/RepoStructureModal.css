@@ -1,0 +1,78 @@
+.rsm-loading {
+  font-size: 12.5px;
+}
+
+.rsm-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.rsm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rsm-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.rsm-empty {
+  font-size: 12.5px;
+}
+
+.rsm-stack-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rsm-flags-row {
+  display: flex;
+  gap: 20px;
+}
+
+.rsm-flag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+}
+
+.rsm-pkg-summary {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.rsm-scripts-pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2, var(--bg));
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.rsm-root-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rsm-root-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  padding: 3px 0;
+}
+
+.rsm-root-item-icon {
+  color: var(--text-faint);
+}

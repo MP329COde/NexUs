@@ -2,6 +2,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './RepoStructureModal.css';
 
 // Structure de développement d'un dépôt : stack détectée, présence de CI et
 // de Docker Compose, scripts npm éventuels — tout lu en direct sur la
@@ -12,28 +13,28 @@ export default function RepoStructureModal({ repo, onClose }) {
 
   return (
     <Modal title="Structure de développement" sub={`${repo.name} · ${repo.defaultBranch}`} onClose={onClose} width={640}>
-      {loading && <div className="faint" style={{ fontSize: 12.5 }}>Analyse de l'arborescence…</div>}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {loading && <div className="faint rsm-loading">Analyse de l'arborescence…</div>}
+      {error && <div className="rsm-error">{error}</div>}
       {s && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="rsm-body">
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', marginBottom: 8 }}>Stack détectée</div>
+            <div className="rsm-section-title">Stack détectée</div>
             {s.stack.length === 0 ? (
-              <div className="faint" style={{ fontSize: 12.5 }}>Aucun fichier de stack reconnu à la racine du dépôt.</div>
+              <div className="faint rsm-empty">Aucun fichier de stack reconnu à la racine du dépôt.</div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div className="rsm-stack-badges">
                 {s.stack.map((label) => <span key={label} className="badge badge-vio">{label}</span>)}
                 {s.packageManager && <span className="badge badge-info">Gestionnaire : {s.packageManager}</span>}
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5 }}>
+          <div className="rsm-flags-row">
+            <div className="rsm-flag">
               <Icon name={s.hasCI ? 'check' : 'xCircle'} size={14} style={{ color: s.hasCI ? 'var(--tone-ok-fg)' : 'var(--text-faint)' }} />
               Pipeline CI {s.hasCI ? 'détecté' : 'absent'}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5 }}>
+            <div className="rsm-flag">
               <Icon name={s.dockerCompose ? 'check' : 'xCircle'} size={14} style={{ color: s.dockerCompose ? 'var(--tone-ok-fg)' : 'var(--text-faint)' }} />
               Docker Compose {s.dockerCompose ? 'détecté' : 'absent'}
             </div>
@@ -41,13 +42,13 @@ export default function RepoStructureModal({ repo, onClose }) {
 
           {s.packageJson && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', marginBottom: 8 }}>package.json</div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 8 }}>
+              <div className="rsm-section-title">package.json</div>
+              <div className="rsm-pkg-summary">
                 {s.packageJson.name && <>« {s.packageJson.name} » — </>}
                 {s.packageJson.dependenciesCount} dépendance(s), {s.packageJson.devDependenciesCount} dépendance(s) de dev
               </div>
               {Object.keys(s.packageJson.scripts).length > 0 && (
-                <pre className="mono" style={{ margin: 0, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2, var(--bg))', fontSize: 12, overflowX: 'auto' }}>
+                <pre className="mono rsm-scripts-pre">
                   {Object.entries(s.packageJson.scripts).map(([name, cmd]) => `${name}: ${cmd}`).join('\n')}
                 </pre>
               )}
@@ -55,11 +56,11 @@ export default function RepoStructureModal({ repo, onClose }) {
           )}
 
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', marginBottom: 8 }}>Racine du dépôt</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="rsm-section-title">Racine du dépôt</div>
+            <div className="rsm-root-list">
               {s.root.map((item) => (
-                <div key={item.path} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, padding: '3px 0' }}>
-                  <Icon name={item.type === 'dir' ? 'folder' : 'box'} size={13} style={{ color: 'var(--text-faint)' }} />
+                <div key={item.path} className="rsm-root-item">
+                  <Icon name={item.type === 'dir' ? 'folder' : 'box'} size={13} className="rsm-root-item-icon" />
                   <span className={item.type === 'dir' ? '' : 'mono'}>{item.name}</span>
                 </div>
               ))}
