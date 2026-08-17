@@ -9,6 +9,7 @@ import { useTheme, THEME_MODES, ACCENT_COLORS } from '../../context/ThemeContext
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './AccountPage.css';
 
 const EMOJIS = ['🧑‍💻', '🛰️', '🐳', '🦾', '🔧', '🛡️', '⚡', '🌐', '🧠', '🔥', '🚀', '🗄️'];
 const COLORS = ['#2563EB', '#8B5CF6', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#EC4899', '#475569'];
@@ -113,38 +114,49 @@ export default function AccountPage() {
     <>
       <PageHeader title="Mon compte" sub="Préférences personnelles : profil, avatar, apparence et sécurité. Ces réglages ne concernent que votre compte." />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="account-grid">
         <Panel title="Profil" span={6}>
-          <form onSubmit={saveProfile} style={{ padding: 16 }}>
+          <form onSubmit={saveProfile} className="account-form-body">
             <Field label="Nom affiché"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
             <Field label="E-mail"><input className="input" value={user?.email || ''} disabled /></Field>
 
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6 }}>Avatar</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div className="account-section-label">Avatar</div>
+            <div className="account-avatar-row">
               <Avatar user={{ name, avatarImage, avatarEmoji: emoji, avatarColor: color }} size={52} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', width: 'fit-content' }}>
+              <div className="account-avatar-actions">
+                <label className="btn-outline account-import-btn">
                   <Icon name="image" size={13} />Importer une image
-                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onPickAvatarImage} style={{ display: 'none' }} />
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onPickAvatarImage} className="account-file-input" />
                 </label>
                 {avatarImage && (
-                  <span className="faint" style={{ fontSize: 11.5, cursor: 'pointer', width: 'fit-content' }} onClick={() => setAvatarImage('')}>
+                  <span className="faint account-remove-image" onClick={() => setAvatarImage('')}>
                     Retirer l'image importée
                   </span>
                 )}
               </div>
             </div>
-            <div className="faint" style={{ fontSize: 11, marginBottom: 10 }}>
+            <div className="faint account-avatar-hint">
               {avatarImage ? "Image importée active — l'emoji ci-dessous est ignoré tant qu'elle est définie." : 'Ou choisissez un emoji :'}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, opacity: avatarImage ? 0.5 : 1 }}>
+            <div className="account-emoji-picker" style={{ opacity: avatarImage ? 0.5 : 1 }}>
               {EMOJIS.map((e) => (
-                <span key={e} onClick={() => { setEmoji(e === emoji ? '' : e); setAvatarImage(''); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, cursor: 'pointer', fontSize: 15, background: e === emoji ? 'var(--primary-soft)' : 'var(--border-soft)', border: e === emoji ? '1px solid var(--primary)' : '1px solid transparent' }}>{e}</span>
+                <span
+                  key={e}
+                  onClick={() => { setEmoji(e === emoji ? '' : e); setAvatarImage(''); }}
+                  className={`account-emoji-option${e === emoji ? ' account-emoji-option-active' : ''}`}
+                >
+                  {e}
+                </span>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+            <div className="account-color-picker">
               {COLORS.map((c) => (
-                <span key={c} onClick={() => setColor(c)} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: c === color ? '0 0 0 2px var(--surface), 0 0 0 4px var(--primary)' : 'none' }} />
+                <span
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`account-color-option${c === color ? ' account-color-option-active' : ''}`}
+                  style={{ background: c }}
+                />
               ))}
             </div>
             <button className="btn" type="submit" disabled={savingProfile}>{savingProfile ? 'Enregistrement…' : 'Enregistrer le profil'}</button>
@@ -152,33 +164,33 @@ export default function AccountPage() {
         </Panel>
 
         <Panel title="Apparence" span={6}>
-          <div style={{ padding: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 8 }}>Thème</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="account-panel-body">
+            <div className="account-section-label">Thème</div>
+            <div className="account-theme-tabs">
               {THEME_MODES.map(({ value, label }) => (
                 <span
                   key={value}
                   onClick={() => setTheme(value)}
-                  className={theme === value ? 'btn' : 'btn-outline'}
-                  style={{ padding: '0 14px', height: 32, display: 'inline-flex', alignItems: 'center' }}
+                  className={`${theme === value ? 'btn' : 'btn-outline'} account-theme-tab`}
                 >
                   {label}
                 </span>
               ))}
             </div>
-            <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
+            <div className="faint account-theme-hint">
               Système suit le réglage de votre appareil ; Auto (horaire) bascule sombre entre 20h et 7h, quel que soit l'appareil.
             </div>
 
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', margin: '18px 0 8px' }}>Couleur d'accent</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="account-section-label account-accent-label">Couleur d'accent</div>
+            <div className="account-accent-picker">
               {ACCENT_COLORS.map(({ value, label, swatch }) => (
                 <span
                   key={value}
                   onClick={() => setAccent(value)}
                   title={label}
+                  className="account-accent-option"
                   style={{
-                    width: 28, height: 28, borderRadius: '50%', background: swatch, cursor: 'pointer',
+                    background: swatch,
                     boxShadow: accent === value ? '0 0 0 2px var(--surface), 0 0 0 4px var(--text)' : '0 0 0 1px var(--border)'
                   }}
                 />
@@ -188,7 +200,7 @@ export default function AccountPage() {
         </Panel>
 
         <Panel title="Sécurité" sub="Changer votre mot de passe" span={6}>
-          <form onSubmit={savePassword} style={{ padding: 16 }}>
+          <form onSubmit={savePassword} className="account-form-body">
             <Field label="Mot de passe actuel"><input className="input" type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></Field>
             <Field label="Nouveau mot de passe"><input className="input" type="password" required minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></Field>
             <Field label="Confirmation"><input className="input" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></Field>
@@ -245,24 +257,24 @@ function PasskeysPanel() {
 
   return (
     <Panel title="Clés d'accès (passkeys)" sub="Connexion sans mot de passe via empreinte, visage ou clé de sécurité" span={12}>
-      <div style={{ padding: 16 }}>
-        <button className="btn" type="button" onClick={register} disabled={registering} style={{ marginBottom: 14 }}>
+      <div className="account-panel-body">
+        <button className="btn account-passkey-register-btn" type="button" onClick={register} disabled={registering}>
           {registering ? 'En attente de l\'authentificateur…' : '+ Enregistrer une clé d\'accès'}
         </button>
         {loading ? (
-          <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>
+          <div className="faint account-passkey-empty">Chargement…</div>
         ) : items.length === 0 ? (
-          <div className="faint" style={{ fontSize: 12.5 }}>Aucune clé d'accès enregistrée — la connexion par mot de passe reste disponible.</div>
+          <div className="faint account-passkey-empty">Aucune clé d'accès enregistrée — la connexion par mot de passe reste disponible.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <div className="account-passkey-list">
             {items.map((c) => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-soft)' }}>
-                <Icon name="lock" size={14} style={{ color: 'var(--text-faint)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.label}{c.deviceType === 'multiDevice' ? ' (synchronisée)' : ''}</div>
-                  <div className="faint" style={{ fontSize: 11 }}>Ajoutée le {formatDate(c.createdAt)}{c.lastUsedAt ? ` · dernière utilisation ${formatDate(c.lastUsedAt)}` : ' · jamais utilisée'}</div>
+              <div key={c.id} className="account-passkey-row">
+                <Icon name="lock" size={14} className="account-passkey-icon" />
+                <div className="account-passkey-info">
+                  <div className="account-passkey-label">{c.label}{c.deviceType === 'multiDevice' ? ' (synchronisée)' : ''}</div>
+                  <div className="faint account-passkey-meta">Ajoutée le {formatDate(c.createdAt)}{c.lastUsedAt ? ` · dernière utilisation ${formatDate(c.lastUsedAt)}` : ' · jamais utilisée'}</div>
                 </div>
-                <button className="btn" type="button" onClick={() => remove(c.id)} style={{ height: 26, padding: '0 10px', fontSize: 11.5 }}>Supprimer</button>
+                <button className="btn account-passkey-remove-btn" type="button" onClick={() => remove(c.id)}>Supprimer</button>
               </div>
             ))}
           </div>
@@ -274,8 +286,8 @@ function PasskeysPanel() {
 
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+    <div className="account-field">
+      <label className="account-field-label">{label}</label>
       {children}
     </div>
   );
