@@ -56,6 +56,20 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 ok "Docker $(docker --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) détecté."
 
+# Sur Linux avec systemd, s'assure explicitement que le démon Docker démarre
+# au boot de la machine (pas seulement à la connexion d'un utilisateur) :
+# get.docker.com l'active déjà en général, mais une installation via le
+# gestionnaire de paquets de la distribution ou une image déjà présente ne
+# le garantit pas — sans ça, la console (restart: unless-stopped) ne
+# redémarre jamais après un reboot puisque Docker lui-même ne tourne pas.
+if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
+  if ! systemctl is-enabled docker >/dev/null 2>&1; then
+    info "Activation de Docker au démarrage du système (systemctl enable docker)…"
+    sudo systemctl enable docker >/dev/null 2>&1 && ok "Docker démarrera automatiquement au boot." \
+      || warn "Impossible d'activer Docker au boot automatiquement (sudo requis) — la console ne redémarrera pas après un reboot tant que Docker n'est pas lancé manuellement."
+  fi
+fi
+
 # --- 2. Configuration (.env) ----------------------------------------------
 if [ ! -f .env ]; then
   info "Génération de .env…"
