@@ -1,0 +1,50 @@
+.pvp-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pvp-title-icon {
+  color: var(--text-faint);
+}
+
+.pvp-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pvp-header-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pvp-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.pvp-reveal-hint {
+  font-size: 11.5px;
+  margin: 0;
+}
+
+.pvp-password-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pvp-password-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.pvp-clear-btn {
+  color: var(--tone-crit-fg);
+}

@@ -6,6 +6,8 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import RotationCountdown from '../../components/vault/RotationCountdown.jsx';
+import './VaultPanel.css';
+import './ProjectVaultPanel.css';
 
 const EMPTY_FORM = { label: '', username: '', secret: '', url: '', notes: '', rotationMinutes: '' };
 
@@ -135,50 +137,50 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
 
   return (
     <Panel
-      title={(<span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="lock" size={13} style={{ color: 'var(--text-faint)' }} />Coffre-fort du projet</span>)}
+      title={(<span className="pvp-title"><Icon name="lock" size={13} className="pvp-title-icon" />Coffre-fort du projet</span>)}
       sub="Secrets partagés entre les membres — révélation protégée par mot de passe"
       span={12}
       actions={canManage && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setVaultPwOpen(true)} title="Mot de passe de coffre-fort du projet">
+        <div className="pvp-header-actions">
+          <span className="btn-outline pvp-header-btn" onClick={() => setVaultPwOpen(true)} title="Mot de passe de coffre-fort du projet">
             <Icon name="lock" size={13} />{vaultPasswordSet ? 'Changer le mot de passe du coffre' : 'Définir un mot de passe de coffre'}
           </span>
-          <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setFormOpen(true)}>
+          <span className="btn-outline pvp-header-btn" onClick={() => setFormOpen(true)}>
             <Icon name="plus" size={13} />Ajouter un secret
           </span>
         </div>
       )}
     >
       {items.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun secret dans ce coffre-fort</div>
+        <div className="pvp-empty">Aucun secret dans ce coffre-fort</div>
       ) : (
-        <div style={{ padding: 6 }}>
+        <div className="vault-list">
           {items.map((entry) => (
-            <div key={entry.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{entry.label}</div>
-                  <div className="faint" style={{ fontSize: 11 }}>{entry.username || '—'}</div>
+            <div key={entry.id} className="vault-row">
+              <div className="vault-row-main">
+                <div className="vault-row-info">
+                  <div className="vault-row-label">{entry.label}</div>
+                  <div className="faint vault-row-username">{entry.username || '—'}</div>
                   {entry.url && (
-                    <div className="mono" style={{ fontSize: 10.5, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{entry.url}</div>
+                    <div className="mono vault-row-url">{entry.url}</div>
                   )}
                 </div>
                 {entry.url && (
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => openAccess(entry)} title="Ouvrir un accès direct">
+                  <span className="btn-outline vault-action-btn" onClick={() => openAccess(entry)} title="Ouvrir un accès direct">
                     <Icon name={accessIcon(entry.url)} size={12} /> Ouvrir
                   </span>
                 )}
                 {revealed[entry.id] === undefined ? (
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => startReveal(entry)}>
+                  <span className="btn-outline vault-action-btn" onClick={() => startReveal(entry)}>
                     <Icon name="shield" size={12} /> Révéler
                   </span>
                 ) : (
                   <>
-                    <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => copy(revealed[entry.id].secret)}>
+                    <span className="btn-outline vault-action-btn" onClick={() => copy(revealed[entry.id].secret)}>
                       <Icon name="copy" size={12} /> Copier
                     </span>
                     <span
-                      className="btn-outline" title="Masquer" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }}
+                      className="btn-outline vault-action-btn-icon" title="Masquer"
                       onClick={() => { setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; }); delete sessionPasswordsRef.current[entry.id]; }}
                     >
                       <Icon name="eyeOff" size={12} />
@@ -187,17 +189,17 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
                 )}
                 {canManage && (
                   <>
-                    <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5 }} onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
+                    <span className="btn-outline vault-action-btn-icon" onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
                       <Icon name="edit" size={12} />
                     </span>
-                    <span className="btn-outline" style={{ height: 26, padding: '0 8px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => remove(entry)}>
+                    <span className="btn-outline vault-action-btn-icon vault-action-btn-danger" onClick={() => remove(entry)}>
                       <Icon name="trash" size={12} />
                     </span>
                   </>
                 )}
               </div>
               {revealed[entry.id] !== undefined && (
-                <div className="mono" style={{ marginTop: 6, fontSize: 11, padding: '6px 8px', background: 'var(--border-soft)', borderRadius: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="mono vault-revealed">
                   <span>{revealed[entry.id].secret}</span>
                   {revealed[entry.id].rotatesAt && (
                     <RotationCountdown rotatesAt={revealed[entry.id].rotatesAt} onDue={() => silentRefresh(entry)} />
@@ -215,19 +217,18 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
           sub={vaultPasswordSet ? 'Mot de passe de coffre-fort du projet requis' : 'Ré-authentification requise'}
           onClose={() => { setRevealing(null); setStepUpPassword(''); }} width={380}
         >
-          <form onSubmit={(e) => { e.preventDefault(); doReveal(revealing); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={(e) => { e.preventDefault(); doReveal(revealing); }} className="vault-modal-form">
             <input
-              className="input" type="password" autoFocus autoComplete="off"
+              className="input vault-stepup-input" type="password" autoFocus autoComplete="off"
               placeholder={vaultPasswordSet ? 'Mot de passe du coffre-fort' : 'Votre mot de passe'}
               value={stepUpPassword} onChange={(e) => setStepUpPassword(e.target.value)}
-              style={{ height: 34, fontSize: 12.5 }}
             />
             {vaultPasswordSet && (
-              <p className="faint" style={{ fontSize: 11.5, margin: 0 }}>
+              <p className="faint pvp-reveal-hint">
                 Ce mot de passe reste actif pour cette page tant qu'elle reste ouverte — vous n'aurez pas à le ressaisir pour les autres secrets du projet.
               </p>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="vault-modal-actions">
               <span className="btn-outline" onClick={() => { setRevealing(null); setStepUpPassword(''); }}>Annuler</span>
               <button className="btn" type="submit">Confirmer</button>
             </div>
@@ -246,20 +247,20 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
 
       {editing && (
         <Modal title={`Modifier « ${editing.label} »`} sub="Le secret lui-même ne peut pas être changé ici — supprimez puis recréez l'entrée." onClose={() => setEditing(null)} width={420}>
-          <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={saveEdit} className="vault-modal-form">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="vault-field-label">Nom</label>
               <input className="input" required value={editing.label} onChange={(e) => setEditing((s) => ({ ...s, label: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Utilisateur</label>
+              <label className="vault-field-label">Utilisateur</label>
               <input className="input" value={editing.username} onChange={(e) => setEditing((s) => ({ ...s, username: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès</label>
+              <label className="vault-field-label">URL / hôte d'accès</label>
               <input className="input" value={editing.url} onChange={(e) => setEditing((s) => ({ ...s, url: e.target.value }))} placeholder="ssh://user@10.0.0.12" />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="vault-modal-actions">
               <span className="btn-outline" onClick={() => setEditing(null)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
             </div>
@@ -269,25 +270,25 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
 
       {formOpen && (
         <Modal title="Ajouter un secret" sub={`Coffre-fort de « ${project.name} »`} onClose={() => setFormOpen(false)} width={440}>
-          <form onSubmit={create} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={create} autoComplete="off" className="vault-modal-form">
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Nom</label>
+              <label className="vault-field-label">Nom</label>
               <input className="input" autoComplete="off" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Base de données staging" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Utilisateur (optionnel)</label>
+              <label className="vault-field-label">Utilisateur (optionnel)</label>
               <input className="input" autoComplete="off" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Secret</label>
+              <label className="vault-field-label">Secret</label>
               <input className="input" type="password" autoComplete="new-password" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>URL / hôte d'accès (optionnel)</label>
+              <label className="vault-field-label">URL / hôte d'accès (optionnel)</label>
               <input className="input" autoComplete="off" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} placeholder="ssh://user@10.0.0.12" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Rotation automatique</label>
+              <label className="vault-field-label">Rotation automatique</label>
               <select className="input" value={form.rotationMinutes} onChange={(e) => setForm((f) => ({ ...f, rotationMinutes: e.target.value }))}>
                 <option value="">Pas de rotation auto</option>
                 <option value="2">Toutes les 2 min</option>
@@ -296,7 +297,7 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
                 <option value="5">Toutes les 5 min</option>
               </select>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="vault-modal-actions">
               <span className="btn-outline" onClick={() => setFormOpen(false)}>Annuler</span>
               <button className="btn" type="submit" disabled={busy}>{busy ? 'Ajout…' : 'Ajouter'}</button>
             </div>
@@ -355,26 +356,26 @@ function ProjectVaultPasswordModal({ project, vaultPasswordSet, onClose, onSaved
       sub="Requis pour révéler les secrets de ce projet — partagé entre les membres, distinct du mot de passe de chacun"
       onClose={onClose} width={420}
     >
-      <form onSubmit={save} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <form onSubmit={save} autoComplete="off" className="vault-modal-form">
         {vaultPasswordSet && (
           <div>
-            <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Mot de passe actuel</label>
+            <label className="vault-field-label">Mot de passe actuel</label>
             <input className="input" type="password" autoComplete="off" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
           </div>
         )}
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>{vaultPasswordSet ? 'Nouveau mot de passe' : 'Nouveau mot de passe de coffre-fort'}</label>
+          <label className="vault-field-label">{vaultPasswordSet ? 'Nouveau mot de passe' : 'Nouveau mot de passe de coffre-fort'}</label>
           <input className="input" type="password" autoComplete="new-password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>Confirmer</label>
+          <label className="vault-field-label">Confirmer</label>
           <input className="input" type="password" autoComplete="new-password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <div className="pvp-password-actions">
           {vaultPasswordSet ? (
-            <span className="btn-outline" style={{ color: 'var(--tone-crit-fg)' }} onClick={clear}>Retirer le mot de passe</span>
+            <span className="btn-outline pvp-clear-btn" onClick={clear}>Retirer le mot de passe</span>
           ) : <span />}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="pvp-password-actions-right">
             <span className="btn-outline" onClick={onClose}>Annuler</span>
             <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
           </div>
