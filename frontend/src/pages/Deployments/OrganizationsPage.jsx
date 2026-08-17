@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
@@ -181,7 +182,7 @@ export default function OrganizationsPage() {
             Vous n'êtes membre d'aucune organisation. Les projets créés en créent automatiquement une par défaut.
           </div>
         ) : organizations.map((org) => (
-          <div key={org.id} className="card org-card">
+          <Link key={org.id} to={`/deployments/organizations/${org.id}`} className="card org-card">
             <div className="org-card-header">
               <span className="org-card-title">
                 {org.icon ? (
@@ -194,24 +195,24 @@ export default function OrganizationsPage() {
               <span className="org-card-actions">
                 <span className="badge badge-vio">{org.my_role}</span>
                 {(org.my_role === 'owner' || org.my_role === 'admin') && (
-                  <span className="btn-outline org-card-edit-btn" onClick={() => setManagingMembers(org)} title="Gérer les membres">
+                  <span className="btn-outline org-card-edit-btn" onClick={(e) => { e.preventDefault(); setManagingMembers(org); }} title="Gérer les membres">
                     <Icon name="users" size={12} />
                   </span>
                 )}
                 {(org.my_role === 'owner' || org.my_role === 'admin') && (
-                  <span className="btn-outline org-card-edit-btn" onClick={() => setEditing(org)} title="Icône et couleur">
+                  <span className="btn-outline org-card-edit-btn" onClick={(e) => { e.preventDefault(); setEditing(org); }} title="Icône et couleur">
                     <Icon name="edit" size={12} />
                   </span>
                 )}
                 {org.my_role === 'owner' && (
-                  <span className="btn-outline org-card-edit-btn org-card-delete-btn" onClick={() => removeOrg(org)}>
+                  <span className="btn-outline org-card-edit-btn org-card-delete-btn" onClick={(e) => { e.preventDefault(); removeOrg(org); }}>
                     <Icon name="trash" size={12} />
                   </span>
                 )}
               </span>
             </div>
             <p className="faint mono org-card-slug">{org.slug}</p>
-          </div>
+          </Link>
         ))}
       </div>
 

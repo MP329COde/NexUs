@@ -12,6 +12,14 @@ export default function Shell() {
   const matches = useMatches();
   const location = useLocation();
   const title = [...matches].reverse().find((m) => m.handle?.title)?.handle?.title ?? 'Nexus Console';
+
+  // Titre de l'onglet navigateur : "Nexus Console" seul sur la page d'accueil
+  // (déjà explicite), "Nexus Console - <page>" partout ailleurs — dérivé du
+  // même `handle.title` que celui affiché dans le header, pour rester toujours
+  // synchronisé avec ce qui est réellement affiché à l'écran.
+  useEffect(() => {
+    document.title = title === 'Vue générale' ? 'Nexus Console' : `Nexus Console - ${title}`;
+  }, [title]);
   const { open: searchOpen, context: searchContext, openPalette, closePalette } = useCommandCenter();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);

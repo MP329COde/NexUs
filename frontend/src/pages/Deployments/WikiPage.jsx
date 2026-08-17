@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
@@ -8,19 +9,25 @@ import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import './WikiPage.css';
 
-// Wiki d'équipe : pages de texte éditables par tout membre de l'organisation
-// sélectionnée, avec historique des révisions (voir routes/wiki.routes.js).
-// Contenu stocké réellement en base (contrairement au lien runbook des
-// incidents, qui pointe volontairement vers une doc externe existante).
+// Wiki d'équipe : pages de texte éditables par tout membre de l'organisation,
+// avec historique des révisions (voir routes/wiki.routes.js). Contenu stocké
+// réellement en base (contrairement au lien runbook des incidents, qui
+// pointe volontairement vers une doc externe existante). Rattaché au menu de
+// l'organisation (voir OrganizationDetailPage.jsx) plutôt qu'à un sélecteur
+// libre : le wiki appartient à une organisation précise, jamais consulté
+// "hors contexte".
 export default function WikiPage() {
+  const { id: routeOrgId } = useParams();
   const { data: orgsData } = useApi(() => api.get('/organizations'), []);
   const organizations = orgsData?.items || [];
-  const [orgId, setOrgId] = useState('');
+  const [orgId, setOrgId] = useState(routeOrgId || '');
+  const currentOrg = organizations.find((o) => o.id === orgId);
   const notify = useNotify();
 
   useEffect(() => {
+    if (routeOrgId) { setOrgId(routeOrgId); return; }
     if (!orgId && organizations.length > 0) setOrgId(organizations[0].id);
-  }, [organizations, orgId]);
+  }, [organizations, orgId, routeOrgId]);
 
   const [q, setQ] = useState('');
   const pages = useApi(() => (orgId ? api.get(`/wiki?orgId=${orgId}${q ? `&q=${encodeURIComponent(q)}` : ''}`) : Promise.resolve({ items: [] })), [orgId, q]);
@@ -59,8 +66,10 @@ export default function WikiPage() {
     <>
       <PageHeader
         title="Wiki d'équipe"
-        sub="Base de connaissance partagée par organisation : procédures, décisions techniques, onboarding."
-        actions={(
+        sub={routeOrgId ? `Organisation : ${currentOrg?.icon ? `${currentOrg.icon} ` : ''}${currentOrg?.name || '…'}` : 'Base de connaissance partagée par organisation : procédures, décisions techniques, onboarding.'}
+        actions={routeOrgId ? (
+          <Link to={`/deployments/organizations/${routeOrgId}`} className="btn-outline wiki-org-select">← Retour à l'organisation</Link>
+        ) : (
           <select className="input wiki-org-select" value={orgId} onChange={(e) => setOrgId(e.target.value)}>
             {organizations.length === 0 && <option value="">Aucune organisation</option>}
             {organizations.map((o) => <option key={o.id} value={o.id}>{o.icon ? `${o.icon} ` : ''}{o.name}</option>)}

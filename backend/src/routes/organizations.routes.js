@@ -24,6 +24,14 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ ok: true, items: await orgStore.listOrganizationsForUser(req.user.id) });
 }));
 
+router.get('/:id', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (!role && req.user.role !== 'admin') return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  const org = await orgStore.getOrganization(req.params.id);
+  if (!org) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  res.json({ ok: true, organization: { ...org, my_role: role } });
+}));
+
 router.post('/', asyncHandler(async (req, res) => {
   const { name, slug, icon, color } = req.body || {};
   if (!name || !slug) return res.status(400).json({ ok: false, error: 'Nom et identifiant requis' });

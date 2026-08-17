@@ -44,6 +44,15 @@ export async function createOrganization({ name, slug, ownerUserId, icon, color 
   }
 }
 
+// Fiche organisation seule (contrairement à listOrganizationsForUser, qui ne
+// renvoie que celles dont l'appelant est membre) : l'appelant vérifie
+// lui-même son rôle via getOrgRole() avant d'exposer quoi que ce soit,
+// exactement comme getProject() plus bas pour les projets.
+export async function getOrganization(orgId) {
+  const { rows } = await query('SELECT * FROM organizations WHERE id = $1', [orgId]);
+  return rows[0] || null;
+}
+
 export async function getOrgRole(orgId, userId) {
   const { rows } = await query(
     'SELECT role FROM org_members WHERE org_id = $1 AND user_id = $2',

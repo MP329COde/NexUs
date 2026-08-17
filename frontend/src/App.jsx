@@ -26,6 +26,7 @@ import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
 import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
 import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
 import OrganizationsPage from './pages/Deployments/OrganizationsPage.jsx';
+import OrganizationDetailPage from './pages/Deployments/OrganizationDetailPage.jsx';
 import WikiPage from './pages/Deployments/WikiPage.jsx';
 import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
 import GitReposPage from './pages/Deployments/GitReposPage.jsx';
@@ -65,22 +66,23 @@ export const router = createBrowserRouter([
             element: <DeploymentsLayout />,
             handle: { title: 'Développement' },
             children: [
-              { index: true, element: <ToolsAccessPage /> },
-              { path: 'projects', element: <ProjectsPage /> },
-              { path: 'organizations', element: <OrganizationsPage /> },
-              { path: 'wiki', element: <WikiPage /> },
-              { path: 'projects/:id', element: <ProjectDetailPage /> },
-              { path: 'repos', element: <GitReposPage /> },
-              { path: 'reviews', element: <CodeReviewsPage /> },
-              { path: 'pipelines', element: <PipelinesPage /> },
-              { path: 'environments', element: <EnvironmentsPage /> },
-              { path: 'releases', element: <ReleasesPage /> },
-              { path: 'iac', element: <IacPage /> },
-              { path: 'tests', element: <TestsQualityPage /> },
-              { path: 'containers', element: <ContainersPage /> },
-              { path: 'images', element: <ImagesRegistryPage /> },
-              { path: 'secrets', element: <SecretsPage /> },
-              { path: 'supply-chain', element: <SupplyChainPage /> }
+              { index: true, element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
+              { path: 'projects', element: <ProjectsPage />, handle: { title: 'Projets' } },
+              { path: 'organizations', element: <OrganizationsPage />, handle: { title: 'Organisations' } },
+              { path: 'organizations/:id', element: <OrganizationDetailPage />, handle: { title: 'Organisation' } },
+              { path: 'organizations/:id/wiki', element: <WikiPage />, handle: { title: "Wiki d'équipe" } },
+              { path: 'projects/:id', element: <ProjectDetailPage />, handle: { title: 'Projet' } },
+              { path: 'repos', element: <GitReposPage />, handle: { title: 'Dépôts Git' } },
+              { path: 'reviews', element: <CodeReviewsPage />, handle: { title: 'Revue de code' } },
+              { path: 'pipelines', element: <PipelinesPage />, handle: { title: 'Pipelines CI/CD' } },
+              { path: 'environments', element: <EnvironmentsPage />, handle: { title: 'Environnements' } },
+              { path: 'releases', element: <ReleasesPage />, handle: { title: 'Déploiements' } },
+              { path: 'iac', element: <IacPage />, handle: { title: 'Infrastructure as Code' } },
+              { path: 'tests', element: <TestsQualityPage />, handle: { title: 'Tests & qualité' } },
+              { path: 'containers', element: <ContainersPage />, handle: { title: 'Conteneurs' } },
+              { path: 'images', element: <ImagesRegistryPage />, handle: { title: 'Images & registry' } },
+              { path: 'secrets', element: <SecretsPage />, handle: { title: 'Secrets & variables' } },
+              { path: 'supply-chain', element: <SupplyChainPage />, handle: { title: 'Supply Chain Security' } }
             ]
           },
           {
@@ -88,8 +90,8 @@ export const router = createBrowserRouter([
             element: <InfrastructureLayout />,
             handle: { title: 'Infrastructure' },
             children: [
-              { index: true, element: <ProxmoxPage /> },
-              { path: 'hosts', element: <RequirePermission domain="hosts" level="admin"><HostsPage /></RequirePermission> }
+              { index: true, element: <ProxmoxPage />, handle: { title: 'Proxmox' } },
+              { path: 'hosts', element: <RequirePermission domain="hosts" level="admin"><HostsPage /></RequirePermission>, handle: { title: 'Hôtes & agents' } }
             ]
           },
           {
@@ -97,9 +99,9 @@ export const router = createBrowserRouter([
             element: <KubernetesLayout />,
             handle: { title: 'Kubernetes' },
             children: [
-              { index: true, element: <KubernetesPage /> },
-              { path: 'services', element: <ServicesPage /> },
-              { path: 'terminal', element: <TerminalPage /> }
+              { index: true, element: <KubernetesPage />, handle: { title: 'Charges de travail' } },
+              { path: 'services', element: <ServicesPage />, handle: { title: 'Services' } },
+              { path: 'terminal', element: <TerminalPage />, handle: { title: 'Terminal sécurisé' } }
             ]
           },
           {
@@ -107,12 +109,12 @@ export const router = createBrowserRouter([
             element: <NetworkLayout />,
             handle: { title: 'Réseaux' },
             children: [
-              { index: true, element: <TopologyPage /> },
-              { path: 'proxies', element: <NetworkPage /> },
-              { path: 'services', element: <NetworkServicesPage /> },
-              { path: 'haproxy', element: <HAProxyPage /> },
-              { path: 'certificates', element: <CertificatesPage /> },
-              { path: 'firewall', element: <FirewallPage /> }
+              { index: true, element: <TopologyPage />, handle: { title: 'Topologie' } },
+              { path: 'proxies', element: <NetworkPage />, handle: { title: 'Proxies & domaines' } },
+              { path: 'services', element: <NetworkServicesPage />, handle: { title: 'Réseaux internes' } },
+              { path: 'haproxy', element: <HAProxyPage />, handle: { title: 'HAProxy' } },
+              { path: 'certificates', element: <CertificatesPage />, handle: { title: 'Certificats' } },
+              { path: 'firewall', element: <FirewallPage />, handle: { title: 'Pare-feu' } }
             ]
           },
           { path: 'monitoring', element: <MonitoringPage />, handle: { title: 'Monitoring' } },
