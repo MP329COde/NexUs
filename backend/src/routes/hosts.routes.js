@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import * as store from '../store/hostsStore.js';
 import { listCatalog, previewScript } from '../services/agentCatalog.js';
+import { listInstallableIds, getServiceMeta, buildServiceScript } from '../services/serviceCatalog.js';
 import { runScript } from '../services/sshExecutor.js';
 import { getConsolePublicKey } from '../utils/sshKeypair.js';
 import { logAudit } from '../services/auditService.js';
@@ -66,6 +67,30 @@ router.post('/:id/agents/:agentId/install', asyncHandler(async (req, res) => {
   store.recordInstallResult(host.id, { agentId: req.params.agentId, ok: result.ok, message: result.ok ? 'Installation réussie' : `Échec (code ${result.exitCode})` });
   logAudit(req, 'host.agent.install', { hostId: host.id, agentId: req.params.agentId, ok: result.ok, exitCode: result.exitCode });
   res.json({ ok: true, result });
+}));
+
+// Catalogue de services complets (serviceCatalog.js — même catalogue que
+// l'assistant de première installation) installables a posteriori sur un
+// hôte déjà géré : utilisé notamment par Monitoring → « Installer Grafana »
+// quand aucune instance n'est encore configurée, sans repasser par le setup.
+router.get('/services/catalog', (req, res) => {
+  res.json({ ok: true, items: listInstallableIds().map((id) => ({ id, ...getServiceMeta(id) })) });
+});
+
+router.get('/services/:serviceId/preview', asyncHandler(async (req, res) => {
+  const host = req.query.address ? { address: req.query.address } : {};
+  res.json({ ok: true, script: buildServiceScript(req.params.serviceId, { address: host.address }) });
+}));
+
+router.post('/:id/services/:serviceId/install', asyncHandler(async (req, res) => {
+  const host = store.getHost(req.params.id);
+  if (!host) return res.status(404).json({ ok: false, error: 'Hôte introuvable' });
+  const meta = getServiceMeta(req.params.serviceId);
+  const script = buildServiceScript(req.params.serviceId, { address: host.address });
+  const result = await runScript(host, script);
+  store.recordInstallResult(host.id, { agentId: req.params.serviceId, ok: result.ok, message: result.ok ? 'Installation réussie' : `Échec (code ${result.exitCode})` });
+  logAudit(req, 'host.service.install', { hostId: host.id, serviceId: req.params.serviceId, ok: result.ok, exitCode: result.exitCode });
+  res.json({ ok: true, result, port: meta?.port, address: host.address });
 }));
 
 export default router;

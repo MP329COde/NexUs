@@ -8,6 +8,7 @@ import MiniLineChart from '../../components/ui/MiniLineChart.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import InstallGrafanaDialog from './InstallGrafanaDialog.jsx';
 import './MonitoringPage.css';
 
 const SEVERITY_FILTERS = [
@@ -24,6 +25,7 @@ export default function MonitoringPage() {
   const [severityFilter, setSeverityFilter] = useState('');
   const [alertSearch, setAlertSearch] = useState('');
   const [nodes, setNodes] = useState(null);
+  const [installOpen, setInstallOpen] = useState(false);
 
   // Les hôtes (nœuds Proxmox) sont chargés en best-effort : cette page reste
   // utile même si seul Grafana (pas Proxmox) est configuré.
@@ -46,7 +48,18 @@ export default function MonitoringPage() {
     return (
       <>
         <PageHeader title="Monitoring" sub="Métriques, alertes et tableaux de bord Grafana" />
-        <div className="card"><EmptyState title="Grafana n'est pas configuré" hint="Renseignez l'URL et une clé API depuis Paramètres → Grafana." /></div>
+        <div className="card">
+          <EmptyState
+            title="Grafana n'est pas configuré"
+            hint="Renseignez l'URL et une clé API depuis Paramètres → Grafana — ou installez automatiquement une instance Grafana sur un hôte déjà géré si vous n'en avez pas encore."
+          />
+          <div className="monitoring-empty-install">
+            <button className="btn" onClick={() => setInstallOpen(true)}>Installer Grafana automatiquement</button>
+          </div>
+        </div>
+        {installOpen && (
+          <InstallGrafanaDialog onClose={() => setInstallOpen(false)} onInstalled={() => { setInstallOpen(false); status.reload(); }} />
+        )}
       </>
     );
   }

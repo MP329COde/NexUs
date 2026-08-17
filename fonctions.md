@@ -20,7 +20,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **grafana.routes.js** — Statut Grafana, dashboards, alertes.
 - **groups.routes.js** — CRUD des groupes d'utilisateurs.
 - **haproxy.routes.js** — Statut, backends, serveurs (état runtime + changement d'état admin), frontends (Data Plane API).
-- **hosts.routes.js** — Clé publique SSH console, catalogue d'agents, CRUD hôtes, hôtes critiques, installation d'agent via SSH.
+- **hosts.routes.js** — Clé publique SSH console, catalogue d'agents, CRUD hôtes, hôtes critiques, installation d'agent via SSH, **installation de service complet** (`GET /services/catalog`, `GET /services/:serviceId/preview`, `POST /:id/services/:serviceId/install` — même catalogue que l'assistant de première installation, `serviceCatalog.js`, réutilisable a posteriori sur un hôte déjà géré).
 - **dockerHub.routes.js** — Consultation du registre public Docker Hub (tags, métadonnées), sans authentification.
 - **imageScans.routes.js** — Scan de vulnérabilités d'une image via Trivy (admin), historique des scans.
 - **dastScans.routes.js** — DAST réel via OWASP ZAP (`zap-baseline.py`, admin) : cible strictement limitée à un domaine déjà déclaré dans Réseaux → Proxies (jamais une URL arbitraire, pour ne jamais servir de scanner ouvert), historique, notification critique si alertes à risque élevé.
@@ -180,7 +180,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 ### Monitoring / Stockage / Sécurité / autres
 
-- **MonitoringPage.jsx** — Statut/dashboards/alertes Grafana, **filtre texte sur les alertes** (en plus du filtre par sévérité), **tendance de charge CPU/RAM** (sparklines ~6h, `/status/infra-load`), **hôtes triés par charge la plus élevée d'abord** avec icône d'alerte au-delà de 85%.
+- **MonitoringPage.jsx / InstallGrafanaDialog.jsx** — Statut/dashboards/alertes Grafana, **filtre texte sur les alertes** (en plus du filtre par sévérité), **tendance de charge CPU/RAM** (sparklines ~6h, `/status/infra-load`), **hôtes triés par charge la plus élevée d'abord** avec icône d'alerte au-delà de 85%. Quand Grafana n'est pas configuré : bouton **« Installer Grafana automatiquement »** sur un hôte déjà géré (Infrastructure → Hôtes), avec aperçu du script avant exécution et indication du branchement restant (créer un compte de service Grafana, puis renseigner Paramètres → Grafana).
 - **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, pas d'intégration réelle).
 - **NetworkServicesPage.jsx** — Réseaux internes : VLAN/sous-réseaux, DHCP, DNS interne, VPN (4 onglets, CRUD déclaratif, local, pas d'intégration réelle).
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
