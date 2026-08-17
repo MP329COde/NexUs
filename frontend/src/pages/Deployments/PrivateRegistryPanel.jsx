@@ -5,6 +5,8 @@ import DemoNote from '../../components/ui/DemoNote.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './TrivyScanPanel.css';
+import './PrivateRegistryPanel.css';
 
 function formatSize(bytes) {
   if (!bytes) return '—';
@@ -73,34 +75,34 @@ export default function PrivateRegistryPanel() {
 
   return (
     <Panel title="Registre d'images privé" sub="Docker Distribution, en direct — dépôts et étiquettes réellement présents sur votre registre" span={12}>
-      <div style={{ display: 'flex', minHeight: 180 }}>
-        <div style={{ width: 220, flex: 'none', borderRight: '1px solid var(--border-soft)', maxHeight: 360, overflowY: 'auto' }}>
+      <div className="trivy-body">
+        <div className="trivy-sidebar">
           {loading ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Chargement…</div>
+            <div className="faint trivy-sidebar-empty">Chargement…</div>
           ) : repositories.length === 0 ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Aucune image poussée pour l'instant.</div>
+            <div className="faint trivy-sidebar-empty">Aucune image poussée pour l'instant.</div>
           ) : (
             repositories.map((repo) => (
               <div
                 key={repo} onClick={() => openRepository(repo)}
-                style={{ padding: '9px 12px', cursor: 'pointer', background: openRepo === repo ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
+                className={`trivy-scan-row${openRepo === repo ? ' trivy-scan-row-active' : ''}`}
               >
-                <span className="mono" style={{ fontSize: 11.5, fontWeight: 600 }}>{repo}</span>
+                <span className="mono registry-repo-name">{repo}</span>
               </div>
             ))
           )}
         </div>
-        <div style={{ flex: 1, padding: 16 }}>
+        <div className="trivy-detail">
           {!openRepo ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', paddingTop: 40 }}>Sélectionnez un dépôt pour voir ses étiquettes.</div>
+            <div className="faint trivy-detail-empty">Sélectionnez un dépôt pour voir ses étiquettes.</div>
           ) : tagsLoading ? (
-            <div className="faint" style={{ fontSize: 12.5 }}>Chargement…</div>
+            <div className="faint">Chargement…</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <table className="registry-tags-table">
               <thead>
                 <tr>
                   {['Étiquette', 'Taille', 'Digest', ''].map((c) => (
-                    <th key={c} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                    <th key={c} className="registry-tags-head">{c}</th>
                   ))}
                 </tr>
               </thead>
@@ -108,12 +110,12 @@ export default function PrivateRegistryPanel() {
                 {(tags || []).map((tag) => {
                   const m = manifests[tag];
                   return (
-                    <tr key={tag} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                      <td style={{ padding: '6px 10px' }} className="mono">{tag}</td>
-                      <td style={{ padding: '6px 10px' }} className="mono muted">{m ? formatSize(m.sizeBytes) : '…'}</td>
-                      <td style={{ padding: '6px 10px', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="mono muted">{m?.digest || '…'}</td>
-                      <td style={{ padding: '6px 10px' }}>
-                        <button className="btn" type="button" onClick={() => removeTag(tag)} style={{ fontSize: 11, padding: '3px 8px' }}>
+                    <tr key={tag} className="registry-tags-row">
+                      <td className="registry-tags-cell mono">{tag}</td>
+                      <td className="registry-tags-cell mono muted">{m ? formatSize(m.sizeBytes) : '…'}</td>
+                      <td className="registry-tags-cell registry-tags-digest mono muted">{m?.digest || '…'}</td>
+                      <td className="registry-tags-cell">
+                        <button className="btn registry-remove-btn" type="button" onClick={() => removeTag(tag)}>
                           <Icon name="trash" size={12} /> Supprimer
                         </button>
                       </td>

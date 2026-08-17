@@ -4,6 +4,8 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './TrivyScanPanel.css';
+import './SbomPanel.css';
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('fr-FR');
@@ -86,89 +88,89 @@ export default function SbomPanel() {
       sub="Syft, open source — inventaire logiciel réel d'une image (paquets, versions, licences)"
       span={12}
     >
-      <form onSubmit={generate} style={{ display: 'flex', gap: 8, padding: 16, borderBottom: '1px solid var(--border-soft)' }}>
-        <input className="input mono" placeholder="ex. nginx:1.27, alpine:3.19" value={imageRef} onChange={(e) => setImageRef(e.target.value)} style={{ flex: 1, fontSize: 12.5 }} />
+      <form onSubmit={generate} className="trivy-form">
+        <input className="input mono trivy-form-input" placeholder="ex. nginx:1.27, alpine:3.19" value={imageRef} onChange={(e) => setImageRef(e.target.value)} />
         <button className="btn" type="submit" disabled={generating || !imageRef.trim()}>{generating ? 'Génération…' : 'Générer le SBOM'}</button>
       </form>
 
-      <div style={{ display: 'flex', minHeight: 180 }}>
-        <div style={{ width: 220, flex: 'none', borderRight: '1px solid var(--border-soft)', maxHeight: 360, overflowY: 'auto' }}>
+      <div className="trivy-body">
+        <div className="trivy-sidebar">
           {loading ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Chargement…</div>
+            <div className="faint trivy-sidebar-empty">Chargement…</div>
           ) : sboms.length === 0 ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Aucun SBOM encore généré</div>
+            <div className="faint trivy-sidebar-empty">Aucun SBOM encore généré</div>
           ) : (
             sboms.map((s) => (
               <div
                 key={s.id} onClick={() => { setOpen(s.id); setFilter(''); }}
-                style={{ padding: '9px 12px', cursor: 'pointer', background: active?.id === s.id ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
+                className={`trivy-scan-row${active?.id === s.id ? ' trivy-scan-row-active' : ''}`}
               >
-                <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.imageRef}</div>
-                <div className="faint" style={{ fontSize: 10.5 }}>{s.total} paquets · {formatDate(s.generatedAt)}</div>
+                <div className="mono trivy-scan-ref">{s.imageRef}</div>
+                <div className="faint trivy-scan-date">{s.total} paquets · {formatDate(s.generatedAt)}</div>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ flex: 1, padding: 16 }}>
+        <div className="trivy-detail">
           {!active ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', paddingTop: 40 }}>Générez un SBOM pour voir l'inventaire ici.</div>
+            <div className="faint trivy-detail-empty">Générez un SBOM pour voir l'inventaire ici.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                <Icon name="layers" size={15} style={{ color: 'var(--text-faint)' }} />
-                <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{active.imageRef}</span>
-                <span className="faint" style={{ fontSize: 11 }}>{active.total} paquets</span>
+              <div className="sbom-detail-header">
+                <Icon name="layers" size={15} className="trivy-detail-icon" />
+                <span className="mono trivy-detail-ref">{active.imageRef}</span>
+                <span className="faint trivy-detail-os">{active.total} paquets</span>
                 {Object.entries(active.byType).map(([type, count]) => (
-                  <span key={type} className="badge badge-mut" style={{ fontSize: 10 }}>{type} · {count}</span>
+                  <span key={type} className="badge badge-mut sbom-type-badge">{type} · {count}</span>
                 ))}
-                <input className="input" placeholder="Filtrer par nom…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ marginLeft: 'auto', height: 26, fontSize: 11.5, width: 160 }} />
+                <input className="input sbom-filter-input" placeholder="Filtrer par nom…" value={filter} onChange={(e) => setFilter(e.target.value)} />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 10px', borderRadius: 8, background: 'var(--border-soft)', flexWrap: 'wrap' }}>
-                <Icon name="lock" size={13} style={{ color: 'var(--text-faint)' }} />
+              <div className="sbom-signature-bar">
+                <Icon name="lock" size={13} className="trivy-detail-icon" />
                 {!signature ? (
                   <>
-                    <span className="faint" style={{ fontSize: 11.5 }}>Ce SBOM n'est pas signé.</span>
-                    <button className="btn" type="button" onClick={sign} disabled={signing} style={{ marginLeft: 'auto', fontSize: 11.5, padding: '4px 10px' }}>
+                    <span className="faint sbom-unsigned-text">Ce SBOM n'est pas signé.</span>
+                    <button className="btn sbom-signature-btn" type="button" onClick={sign} disabled={signing}>
                       {signing ? 'Signature…' : 'Signer avec cosign'}
                     </button>
                   </>
                 ) : (
                   <>
-                    <span style={{ fontSize: 11.5 }}>Signé (cosign, {signature.algorithm}) le {formatDate(signature.signedAt)}</span>
+                    <span className="sbom-signed-text">Signé (cosign, {signature.algorithm}) le {formatDate(signature.signedAt)}</span>
                     {verified !== null && (
-                      <span className={`badge badge-${verified ? 'ok' : 'crit'}`} style={{ fontSize: 10 }}>
+                      <span className={`badge badge-${verified ? 'ok' : 'crit'} sbom-signature-status-badge`}>
                         <span className="dot" />{verified ? 'Signature valide' : 'Signature invalide'}
                       </span>
                     )}
-                    <button className="btn" type="button" onClick={verify} disabled={verifying} style={{ marginLeft: 'auto', fontSize: 11.5, padding: '4px 10px' }}>
+                    <button className="btn sbom-signature-btn" type="button" onClick={verify} disabled={verifying}>
                       {verifying ? 'Vérification…' : 'Vérifier la signature'}
                     </button>
                   </>
                 )}
               </div>
-              <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <div className="sbom-packages-wrap">
+                <table className="sbom-packages-table">
                   <thead>
                     <tr>
                       {['Paquet', 'Version', 'Type', 'Licence'].map((c) => (
-                        <th key={c} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)', position: 'sticky', top: 0, background: 'var(--surface)' }}>{c}</th>
+                        <th key={c} className="sbom-packages-head">{c}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredPackages.slice(0, 200).map((p, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                        <td style={{ padding: '5px 10px' }} className="mono">{p.name}</td>
-                        <td style={{ padding: '5px 10px' }} className="mono muted">{p.version}</td>
-                        <td style={{ padding: '5px 10px' }} className="faint">{p.type}</td>
-                        <td style={{ padding: '5px 10px' }} className="faint">{p.licenses.join(', ') || '—'}</td>
+                      <tr key={i} className="sbom-packages-row">
+                        <td className="sbom-packages-cell mono">{p.name}</td>
+                        <td className="sbom-packages-cell mono muted">{p.version}</td>
+                        <td className="sbom-packages-cell faint">{p.type}</td>
+                        <td className="sbom-packages-cell faint">{p.licenses.join(', ') || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {filteredPackages.length > 200 && <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>+ {filteredPackages.length - 200} autre(s), non affiché(es)</div>}
+                {filteredPackages.length > 200 && <div className="faint trivy-more">+ {filteredPackages.length - 200} autre(s), non affiché(es)</div>}
               </div>
             </>
           )}
