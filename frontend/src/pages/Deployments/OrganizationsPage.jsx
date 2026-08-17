@@ -90,7 +90,7 @@ export default function OrganizationsPage() {
             </div>
             <div>
               <label className="org-form-label">Identifiant (URL, minuscules/tirets)</label>
-              <input className="input" required pattern="[a-z0-9-]+" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="mon-equipe" />
+              <input className="input" required pattern="[a-z0-9\-]+" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="mon-equipe" />
             </div>
             <div>
               <label className="org-form-label">Icône (optionnel)</label>
