@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import ProjectShortcutsPanel from './ProjectShortcutsPanel.jsx';
 import ProjectVaultPanel from './ProjectVaultPanel.jsx';
+import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
 const STATUS_ORDER = ['todo', 'in_progress', 'review', 'done'];
@@ -82,43 +83,43 @@ export default function ProjectDetailPage() {
     <>
       <PageHeader
         title={(
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="pd-title-row">
             {p.icon ? (
-              <span style={{ width: 30, height: 30, borderRadius: 8, background: p.color || 'var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flex: 'none' }}>{p.icon}</span>
+              <span className="pd-title-icon" style={{ background: p.color || 'var(--border-soft)' }}>{p.icon}</span>
             ) : (
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || 'var(--text-faint)', flex: 'none' }} />
+              <span className="pd-title-dot" style={{ background: p.color || 'var(--text-faint)' }} />
             )}
             {p.name}
           </span>
         )}
         sub={p.description || 'Fiche projet'}
-        actions={<Link to="/deployments/projects" className="btn-outline" style={{ textDecoration: 'none' }}>← Tous les projets</Link>}
+        actions={<Link to="/deployments/projects" className="btn-outline pd-back-link">← Tous les projets</Link>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <Panel title="Backlog" sub="Tâches d'équipe — chacun peut s'assigner" span={8}>
           {user?.role === 'admin' || p.memberIds.includes(user?.id) ? (
-            <form onSubmit={addTask} style={{ display: 'flex', gap: 8, padding: '14px 16px', borderBottom: '1px solid var(--border-soft)' }}>
-              <input className="input" placeholder="Nouvelle tâche…" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} style={{ flex: 1 }} />
+            <form onSubmit={addTask} className="pd-form-row">
+              <input className="input pd-form-input" placeholder="Nouvelle tâche…" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
               <button className="btn" type="submit">Ajouter</button>
             </form>
           ) : null}
           {taskItems.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune tâche</div>
+            <div className="pd-empty">Aucune tâche</div>
           ) : (
-            <div style={{ padding: 6 }}>
+            <div className="pd-list-loose">
               {taskItems.map((t) => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px' }}>
-                  <select className="input" value={t.status} onChange={(e) => setTaskStatus(t, e.target.value)} style={{ height: 28, fontSize: 11.5, width: 110 }}>
+                <div key={t.id} className="pd-task-row">
+                  <select className="input pd-task-status" value={t.status} onChange={(e) => setTaskStatus(t, e.target.value)}>
                     {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                   </select>
-                  <span style={{ flex: 1, fontSize: 12.5 }}>{t.title}</span>
+                  <span className="pd-task-title">{t.title}</span>
                   {t.assigneeId ? (
                     <span className="badge badge-vio" style={{ cursor: 'pointer' }} onClick={() => assignTask(t, null)} title="Se désassigner">{userName(t.assigneeId)}</span>
                   ) : (
-                    <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => assignTask(t, user?.id)}>S'assigner</span>
+                    <span className="btn-outline pd-action-btn" onClick={() => assignTask(t, user?.id)}>S'assigner</span>
                   )}
-                  <span onClick={() => removeTask(t.id)} style={{ cursor: 'pointer', color: 'var(--text-faintest)' }}><Icon name="trash" size={13} /></span>
+                  <span onClick={() => removeTask(t.id)} className="pd-task-remove"><Icon name="trash" size={13} /></span>
                 </div>
               ))}
             </div>
@@ -136,17 +137,17 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <Panel title="Dépôts rattachés" span={6} actions={user?.role === 'admin' && <RepoPicker allRepos={repos.data?.items || []} linkedKeys={p.repoKeys} onToggle={toggleRepo} />}>
           {linkedRepos.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun dépôt rattaché</div>
+            <div className="pd-empty">Aucun dépôt rattaché</div>
           ) : (
-            <div style={{ padding: 6 }}>
+            <div className="pd-list-loose">
               {linkedRepos.map((r) => (
-                <a key={r.key} href={r.webUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', textDecoration: 'none', color: 'inherit' }}>
-                  <Icon name="gitBranch" size={13} style={{ color: 'var(--text-faint)' }} />
-                  <span style={{ flex: 1, fontSize: 12.5 }}>{r.name}</span>
-                  <Icon name="externalLink" size={12} style={{ color: 'var(--text-faint)' }} />
+                <a key={r.key} href={r.webUrl} target="_blank" rel="noreferrer" className="pd-repo-link">
+                  <Icon name="gitBranch" size={13} className="pd-repo-link-icon" />
+                  <span className="pd-task-title">{r.name}</span>
+                  <Icon name="externalLink" size={12} className="pd-repo-link-icon" />
                 </a>
               ))}
             </div>
@@ -155,12 +156,12 @@ export default function ProjectDetailPage() {
 
         <Panel title="Revues liées" sub="MR/PR ouvertes sur les dépôts du projet" span={6}>
           {linkedReviews.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune revue ouverte</div>
+            <div className="pd-empty">Aucune revue ouverte</div>
           ) : (
-            <div style={{ padding: 6 }}>
+            <div className="pd-list-loose">
               {linkedReviews.map((r) => (
-                <a key={r.key} href={r.webUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', textDecoration: 'none', color: 'inherit' }}>
-                  <span style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                <a key={r.key} href={r.webUrl} target="_blank" rel="noreferrer" className="pd-repo-link">
+                  <span className="pd-review-title">{r.title}</span>
                   <span className="mono faint" style={{ fontSize: 11 }}>{r.author}</span>
                 </a>
               ))}
@@ -169,11 +170,11 @@ export default function ProjectDetailPage() {
         </Panel>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} projectId={id} onChanged={workspace.reload} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <EnvironmentsPanel
           environments={environments.data?.items || []}
           migrated={environments.data?.migrated}
@@ -184,7 +185,7 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <IncidentsPanel
           incidents={incidents.data?.items || []}
           projectId={id}
@@ -193,7 +194,7 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <ChangesPanel
           changes={changes.data?.items || []}
           environments={environments.data?.items || []}
@@ -203,7 +204,7 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <JobsPanel
           jobs={jobs.data?.items || []}
           projectId={id}
@@ -212,7 +213,7 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <SecurityScansPanel
           scans={securityScans.data?.items || []}
           repoCount={p.repoKeys.length}
@@ -222,7 +223,7 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="pd-grid-row">
         <MaintenanceWindowsPanel
           windows={maintenanceWindows.data?.items || []}
           environments={environments.data?.items || []}
@@ -235,7 +236,7 @@ export default function ProjectDetailPage() {
       {(() => {
         const isMember = user?.role === 'admin' || p.memberIds.includes(user?.id);
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+          <div className="pd-grid-row">
             <ProjectShortcutsPanel project={p} canManage={isMember} />
             <ProjectVaultPanel project={p} canManage={isMember} onProjectChanged={project.reload} />
           </div>
@@ -243,7 +244,7 @@ export default function ProjectDetailPage() {
       })()}
 
       {roleAtLeast(projectRole, 'maintainer') && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16, marginBottom: 16 }}>
+        <div className="pd-grid-row">
           <WebhookPanel projectId={id} />
         </div>
       )}
@@ -291,25 +292,25 @@ function WebhookPanel({ projectId }) {
 
   return (
     <Panel title="Webhook" sub="Réagit automatiquement aux pipelines/workflows en échec (ouvre un incident)" span={12}>
-      <div style={{ padding: 16 }}>
+      <div className="pd-webhook-body">
         {!webhook ? (
           <button className="btn-outline" onClick={reveal} disabled={loading}>{loading ? 'Chargement…' : 'Afficher la configuration'}</button>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="pd-webhook-fields">
             <div>
-              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>URL GitLab (Project Hooks → URL, activer "Pipeline events")</div>
-              <code className="mono" style={{ fontSize: 12 }}>{webhook.gitlabUrl}</code>
+              <div className="faint pd-webhook-field-label">URL GitLab (Project Hooks → URL, activer "Pipeline events")</div>
+              <code className="mono pd-webhook-code">{webhook.gitlabUrl}</code>
             </div>
             <div>
-              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>URL GitHub (Settings → Webhooks → Payload URL, événement "Workflow runs")</div>
-              <code className="mono" style={{ fontSize: 12 }}>{webhook.githubUrl}</code>
+              <div className="faint pd-webhook-field-label">URL GitHub (Settings → Webhooks → Payload URL, événement "Workflow runs")</div>
+              <code className="mono pd-webhook-code">{webhook.githubUrl}</code>
             </div>
             <div>
-              <div className="faint" style={{ fontSize: 11, marginBottom: 3 }}>Secret (GitLab : "Secret Token" — GitHub : "Secret")</div>
-              <code className="mono" style={{ fontSize: 12 }}>{webhook.secret}</code>
+              <div className="faint pd-webhook-field-label">Secret (GitLab : "Secret Token" — GitHub : "Secret")</div>
+              <code className="mono pd-webhook-code">{webhook.secret}</code>
             </div>
             <div>
-              <button className="btn-outline" style={{ color: 'var(--tone-crit-fg)' }} onClick={rotate} disabled={rotating}>
+              <button className="btn-outline pd-action-btn-danger" onClick={rotate} disabled={rotating}>
                 {rotating ? 'Régénération…' : 'Régénérer le secret'}
               </button>
             </div>
@@ -343,25 +344,25 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
       title="Incidents"
       sub={openCount > 0 ? `${openCount} incident(s) ouvert(s)` : 'Aucun incident ouvert'}
       span={12}
-      actions={canCreate && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setOpen(true)}>Déclarer</span>}
+      actions={canCreate && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setOpen(true)}>Déclarer</span>}
     >
       {incidents.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun incident déclaré sur ce projet.</div>
+        <div className="pd-empty">Aucun incident déclaré sur ce projet.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="pd-list">
           {incidents.map((inc) => (
-            <div key={inc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+            <div key={inc.id} className="pd-row">
               <span className={`badge badge-${SEVERITY_TONE[inc.severity]}`}>{SEVERITY_LABEL[inc.severity]}</span>
               <span className={`badge badge-${STATUS_TONE[inc.status]}`}><span className="dot" />{STATUS_LABEL[inc.status]}</span>
-              <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{inc.title}</span>
+              <span className="pd-row-title">{inc.title}</span>
               {inc.runbook_url && (
                 <a href={inc.runbook_url} target="_blank" rel="noreferrer" title="Ouvrir le runbook" style={{ display: 'flex', color: 'var(--text-faint)' }}>
                   <Icon name="externalLink" size={13} />
                 </a>
               )}
-              <span className="faint" style={{ fontSize: 11 }}>{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
+              <span className="faint pd-row-date">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
               {inc.status !== 'resolved' && canResolve && (
-                <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setResolving(inc)}>Résoudre</span>
+                <span className="btn-outline" className="pd-action-btn" onClick={() => setResolving(inc)}>Résoudre</span>
               )}
             </div>
           ))}
@@ -440,30 +441,30 @@ function ChangesPanel({ changes, environments, projectId, role, onChanged }) {
       title="Changements"
       sub={pendingCount > 0 ? `${pendingCount} en attente d'approbation` : 'Aucun changement en attente'}
       span={12}
-      actions={canPropose && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setProposing(true)}>Proposer</span>}
+      actions={canPropose && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setProposing(true)}>Proposer</span>}
     >
       {changes.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun changement proposé sur ce projet.</div>
+        <div className="pd-empty">Aucun changement proposé sur ce projet.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="pd-list">
           {changes.map((c) => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+            <div key={c.id} className="pd-row">
               <span className={`badge badge-${CHANGE_STATUS_TONE[c.status]}`}><span className="dot" />{CHANGE_STATUS_LABEL[c.status]}</span>
               {c.environment_id && <span className="badge badge-mut">{envName(c.environment_id) || 'environnement'}</span>}
-              <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{c.title}</span>
-              {c.impact && <span className="faint" style={{ fontSize: 11 }}>{c.impact}</span>}
+              <span className="pd-row-title">{c.title}</span>
+              {c.impact && <span className="faint pd-row-date">{c.impact}</span>}
               {c.status === 'pending' && canDecide && (
                 <>
-                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => decide(c, 'approved')}>
+                  <span className="btn-outline" className="pd-action-btn" onClick={() => decide(c, 'approved')}>
                     {busyId === c.id ? '…' : 'Approuver'}
                   </span>
-                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer', color: 'var(--tone-crit-fg)' }} onClick={() => decide(c, 'rejected')}>
+                  <span className="btn-outline pd-action-btn pd-action-btn-danger" onClick={() => decide(c, 'rejected')}>
                     Rejeter
                   </span>
                 </>
               )}
               {c.status === 'approved' && canDecide && (
-                <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => execute(c)}>
+                <span className="btn-outline" className="pd-action-btn" onClick={() => execute(c)}>
                   {busyId === c.id ? '…' : 'Marquer exécuté'}
                 </span>
               )}
@@ -509,7 +510,7 @@ function ProposeChangeModal({ projectId, environments, onClose, onCreated, notif
 
   return (
     <Modal title="Proposer un changement" onClose={onClose} width={420}>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <form onSubmit={submit} className="pd-webhook-fields">
         <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         <select className="input" value={environmentId} onChange={(e) => setEnvironmentId(e.target.value)}>
           <option value="">Aucun environnement précis</option>
@@ -561,23 +562,23 @@ function JobsPanel({ jobs, projectId, role, onChanged }) {
       sub={runningCount > 0 ? `${runningCount} en cours` : 'Historique des opérations asynchrones'}
       span={12}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div className="pd-list">
         {jobs.slice(0, 15).map((j) => (
-          <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+          <div key={j.id} className="pd-row">
             <span className={`badge badge-${JOB_STATUS_TONE[j.status]}`}>
               {(j.status === 'running' || j.status === 'pending') && <Icon name="refresh" size={11} className="spin" />}
               {JOB_STATUS_LABEL[j.status] || j.status}
             </span>
-            <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>
+            <span className="pd-row-title">
               {JOB_TYPE_LABEL[j.type] || j.type}
               {j.retry_of && <span className="faint" style={{ fontWeight: 400 }}> (relance)</span>}
             </span>
             {j.status === 'failed' && j.error && (
               <span className="faint" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={j.error}>{j.error}</span>
             )}
-            <span className="faint" style={{ fontSize: 11 }}>{new Date(j.created_at).toLocaleString('fr-FR')}</span>
+            <span className="faint pd-row-date">{new Date(j.created_at).toLocaleString('fr-FR')}</span>
             {j.status === 'failed' && canRetry && RETRYABLE_JOB_TYPES.has(j.type) && (
-              <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => retry(j)}>
+              <span className="btn-outline" className="pd-action-btn" onClick={() => retry(j)}>
                 {retryingId === j.id ? '…' : 'Relancer'}
               </span>
             )}
@@ -618,25 +619,25 @@ function SecurityScansPanel({ scans, repoCount, projectId, role, onChanged }) {
       sub="Semgrep, Trivy et Checkov sur les dépôts liés à ce projet"
       span={12}
       actions={canRun && (
-        <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6, cursor: repoCount === 0 ? 'not-allowed' : 'pointer', opacity: repoCount === 0 ? 0.5 : 1 }} onClick={repoCount > 0 ? run : undefined}>
+        <span className={`btn-outline pd-header-action-btn pd-security-header${repoCount === 0 ? ' pd-security-btn-disabled' : ''}`} onClick={repoCount > 0 ? run : undefined}>
           <Icon name={running ? 'refresh' : 'shield'} size={12} className={running ? 'spin' : ''} />{running ? 'Analyse en cours…' : 'Lancer un scan'}
         </span>
       )}
     >
       {repoCount === 0 ? (
-        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun dépôt rattaché à ce projet.</div>
+        <div className="pd-empty">Aucun dépôt rattaché à ce projet.</div>
       ) : scans.length === 0 ? (
-        <div style={{ padding: 20, fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun scan lancé pour l'instant.</div>
+        <div className="pd-empty">Aucun scan lancé pour l'instant.</div>
       ) : (
-        <div style={{ padding: '4px 16px 16px' }}>
-          <div className="faint" style={{ fontSize: 11, marginBottom: 10 }}>Dernier scan : {new Date(latest.createdAt).toLocaleString('fr-FR')}</div>
+        <div className="pd-security-body">
+          <div className="faint pd-security-scanned-at">Dernier scan : {new Date(latest.createdAt).toLocaleString('fr-FR')}</div>
           {latest.results.map((r) => (
-            <div key={r.repoKey} style={{ padding: '10px 0', borderTop: '1px solid var(--border-soft)' }}>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{r.repoKey}</div>
+            <div key={r.repoKey} className="pd-security-repo-block">
+              <div className="mono pd-security-repo-key">{r.repoKey}</div>
               {r.error ? (
-                <div style={{ fontSize: 12, color: 'var(--tone-crit-fg)' }}>{r.error}</div>
+                <div className="pd-security-error">{r.error}</div>
               ) : (
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div className="pd-security-badges">
                   <ScanResultBadge label="SAST (Semgrep)" result={r.sast} />
                   <ScanResultBadge label="SCA (Trivy)" result={r.sca} />
                   <ScanResultBadge label="IaC (Checkov)" result={r.iac} />
@@ -705,24 +706,24 @@ function MaintenanceWindowsPanel({ windows, environments, projectId, role, onCha
       title="Fenêtres de maintenance"
       sub={activeCount > 0 ? `${activeCount} en cours` : 'Aucune maintenance en cours'}
       span={12}
-      actions={canManage && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setCreating(true)}>Planifier</span>}
+      actions={canManage && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setCreating(true)}>Planifier</span>}
     >
       {windows.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucune fenêtre de maintenance planifiée sur ce projet.</div>
+        <div className="pd-empty">Aucune fenêtre de maintenance planifiée sur ce projet.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="pd-list">
           {windows.map((w) => {
             const status = windowStatus(w);
             return (
-              <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+              <div key={w.id} className="pd-row">
                 <span className={`badge badge-${status.tone}`}>{status.label}</span>
                 {w.environment_id && <span className="badge badge-mut">{envName(w.environment_id) || 'environnement'}</span>}
-                <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{w.title}</span>
-                <span className="faint" style={{ fontSize: 11 }}>
+                <span className="pd-row-title">{w.title}</span>
+                <span className="faint pd-row-date">
                   {new Date(w.starts_at).toLocaleString('fr-FR')} → {new Date(w.ends_at).toLocaleString('fr-FR')}
                 </span>
                 {!w.cancelled_at && status.label !== 'Terminée' && canManage && (
-                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer', color: 'var(--tone-crit-fg)' }} onClick={() => cancelWindow(w)}>
+                  <span className="btn-outline pd-action-btn pd-action-btn-danger" onClick={() => cancelWindow(w)}>
                     {busyId === w.id ? '…' : 'Annuler'}
                   </span>
                 )}
@@ -776,7 +777,7 @@ function PlanMaintenanceWindowModal({ projectId, environments, onClose, onCreate
 
   return (
     <Modal title="Planifier une fenêtre de maintenance" onClose={onClose} width={420}>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <form onSubmit={submit} className="pd-webhook-fields">
         <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         <select className="input" value={environmentId} onChange={(e) => setEnvironmentId(e.target.value)}>
           <option value="">Aucun environnement précis</option>
@@ -823,7 +824,7 @@ function DeclareIncidentModal({ onClose, onCreated, projectId, notify }) {
 
   return (
     <Modal title="Déclarer un incident" onClose={onClose} width={420}>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <form onSubmit={submit} className="pd-webhook-fields">
         <input className="input" placeholder="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value)}>
           {Object.entries(SEVERITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -857,7 +858,7 @@ function ResolveIncidentModal({ incident, onClose, onResolved, projectId, notify
 
   return (
     <Modal title={`Résoudre : ${incident.title}`} sub="La résolution doit être documentée avant de clore l'incident" onClose={onClose} width={420}>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <form onSubmit={submit} className="pd-webhook-fields">
         <textarea className="input" placeholder="Résolution (cause, correctif appliqué...)" required rows={4} value={resolution} onChange={(e) => setResolution(e.target.value)} autoFocus />
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Clore l\'incident'}</button>
       </form>
@@ -911,21 +912,21 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
       title="Équipe"
       sub={migrated ? `${items.length} membre(s) — rôles granulaires` : `${legacyMemberIds.length} membre(s)`}
       span={4}
-      actions={migrated && canManage && <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setAdding(true)}>Ajouter</span>}
+      actions={migrated && canManage && <span className="btn-outline" className="pd-header-action-btn" onClick={() => setAdding(true)}>Ajouter</span>}
     >
-      <div style={{ padding: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div className="pd-team-body">
         {migrated ? (
           items.length === 0
-            ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
+            ? <span className="faint pd-scan-badge-inline">Aucun membre</span>
             : items.map((m) => (
                 canManage ? (
-                  <div key={m.user_id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <label className="badge badge-vio" style={{ gap: 4 }}>
+                  <div key={m.user_id} className="pd-team-member-col">
+                    <label className="badge badge-vio pd-team-role-badge">
                       <span className="dot" />{userName(m.user_id)}
                       <select
                         value={m.role}
                         onChange={(e) => setRole(m.user_id, e.target.value)}
-                        style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                        className="pd-team-role-select"
                       >
                         {Object.entries(TEAM_ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
@@ -935,7 +936,7 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
                         value={grantFor(m.user_id)?.level || ''}
                         onChange={(e) => setVaultGrant(m.user_id, e.target.value)}
                         title="Accès ponctuel au coffre-fort du projet, sans changer le rôle global"
-                        style={{ fontSize: 10, height: 20, border: '1px dashed var(--border-soft)', borderRadius: 5, background: 'transparent', color: 'var(--text-faint)' }}
+                        className="pd-team-vault-grant"
                       >
                         <option value="">Coffre-fort : aucun accès</option>
                         <option value="read">Coffre-fort : lecture</option>
@@ -951,7 +952,7 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
               ))
         ) : (
           legacyMemberIds.length === 0
-            ? <span className="faint" style={{ fontSize: 12.5 }}>Aucun membre</span>
+            ? <span className="faint pd-scan-badge-inline">Aucun membre</span>
             : legacyMemberIds.map((mid) => <span key={mid} className="badge badge-vio"><span className="dot" />{userName(mid)}</span>)
         )}
       </div>
@@ -959,13 +960,13 @@ function TeamPanel({ members, legacyMemberIds, userName, allUsers, projectId, ca
       {adding && (
         <Modal title="Ajouter un membre" onClose={() => setAdding(false)} width={360}>
           {allUsers.filter((u) => !items.some((m) => m.user_id === u.id)).length === 0 ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: 10 }}>Tous les utilisateurs sont déjà membres.</div>
+            <div className="faint pd-team-add-empty">Tous les utilisateurs sont déjà membres.</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="pd-team-add-list">
               {allUsers.filter((u) => !items.some((m) => m.user_id === u.id)).map((u) => (
-                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12.5 }}>
-                  <span style={{ flex: 1 }}>{u.name}</span>
-                  <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={async () => { await setRole(u.id, 'developer'); setAdding(false); }}>
+                <div key={u.id} className="pd-team-add-row">
+                  <span className="pd-team-add-name">{u.name}</span>
+                  <span className="btn-outline" className="pd-action-btn" onClick={async () => { await setRole(u.id, 'developer'); setAdding(false); }}>
                     Ajouter (Développeur)
                   </span>
                 </div>
@@ -1034,7 +1035,7 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
   if (!migrated) {
     return (
       <Panel title="Environnements & déploiements" span={12}>
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <div className="pd-empty">
           Ce projet n'est pas encore rattaché au socle relationnel (organisations/environnements). Voir <code>npm run migrate:postgres</code> côté backend.
         </div>
       </Panel>
@@ -1044,34 +1045,34 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
   return (
     <Panel title="Environnements & déploiements" sub="Un environnement de production exige le rôle propriétaire pour toute action" span={12}>
       {environments.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun environnement.</div>
+        <div className="pd-empty">Aucun environnement.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="pd-list">
           {environments.map((env) => {
             const links = deployments.filter((l) => l.environmentId === env.id);
             const canSync = env.is_production ? roleAtLeast(role, 'owner') : roleAtLeast(role, 'maintainer');
             return (
-              <div key={env.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-soft)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: links.length ? 6 : 0 }}>
+              <div key={env.id} className="pd-env-block">
+                <div className={`pd-env-block-header${links.length ? ' pd-env-block-header-spaced' : ''}`}>
                   <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'}`}>{env.is_production ? 'Production' : env.kind}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{env.name}</span>
-                  <span className="faint" style={{ fontSize: 11.5, flex: 1 }}>{links.length} déploiement(s) rattaché(s)</span>
+                  <span className="pd-env-name">{env.name}</span>
+                  <span className="faint pd-env-links-count">{links.length} déploiement(s) rattaché(s)</span>
                 </div>
                 {links.map((link) => (
-                  <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 4px 8px', fontSize: 12 }}>
-                    <Icon name="box" size={12} style={{ color: 'var(--text-faint)' }} />
-                    <span style={{ flex: 1 }}>{link.name}</span>
-                    <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11, cursor: 'pointer' }} onClick={() => setPipelineLink(link)}>Chemin réseau</span>
+                  <div key={link.id} className="pd-env-link-row">
+                    <Icon name="box" size={12} className="pd-repo-link-icon" />
+                    <span className="pd-env-link-name">{link.name}</span>
+                    <span className="btn-outline" className="pd-action-btn" onClick={() => setPipelineLink(link)}>Chemin réseau</span>
                     {link.argocdAppName ? (
                       canSync ? (
-                        <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyId === link.id} onClick={() => sync(link)}>
+                        <button className="btn-outline pd-action-btn" disabled={busyId === link.id} onClick={() => sync(link)}>
                           {busyId === link.id ? '…' : 'Synchroniser'}
                         </button>
                       ) : (
-                        <span className="faint" style={{ fontSize: 11 }} title="Rôle insuffisant pour cette action">Synchronisation réservée</span>
+                        <span className="faint pd-row-date" title="Rôle insuffisant pour cette action">Synchronisation réservée</span>
                       )
                     ) : (
-                      <span className="faint" style={{ fontSize: 11 }}>Aucune app Argo CD associée</span>
+                      <span className="faint pd-row-date">Aucune app Argo CD associée</span>
                     )}
                   </div>
                 ))}
@@ -1096,10 +1097,10 @@ function PipelineModal({ link, projectId, onClose }) {
 
   return (
     <Modal title={`Chemin réseau — ${link.name}`} onClose={onClose} width={480}>
-      {loading && <div style={{ padding: 10, fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>}
-      {error && <div style={{ padding: 10, fontSize: 12.5, color: 'var(--tone-crit-fg)' }}>{error}</div>}
+      {loading && <div className="pd-modal-loading">Chargement…</div>}
+      {error && <div className="pd-modal-error">{error}</div>}
       {stages && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="pd-webhook-fields">
           <PipelineStageRow
             label="Git"
             configured={stages.git.configured}
@@ -1135,10 +1136,10 @@ function PipelineStageRow({ label, configured, detail, webUrl, error }) {
   const tone = error ? 'crit' : configured ? 'ok' : 'mut';
   const status = error ? 'Erreur' : configured ? 'Configuré' : 'Non configuré';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-soft)' }}>
-      <span style={{ width: 110, fontSize: 12.5, fontWeight: 600 }}>{label}</span>
+    <div className="pd-stage-row">
+      <span className="pd-stage-label">{label}</span>
       <span className={`badge badge-${tone}`}><span className="dot" />{status}</span>
-      <span className="faint" style={{ flex: 1, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={error || detail || ''}>
+      <span className="faint pd-stage-detail" title={error || detail || ''}>
         {error || detail || ''}
       </span>
       {webUrl && <a href={webUrl} target="_blank" rel="noreferrer"><Icon name="externalLink" size={13} /></a>}
@@ -1193,23 +1194,23 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
   return (
     <Panel title="Activité des dépôts" sub="Commits, branches, revues et pipelines — par dépôt rattaché" span={12}>
       {loading ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Chargement…</div>
+        <div className="pd-empty">Chargement…</div>
       ) : repos.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun dépôt rattaché à ce projet.</div>
+        <div className="pd-empty">Aucun dépôt rattaché à ce projet.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="pd-list">
           {repos.map((r) => (
-            <div key={r.key} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-soft)' }}>
+            <div key={r.key} className="pd-repo-block">
               {r.error ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="gitBranch" size={13} style={{ color: 'var(--text-faint)' }} />
-                  <span className="mono" style={{ fontSize: 12, flex: 1 }}>{r.key}</span>
+                <div className="pd-repo-error-row">
+                  <Icon name="gitBranch" size={13} className="pd-repo-link-icon" />
+                  <span className="mono pd-repo-error-key">{r.key}</span>
                   <span className="badge badge-crit" title={r.error}>Indisponible</span>
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <a href={r.webUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, textDecoration: 'none', color: 'inherit', flex: 1 }}>{r.name}</a>
+                  <div className="pd-repo-head">
+                    <a href={r.webUrl} target="_blank" rel="noreferrer" className="pd-repo-name-link">{r.name}</a>
                     <span className="badge badge-mut">{r.branches?.length ?? 0} branche(s)</span>
                     {r.dependencyAlerts?.length > 0 && (
                       <span className={`badge badge-${r.dependencyAlerts.some((a) => a.severity === 'critical' || a.severity === 'high') ? 'crit' : 'warn'}`} title="Dépendances vulnérables (Dependabot)">
@@ -1218,11 +1219,11 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
                     )}
                     {r.pipelines?.[0] && (
                       <>
-                        <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]}`} style={{ textDecoration: 'none' }}>
+                        <a href={r.pipelines[0].webUrl} target="_blank" rel="noreferrer" className={`badge badge-${PIPELINE_TONE[r.pipelines[0].status]} pd-repo-pipeline-badge`}>
                           <span className="dot" />{PIPELINE_LABEL[r.pipelines[0].status]}
                         </a>
                         {r.pipelines[0].retryable && (
-                          <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyKey === r.pipelines[0].id} onClick={() => retryPipeline(r.pipelines[0].id)}>
+                          <button className="btn-outline pd-action-btn" disabled={busyKey === r.pipelines[0].id} onClick={() => retryPipeline(r.pipelines[0].id)}>
                             {busyKey === r.pipelines[0].id ? '…' : 'Relancer'}
                           </button>
                         )}
@@ -1230,20 +1231,20 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
                     )}
                   </div>
                   {r.commits?.[0] && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: r.mergeRequests?.length ? 8 : 0 }}>
+                    <div className="pd-repo-commit-row">
                       <span className="mono">{r.commits[0].sha}</span>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.commits[0].message}</span>
+                      <span className="pd-repo-commit-message">{r.commits[0].message}</span>
                       <span className="faint">{r.commits[0].author}</span>
                     </div>
                   )}
                   {r.mergeRequests?.map((mr) => {
                     const reviewKey = `${r.provider}:${r.id}:${mr.id}`;
                     return (
-                      <div key={mr.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12 }}>
-                        <Icon name="gitBranch" size={12} style={{ color: 'var(--text-faint)' }} />
-                        <a href={mr.webUrl} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'inherit' }}>{mr.title}</a>
-                        <span className="faint mono" style={{ fontSize: 11 }}>{mr.sourceBranch} → {mr.targetBranch}</span>
-                        <button className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} disabled={busyKey === reviewKey} onClick={() => approveReview(reviewKey)}>
+                      <div key={mr.id} className="pd-repo-mr-row">
+                        <Icon name="gitBranch" size={12} className="pd-repo-link-icon" />
+                        <a href={mr.webUrl} target="_blank" rel="noreferrer" className="pd-repo-mr-title">{mr.title}</a>
+                        <span className="faint mono pd-repo-mr-branches">{mr.sourceBranch} → {mr.targetBranch}</span>
+                        <button className="btn-outline pd-action-btn" disabled={busyKey === reviewKey} onClick={() => approveReview(reviewKey)}>
                           {busyKey === reviewKey ? '…' : 'Approuver'}
                         </button>
                       </div>
@@ -1266,15 +1267,15 @@ function RepoPicker({ allRepos, linkedKeys, onToggle }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }} onClick={() => setOpen(true)}>Rattacher</span>
+      <span className="btn-outline" className="pd-header-action-btn" onClick={() => setOpen(true)}>Rattacher</span>
       {open && (
         <Modal title="Rattacher des dépôts" sub="Cochez les dépôts liés à ce projet" onClose={() => setOpen(false)} width={380}>
           {allRepos.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: 'var(--text-faint)', textAlign: 'center', padding: 10 }}>Aucun dépôt disponible</div>
+            <div className="pd-picker-empty">Aucun dépôt disponible</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="pd-team-member-col">
               {allRepos.map((r) => (
-                <label key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12.5, borderRadius: 8, cursor: 'pointer' }}>
+                <label key={r.key} className="pd-picker-row">
                   <input type="checkbox" checked={linkedKeys.includes(r.key)} onChange={() => onToggle(r.key)} />
                   {r.name}
                 </label>
@@ -1314,11 +1315,11 @@ function ApiPreviewPanel({ project, canEdit, onSaved }) {
 
   return (
     <Panel title="Endpoints & logs en direct" sub="Prévisualisation API du projet" span={12}>
-      <div style={{ padding: 16 }}>
+      <div className="pd-webhook-body">
         {canEdit && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 11.5, marginBottom: 4, color: 'var(--text-muted)' }}>Namespace Kubernetes rattaché</label>
+          <div className="pd-api-namespace-row">
+            <div className="pd-api-namespace-field">
+              <label className="pd-api-field-label">Namespace Kubernetes rattaché</label>
               <input className="input" value={namespace} onChange={(e) => setNamespace(e.target.value)} placeholder="prod-api-gateway" />
             </div>
             <button className="btn-outline" onClick={saveNamespace}>Enregistrer</button>
@@ -1326,22 +1327,22 @@ function ApiPreviewPanel({ project, canEdit, onSaved }) {
         )}
 
         {namespace ? (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-            <select className="input" value={podName} onChange={(e) => setPodName(e.target.value)} style={{ width: 260 }}>
+          <div className="pd-api-pod-row">
+            <select className="input" value={podName} onChange={(e) => setPodName(e.target.value)} className="pd-api-pod-select">
               <option value="">Sélectionner un pod…</option>
               {(pods.data?.items || []).map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
             <button className={live ? 'btn' : 'btn-outline'} onClick={() => setLive((v) => !v)} disabled={!podName}>
               {live ? 'Arrêter le direct' : 'Voir les logs en direct'}
             </button>
-            {live && <span className="badge badge-ok"><span className="dot" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} />LIVE — tant que la page reste ouverte</span>}
+            {live && <span className="badge badge-ok"><span className="dot" className="pd-api-live-dot" />LIVE — tant que la page reste ouverte</span>}
           </div>
         ) : (
-          <div className="faint" style={{ fontSize: 12.5, marginBottom: 12 }}>Aucun namespace Kubernetes rattaché à ce projet.</div>
+          <div className="faint pd-api-no-namespace">Aucun namespace Kubernetes rattaché à ce projet.</div>
         )}
 
         {logs !== null && (
-          <pre className="mono" style={{ maxHeight: 320, overflow: 'auto', margin: 0, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2, var(--bg))', fontSize: 11.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <pre className="mono" className="pd-api-logs">
             {logs || '(aucun log)'}
           </pre>
         )}

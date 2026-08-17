@@ -1,0 +1,573 @@
+/* Classes génériques réutilisées par les ~15 sous-panneaux de cette page
+   (backlog, équipe, environnements, incidents, changements, jobs, sécurité,
+   maintenance, activité dépôts...) — motifs de style identiques répétés
+   des dizaines de fois dans l'ancien code inline. */
+
+.pd-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-title-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex: none;
+}
+
+.pd-title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.pd-back-link {
+  text-decoration: none;
+}
+
+.pd-grid-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pd-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.pd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pd-list-loose {
+  padding: 6px;
+}
+
+.pd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pd-row-title {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pd-row-date {
+  font-size: 11px;
+}
+
+.pd-action-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pd-action-btn-danger {
+  color: var(--tone-crit-fg);
+}
+
+.pd-header-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.pd-form-row {
+  display: flex;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pd-form-input {
+  flex: 1;
+}
+
+.pd-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pd-modal-field-half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.pd-task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.pd-task-status {
+  height: 28px;
+  font-size: 11.5px;
+  width: 110px;
+}
+
+.pd-task-title {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.pd-task-remove {
+  cursor: pointer;
+  color: var(--text-faintest);
+}
+
+.pd-repo-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pd-repo-link-icon {
+  color: var(--text-faint);
+}
+
+.pd-repo-link-name {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.pd-review-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pd-review-title {
+  flex: 1;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-webhook-body {
+  padding: 16px;
+}
+
+.pd-webhook-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pd-webhook-field-label {
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.pd-webhook-code {
+  font-size: 12px;
+}
+
+.pd-changes-impact {
+  font-size: 11px;
+}
+
+.pd-jobs-type {
+  font-weight: 400;
+}
+
+.pd-jobs-error {
+  font-size: 11px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-security-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-security-btn-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pd-security-body {
+  padding: 4px 16px 16px;
+}
+
+.pd-security-scanned-at {
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+.pd-security-repo-block {
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.pd-security-repo-key {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pd-security-error {
+  font-size: 12px;
+  color: var(--tone-crit-fg);
+}
+
+.pd-security-badges {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pd-scan-badge {
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-scan-badge-inline {
+  font-size: 11.5px;
+}
+
+.pd-scan-badge-error {
+  color: var(--tone-crit-fg);
+}
+
+.pd-window-time {
+  font-size: 11px;
+}
+
+.pd-team-body {
+  padding: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pd-team-member-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pd-team-role-badge {
+  gap: 4px;
+}
+
+.pd-team-role-select {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pd-team-vault-grant {
+  font-size: 10px;
+  height: 20px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.pd-team-add-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding: 10px;
+}
+
+.pd-team-add-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pd-team-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.pd-team-add-name {
+  flex: 1;
+}
+
+.pd-env-not-migrated {
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.pd-env-block {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pd-env-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pd-env-block-header-spaced {
+  margin-bottom: 6px;
+}
+
+.pd-env-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pd-env-links-count {
+  font-size: 11.5px;
+  flex: 1;
+}
+
+.pd-env-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 4px 8px;
+  font-size: 12px;
+}
+
+.pd-env-link-icon {
+  color: var(--text-faint);
+}
+
+.pd-env-link-name {
+  flex: 1;
+}
+
+.pd-env-link-note {
+  font-size: 11px;
+}
+
+.pd-modal-loading {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.pd-modal-error {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.pd-pipeline-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pd-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pd-stage-label {
+  width: 110px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pd-stage-detail {
+  flex: 1;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-repo-block {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pd-repo-error-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pd-repo-error-key {
+  font-size: 12px;
+  flex: 1;
+}
+
+.pd-repo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pd-repo-name-link {
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+}
+
+.pd-repo-pipeline-badge {
+  text-decoration: none;
+}
+
+.pd-repo-commit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pd-repo-commit-message {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-repo-mr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.pd-repo-mr-icon {
+  color: var(--text-faint);
+}
+
+.pd-repo-mr-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.pd-repo-mr-branches {
+  font-size: 11px;
+}
+
+.pd-picker-empty {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 10px;
+}
+
+.pd-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pd-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pd-api-body {
+  padding: 16px;
+}
+
+.pd-api-namespace-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.pd-api-namespace-field {
+  flex: 1;
+}
+
+.pd-api-field-label {
+  display: block;
+  font-size: 11.5px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.pd-api-pod-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.pd-api-pod-select {
+  width: 260px;
+}
+
+.pd-api-live-dot {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+.pd-api-no-namespace {
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+
+.pd-api-logs {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2, var(--bg));
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
