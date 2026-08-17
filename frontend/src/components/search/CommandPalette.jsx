@@ -6,6 +6,7 @@ import { STATIC_SEARCH_ITEMS } from '../../config/searchIndex.js';
 import { fuzzyScore, queryTerms } from '../../lib/fuzzyMatch.js';
 import { contextualActions, contextLabel } from './contextualActions.js';
 import Icon from '../ui/Icon.jsx';
+import './CommandPalette.css';
 
 // Command Center : ⌘K / ⌘⇧F ouvrent la même palette. Sans contexte, c'est une
 // recherche plate sur les pages et données de la plateforme (proxies, hôtes,
@@ -158,28 +159,27 @@ export default function CommandPalette({ open, onClose, context }) {
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12vh 16px 0', animation: 'fadeIn .12s ease both' }}
+      className="cmdp-overlay"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ width: '100%', maxWidth: 560, boxShadow: 'var(--shadow-pop)', overflow: 'hidden', animation: 'popIn .15s ease both' }}
+        className="card cmdp-card"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border-soft)' }}>
-          <Icon name="search" size={16} style={{ color: 'var(--text-faint)', flex: 'none' }} />
+        <div className="cmdp-input-row">
+          <Icon name="search" size={16} className="cmdp-input-icon" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={context ? `Actions sur ${contextLabel(context)}, ou rechercher…` : 'Rechercher une page, une action, un proxy, un hôte, un dépôt…'}
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)' }}
+            className="cmdp-input"
           />
-          <span style={{ fontSize: 11, color: 'var(--text-faintest)', flex: 'none' }}>Échap</span>
+          <span className="cmdp-escape-hint">Échap</span>
         </div>
 
-        <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: 6 }}>
+        <div className="cmdp-results">
           {combined.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun résultat</div>
+            <div className="cmdp-empty">Aucun résultat</div>
           )}
           {combined.map((item, idx) => {
             const showGroup = item.group !== lastGroup;
@@ -187,25 +187,16 @@ export default function CommandPalette({ open, onClose, context }) {
             return (
               <div key={`${item.group}-${item.label}-${idx}`}>
                 {showGroup && (
-                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faintest)', padding: '8px 10px 4px' }}>
+                  <div className="cmdp-group-label">
                     {item.group}
                   </div>
                 )}
                 <div
                   onMouseEnter={() => setActiveIndex(idx)}
                   onClick={() => go(item)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 9,
-                    padding: '9px 10px',
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: idx === activeIndex ? 600 : 500,
-                    color: idx === activeIndex ? 'var(--primary)' : (item.tone === 'crit' ? 'var(--tone-crit-fg)' : 'var(--text)'),
-                    background: idx === activeIndex ? 'var(--primary-soft)' : 'transparent',
-                    cursor: 'pointer'
-                  }}
+                  className={`cmdp-item ${idx === activeIndex ? 'cmdp-item-active' : (item.tone === 'crit' ? 'cmdp-item-crit' : '')}`}
                 >
-                  {item.icon && <Icon name={item.icon} size={14} style={{ flex: 'none', opacity: .8 }} />}
+                  {item.icon && <Icon name={item.icon} size={14} className="cmdp-item-icon" />}
                   {item.label}
                 </div>
               </div>

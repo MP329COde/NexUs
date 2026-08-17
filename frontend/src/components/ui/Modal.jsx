@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon.jsx';
+import './Modal.css';
 
 // Popup générique (overlay + carte centrée + fermeture Échap/clic extérieur),
 // pour séparer les actions ponctuelles (formulaire, script, détail) du flux
@@ -28,26 +29,26 @@ export default function Modal({ title, sub, onClose, width = 480, children, acti
 
   return createPortal((
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20, animation: 'fadeIn .12s ease' }}
+      className="modal-overlay"
       onClick={onClose}
     >
       <div
-        className="card"
-        style={{ width: '100%', maxWidth: width, maxHeight: '86vh', display: 'flex', flexDirection: 'column', animation: 'popIn .14s ease' }}
+        className="card modal-card"
+        style={{ maxWidth: width }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--border-soft)', flex: 'none' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, overflowWrap: 'break-word' }}>{title}</div>
-            {sub && <div className="faint" style={{ fontSize: 11.5, marginTop: 2, overflowWrap: 'break-word' }}>{sub}</div>}
+        <div className="modal-header">
+          <div className="modal-header-text">
+            <div className="modal-title">{title}</div>
+            {sub && <div className="faint modal-sub">{sub}</div>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
+          <div className="modal-header-actions">
             {headerActions}
-            <span onClick={onClose} style={{ cursor: 'pointer', color: 'var(--text-faint)', padding: 4 }}><Icon name="x" size={16} /></span>
+            <span onClick={onClose} className="modal-close-btn"><Icon name="x" size={16} /></span>
           </div>
         </div>
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: 16 }}>{children}</div>
-        {actions && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border-soft)', flex: 'none' }}>{actions}</div>}
+        <div className="modal-body">{children}</div>
+        {actions && <div className="modal-footer">{actions}</div>}
       </div>
     </div>
   ), document.body);
