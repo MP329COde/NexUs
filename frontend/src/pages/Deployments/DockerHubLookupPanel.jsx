@@ -17,8 +17,7 @@ function formatDate(iso) {
 
 // Consultation en direct du registre public Docker Hub (aucune authentification
 // requise — voir backend/src/services/integrations/dockerHubService.js) :
-// données réelles (tags, tailles, architectures), indépendant du tableau de
-// démonstration ci-dessous qui n'a aucun registre connecté.
+// données réelles (tags, tailles, architectures).
 export default function DockerHubLookupPanel() {
   const notify = useNotify();
   const [namespace, setNamespace] = useState('');
@@ -51,7 +50,7 @@ export default function DockerHubLookupPanel() {
   return (
     <Panel
       title="Recherche Docker Hub"
-      sub="Registre public en direct — aucune configuration requise, indépendant du tableau de démonstration ci-dessous"
+      sub="Registre public en direct — aucune configuration requise"
       span={12}
     >
       <form onSubmit={search} className="dhl-form">

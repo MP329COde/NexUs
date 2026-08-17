@@ -14,11 +14,10 @@ function formatDate(iso) {
 }
 
 // Scan de vulnérabilités réel via Trivy (open source, exécuté en local sur
-// la machine backend — voir backend/src/services/trivyService.js). Aucun
-// registre n'est intégré à la console, mais n'importe quelle image
-// accessible publiquement (Docker Hub, GHCR public...) peut être scannée à
-// la demande, indépendamment du tableau de démonstration ci-dessous.
-// Chaque image scannée au moins une fois est ensuite re-scannée
+// la machine backend — voir backend/src/services/trivyService.js).
+// N'importe quelle image accessible (Docker Hub, GHCR public, ou le
+// registre privé — voir PrivateRegistryPanel) peut être scannée à la
+// demande. Chaque image scannée au moins une fois est ensuite re-scannée
 // automatiquement toutes les heures (voir scheduledTrivyScanService.js).
 export default function TrivyScanPanel() {
   const notify = useNotify();
@@ -50,7 +49,7 @@ export default function TrivyScanPanel() {
   return (
     <Panel
       title="Scanner Trivy"
-      sub="Scan de vulnérabilités réel (Aqua Security, open source) sur n'importe quelle image accessible — indépendant du tableau de démonstration ci-dessous"
+      sub="Scan de vulnérabilités réel (Aqua Security, open source) sur n'importe quelle image accessible"
       span={12}
     >
       <form onSubmit={runScan} className="trivy-form">
