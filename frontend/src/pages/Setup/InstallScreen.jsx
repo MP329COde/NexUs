@@ -3,6 +3,7 @@ import { api } from '../../lib/apiClient.js';
 import BrandMark from '../../components/ui/BrandMark.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { DOMAINS } from '../../config/domains.js';
+import './InstallScreen.css';
 
 const STATUS_META = {
   connecting: { label: 'Connexion SSH…', color: '#F59E0B', icon: 'sync' },
@@ -75,48 +76,48 @@ export default function InstallScreen({ tools, onFinish }) {
   const successCount = jobs.filter((j) => j.status === 'success').length;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#0B1120', color: '#E7ECF5' }}>
-      <section style={{ width: '46%', flex: 'none', display: 'flex', flexDirection: 'column', padding: '32px 40px', borderRight: '1px solid #1A2338' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+    <div className="install-screen">
+      <section className="install-jobs-col">
+        <div className="install-brand-row">
           <BrandMark size={28} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Nexus Console</span>
+          <span className="install-brand-name">Nexus Console</span>
         </div>
 
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Installation des outils</h1>
-        <p style={{ margin: '6px 0 24px', fontSize: 12.5, color: '#6B7A9C' }}>
+        <h1 className="install-title">Installation des outils</h1>
+        <p className="install-intro">
           Déploiement via la clé SSH de la console — aucun mot de passe transmis. Vous pouvez ouvrir la
           console dès maintenant, l'installation continue en tâche de fond.
         </p>
 
         {launchError && (
-          <div style={{ fontSize: 12.5, color: '#FDA4AF', background: '#3F1725', border: '1px solid #6B2333', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+          <div className="install-launch-error">
             {launchError}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, overflowY: 'auto' }}>
+        <div className="install-jobs-list">
           {jobs.map((job) => {
             const meta = STATUS_META[job.status] || STATUS_META.connecting;
             return (
-              <div key={job.toolId} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, background: '#111A2E', border: '1px solid #1A2338' }}>
-                <span style={{ color: meta.color, marginTop: 1 }}>
+              <div key={job.toolId} className="install-job-card">
+                <span className="install-job-icon" style={{ color: meta.color }}>
                   <Icon name={meta.icon} size={16} />
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>{job.label}</span>
-                    <span style={{ fontSize: 11, color: meta.color, flex: 'none' }}>{meta.label}</span>
+                <div className="install-job-body">
+                  <div className="install-job-head">
+                    <span className="install-job-label">{job.label}</span>
+                    <span className="install-job-status" style={{ color: meta.color }}>{meta.label}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#6B7A9C' }}>{job.address}</div>
-                  {job.message && <div style={{ fontSize: 11, color: job.status === 'error' ? '#FDA4AF' : '#6B7A9C', marginTop: 2 }}>{job.message}</div>}
+                  <div className="install-job-address">{job.address}</div>
+                  {job.message && <div className={`install-job-message${job.status === 'error' ? ' install-job-message-error' : ''}`}>{job.message}</div>}
                 </div>
               </div>
             );
           })}
         </div>
 
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #1A2338', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11.5, color: '#6B7A9C' }}>
+        <div className="install-footer">
+          <span className="install-footer-status">
             {allSettled ? `${successCount}/${jobs.length} installations réussies` : 'Installation en cours…'}
           </span>
           <button type="button" className="btn" onClick={onFinish}>
@@ -125,28 +126,25 @@ export default function InstallScreen({ tools, onFinish }) {
         </div>
       </section>
 
-      <section style={{ flex: 1, padding: '48px 56px', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 720 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: '#5B7CFA', textTransform: 'uppercase', marginBottom: 10 }}>
+      <section className="install-showcase-col">
+        <div className="install-showcase-eyebrow">
           Pendant que ça s'installe
         </div>
-        <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Le centre de contrôle de votre infrastructure</h2>
-        <p style={{ margin: '10px 0 28px', fontSize: 13.5, color: '#9AA7C7', lineHeight: 1.6 }}>
+        <h2 className="install-showcase-title">Le centre de contrôle de votre infrastructure</h2>
+        <p className="install-showcase-desc">
           Une fois ouverte, la console réunit chaque domaine de votre homelab derrière une seule
           interface. Chaque outil connecté ci-contre alimente automatiquement la page correspondante.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="install-domains-grid">
           {DOMAINS.filter((d) => !d.adminOnly).map((d) => (
-            <div key={d.id} style={{ display: 'flex', gap: 10, padding: 14, borderRadius: 10, background: '#111A2E', border: '1px solid #1A2338' }}>
-              <span style={{
-                width: 30, height: 30, borderRadius: 8, background: '#1B2542', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#7C93E0', flex: 'none'
-              }}>
+            <div key={d.id} className="install-domain-card">
+              <span className="install-domain-badge">
                 {d.code}
               </span>
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{d.label}</div>
-                <div style={{ fontSize: 11, color: '#6B7A9C' }}>{d.sub}</div>
+                <div className="install-domain-label">{d.label}</div>
+                <div className="install-domain-sub">{d.sub}</div>
               </div>
             </div>
           ))}

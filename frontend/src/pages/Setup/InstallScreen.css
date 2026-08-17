@@ -1,0 +1,191 @@
+.install-screen {
+  min-height: 100vh;
+  display: flex;
+  background: #0B1120;
+  color: #E7ECF5;
+}
+
+.install-jobs-col {
+  width: 46%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 40px;
+  border-right: 1px solid #1A2338;
+}
+
+.install-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.install-brand-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.install-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.install-intro {
+  margin: 6px 0 24px;
+  font-size: 12.5px;
+  color: #6B7A9C;
+}
+
+.install-launch-error {
+  font-size: 12.5px;
+  color: #FDA4AF;
+  background: #3F1725;
+  border: 1px solid #6B2333;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.install-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.install-job-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #111A2E;
+  border: 1px solid #1A2338;
+}
+
+.install-job-icon {
+  margin-top: 1px;
+}
+
+.install-job-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-job-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.install-job-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.install-job-status {
+  font-size: 11px;
+  flex: none;
+}
+
+.install-job-address {
+  font-size: 11px;
+  color: #6B7A9C;
+}
+
+.install-job-message {
+  font-size: 11px;
+  color: #6B7A9C;
+  margin-top: 2px;
+}
+
+.install-job-message-error {
+  color: #FDA4AF;
+}
+
+.install-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #1A2338;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.install-footer-status {
+  font-size: 11.5px;
+  color: #6B7A9C;
+}
+
+.install-showcase-col {
+  flex: 1;
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 720px;
+}
+
+.install-showcase-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #5B7CFA;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.install-showcase-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.install-showcase-desc {
+  margin: 10px 0 28px;
+  font-size: 13.5px;
+  color: #9AA7C7;
+  line-height: 1.6;
+}
+
+.install-domains-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.install-domain-card {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #111A2E;
+  border: 1px solid #1A2338;
+}
+
+.install-domain-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #1B2542;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7C93E0;
+  flex: none;
+}
+
+.install-domain-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.install-domain-sub {
+  font-size: 11px;
+  color: #6B7A9C;
+}
