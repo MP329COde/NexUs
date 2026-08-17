@@ -191,12 +191,69 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
   .header-manual-link { display: none !important; }
 }
 
+/* Sous 480px, la recherche pleine largeur (220px) fait déborder le header et
+   pousse thème/notifications/avatar hors écran : elle se réduit à une simple
+   icône, comme les autres actions, pour que tout reste accessible d'un tap. */
+@media (max-width: 480px) {
+  .header-title-wrap { display: none; }
+  .header-search-bar {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .header-search-text { display: none; }
+}
+
 /* Layouts à deux colonnes (Manuel, futures pages similaires) : empilées sous
    860px plutôt que compressées à une colonne de quelques pixels de large. */
 @media (max-width: 860px) {
   .manual-layout { flex-direction: column; align-items: stretch !important; }
   .manual-toc { width: 100% !important; position: static !important; }
   .manual-content { max-width: 100% !important; }
+}
+
+/* Sous-navigation "Développement" (DeploymentsLayout) : même défaut que le
+   sommaire du Manuel — une colonne latérale de largeur fixe (210px) pousse
+   tout le contenu hors écran sur mobile. Repliée en un bandeau de icônes
+   défilable horizontalement au-dessus du contenu plutôt qu'à côté. */
+@media (max-width: 860px) {
+  .dev-layout { flex-direction: column; gap: 12px !important; }
+  .dev-nav {
+    width: 100% !important;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+  .dev-nav-groups { flex-direction: row; gap: 4px; }
+  .dev-nav-group-label { display: none; }
+  .dev-nav-group-items { flex-direction: row; }
+  .dev-nav-link-label { display: none; }
+  .dev-nav-link { padding: 8px; }
+  .dev-nav-external { border-top: none; border-left: 1px solid var(--border-soft); padding-top: 0; padding-left: 10px; flex-direction: row; }
+  .dev-nav-toggle { display: none; }
+}
+
+/* Même correctif pour les sous-navigations plus courtes (Kubernetes, Réseaux,
+   Infrastructure) : rail vertical de 190px fixe -> bandeau d'icônes
+   défilable horizontalement au-dessus du contenu. */
+@media (max-width: 860px) {
+  .k8s-layout, .network-layout {
+    flex-direction: column;
+    gap: 12px !important;
+  }
+  .k8s-layout-nav, .network-layout-nav {
+    width: 100% !important;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+  }
+  .k8s-layout-nav-link, .network-layout-nav-link {
+    flex: none;
+    white-space: nowrap;
+  }
 }
 
 /* Respecte la préférence système "réduire les animations" (accessibilité) :
