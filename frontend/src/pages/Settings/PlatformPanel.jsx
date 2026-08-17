@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './PlatformPanel.css';
 
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
 const LANGUAGES = [['fr', 'Français'], ['en', 'English']];
@@ -32,7 +33,7 @@ export default function PlatformPanel({ data, error, reload }) {
   if (!form) {
     if (error) {
       return (
-        <div style={{ padding: 16, fontSize: 13, color: 'var(--tone-crit-fg)' }}>
+        <div className="platform-error">
           {error.status === 429
             ? 'Trop de requêtes envoyées au serveur — réessayez dans une minute.'
             : error.status === 401
@@ -63,9 +64,9 @@ export default function PlatformPanel({ data, error, reload }) {
   }
 
   return (
-    <form onSubmit={save} style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+    <form onSubmit={save} className="platform-form">
       <Panel title="Organisation & régionalisation" sub="Identité de l'instance, langue et fuseau horaire" span={12}>
-        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
+        <div className="platform-fields-grid">
           <Field label="Nom de l'organisation" hint="Affiché dans l'en-tête et les rapports">
             <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} />
           </Field>
@@ -88,29 +89,29 @@ export default function PlatformPanel({ data, error, reload }) {
             <input className="input" type="email" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
           </Field>
         </div>
-        <div className="faint" style={{ padding: '0 16px 16px', fontSize: 11 }}>
+        <div className="faint platform-note">
           Le nom de l'organisation est déjà appliqué dans l'en-tête. Langue et format de date sont enregistrés pour l'instant sans effet
           sur l'interface (pas encore de traduction multilingue) — la base est posée pour un futur passage à l'internationalisation.
         </div>
       </Panel>
 
       <Panel title="Accès" sub="Visibilité de la Vue générale" span={12}>
-        <div style={{ padding: 16 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+        <div className="platform-panel-body">
+          <label className="platform-checkbox-label">
             <input
               type="checkbox"
               checked={form.homeRestrictedToAdmins}
               onChange={(e) => set('homeRestrictedToAdmins', e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Réserver la Vue générale aux administrateurs</span>
+            <span className="platform-checkbox-text">Réserver la Vue générale aux administrateurs</span>
           </label>
-          <div className="faint" style={{ fontSize: 11, marginTop: 6 }}>
+          <div className="faint platform-checkbox-hint">
             Si activé, les comptes non-admin sont redirigés vers Développement et le lien disparaît de la navigation.
           </div>
         </div>
       </Panel>
 
-      <div style={{ gridColumn: 'span 12' }}>
+      <div className="platform-submit-col">
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
       </div>
     </form>
@@ -120,9 +121,9 @@ export default function PlatformPanel({ data, error, reload }) {
 function Field({ label, hint, children }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+      <label className="platform-field-label">{label}</label>
       {children}
-      {hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{hint}</div>}
+      {hint && <div className="faint platform-field-hint">{hint}</div>}
     </div>
   );
 }
