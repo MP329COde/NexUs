@@ -571,3 +571,62 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+.pd-error-state {
+  padding: 30px;
+  text-align: center;
+}
+
+.pd-loading-state {
+  padding: 30px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.pd-review-author {
+  font-size: 11px;
+}
+
+.pd-runbook-link {
+  display: flex;
+  color: var(--text-faint);
+}
+
+.pd-job-retry-tag {
+  font-weight: 400;
+}
+
+.pd-job-error {
+  font-size: 11px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-scan-badge {
+  font-size: 11.5px;
+}
+
+.pd-scan-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-scan-badge-error {
+  color: var(--tone-crit-fg);
+}
+
+.pd-mw-time-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pd-mw-time-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}

@@ -36,11 +36,11 @@ export default function ProjectDetailPage() {
   const [taskTitle, setTaskTitle] = useState('');
 
   if (project.error) {
-    return <div className="card" style={{ padding: 30, textAlign: 'center' }}>Projet introuvable ou non accessible.</div>;
+    return <div className="card pd-error-state">Projet introuvable ou non accessible.</div>;
   }
   const p = project.data?.project;
   const projectRole = project.data?.role || (user?.role === 'admin' ? 'owner' : null);
-  if (!p) return <div style={{ padding: 30, fontSize: 13, color: 'var(--text-faint)' }}>Chargement…</div>;
+  if (!p) return <div className="pd-loading-state">Chargement…</div>;
 
   const allUsers = users.data?.items || [];
   const userName = (uid) => allUsers.find((u) => u.id === uid)?.name || (uid === user?.id ? user.name : uid);
@@ -162,7 +162,7 @@ export default function ProjectDetailPage() {
               {linkedReviews.map((r) => (
                 <a key={r.key} href={r.webUrl} target="_blank" rel="noreferrer" className="pd-repo-link">
                   <span className="pd-review-title">{r.title}</span>
-                  <span className="mono faint" style={{ fontSize: 11 }}>{r.author}</span>
+                  <span className="mono faint pd-review-author">{r.author}</span>
                 </a>
               ))}
             </div>
@@ -356,7 +356,7 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
               <span className={`badge badge-${STATUS_TONE[inc.status]}`}><span className="dot" />{STATUS_LABEL[inc.status]}</span>
               <span className="pd-row-title">{inc.title}</span>
               {inc.runbook_url && (
-                <a href={inc.runbook_url} target="_blank" rel="noreferrer" title="Ouvrir le runbook" style={{ display: 'flex', color: 'var(--text-faint)' }}>
+                <a href={inc.runbook_url} target="_blank" rel="noreferrer" title="Ouvrir le runbook" className="pd-runbook-link">
                   <Icon name="externalLink" size={13} />
                 </a>
               )}
@@ -571,14 +571,14 @@ function JobsPanel({ jobs, projectId, role, onChanged }) {
             </span>
             <span className="pd-row-title">
               {JOB_TYPE_LABEL[j.type] || j.type}
-              {j.retry_of && <span className="faint" style={{ fontWeight: 400 }}> (relance)</span>}
+              {j.retry_of && <span className="faint pd-job-retry-tag"> (relance)</span>}
             </span>
             {j.status === 'failed' && j.error && (
-              <span className="faint" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={j.error}>{j.error}</span>
+              <span className="faint pd-job-error" title={j.error}>{j.error}</span>
             )}
             <span className="faint pd-row-date">{new Date(j.created_at).toLocaleString('fr-FR')}</span>
             {j.status === 'failed' && canRetry && RETRYABLE_JOB_TYPES.has(j.type) && (
-              <span className="btn-outline" className="pd-action-btn" onClick={() => retry(j)}>
+              <span className="btn-outline pd-action-btn" onClick={() => retry(j)}>
                 {retryingId === j.id ? '…' : 'Relancer'}
               </span>
             )}
@@ -653,11 +653,11 @@ function SecurityScansPanel({ scans, repoCount, projectId, role, onChanged }) {
 
 function ScanResultBadge({ label, result }) {
   if (result?.error) {
-    return <div style={{ fontSize: 11.5 }}><span className="faint">{label} : </span><span style={{ color: 'var(--tone-crit-fg)' }}>{result.error}</span></div>;
+    return <div className="pd-scan-badge"><span className="faint">{label} : </span><span className="pd-scan-badge-error">{result.error}</span></div>;
   }
   const total = result?.total ?? 0;
   return (
-    <div style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div className="pd-scan-badge pd-scan-badge-row">
       <span className="faint">{label}</span>
       <span className={`badge badge-${total > 0 ? 'warn' : 'ok'}`}><span className="dot" />{total} problème(s)</span>
     </div>
@@ -783,12 +783,12 @@ function PlanMaintenanceWindowModal({ projectId, environments, onClose, onCreate
           <option value="">Aucun environnement précis</option>
           {environments.map((env) => <option key={env.id} value={env.id}>{env.name}{env.is_production ? ' (production)' : ''}</option>)}
         </select>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }} className="faint">
+        <div className="pd-mw-time-row">
+          <label className="faint pd-mw-time-field">
             Début
             <input className="input" type="datetime-local" required value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
           </label>
-          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }} className="faint">
+          <label className="faint pd-mw-time-field">
             Fin
             <input className="input" type="datetime-local" required value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
           </label>
