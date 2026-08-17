@@ -5,6 +5,7 @@ import DemoNote from '../../components/ui/DemoNote.jsx';
 import CodeScanPanel from './CodeScanPanel.jsx';
 import IacScanPanel from './IacScanPanel.jsx';
 import DastScanPanel from './DastScanPanel.jsx';
+import SecurityGatePanel from './SecurityGatePanel.jsx';
 import './SupplyChainPage.css';
 
 // Tout le pipeline (source, SAST, secrets, dépendances/conteneur, IaC, SBOM,
@@ -76,22 +77,7 @@ export default function SupplyChainPage() {
         ))}
       </div>
 
-      <Panel title="Security Gate" sub="Décision automatique à l'entrée d'Argo CD — démonstration" span={12}>
-        <DemoNote>Exemple de ce que produirait un Security Gate une fois les scanners ci-dessus connectés — seuils et résultat illustratifs, pas calculés.</DemoNote>
-        <div className="scp-gate-body">
-          <div className="scp-gate-counts">
-            <span>Critical : <strong className="mono">0</strong></span>
-            <span>High : <strong className="mono">0</strong></span>
-            <span>Medium : <strong className="mono">4</strong></span>
-          </div>
-          <div className="scp-gate-verdict">
-            <Icon name="check" size={15} />Déploiement autorisé — aucune vulnérabilité critique ou élevée
-          </div>
-          <div className="faint scp-gate-rule">
-            Règle type : bloquer le déploiement (refuser la synchronisation Argo CD) si au moins une vulnérabilité "Critical" est détectée par le scan de conteneur ou de dépendances.
-          </div>
-        </div>
-      </Panel>
+      <SecurityGatePanel />
     </>
   );
 }
