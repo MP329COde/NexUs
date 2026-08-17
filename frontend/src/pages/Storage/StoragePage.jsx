@@ -105,9 +105,54 @@ export default function StoragePage() {
           )}
         </Panel>
 
+        <ProxmoxStoragePanel />
+
         {user?.role === 'admin' && <BackupSummaryPanel />}
       </div>
     </>
+  );
+}
+
+// Distinct du suivi déclaratif ci-dessus (saisi/mis à jour à la main) : ici,
+// l'état réel des stockages Proxmox (dir, lvmthin, zfspool, nfs...) tel que
+// rapporté par l'API, used/avail en octets déjà fournis par Proxmox — jamais
+// de valeur inventée si l'intégration n'est pas configurée (panneau masqué).
+function ProxmoxStoragePanel() {
+  const status = useApi(() => api.get('/proxmox/status'), []);
+  const storage = useApi(() => api.get('/proxmox/storage'), [], { pollMs: 30000 });
+
+  if (status.data && !status.data.status.configured) return null;
+
+  const items = storage.data?.items || [];
+
+  return (
+    <Panel title="Stockage Proxmox" sub="État réel des stockages par nœud (rafraîchi toutes les 30s)" span={12}>
+      {items.length === 0 ? (
+        <div className="storage-empty">Aucun stockage remonté par Proxmox</div>
+      ) : (
+        <div className="storage-volume-list">
+          {items.map((s) => {
+            const pct = Math.round((s.usedFraction || 0) * 100);
+            const color = pct > 85 ? 'var(--tone-crit-dot)' : pct > 65 ? 'var(--tone-warn-dot)' : 'var(--tone-ok-dot)';
+            const usedGB = Math.round(s.used / 1024 / 1024 / 1024);
+            const totalGB = Math.round(s.total / 1024 / 1024 / 1024);
+            return (
+              <div key={`${s.node}-${s.storage}`} className="storage-volume-row">
+                <div className="storage-volume-meta">
+                  <div className="storage-volume-name">{s.storage}</div>
+                  <div className="faint storage-volume-type">{s.node} · {s.type}{!s.active ? ' · inactif' : ''}</div>
+                </div>
+                <div className="storage-volume-bar-track">
+                  <div className="storage-volume-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
+                </div>
+                <span className="mono storage-volume-usage">{usedGB} / {totalGB} Go</span>
+                {pct > 85 && <Icon name="alertTriangle" size={14} className="storage-volume-alert-icon" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
   );
 }
 

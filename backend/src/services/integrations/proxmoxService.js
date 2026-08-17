@@ -39,6 +39,33 @@ export async function listVMs(node) {
   return [...map(qemu, 'qemu'), ...map(lxc, 'lxc')];
 }
 
+// Stockage réel Proxmox (agrégé sur tous les nœuds) : chaque entrée de
+// /nodes/{node}/storage expose déjà used/avail/total en octets et le type
+// de backend (dir, lvmthin, zfspool, nfs, cifs...) — pas besoin de deviner
+// depuis /storage (définitions de la config cluster, sans les tailles réelles).
+export async function listStorage() {
+  const c = client();
+  if (!c) throw new IntegrationError('Proxmox non configuré', { status: 409 });
+  const nodesData = await request(c.http, { method: 'GET', url: '/api2/json/nodes' }, 'Proxmox');
+  const nodes = (nodesData.data || []).map((n) => n.node);
+  const perNode = await Promise.all(nodes.map(async (node) => {
+    const data = await request(c.http, { method: 'GET', url: `/api2/json/nodes/${node}/storage` }, 'Proxmox').catch(() => ({ data: [] }));
+    return (data.data || []).map((s) => ({
+      node,
+      storage: s.storage,
+      type: s.type,
+      content: s.content,
+      shared: Boolean(s.shared),
+      active: Boolean(s.active),
+      total: s.total || 0,
+      used: s.used || 0,
+      avail: s.avail || 0,
+      usedFraction: s.total ? s.used / s.total : 0
+    }));
+  }));
+  return perNode.flat();
+}
+
 export async function vmAction(node, vmid, type, action) {
   const c = client();
   if (!c) throw new IntegrationError('Proxmox non configuré', { status: 409 });

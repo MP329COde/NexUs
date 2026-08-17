@@ -11,6 +11,7 @@ router.use(requireAuth);
 router.get('/status', asyncHandler(async (req, res) => res.json({ ok: true, status: await proxmox.getStatus() })));
 router.get('/nodes', asyncHandler(async (req, res) => res.json({ ok: true, items: await proxmox.listNodes() })));
 router.get('/nodes/:node/vms', asyncHandler(async (req, res) => res.json({ ok: true, items: await proxmox.listVMs(req.params.node) })));
+router.get('/storage', asyncHandler(async (req, res) => res.json({ ok: true, items: await proxmox.listStorage() })));
 
 // start/stop/shutdown/reboot une VM ou un conteneur (voir la liste blanche
 // dans proxmoxService.vmAction) : action perturbatrice sur l'infrastructure

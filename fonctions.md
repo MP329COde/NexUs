@@ -98,7 +98,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **integrations/haproxyService.js** — Data Plane API v2/v3 réelle.
 - **integrations/httpClient.js** — Client HTTP axios normalisé + erreur commune.
 - **integrations/kubernetesService.js** — Le plus complet : namespaces, pods, deployments, services, logs, describe, metrics, restart/scale/rollback/purge, exec.
-- **integrations/proxmoxService.js** — API2 JSON réelle, `listNodes()` expose désormais aussi `maxcpu`/`disk`/`maxdisk`.
+- **integrations/proxmoxService.js** — API2 JSON réelle, `listNodes()` expose désormais aussi `maxcpu`/`disk`/`maxdisk`, **`listStorage()`** agrège l'état réel de chaque stockage (`/nodes/{node}/storage` : type, used/avail/total en octets, actif) sur tous les nœuds.
 - **integrations/traefikService.js** — API REST réelle, écriture de routes dynamiques.
 - **integrations/wazuhService.js** — API REST avec cache JWT (token 14min).
 - **integrations/ovhService.js** — API OVH réelle (gestion de zones DNS) : authentification signée (application key/secret + consumer key, calcul du décalage d'horloge via `/auth/time`), `listZones`/`listRecords`/`upsertRecord` (crée ou met à jour l'enregistrement A puis rafraîchit la zone).
@@ -181,7 +181,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 ### Monitoring / Stockage / Sécurité / autres
 
 - **MonitoringPage.jsx / InstallGrafanaDialog.jsx** — Statut/dashboards/alertes Grafana, **filtre texte sur les alertes** (en plus du filtre par sévérité), **tendance de charge CPU/RAM** (sparklines ~6h, `/status/infra-load`), **hôtes triés par charge la plus élevée d'abord** avec icône d'alerte au-delà de 85%. Quand Grafana n'est pas configuré : bouton **« Installer Grafana automatiquement »** sur un hôte déjà géré (Infrastructure → Hôtes), avec aperçu du script avant exécution et indication du branchement restant (créer un compte de service Grafana, puis renseigner Paramètres → Grafana).
-- **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, pas d'intégration réelle).
+- **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, suivi déclaratif mis à jour à la main) **+ panneau « Stockage Proxmox »** avec l'état réel (used/avail par nœud, rafraîchi toutes les 30s, `GET /proxmox/storage`) quand Proxmox est configuré — masqué sinon, jamais de valeur inventée.
 - **NetworkServicesPage.jsx** — Réseaux internes : VLAN/sous-réseaux, DHCP, DNS interne, VPN (4 onglets, CRUD déclaratif, local, pas d'intégration réelle).
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
 - **ReportPage.jsx** — Rapport imprimable.
