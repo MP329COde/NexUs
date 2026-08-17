@@ -1,0 +1,75 @@
+.restore-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.restore-card {
+  width: 420px;
+  padding: 22px;
+}
+
+.restore-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.restore-header-icon {
+  color: var(--tone-crit-fg);
+}
+
+.restore-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.restore-intro {
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+
+.restore-file {
+  display: block;
+  font-size: 11.5px;
+  background: var(--border-soft);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  word-break: break-all;
+}
+
+.restore-note {
+  font-size: 11.5px;
+  margin-bottom: 14px;
+}
+
+.restore-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.restore-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin: 10px 0 0;
+}
+
+.restore-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.restore-submit-btn {
+  background: var(--tone-crit-dot);
+}
