@@ -57,11 +57,30 @@ export async function getOrgRole(orgId, userId) {
 // comme pour les projets (store/projectsStore.js) — pas de distinction
 // entre "non fourni" et "explicitement vidé" à gérer côté client.
 export async function updateOrganization(orgId, { name, icon, color }) {
+  // icon n'était pas protégé par COALESCE (contrairement à name/color) : une
+  // mise à jour ne renseignant pas l'icône (ex. juste renommer l'organisation)
+  // l'effaçait silencieusement à NULL — trouvé en auditant le même défaut
+  // que celui corrigé dans projectsStore.updateProject().
   const { rows } = await query(
-    `UPDATE organizations SET name = COALESCE($2, name), icon = $3, color = COALESCE($4, color) WHERE id = $1 RETURNING *`,
+    `UPDATE organizations SET name = COALESCE($2, name), icon = COALESCE($3, icon), color = COALESCE($4, color) WHERE id = $1 RETURNING *`,
     [orgId, name || null, icon || null, color || null]
   );
   return rows[0] || null;
+}
+
+// Suppression réelle (ON DELETE CASCADE sur org_members/teams/projects/
+// wiki_pages, voir migrations 0001_core.sql et 0012_wiki.sql) : irréversible,
+// d'où le comptage préalable des projets pour que la route appelante puisse
+// exiger une confirmation explicite si l'organisation n'est pas vide plutôt
+// que de supprimer silencieusement des projets entiers.
+export async function countOrgProjects(orgId) {
+  const { rows } = await query('SELECT COUNT(*)::int AS n FROM projects WHERE org_id = $1', [orgId]);
+  return rows[0].n;
+}
+
+export async function deleteOrganization(orgId) {
+  const { rowCount } = await query('DELETE FROM organizations WHERE id = $1', [orgId]);
+  return rowCount > 0;
 }
 
 // --- Projets ---

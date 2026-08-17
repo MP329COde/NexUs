@@ -49,6 +49,26 @@ router.put('/:id', asyncHandler(async (req, res) => {
   res.json({ ok: true, organization: org });
 }));
 
+// Irréversible (cascade réelle sur teams/projects/wiki, voir orgStore.js) :
+// réservée à l'owner de l'organisation ou à un admin plateforme, et exige
+// ?force=true si l'organisation contient encore des projets, plutôt que de
+// les supprimer silencieusement — même politique que POST /backups/:file/restore
+// (confirmation explicite avant une action destructrice de grande ampleur).
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (role !== 'owner' && req.user.role !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Seul le propriétaire de cette organisation (ou un administrateur) peut la supprimer' });
+  }
+  const projectCount = await orgStore.countOrgProjects(req.params.id);
+  if (projectCount > 0 && req.query.force !== 'true') {
+    return res.status(409).json({ ok: false, error: `Cette organisation contient ${projectCount} projet(s) — ajoutez ?force=true pour confirmer leur suppression définitive`, projectCount });
+  }
+  const deleted = await orgStore.deleteOrganization(req.params.id);
+  if (!deleted) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  logAudit(req, 'organization.delete', { orgId: req.params.id, projectCount });
+  res.json({ ok: true });
+}));
+
 router.get('/:id/projects', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
   if (!role && req.user.role !== 'admin') return res.status(404).json({ ok: false, error: 'Organisation introuvable' });

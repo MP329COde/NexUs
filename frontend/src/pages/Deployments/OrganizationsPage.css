@@ -131,6 +131,10 @@
   cursor: pointer;
 }
 
+.org-card-delete-btn {
+  color: var(--tone-crit-fg);
+}
+
 .org-card-slug {
   font-size: 12px;
   margin: 0;

@@ -57,6 +57,29 @@ export default function OrganizationsPage() {
     }
   }
 
+  async function removeOrg(org) {
+    if (!confirm(`Supprimer définitivement "${org.name}" ?`)) return;
+    try {
+      await api.del(`/organizations/${org.id}`);
+      notify('Organisation supprimée', { type: 'info' });
+      reload();
+    } catch (err) {
+      if (err.status === 409 && err.body?.projectCount) {
+        if (confirm(`${err.message}\n\nConfirmer la suppression de "${org.name}" ET de ses ${err.body.projectCount} projet(s) ?`)) {
+          try {
+            await api.del(`/organizations/${org.id}?force=true`);
+            notify('Organisation et ses projets supprimés', { type: 'info' });
+            reload();
+          } catch (err2) {
+            notify(err2.message, { type: 'crit' });
+          }
+        }
+      } else {
+        notify(err.message, { type: 'crit' });
+      }
+    }
+  }
+
   if (!configured) {
     return (
       <>
@@ -169,6 +192,11 @@ export default function OrganizationsPage() {
                 {(org.my_role === 'owner' || org.my_role === 'admin') && (
                   <span className="btn-outline org-card-edit-btn" onClick={() => setEditing(org)}>
                     <Icon name="edit" size={12} />
+                  </span>
+                )}
+                {org.my_role === 'owner' && (
+                  <span className="btn-outline org-card-edit-btn org-card-delete-btn" onClick={() => removeOrg(org)}>
+                    <Icon name="trash" size={12} />
                   </span>
                 )}
               </span>
