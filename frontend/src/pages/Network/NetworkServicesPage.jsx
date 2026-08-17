@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './NetworkServicesPage.css';
 
 const TABS = [
   { id: 'vlans', label: 'VLAN & sous-réseaux', icon: 'layers' },
@@ -95,25 +96,24 @@ export default function NetworkServicesPage() {
     <>
       <PageHeader title="Réseaux internes" sub="VLAN/sous-réseaux, DHCP, DNS interne et VPN — suivi déclaratif, mis à jour manuellement" />
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      <div className="nsp-tabs">
         {TABS.map((t) => (
           <span
             key={t.id}
             onClick={() => switchTab(t.id)}
-            className={t.id === tab ? 'btn' : 'btn-outline'}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+            className={`nsp-tab ${t.id === tab ? 'btn' : 'btn-outline'}`}
           >
             <Icon name={t.icon} size={13} />{t.label}
           </span>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+      <div className="nsp-grid">
         <Panel title="Ajouter" span={4}>
-          <form onSubmit={createItem} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={createItem} className="nsp-add-form">
             {fields.map((f) => (
               <div key={f.key}>
-                <label style={{ display: 'block', fontSize: 12, marginBottom: 5, color: 'var(--text-muted)' }}>{f.label}</label>
+                <label className="nsp-field-label">{f.label}</label>
                 {f.options ? (
                   <select className="input" value={form[f.key]} onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}>
                     {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -136,26 +136,26 @@ export default function NetworkServicesPage() {
 
         <Panel title={TABS.find((t) => t.id === tab).label} sub={`${items.length} élément(s) suivi(s)`} span={8}>
           {items.length === 0 ? (
-            <div style={{ padding: 30, textAlign: 'center', fontSize: 12.5, color: 'var(--text-faint)' }}>Aucun élément suivi</div>
+            <div className="nsp-empty">Aucun élément suivi</div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div className="nsp-table-wrap">
+              <table className="nsp-table">
                 <thead>
                   <tr>
                     {fields.map((f) => (
-                      <th key={f.key} style={{ textAlign: 'left', padding: '8px 16px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{f.label}</th>
+                      <th key={f.key} className="nsp-th">{f.label}</th>
                     ))}
-                    <th style={{ borderBottom: '1px solid var(--border-soft)' }} />
+                    <th className="nsp-th" />
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                    <tr key={item.id} className="nsp-row">
                       {fields.map((f) => (
-                        <td key={f.key} style={{ padding: '9px 16px' }} className={f.key.toLowerCase().includes('ip') || f.key === 'cidr' || f.key === 'value' ? 'mono' : ''}>{item[f.key] || '—'}</td>
+                        <td key={f.key} className={`nsp-td ${f.key.toLowerCase().includes('ip') || f.key === 'cidr' || f.key === 'value' ? 'mono' : ''}`}>{item[f.key] || '—'}</td>
                       ))}
-                      <td style={{ padding: '9px 16px' }}>
-                        <span className="btn-outline" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => removeItem(item)}>
+                      <td className="nsp-td">
+                        <span className="btn-outline nsp-delete-btn" onClick={() => removeItem(item)}>
                           <Icon name="trash" size={11} />
                         </span>
                       </td>

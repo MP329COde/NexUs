@@ -1,0 +1,70 @@
+.pfd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.pfd-card {
+  width: 440px;
+  padding: 22px;
+}
+
+.pfd-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.pfd-row {
+  display: flex;
+  gap: 10px;
+}
+
+.pfd-row-service {
+  flex: 2;
+}
+
+.pfd-row-port {
+  flex: 1;
+}
+
+.pfd-row-tls {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 22px;
+}
+
+.pfd-tls-label {
+  font-size: 13px;
+}
+
+.pfd-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin: 8px 0;
+}
+
+.pfd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.pfd-field {
+  margin-bottom: 12px;
+}
+
+.pfd-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
