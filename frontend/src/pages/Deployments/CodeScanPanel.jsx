@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './ScanPanels.css';
 
 const SEVERITY_TONE = { ERROR: 'crit', WARNING: 'warn', INFO: 'mut' };
 const SEVERITY_ORDER = ['ERROR', 'WARNING', 'INFO'];
@@ -46,71 +47,71 @@ export default function CodeScanPanel() {
       sub="Semgrep, open source — scanne le code source réel de la plateforme (backend/frontend), jamais de résultat inventé"
       span={12}
       actions={
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="input" value={target} onChange={(e) => setTarget(e.target.value)} style={{ height: 28, fontSize: 12 }}>
+        <div className="scanp-actions">
+          <select className="input scanp-target-select" value={target} onChange={(e) => setTarget(e.target.value)}>
             <option value="all">Backend + Frontend</option>
             <option value="backend">Backend uniquement</option>
             <option value="frontend">Frontend uniquement</option>
           </select>
-          <span className="btn-outline" style={{ height: 28, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: scanning ? 'default' : 'pointer', opacity: scanning ? 0.6 : 1 }} onClick={scanning ? undefined : runScan}>
+          <span className={`btn-outline scanp-run-btn${scanning ? ' scanp-run-btn-disabled' : ''}`} onClick={scanning ? undefined : runScan}>
             <Icon name={scanning ? 'refresh' : 'terminal'} size={13} />{scanning ? 'Scan en cours…' : 'Lancer un scan'}
           </span>
         </div>
       }
     >
-      <div style={{ display: 'flex', minHeight: 180 }}>
-        <div style={{ width: 220, flex: 'none', borderRight: '1px solid var(--border-soft)', maxHeight: 340, overflowY: 'auto' }}>
+      <div className="scanp-body">
+        <div className="scanp-list">
           {loading ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Chargement…</div>
+            <div className="faint scanp-list-msg">Chargement…</div>
           ) : scans.length === 0 ? (
-            <div className="faint" style={{ padding: 16, fontSize: 12 }}>Aucun scan encore lancé</div>
+            <div className="faint scanp-list-msg">Aucun scan encore lancé</div>
           ) : (
             scans.map((s) => (
               <div
                 key={s.id} onClick={() => setOpenScan(s.id)}
-                style={{ padding: '9px 12px', cursor: 'pointer', background: active?.id === s.id ? 'var(--border-soft)' : 'transparent', borderBottom: '1px solid var(--border-soft)' }}
+                className={`scanp-list-item${active?.id === s.id ? ' scanp-list-item-active' : ''}`}
               >
-                <div style={{ fontSize: 11.5, fontWeight: 600 }}>{TARGET_LABEL[s.target] || s.target}</div>
-                <div className="faint" style={{ fontSize: 10.5 }}>{formatDate(s.scannedAt)}</div>
+                <div className="scanp-list-item-title">{TARGET_LABEL[s.target] || s.target}</div>
+                <div className="faint scanp-list-item-date">{formatDate(s.scannedAt)}</div>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ flex: 1, padding: 16 }}>
+        <div className="scanp-results">
           {!active ? (
-            <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', paddingTop: 40 }}>Lancez un scan pour voir les résultats ici.</div>
+            <div className="faint scanp-results-empty">Lancez un scan pour voir les résultats ici.</div>
           ) : (
             <>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div className="scanp-counts-row">
                 {SEVERITY_ORDER.filter((sev) => active.counts[sev] > 0).map((sev) => (
                   <span key={sev} className={`badge badge-${SEVERITY_TONE[sev]}`}><span className="dot" />{active.counts[sev]} {sev}</span>
                 ))}
                 {active.total === 0 && <span className="badge badge-ok"><span className="dot" />Aucun problème détecté</span>}
               </div>
               {active.findings.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <div className="scanp-table-wrap">
+                  <table className="scanp-table">
                     <thead>
                       <tr>
                         {['Règle', 'Sévérité', 'Fichier', 'Ligne', 'Message'].map((c) => (
-                          <th key={c} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-faint)', borderBottom: '1px solid var(--border-soft)' }}>{c}</th>
+                          <th key={c} className="scanp-th">{c}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {active.findings.slice(0, 30).map((f, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                          <td style={{ padding: '6px 10px' }} className="mono" title={f.ruleId}>{f.ruleId.split('.').pop()}</td>
-                          <td style={{ padding: '6px 10px' }}><span className={`badge badge-${SEVERITY_TONE[f.severity]}`} style={{ fontSize: 10 }}>{f.severity}</span></td>
-                          <td style={{ padding: '6px 10px' }} className="mono muted">{f.file}</td>
-                          <td style={{ padding: '6px 10px' }} className="mono muted">{f.line}</td>
-                          <td style={{ padding: '6px 10px', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.message}>{f.message}</td>
+                        <tr key={i} className="scanp-row">
+                          <td className="scanp-td mono" title={f.ruleId}>{f.ruleId.split('.').pop()}</td>
+                          <td className="scanp-td"><span className={`badge badge-${SEVERITY_TONE[f.severity]} scanp-badge-sm`}>{f.severity}</span></td>
+                          <td className="scanp-td mono muted">{f.file}</td>
+                          <td className="scanp-td mono muted">{f.line}</td>
+                          <td className="scanp-td-ellipsis" title={f.message}>{f.message}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {active.total > 30 && <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>+ {active.total - 30} autre(s), non affiché(es)</div>}
+                  {active.total > 30 && <div className="faint scanp-more">+ {active.total - 30} autre(s), non affiché(es)</div>}
                 </div>
               )}
             </>

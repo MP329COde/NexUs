@@ -1,0 +1,149 @@
+/* Partagé par CodeScanPanel, DastScanPanel, IacScanPanel, SecretLeakScanPanel. */
+
+.scanp-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scanp-target-select {
+  height: 28px;
+  font-size: 12px;
+}
+
+.scanp-target-select-wide {
+  min-width: 160px;
+}
+
+.scanp-run-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.scanp-run-btn-disabled {
+  cursor: default;
+  opacity: .6;
+}
+
+.scanp-body {
+  display: flex;
+  min-height: 180px;
+}
+
+.scanp-list {
+  width: 220px;
+  flex: none;
+  border-right: 1px solid var(--border-soft);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.scanp-list-msg {
+  padding: 16px;
+  font-size: 12px;
+}
+
+.scanp-list-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  background: transparent;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scanp-list-item-active {
+  background: var(--border-soft);
+}
+
+.scanp-list-item-title {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.scanp-list-item-title-mono {
+  font-size: 11.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanp-list-item-date {
+  font-size: 10.5px;
+}
+
+.scanp-results {
+  flex: 1;
+  padding: 16px;
+}
+
+.scanp-results-empty {
+  font-size: 12.5px;
+  text-align: center;
+  padding-top: 40px;
+}
+
+.scanp-counts-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.scanp-table-wrap {
+  overflow-x: auto;
+}
+
+.scanp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.scanp-th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scanp-row {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scanp-td {
+  padding: 6px 10px;
+}
+
+.scanp-td-ellipsis {
+  padding: 6px 10px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanp-td-ellipsis-wide {
+  padding: 6px 10px;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanp-badge-sm {
+  font-size: 10px;
+}
+
+.scanp-more {
+  font-size: 11px;
+  margin-top: 8px;
+}
