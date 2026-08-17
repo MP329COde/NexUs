@@ -1,0 +1,156 @@
+.pv-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pv-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pv-action-btn-danger {
+  color: var(--tone-crit-fg);
+}
+
+.pv-stages {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  flex-wrap: wrap;
+}
+
+.pv-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pv-form-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.pv-form-hint {
+  font-size: 11.5px;
+}
+
+.pv-form-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+}
+
+.pv-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pv-history-loading,
+.pv-history-empty {
+  font-size: 12.5px;
+}
+
+.pv-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pv-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+}
+
+.pv-history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pv-history-revision {
+  font-size: 12px;
+}
+
+.pv-history-date {
+  font-size: 10.5px;
+}
+
+.pv-history-restore-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.pv-history-error {
+  font-size: 12.5px;
+  color: var(--tone-crit-fg);
+  margin-top: 10px;
+}
+
+.pv-stage-card {
+  flex: 1 1 220px;
+  padding: 14px;
+}
+
+.pv-stage-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pv-stage-card-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pv-stage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  margin-top: 8px;
+}
+
+.pv-stage-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  margin-top: 8px;
+  height: 24px;
+  padding: 0 8px;
+}
+
+.pv-form-intro {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+}
+
+.pv-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.pv-stage-detail-error {
+  font-size: 12px;
+  color: var(--tone-crit-fg);
+}
+
+.pv-stage-detail-muted {
+  font-size: 12px;
+}
+
+.pv-stage-detail-mono {
+  font-size: 12px;
+}
