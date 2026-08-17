@@ -52,6 +52,7 @@ Inventaire des fonctionnalités réellement présentes dans le projet (backend `
 - **users.routes.js** — CRUD utilisateurs, palier terminal.
 - **vault.routes.js** — Coffres dev/prod, révélation avec vérification de mot de passe (compte, ou mot de passe de projet dédié pour tier `project`), édition/suppression, **rotation automatique configurable (2-5 min)** des secrets prod/projet avec échéance exposée au reveal.
 - **volumes.routes.js** — CRUD stockage (volumes, NAS, pools ZFS, partages).
+- **networkServices.routes.js** — CRUD déclaratif VLAN/sous-réseaux, plages DHCP, enregistrements DNS internes, IPs VPN (`/network-services/{vlans,dhcp-ranges,dns-records,vpn-clients}`) — même principe que le stockage : aucune intégration DHCP/DNS/VPN réelle branchée.
 - **wazuh.routes.js** — Statut, agents, résumé Wazuh.
 - **webhooks.routes.js** — Réception de webhooks entrants GitLab/GitHub par projet.
 - **wiki.routes.js** — Wiki d'équipe : CRUD de pages par organisation (optionnellement liées à un projet), historique des révisions (`GET /:id/revisions`), recherche (`?q=`). Contenu réellement stocké en base (socle Postgres, `wiki_pages`/`wiki_page_revisions`, migration `0012_wiki.sql`) — à la différence du lien runbook des incidents qui pointe vers une doc externe. Lecture/écriture ouvertes à tout membre de l'organisation, suppression réservée à owner/admin d'organisation ou admin plateforme.
@@ -178,6 +179,7 @@ Toutes les intégrations suivent le même patron : `notConfigured()` si non para
 
 - **MonitoringPage.jsx** — Statut/dashboards/alertes Grafana.
 - **StoragePage.jsx** — CRUD volumes/NAS/pools ZFS/partages (local, pas d'intégration réelle).
+- **NetworkServicesPage.jsx** — Réseaux internes : VLAN/sous-réseaux, DHCP, DNS interne, VPN (4 onglets, CRUD déclaratif, local, pas d'intégration réelle).
 - **SecurityPage.jsx** — Scans nmap, overview sécurité.
 - **ReportPage.jsx** — Rapport imprimable.
 - **ManualPage.jsx** — Documentation intégrée, incluant un groupe **« Manuel de code »** (structure du dépôt, conventions JSX/React, patrons backend — services/integrations, strangler pattern Postgres/JSON, jobService, rôles projet) destiné aux contributeurs du code de Nexus Console lui-même.

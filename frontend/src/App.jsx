@@ -13,6 +13,7 @@ import ServicesPage from './pages/Kubernetes/ServicesPage.jsx';
 import TerminalPage from './pages/Kubernetes/TerminalPage.jsx';
 import NetworkLayout from './pages/Network/NetworkLayout.jsx';
 import NetworkPage from './pages/Network/NetworkPage.jsx';
+import NetworkServicesPage from './pages/Network/NetworkServicesPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
 import TopologyPage from './pages/Network/TopologyPage.jsx';
 import CertificatesPage from './pages/Network/CertificatesPage.jsx';
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <TopologyPage /> },
               { path: 'proxies', element: <NetworkPage /> },
+              { path: 'services', element: <NetworkServicesPage /> },
               { path: 'haproxy', element: <HAProxyPage /> },
               { path: 'certificates', element: <CertificatesPage /> },
               { path: 'firewall', element: <FirewallPage /> }

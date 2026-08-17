@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon.jsx';
 const ITEMS = [
   { to: '/network', label: 'Topologie', icon: 'layers', end: true },
   { to: '/network/proxies', label: 'Proxies & domaines', icon: 'globe' },
+  { to: '/network/services', label: 'Réseaux internes', icon: 'net' },
   { to: '/network/haproxy', label: 'HAProxy', icon: 'server' },
   { to: '/network/certificates', label: 'Certificats', icon: 'lock' },
   { to: '/network/firewall', label: 'Pare-feu', icon: 'shield' }

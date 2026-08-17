@@ -8,6 +8,7 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Organisations', group: 'Pages', path: '/deployments/organizations', keywords: 'organisation équipe team membre rôle rbac' },
   { label: 'Wiki d\'équipe', group: 'Pages', path: '/deployments/wiki', keywords: 'wiki documentation connaissance procédure onboarding page' },
   { label: 'Infrastructure as Code', group: 'Pages', path: '/deployments/iac', keywords: 'terraform iac infra as code proxmox vm provisioning plan apply' },
+  { label: 'Réseaux internes', group: 'Pages', path: '/network/services', keywords: 'vlan sous-réseau subnet dhcp dns interne vpn ip' },
   { label: 'Développement — Dépôts Git', group: 'Pages', path: '/deployments/repos', keywords: 'gitlab github dépôt repo forge étiquette rôle' },
   { label: 'Développement — Revue de code', group: 'Pages', path: '/deployments/reviews', keywords: 'merge request pull request relecture revue mr pr' },
   { label: 'Développement — Pipelines CI/CD', group: 'Pages', path: '/deployments/pipelines', keywords: 'ci cd pipeline exécution build' },
