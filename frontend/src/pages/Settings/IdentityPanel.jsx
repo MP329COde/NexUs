@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import './IdentityPanel.css';
 
 export default function IdentityPanel() {
   const { data, error, reload } = useApi(() => api.get('/identity'), []);
@@ -31,7 +32,7 @@ export default function IdentityPanel() {
   if (!form) {
     if (error) {
       return (
-        <div style={{ padding: 16, fontSize: 13, color: 'var(--tone-crit-fg)' }}>
+        <div className="identity-error">
           {error.status === 429
             ? 'Trop de requêtes envoyées au serveur — réessayez dans une minute.'
             : error.status === 401
@@ -75,9 +76,9 @@ export default function IdentityPanel() {
   }
 
   return (
-    <form onSubmit={save} style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+    <form onSubmit={save} className="identity-form">
       <Panel title="Authentification & accès" sub="Politique globale de connexion, appliquée immédiatement" span={6}>
-        <div style={{ padding: 16 }}>
+        <div className="identity-panel-body">
           <Field label="Durée de session" hint="Durée de validité du cookie de connexion, en minutes.">
             <input className="input" type="number" min={5} max={10080} value={form.sessionMinutes} onChange={(e) => set('sessionMinutes', Number(e.target.value))} />
           </Field>
@@ -88,7 +89,7 @@ export default function IdentityPanel() {
       </Panel>
 
       <Panel title="Fournisseur OIDC" sub="Configuration enregistrée et testable — n'est pas encore un second chemin de connexion actif" span={6}>
-        <div style={{ padding: 16 }}>
+        <div className="identity-panel-body">
           <Field label="Émetteur (issuer)" hint="URL de découverte OpenID Connect.">
             <input className="input" placeholder="https://auth.lab.local/application/o/nexus" value={form.oidcIssuer} onChange={(e) => set('oidcIssuer', e.target.value)} />
           </Field>
@@ -98,11 +99,11 @@ export default function IdentityPanel() {
           <Field label="Secret client" hint={data?.identity?.oidcClientSecretSet ? 'Déjà renseigné — laisser vide pour conserver' : undefined}>
             <input className="input" type="password" value={form.oidcClientSecret} onChange={(e) => set('oidcClientSecret', e.target.value)} />
           </Field>
-          <span className="btn-outline" onClick={testOidc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className="btn-outline identity-test-btn" onClick={testOidc}>
             <Icon name="refresh" size={13} className={testing ? 'spin' : ''} />{testing ? 'Test…' : "Tester l'issuer"}
           </span>
           {testResult && (
-            <div style={{ marginTop: 10, padding: 10, borderRadius: 8, fontSize: 12, background: testResult.ok ? 'var(--tone-ok-bg)' : 'var(--tone-crit-bg)', color: testResult.ok ? 'var(--tone-ok-fg)' : 'var(--tone-crit-fg)' }}>
+            <div className="identity-test-result" style={{ background: testResult.ok ? 'var(--tone-ok-bg)' : 'var(--tone-crit-bg)', color: testResult.ok ? 'var(--tone-ok-fg)' : 'var(--tone-crit-fg)' }}>
               {testResult.message}
             </div>
           )}
@@ -110,7 +111,7 @@ export default function IdentityPanel() {
       </Panel>
 
       <Panel title="Annuaire LDAP" sub="Secours local, configuration enregistrée uniquement" span={6}>
-        <div style={{ padding: 16 }}>
+        <div className="identity-panel-body">
           <Field label="URL LDAP"><input className="input" placeholder="ldaps://ldap.lab.local" value={form.ldapUrl} onChange={(e) => set('ldapUrl', e.target.value)} /></Field>
           <Field label="Bind DN"><input className="input" value={form.ldapBindDn} onChange={(e) => set('ldapBindDn', e.target.value)} /></Field>
           <Field label="Mot de passe de bind" hint={data?.identity?.ldapBindPasswordSet ? 'Déjà renseigné — laisser vide pour conserver' : undefined}>
@@ -120,8 +121,8 @@ export default function IdentityPanel() {
       </Panel>
 
       <Panel title="Ce que vous ne pouvez pas encore faire ici" span={6}>
-        <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-          <p style={{ margin: '0 0 8px' }}>
+        <div className="identity-limits-body">
+          <p className="identity-limits-text">
             Cette page enregistre et teste la configuration SSO, mais la console n'authentifie aujourd'hui qu'avec le mot de passe local
             (voir le Manuel, section Sécurité). Activer réellement OIDC/LDAP comme second chemin de connexion touche au cœur de
             l'authentification et n'a volontairement pas été précipité.
@@ -129,7 +130,7 @@ export default function IdentityPanel() {
         </div>
       </Panel>
 
-      <div style={{ gridColumn: 'span 12' }}>
+      <div className="identity-submit-col">
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
       </div>
     </form>
@@ -138,10 +139,10 @@ export default function IdentityPanel() {
 
 function Field({ label, hint, children }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 5, color: 'var(--text-muted)' }}>{label}</label>
+    <div className="identity-field">
+      <label className="identity-field-label">{label}</label>
       {children}
-      {hint && <div className="faint" style={{ fontSize: 11, marginTop: 4 }}>{hint}</div>}
+      {hint && <div className="faint identity-field-hint">{hint}</div>}
     </div>
   );
 }
