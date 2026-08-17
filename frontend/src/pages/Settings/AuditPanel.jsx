@@ -4,6 +4,7 @@ import DataTable from '../../components/ui/DataTable.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import './AuditPanel.css';
 
 const ACTION_LABELS = {
   'auth.login': 'Connexion',
@@ -108,13 +109,12 @@ export default function AuditPanel() {
       sub={`Chaque action qui modifie un système réel${query ? ' — filtré' : ', les 200 dernières'}`}
       span={12}
       actions={(
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input className="input" placeholder="Rechercher (action, auteur, IP...)" value={q} onChange={(e) => setQ(e.target.value)} style={{ height: 28, fontSize: 11.5, width: 200 }} />
-          <input className="input" type="date" value={since} onChange={(e) => setSince(e.target.value)} title="Depuis" style={{ height: 28, fontSize: 11.5 }} />
-          <input className="input" type="date" value={until} onChange={(e) => setUntil(e.target.value)} title="Jusqu'à" style={{ height: 28, fontSize: 11.5 }} />
+        <div className="audit-filters">
+          <input className="input audit-filter-input" placeholder="Rechercher (action, auteur, IP...)" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input audit-filter-date" type="date" value={since} onChange={(e) => setSince(e.target.value)} title="Depuis" />
+          <input className="input audit-filter-date" type="date" value={until} onChange={(e) => setUntil(e.target.value)} title="Jusqu'à" />
           <a
-            className="btn-outline"
-            style={{ height: 28, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            className="btn-outline audit-export-btn"
             href={`/api/audit/export.csv${query ? `?${query}` : ''}`}
             target="_blank"
             rel="noreferrer"
@@ -136,7 +136,7 @@ export default function AuditPanel() {
               </span>
             </td>
             <td className="mono muted">{e.actorEmail || '—'}</td>
-            <td className="mono faint" style={{ fontSize: 11.5, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>{Object.keys(e.meta || {}).length ? JSON.stringify(e.meta) : '—'}</td>
+            <td className="mono faint audit-cell-meta">{Object.keys(e.meta || {}).length ? JSON.stringify(e.meta) : '—'}</td>
             <td className="mono faint">{e.ip || '—'}</td>
             <td className="mono faint">{new Date(e.at).toLocaleString('fr-FR')}</td>
           </tr>
