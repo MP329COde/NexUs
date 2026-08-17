@@ -84,13 +84,12 @@ export default function MonitoringPage() {
           sub="Grafana, temps réel"
           span={12}
           actions={(
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="monitoring-alerts-actions">
               <input
-                className="input"
+                className="input monitoring-alerts-search"
                 placeholder="Filtrer par nom…"
                 value={alertSearch}
                 onChange={(e) => setAlertSearch(e.target.value)}
-                style={{ height: 28, fontSize: 12, width: 160 }}
               />
               <div className="monitoring-severity-tabs">
                 {SEVERITY_FILTERS.map((f) => (
@@ -123,13 +122,13 @@ export default function MonitoringPage() {
 
         {samples.length > 1 && (
           <Panel title="Tendance de charge" sub="CPU / RAM moyens, échantillonnés toutes les 30s (~6h)" span={12}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16 }}>
+            <div className="monitoring-trend-grid">
               <div>
-                <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>CPU</div>
+                <div className="faint monitoring-trend-label">CPU</div>
                 <MiniLineChart values={cpuSeries} height={70} color="#3B82F6" />
               </div>
               <div>
-                <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>Mémoire</div>
+                <div className="faint monitoring-trend-label">Mémoire</div>
                 <MiniLineChart values={ramSeries} height={70} color="#8B5CF6" />
               </div>
             </div>
@@ -145,7 +144,7 @@ export default function MonitoringPage() {
                 const worrying = cpuPct > 85 || memPct > 85;
                 return (
                   <div key={n.node} className="monitoring-host-row">
-                    {worrying && <Icon name="alertTriangle" size={13} style={{ color: 'var(--tone-crit-fg)', flex: 'none' }} />}
+                    {worrying && <Icon name="alertTriangle" size={13} className="monitoring-host-warn-icon" />}
                     <span className="monitoring-host-name">{n.node}</span>
                     <span className={`badge badge-${n.status === 'online' ? 'ok' : 'crit'} monitoring-host-badge`}><span className="dot" />{n.status}</span>
                     <MiniGauge label="CPU" pct={cpuPct} />

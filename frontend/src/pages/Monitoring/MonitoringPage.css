@@ -96,3 +96,32 @@
   flex: none;
   text-align: right;
 }
+
+.monitoring-alerts-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monitoring-alerts-search {
+  height: 28px;
+  font-size: 12px;
+  width: 160px;
+}
+
+.monitoring-trend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+}
+
+.monitoring-trend-label {
+  font-size: 11.5px;
+  margin-bottom: 6px;
+}
+
+.monitoring-host-warn-icon {
+  color: var(--tone-crit-fg);
+  flex: none;
+}

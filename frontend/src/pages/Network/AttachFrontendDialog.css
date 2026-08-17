@@ -1,0 +1,52 @@
+.afd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.afd-card {
+  width: 420px;
+  padding: 22px;
+}
+
+.afd-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.afd-title-icon {
+  color: var(--primary);
+}
+
+.afd-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.afd-desc {
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.afd-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.afd-select {
+  margin-bottom: 18px;
+}
+
+.afd-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
