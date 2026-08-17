@@ -6,6 +6,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import RestoreBackupDialog from './RestoreBackupDialog.jsx';
+import './SystemPanel.css';
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} o`;
@@ -78,32 +79,32 @@ export default function SystemPanel() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', gap: 16 }}>
+    <div className="system-grid">
       <Panel title="Version" span={6}>
-        <div style={{ padding: 16 }}>
-          <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
+        <div className="system-panel-body">
+          <div className="system-version-row">
             <div>
-              <div className="faint" style={{ fontSize: 11 }}>Version</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{version.data?.version.packageVersion || '—'}</div>
+              <div className="faint system-version-label">Version</div>
+              <div className="mono system-version-value">{version.data?.version.packageVersion || '—'}</div>
             </div>
             <div>
-              <div className="faint" style={{ fontSize: 11 }}>Commit</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{version.data?.version.commit || '—'}</div>
+              <div className="faint system-version-label">Commit</div>
+              <div className="mono system-version-value">{version.data?.version.commit || '—'}</div>
             </div>
             <div>
-              <div className="faint" style={{ fontSize: 11 }}>Branche</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{version.data?.version.branch || '—'}</div>
+              <div className="faint system-version-label">Branche</div>
+              <div className="mono system-version-value">{version.data?.version.branch || '—'}</div>
             </div>
           </div>
-          <span className="btn-outline" onClick={checkUpdates} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className="btn-outline system-check-btn" onClick={checkUpdates}>
             <Icon name="refresh" size={13} className={checking ? 'spin' : ''} />Vérifier les mises à jour
           </span>
           {updateInfo && (
-            <div style={{ marginTop: 12, padding: 10, borderRadius: 8, fontSize: 12.5, background: updateInfo.upToDate ? 'var(--tone-ok-bg)' : 'var(--tone-warn-bg)', color: updateInfo.upToDate ? 'var(--tone-ok-fg)' : 'var(--tone-warn-fg)' }}>
+            <div className="system-update-result" style={{ background: updateInfo.upToDate ? 'var(--tone-ok-bg)' : 'var(--tone-warn-bg)', color: updateInfo.upToDate ? 'var(--tone-ok-fg)' : 'var(--tone-warn-fg)' }}>
               {updateInfo.message}
             </div>
           )}
-          <p className="faint" style={{ fontSize: 11.5, marginTop: 12 }}>
+          <p className="faint system-note">
             La console ne s'auto-met-à-jour jamais : appliquez la mise à jour vous-même (<code className="mono">git pull</code> puis redémarrage) une fois prévenu ici.
           </p>
         </div>
@@ -114,12 +115,12 @@ export default function SystemPanel() {
         sub="Copie horodatée de la base (nexus.db), planifiée chaque nuit à 3h — 14 dernières conservées"
         span={12}
         actions={(
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input ref={fileInputRef} type="file" accept=".db" style={{ display: 'none' }} onChange={onFileSelected} />
-            <span className="btn-outline" onClick={() => fileInputRef.current?.click()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <div className="system-backup-actions">
+            <input ref={fileInputRef} type="file" accept=".db" className="system-file-input" onChange={onFileSelected} />
+            <span className="btn-outline system-import-btn" onClick={() => fileInputRef.current?.click()}>
               <Icon name="externalLink" size={13} className={importing ? 'spin' : ''} />{importing ? 'Import…' : 'Importer un fichier .db'}
             </span>
-            <span className="btn-outline" onClick={createBackup} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span className="btn-outline system-import-btn" onClick={createBackup}>
               <Icon name="plus" size={13} />Sauvegarder maintenant
             </span>
           </div>
@@ -131,19 +132,19 @@ export default function SystemPanel() {
           emptyTitle="Aucune sauvegarde"
           renderRow={(b) => (
             <tr key={b.file}>
-              <td className="mono" style={{ fontSize: 12 }}>{b.file}</td>
+              <td className="mono system-cell-file">{b.file}</td>
               <td className="mono muted">{formatSize(b.sizeBytes)}</td>
               <td>
                 {b.hasRelationalDump
-                  ? <span className="badge" style={{ color: 'var(--tone-ok-fg)' }}>Inclus</span>
+                  ? <span className="badge system-included-badge">Inclus</span>
                   : <span className="badge faint" title="Organisations, projets, RBAC, incidents et changements ne sont pas dans cette sauvegarde">Non inclus</span>}
               </td>
               <td className="mono faint">{new Date(b.createdAt).toLocaleString('fr-FR')}</td>
               <td>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <a className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center' }} href={`/api/backups/${b.file}/download`} target="_blank" rel="noreferrer">Télécharger</a>
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5 }} onClick={() => setRestoreTarget(b.file)}>Restaurer</span>
-                  <span className="btn-outline" style={{ height: 26, padding: '0 9px', fontSize: 11.5, color: 'var(--tone-crit-fg)' }} onClick={() => removeBackup(b.file)}>Suppr.</span>
+                <div className="system-row-actions">
+                  <a className="btn-outline system-download-btn" href={`/api/backups/${b.file}/download`} target="_blank" rel="noreferrer">Télécharger</a>
+                  <span className="btn-outline system-action-btn" onClick={() => setRestoreTarget(b.file)}>Restaurer</span>
+                  <span className="btn-outline system-action-btn system-action-btn-danger" onClick={() => removeBackup(b.file)}>Suppr.</span>
                 </div>
               </td>
             </tr>

@@ -1,0 +1,88 @@
+.system-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.system-panel-body {
+  padding: 16px;
+}
+
+.system-version-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 14px;
+}
+
+.system-version-label {
+  font-size: 11px;
+}
+
+.system-version-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.system-check-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.system-update-result {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.system-note {
+  font-size: 11.5px;
+  margin-top: 12px;
+}
+
+.system-backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.system-file-input {
+  display: none;
+}
+
+.system-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.system-cell-file {
+  font-size: 12px;
+}
+
+.system-included-badge {
+  color: var(--tone-ok-fg);
+}
+
+.system-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.system-download-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.system-action-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.system-action-btn-danger {
+  color: var(--tone-crit-fg);
+}
