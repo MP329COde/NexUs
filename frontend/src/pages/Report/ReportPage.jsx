@@ -2,14 +2,11 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/apiClient.js';
 import Icon from '../../components/ui/Icon.jsx';
 import BrandMark from '../../components/ui/BrandMark.jsx';
+import './ReportPage.css';
 
 // Rapport imprimable : couleurs fixes (indépendantes du thème clair/sombre de
 // l'app) pour garantir un rendu papier/PDF lisible via le dialogue d'impression
 // du navigateur (Ctrl/⌘+P → Enregistrer en PDF), sans dépendance PDF côté serveur.
-const ink = '#0F172A';
-const muted = '#64748B';
-const border = '#E2E8F0';
-
 const TONE_COLOR = { ok: '#047857', warn: '#B45309', crit: '#B91C1C', mut: '#64748B' };
 
 function toneFor(entry) {
@@ -39,56 +36,56 @@ export default function ReportPage() {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: 40, fontSize: 13, color: muted }}>Génération du rapport…</div>;
+    return <div className="report-loading">Génération du rapport…</div>;
   }
 
   const generatedAt = new Date();
 
   return (
-    <div style={{ background: '#fff', color: ink, fontFamily: 'IBM Plex Sans, Arial, sans-serif', maxWidth: 820, margin: '0 auto' }}>
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 18 }}>
-        <button className="btn" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+    <div className="report-page">
+      <div className="no-print report-print-bar">
+        <button className="btn report-print-btn" onClick={() => window.print()}>
           <Icon name="externalLink" size={14} />Imprimer / Enregistrer en PDF
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+      <div className="report-header">
         <BrandMark size={34} />
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Rapport de santé — Nexus Console</div>
-          <div style={{ fontSize: 12, color: muted }}>Généré le {generatedAt.toLocaleString('fr-FR')}</div>
+          <div className="report-title">Rapport de santé — Nexus Console</div>
+          <div className="report-generated-at">Généré le {generatedAt.toLocaleString('fr-FR')}</div>
         </div>
       </div>
 
-      <div style={{ height: 1, background: border, margin: '18px 0 22px' }} />
+      <div className="report-divider" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 26 }}>
+      <div className="report-kpi-grid">
         <ReportKpi label="Santé globale" value={overview ? `${overview.score} %` : '—'} />
         <ReportKpi label="Intégrations configurées" value={overview ? `${overview.integrations.filter((i) => i.configured).length} / ${overview.integrations.length}` : '—'} />
         <ReportKpi label="Alertes actives" value={String(alerts.length)} />
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Intégrations</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 26, fontSize: 11.5 }}>
+      <div className="report-section-title">Intégrations</div>
+      <table className="report-table">
         <thead>
-          <tr style={{ textAlign: 'left', color: muted, borderBottom: `1px solid ${border}` }}>
-            <th style={{ padding: '6px 8px', fontWeight: 600 }}>Intégration</th>
-            <th style={{ padding: '6px 8px', fontWeight: 600 }}>Statut</th>
-            <th style={{ padding: '6px 8px', fontWeight: 600 }}>Détail</th>
-            <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Latence</th>
+          <tr className="report-table-head-row">
+            <th className="report-table-head">Intégration</th>
+            <th className="report-table-head">Statut</th>
+            <th className="report-table-head">Détail</th>
+            <th className="report-table-head report-table-head-right">Latence</th>
           </tr>
         </thead>
         <tbody>
           {overview?.integrations.map((entry) => (
-            <tr key={entry.key} style={{ borderBottom: `1px solid ${border}` }}>
-              <td style={{ padding: '7px 8px', fontWeight: 500 }}>{entry.label}</td>
-              <td style={{ padding: '7px 8px' }}>
-                <span style={{ color: TONE_COLOR[toneFor(entry)], fontWeight: 600 }}>
+            <tr key={entry.key} className="report-table-row">
+              <td className="report-cell report-cell-name">{entry.label}</td>
+              <td className="report-cell">
+                <span className="report-cell-status" style={{ color: TONE_COLOR[toneFor(entry)] }}>
                   {entry.configured ? (entry.ok ? 'Opérationnel' : 'Erreur') : 'Non configuré'}
                 </span>
               </td>
-              <td style={{ padding: '7px 8px', color: muted }}>{entry.message}</td>
-              <td style={{ padding: '7px 8px', textAlign: 'right', color: muted, fontFamily: 'JetBrains Mono, monospace' }}>{entry.latencyMs} ms</td>
+              <td className="report-cell report-cell-muted">{entry.message}</td>
+              <td className="report-cell report-cell-latency">{entry.latencyMs} ms</td>
             </tr>
           ))}
         </tbody>
@@ -96,8 +93,8 @@ export default function ReportPage() {
 
       {wazuhSummary && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Cybersécurité (Wazuh)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 26 }}>
+          <div className="report-section-title">Cybersécurité (Wazuh)</div>
+          <div className="report-kpi-grid">
             <ReportKpi label="Agents actifs" value={String(wazuhSummary.active ?? '—')} />
             <ReportKpi label="Agents déconnectés" value={String(wazuhSummary.disconnected ?? '—')} />
             <ReportKpi label="Total agents" value={String(wazuhSummary.total ?? '—')} />
@@ -105,23 +102,23 @@ export default function ReportPage() {
         </>
       )}
 
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Alertes actives ({alerts.length})</div>
+      <div className="report-section-title">Alertes actives ({alerts.length})</div>
       {alerts.length === 0 ? (
-        <div style={{ fontSize: 12, color: muted, marginBottom: 26 }}>Aucune alerte active, ou Grafana n'est pas configuré.</div>
+        <div className="report-empty">Aucune alerte active, ou Grafana n'est pas configuré.</div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 26, fontSize: 11.5 }}>
+        <table className="report-table">
           <tbody>
             {alerts.map((a, i) => (
-              <tr key={i} style={{ borderBottom: `1px solid ${border}` }}>
-                <td style={{ padding: '7px 8px', fontWeight: 500 }}>{a.name || a.title || '—'}</td>
-                <td style={{ padding: '7px 8px', color: muted }}>{a.state || a.severity || ''}</td>
+              <tr key={i} className="report-table-row">
+                <td className="report-cell report-cell-name">{a.name || a.title || '—'}</td>
+                <td className="report-cell report-cell-muted">{a.state || a.severity || ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      <div style={{ fontSize: 10.5, color: muted, marginTop: 30 }}>
+      <div className="report-footer">
         Rapport généré automatiquement depuis Nexus Console — reflète l'état des intégrations au moment de la génération, pas un historique.
       </div>
     </div>
@@ -130,9 +127,9 @@ export default function ReportPage() {
 
 function ReportKpi({ label, value }) {
   return (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 10.5, color: muted, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 17, fontWeight: 700 }}>{value}</div>
+    <div className="report-kpi-card">
+      <div className="report-kpi-label">{label}</div>
+      <div className="report-kpi-value">{value}</div>
     </div>
   );
 }
