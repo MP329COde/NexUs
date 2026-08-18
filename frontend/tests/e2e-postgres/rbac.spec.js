@@ -127,6 +127,44 @@ test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
     expect(body.error).toMatch(/owner/i);
   });
 
+  // IDOR corrigé (audit sécurité, ÉTAPE 9/28) : PUT .../environments/:envId/link
+  // et POST .../environments/:envId/provision-argocd-app ne vérifiaient pas
+  // que :envId appartenait bien au projet de l'URL — un maintainer d'un
+  // projet A pouvait manipuler le lien Argo CD d'un environnement d'un
+  // projet B en devinant/énumérant son id, malgré loadProjectAccess() qui
+  // n'autorise que le rôle sur A.
+  test('SÉCURITÉ — un maintainer du projet A ne peut pas lier/provisionner un environnement du projet B via son id', async () => {
+    const detail = await adminApi.get(`/api/projects/${projectId}`);
+    const { project: fullProject } = await detail.json();
+
+    const proj2 = await adminApi.post('/api/projects', { data: { name: 'RBAC Project 2 (autre projet)', organizationId: fullProject.orgId } });
+    expect(proj2.ok()).toBeTruthy();
+    const project2Id = (await proj2.json()).project.id;
+
+    const envsRes = await adminApi.get(`/api/projects/${project2Id}/environments`);
+    const { items: project2Envs } = await envsRes.json();
+    const otherProjectEnvId = project2Envs[0].id; // "production" auto-créé avec le projet
+
+    // Alice est maintainer sur `projectId` (test précédent) mais pas membre
+    // de project2 : viser l'environnement de project2 DEPUIS l'URL de
+    // projectId doit être refusé comme si l'environnement n'existait pas
+    // pour ce projet, jamais accepté silencieusement.
+    const link = await aliceApi.put(`/api/projects/${projectId}/environments/${otherProjectEnvId}/link`, { data: { argocdApp: 'stolen-app-name' } });
+    expect(link.status()).toBe(404);
+
+    const provision = await aliceApi.post(`/api/projects/${projectId}/environments/${otherProjectEnvId}/provision-argocd-app`, {
+      data: { repoURL: 'https://github.com/org/repo.git', destinationNamespace: 'x' }
+    });
+    expect(provision.status()).toBe(404);
+
+    // L'environnement de project2 n'a bien été modifié par aucune des deux
+    // tentatives (pas seulement un 404 — vérifie qu'il n'y a pas eu d'effet
+    // de bord avant le rejet).
+    const unchanged = await adminApi.get(`/api/projects/${project2Id}/environments`);
+    const { items: stillEnvs } = await unchanged.json();
+    expect(stillEnvs.find((e) => e.id === otherProjectEnvId).argocd_app).toBeNull();
+  });
+
   // Lien projet ↔ wiki d'organisation (voir ProjectDetailPage.jsx,
   // panneau Documentation) : jusqu'ici trois îlots de données séparés
   // (projets, wiki, runbook des incidents) sans lien dans l'UI, alors que

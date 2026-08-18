@@ -339,6 +339,14 @@ router.delete('/:id/environments/:envId', loadProjectAccess(), requireMinRole('m
 
 router.put('/:id/environments/:envId/link', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  // IDOR corrigé (audit sécurité) : linkEnvironment() ne vérifie lui-même
+  // que l'existence de l'environnement, jamais son project_id — sans ce
+  // contrôle ici, un maintainer d'un projet A pouvait modifier le lien Argo
+  // CD d'un environnement appartenant à un projet B en devinant/énumérant
+  // son id, malgré loadProjectAccess() qui n'autorise que le rôle sur A.
+  const target = await orgStore.getEnvironment(req.params.envId);
+  if (!target || target.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  await guardProductionEnvironment(req, req.params.envId);
   const { argocdApp } = req.body || {};
   const environment = await linkEnvironment(req.params.envId, argocdApp || null);
   logAudit(req, 'project.environment.link', { projectId: req.legacyProject.id, environmentId: req.params.envId, argocdApp: argocdApp || null });
@@ -352,6 +360,11 @@ router.post('/:id/environments/:envId/provision-argocd-app', loadProjectAccess()
   if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
   const environment = await orgStore.getEnvironment(req.params.envId);
   if (!environment || environment.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  // Même garde que sync/rollback/promote (audit sécurité) : provisionner
+  // (créer/reconfigurer) l'Application Argo CD d'un environnement de
+  // production est une action au moins aussi sensible qu'une simple
+  // synchronisation — pas de raison qu'elle échappe à guardProductionEnvironment.
+  await guardProductionEnvironment(req, req.params.envId);
   const { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync } = req.body || {};
   const updated = await provisionArgocdApp(req.params.envId, req.pgProject.slug, { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync });
   logAudit(req, 'project.environment.provision_argocd_app', { projectId: req.legacyProject.id, environmentId: req.params.envId, appName: updated.argocd_app });
