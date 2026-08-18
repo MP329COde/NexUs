@@ -27,6 +27,25 @@ export default function CatalogComponentPage() {
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
 
+  // Le manifeste est servi en text/yaml (pas JSON) : contourne apiClient.js,
+  // conçu pour des réponses JSON — voir routes/catalog.routes.js.
+  async function handleExport() {
+    try {
+      const res = await fetch(`/api/catalog/components/${id}/manifest`, { credentials: 'include' });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${component.slug}.service.yaml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(`Supprimer « ${component.name} » du catalogue ? Cette action est irréversible.`)) return;
     setDeleting(true);
@@ -51,10 +70,17 @@ export default function CatalogComponentPage() {
       <PageHeader
         title={component.name}
         sub={component.description || 'Aucune description'}
-        actions={canManage && (
-          <button className="btn-outline" onClick={handleDelete} disabled={deleting}>
-            <Icon name="trash" size={14} />{deleting ? 'Suppression…' : 'Supprimer'}
-          </button>
+        actions={(
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-outline" onClick={handleExport}>
+              <Icon name="box" size={14} />Exporter en service.yaml
+            </button>
+            {canManage && (
+              <button className="btn-outline" onClick={handleDelete} disabled={deleting}>
+                <Icon name="trash" size={14} />{deleting ? 'Suppression…' : 'Supprimer'}
+              </button>
+            )}
+          </div>
         )}
       />
 

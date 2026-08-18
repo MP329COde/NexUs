@@ -560,7 +560,7 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
   if (ownerTeamId) { params.push(ownerTeamId); conditions.push(`c.owner_team_id = $${params.length}`); }
   if (projectId) { params.push(projectId); conditions.push(`c.project_id = $${params.length}`); }
   const { rows } = await query(
-    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name
+    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
@@ -575,13 +575,31 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
 
 export async function getComponent(id) {
   const { rows } = await query(
-    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name
+    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN teams t ON t.id = c.owner_team_id
      WHERE c.id = $1`,
     [id]
   );
+  return rows[0] || null;
+}
+
+// Résolution utilisée par l'import service.yaml (services/serviceManifest.js) :
+// spec.owner y référence une équipe par son slug (lisible, stable dans un
+// fichier versionné), jamais par son UUID interne.
+export async function getTeamBySlug(orgId, slug) {
+  const { rows } = await query('SELECT * FROM teams WHERE org_id = $1 AND slug = $2', [orgId, slug]);
+  return rows[0] || null;
+}
+
+// Upsert du même composant (même projet + même slug) : c'est ce qui permet
+// à un import service.yaml répété (CI, ou nouveau collage manuel après
+// modification du fichier) de mettre à jour la fiche existante plutôt que
+// d'échouer sur la contrainte UNIQUE (project_id, slug) ou de créer un
+// doublon.
+export async function getComponentBySlug(projectId, slug) {
+  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 AND slug = $2', [projectId, slug]);
   return rows[0] || null;
 }
 

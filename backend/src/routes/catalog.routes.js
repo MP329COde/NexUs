@@ -4,6 +4,7 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
+import { parseServiceManifest, componentToManifest, ManifestError } from '../services/serviceManifest.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -84,6 +85,70 @@ router.put('/components/:id', asyncHandler(async (req, res) => {
   const component = await orgStore.updateComponent(req.params.id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links });
   logAudit(req, 'catalog.component.update', { componentId: component.id, name: component.name });
   res.json({ ok: true, component });
+}));
+
+// Export au format service.yaml — voir services/serviceManifest.js. Même
+// portée de lecture que GET /components/:id.
+router.get('/components/:id/manifest', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  res.type('text/yaml').send(componentToManifest(component));
+}));
+
+// Import/synchronisation depuis un service.yaml collé dans l'interface (ou,
+// à terme, poussé automatiquement depuis un dépôt) : crée le composant s'il
+// n'existe pas encore dans ce projet (slug = metadata.name), le met à jour
+// sinon — un import répété est donc idempotent, contrairement à POST
+// /components qui échouerait sur la contrainte UNIQUE (project_id, slug).
+router.post('/components/import', asyncHandler(async (req, res) => {
+  const { projectId: rawProjectId, legacyProjectId, yaml } = req.body || {};
+  let projectId = rawProjectId;
+  if (!projectId && legacyProjectId) {
+    const pgProject = await orgStore.getProjectByLegacyId(legacyProjectId);
+    if (!pgProject) return res.status(404).json({ ok: false, error: 'Projet introuvable ou pas encore relié au socle organisations' });
+    projectId = pgProject.id;
+  }
+  if (!projectId) return res.status(400).json({ ok: false, error: 'projectId (ou legacyProjectId) requis' });
+
+  let manifest;
+  try {
+    manifest = parseServiceManifest(yaml);
+  } catch (err) {
+    if (err instanceof ManifestError) return res.status(400).json({ ok: false, error: err.message });
+    throw err;
+  }
+
+  const role = await orgStore.getProjectRole(projectId, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+
+  let ownerTeamId = null;
+  if (manifest.ownerTeamSlug) {
+    const project = await orgStore.getProject(projectId);
+    const team = await orgStore.getTeamBySlug(project.org_id, manifest.ownerTeamSlug);
+    if (!team) return res.status(400).json({ ok: false, error: `Équipe introuvable pour spec.owner: "${manifest.ownerTeamSlug}" (créez-la d'abord depuis la fiche organisation)` });
+    ownerTeamId = team.id;
+  }
+
+  const fields = {
+    ownerTeamId, name: manifest.name, kind: manifest.kind, lifecycle: manifest.lifecycle,
+    description: manifest.description, language: manifest.language, framework: manifest.framework,
+    repositoryProvider: manifest.repositoryProvider, repositoryUrl: manifest.repositoryUrl, tags: manifest.tags, links: manifest.links
+  };
+
+  const existing = await orgStore.getComponentBySlug(projectId, manifest.name);
+  let component;
+  if (existing) {
+    component = await orgStore.updateComponent(existing.id, fields);
+    logAudit(req, 'catalog.component.import.update', { componentId: component.id, projectId, name: manifest.name });
+  } else {
+    component = await orgStore.createComponent({ projectId, slug: manifest.name, ...fields });
+    logAudit(req, 'catalog.component.import.create', { componentId: component.id, projectId, name: manifest.name });
+  }
+  res.status(existing ? 200 : 201).json({ ok: true, component, created: !existing });
 }));
 
 router.delete('/components/:id', asyncHandler(async (req, res) => {

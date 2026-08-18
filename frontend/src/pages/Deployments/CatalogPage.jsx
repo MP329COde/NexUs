@@ -7,6 +7,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import ImportManifestModal from './ImportManifestModal.jsx';
 import './CatalogPage.css';
 
 const KINDS = [
@@ -39,6 +40,7 @@ export default function CatalogPage() {
   const { data, reload, loading, error } = useApi(() => api.get('/catalog/components'), []);
   const projects = useApi(() => api.get('/projects'), []);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   // L'équipe propriétaire proposée dépend de l'organisation du projet
   // sélectionné (une équipe appartient à une organisation, voir
@@ -96,9 +98,14 @@ export default function CatalogPage() {
         title="Catalogue logiciel"
         sub="Services, APIs, workers et librairies possédés par vos équipes."
         actions={
-          <button className="btn" onClick={() => setFormOpen(true)}>
-            <Icon name="plus" size={14} />Déclarer un composant
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-outline" onClick={() => setImportOpen(true)}>
+              <Icon name="upload" size={14} />Importer un service.yaml
+            </button>
+            <button className="btn" onClick={() => setFormOpen(true)}>
+              <Icon name="plus" size={14} />Déclarer un composant
+            </button>
+          </div>
         }
       />
 
@@ -186,6 +193,10 @@ export default function CatalogPage() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {importOpen && (
+        <ImportManifestModal projects={allProjects} onClose={() => setImportOpen(false)} onImported={reload} />
       )}
 
       {loading ? (
