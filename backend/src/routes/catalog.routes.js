@@ -4,7 +4,8 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
-import { parseServiceManifest, componentToManifest, ManifestError } from '../services/serviceManifest.js';
+import { componentToManifest } from '../services/serviceManifest.js';
+import { importServiceManifest, ManifestError } from '../services/serviceManifestImportService.js';
 import { listTemplatesSummary } from '../services/scaffolderTemplates.js';
 import { scaffoldService } from '../services/scaffolderService.js';
 import * as jobService from '../services/jobService.js';
@@ -282,43 +283,20 @@ router.post('/components/import', asyncHandler(async (req, res) => {
   }
   if (!projectId) return res.status(400).json({ ok: false, error: 'projectId (ou legacyProjectId) requis' });
 
-  let manifest;
-  try {
-    manifest = parseServiceManifest(yaml);
-  } catch (err) {
-    if (err instanceof ManifestError) return res.status(400).json({ ok: false, error: err.message });
-    throw err;
-  }
-
   const role = await orgStore.getProjectRole(projectId, req.user.id);
   if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
     return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
   }
 
-  let ownerTeamId = null;
-  if (manifest.ownerTeamSlug) {
-    const project = await orgStore.getProject(projectId);
-    const team = await orgStore.getTeamBySlug(project.org_id, manifest.ownerTeamSlug);
-    if (!team) return res.status(400).json({ ok: false, error: `Équipe introuvable pour spec.owner: "${manifest.ownerTeamSlug}" (créez-la d'abord depuis la fiche organisation)` });
-    ownerTeamId = team.id;
+  let result;
+  try {
+    result = await importServiceManifest({ projectId, yaml });
+  } catch (err) {
+    if (err instanceof ManifestError) return res.status(400).json({ ok: false, error: err.message });
+    throw err;
   }
-
-  const fields = {
-    ownerTeamId, name: manifest.name, kind: manifest.kind, lifecycle: manifest.lifecycle,
-    description: manifest.description, language: manifest.language, framework: manifest.framework,
-    repositoryProvider: manifest.repositoryProvider, repositoryUrl: manifest.repositoryUrl, tags: manifest.tags, links: manifest.links
-  };
-
-  const existing = await orgStore.getComponentBySlug(projectId, manifest.name);
-  let component;
-  if (existing) {
-    component = await orgStore.updateComponent(existing.id, fields);
-    logAudit(req, 'catalog.component.import.update', { componentId: component.id, projectId, name: manifest.name });
-  } else {
-    component = await orgStore.createComponent({ projectId, slug: manifest.name, ...fields });
-    logAudit(req, 'catalog.component.import.create', { componentId: component.id, projectId, name: manifest.name });
-  }
-  res.status(existing ? 200 : 201).json({ ok: true, component, created: !existing });
+  logAudit(req, result.created ? 'catalog.component.import.create' : 'catalog.component.import.update', { componentId: result.component.id, projectId, name: result.component.name });
+  res.status(result.created ? 201 : 200).json({ ok: true, component: result.component, created: result.created });
 }));
 
 // Golden paths (ÉTAPE 8/9 IDP) : liste statique, pas de permission

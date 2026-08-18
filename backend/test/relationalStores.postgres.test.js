@@ -489,6 +489,33 @@ if (!hasPostgres) {
     assert.equal(closedAgain.action, 'noop');
   });
 
+  test('serviceYamlDiscoveryService : ne réagit qu\'à un push sur la branche par défaut modifiant service.yaml, échec honnête sans GitHub configuré', async () => {
+    const { handlePushEvent } = await import('../src/services/serviceYamlDiscoveryService.js');
+    const baseEvent = {
+      ref: 'refs/heads/main',
+      repository: { full_name: 'example/demo', default_branch: 'main' },
+      commits: [{ added: [], modified: ['service.yaml'] }]
+    };
+
+    // Push sur une branche de feature : jamais réagi, même si service.yaml
+    // est modifié — évite de polluer le catalogue avant merge.
+    const featureBranch = await handlePushEvent(project, { ...baseEvent, ref: 'refs/heads/feature/x' });
+    assert.equal(featureBranch.handled, false);
+
+    // Push sur la branche par défaut, mais service.yaml pas dans les
+    // fichiers modifiés de ce commit précis.
+    const noManifestChange = await handlePushEvent(project, { ...baseEvent, commits: [{ added: [], modified: ['README.md'] }] });
+    assert.equal(noManifestChange.handled, false);
+
+    // Push sur la branche par défaut ET service.yaml modifié : GitHub n'est
+    // pas configuré dans cet environnement de test — échec honnête, jamais
+    // un import silencieusement inventé.
+    const configured = await handlePushEvent(project, baseEvent);
+    assert.equal(configured.handled, true);
+    assert.equal(configured.status, 'failed');
+    assert.match(configured.message, /GitHub non configuré/);
+  });
+
   test('orgStore (platform requests) : cycle de vie complet + transition unique pending → tranchée', async () => {
     const request = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod RS', description: 'Besoin du vault projet' });
     assert.equal(request.status, 'pending');
