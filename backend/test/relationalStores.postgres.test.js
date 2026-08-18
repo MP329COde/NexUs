@@ -238,4 +238,32 @@ if (!hasPostgres) {
     const all = await orgStore.listComponentsForUser('u1', {});
     assert.ok(all.map((c) => c.id).includes(notMine.id));
   });
+
+  test('orgStore (dependency graph) : dépendances directes visibles dans les deux sens, cascade à la suppression', async () => {
+    const frontend = await orgStore.createComponent({ projectId: project.id, name: 'frontend-dg', slug: `frontend-dg-${Date.now()}`, kind: 'website' });
+    const api = await orgStore.createComponent({ projectId: project.id, name: 'api-dg', slug: `api-dg-${Date.now()}`, kind: 'api' });
+    const db = await orgStore.createComponent({ projectId: project.id, name: 'db-dg', slug: `db-dg-${Date.now()}`, kind: 'infrastructure' });
+
+    await orgStore.createDependency({ componentId: frontend.id, dependsOnComponentId: api.id, kind: 'runtime' });
+    await orgStore.createDependency({ componentId: api.id, dependsOnComponentId: db.id, kind: 'data' });
+
+    const frontendDeps = await orgStore.listDependencies(frontend.id);
+    assert.equal(frontendDeps.length, 1);
+    assert.equal(frontendDeps[0].component_id, api.id);
+
+    const apiDependents = await orgStore.listDependents(api.id);
+    assert.equal(apiDependents.length, 1);
+    assert.equal(apiDependents[0].component_id, frontend.id, 'ce qui dépend de api-dg doit inclure frontend-dg');
+
+    // api-dg n'a rien "en dessous" de son point de vue dependents (rien ne
+    // dépend de lui... au sens amont) — vérifie l'absence de fermeture
+    // transitive : db-dg ne doit PAS apparaître comme dépendance de frontend.
+    assert.ok(!frontendDeps.some((d) => d.component_id === db.id), 'la dépendance transitive frontend→db ne doit pas être calculée automatiquement');
+
+    // ON DELETE CASCADE (components → component_dependencies) : supprimer
+    // api-dg doit faire disparaître les deux arêtes qui le référencent.
+    await orgStore.deleteComponent(api.id);
+    assert.equal((await orgStore.listDependencies(frontend.id)).length, 0);
+    assert.equal((await orgStore.listDependents(db.id)).length, 0);
+  });
 }

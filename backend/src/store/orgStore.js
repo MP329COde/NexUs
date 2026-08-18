@@ -701,3 +701,56 @@ export async function deleteComponent(id) {
   const { rowCount } = await query('DELETE FROM components WHERE id = $1', [id]);
   return rowCount > 0;
 }
+
+// --- Dependency Graph (component_dependencies) ----------------------------
+// Dépendances DIRECTES uniquement (pas de fermeture transitive calculée
+// côté base) : dependsOn = ce dont CE composant a besoin pour fonctionner,
+// dependents = ce qui casserait si CE composant tombait. Les deux sens sont
+// interrogés séparément (pas de UNION) car ce sont deux questions
+// différentes pour l'utilisateur ("de quoi dépend billing-api ?" vs
+// "qu'est-ce qui dépend de billing-api ?").
+export async function listDependencies(componentId) {
+  const { rows } = await query(
+    `SELECT d.id, d.kind, d.created_at, c.id AS component_id, c.name, c.slug, c.kind AS component_kind, c.lifecycle, p.name AS project_name
+     FROM component_dependencies d
+     JOIN components c ON c.id = d.depends_on_component_id
+     JOIN projects p ON p.id = c.project_id
+     WHERE d.component_id = $1
+     ORDER BY c.name`,
+    [componentId]
+  );
+  return rows;
+}
+
+export async function listDependents(componentId) {
+  const { rows } = await query(
+    `SELECT d.id, d.kind, d.created_at, c.id AS component_id, c.name, c.slug, c.kind AS component_kind, c.lifecycle, p.name AS project_name
+     FROM component_dependencies d
+     JOIN components c ON c.id = d.component_id
+     JOIN projects p ON p.id = c.project_id
+     WHERE d.depends_on_component_id = $1
+     ORDER BY c.name`,
+    [componentId]
+  );
+  return rows;
+}
+
+export async function createDependency({ componentId, dependsOnComponentId, kind }) {
+  const { rows } = await query(
+    `INSERT INTO component_dependencies (component_id, depends_on_component_id, kind)
+     VALUES ($1, $2, COALESCE($3, 'runtime'))
+     RETURNING *`,
+    [componentId, dependsOnComponentId, kind || null]
+  );
+  return rows[0];
+}
+
+export async function getDependency(id) {
+  const { rows } = await query('SELECT * FROM component_dependencies WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function deleteDependency(id) {
+  const { rowCount } = await query('DELETE FROM component_dependencies WHERE id = $1', [id]);
+  return rowCount > 0;
+}

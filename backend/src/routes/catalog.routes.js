@@ -91,6 +91,63 @@ router.put('/components/:id', asyncHandler(async (req, res) => {
   res.json({ ok: true, component });
 }));
 
+// Dependency Graph (ÉTAPE 14 IDP) : dépendances directes déclarées entre
+// composants — voir db/migrations/0015_component_dependencies.sql et
+// orgStore.js. Lecture ouverte à quiconque voit déjà le composant (même
+// portée que GET /components/:id) ; écriture réservée maintainer+ sur le
+// PROJET DU COMPOSANT SOURCE (déclarer "billing-api dépend de postgres" est
+// une modification de billing-api, pas de postgres — la cible n'a pas
+// besoin d'un rôle particulier, elle est juste référencée).
+router.get('/components/:id/dependencies', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const [dependsOn, dependents] = await Promise.all([
+    orgStore.listDependencies(req.params.id),
+    orgStore.listDependents(req.params.id)
+  ]);
+  res.json({ ok: true, dependsOn, dependents });
+}));
+
+router.post('/components/:id/dependencies', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const { dependsOnComponentId, kind } = req.body || {};
+  if (!dependsOnComponentId) return res.status(400).json({ ok: false, error: 'dependsOnComponentId requis' });
+  if (dependsOnComponentId === req.params.id) return res.status(400).json({ ok: false, error: 'Un composant ne peut pas dépendre de lui-même' });
+  if (kind && !['runtime', 'build', 'data'].includes(kind)) return res.status(400).json({ ok: false, error: 'Type de dépendance invalide' });
+  const target = await orgStore.getComponent(dependsOnComponentId);
+  if (!target) return res.status(404).json({ ok: false, error: 'Composant cible introuvable' });
+  let dependency;
+  try {
+    dependency = await orgStore.createDependency({ componentId: req.params.id, dependsOnComponentId, kind });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ ok: false, error: 'Cette dépendance existe déjà' });
+    throw err;
+  }
+  logAudit(req, 'catalog.dependency.create', { componentId: req.params.id, dependsOnComponentId, kind: dependency.kind });
+  res.status(201).json({ ok: true, dependency });
+}));
+
+router.delete('/components/:id/dependencies/:depId', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const dependency = await orgStore.getDependency(req.params.depId);
+  if (!dependency || dependency.component_id !== req.params.id) return res.status(404).json({ ok: false, error: 'Dépendance introuvable' });
+  await orgStore.deleteDependency(req.params.depId);
+  logAudit(req, 'catalog.dependency.delete', { componentId: req.params.id, dependencyId: req.params.depId });
+  res.json({ ok: true });
+}));
+
 // Export au format service.yaml — voir services/serviceManifest.js. Même
 // portée de lecture que GET /components/:id.
 router.get('/components/:id/manifest', asyncHandler(async (req, res) => {

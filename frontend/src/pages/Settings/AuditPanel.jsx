@@ -82,6 +82,8 @@ const ACTION_LABELS = {
   'catalog.component.import.create': 'Composant importé (service.yaml)',
   'catalog.component.import.update': 'Composant mis à jour (service.yaml)',
   'catalog.scaffold': 'Service généré depuis un template',
+  'catalog.dependency.create': 'Dépendance déclarée',
+  'catalog.dependency.delete': 'Dépendance retirée',
   'environment_blueprint.create': "Blueprint d'environnement créé",
   'environment_blueprint.update': "Blueprint d'environnement modifié",
   'environment_blueprint.delete': "Blueprint d'environnement supprimé",
