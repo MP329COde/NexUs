@@ -31,6 +31,7 @@ const ROUTES = [
   '/deployments',
   '/deployments/catalog',
   '/deployments/templates',
+  '/deployments/requests',
   '/deployments/projects',
   '/deployments/organizations',
   '/deployments/repos',
