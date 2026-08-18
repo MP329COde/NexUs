@@ -19,6 +19,7 @@ import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
 import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } from '../services/environmentPromotionService.js';
+import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
@@ -306,8 +307,20 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   // toute façon invisible/inutilisable côté UI (sélecteur alimenté par
   // GET /environment-blueprints?orgId=<org du projet>).
   const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl });
-  logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
-  res.status(201).json({ ok: true, environment });
+
+  // Provisioning réel (ÉTAPE 7 IDP) : uniquement si un blueprint a été
+  // choisi — un environnement créé sans blueprint reste purement déclaratif,
+  // comme avant. Ne bloque jamais la réponse HTTP sur un échec Kubernetes
+  // (voir environmentProvisioningService, qui n'a jamais lancé) : le
+  // résultat réel est déjà consigné sur l'environnement au retour.
+  let provisioning = { status: 'skipped', message: 'Aucun blueprint sélectionné' };
+  if (blueprintId) {
+    const blueprint = await orgStore.getEnvironmentBlueprint(blueprintId);
+    provisioning = await provisionFromBlueprint(environment, blueprint, req.pgProject.slug);
+  }
+
+  logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name, provisioning: provisioning.status });
+  res.status(201).json({ ok: true, environment: { ...environment, provisioning_status: provisioning.status, provisioning_message: provisioning.message, provisioned_namespace: provisioning.namespace || null } });
 }));
 
 // Destroy Preview (ÉTAPE 11) : suppression manuelle, jamais la production

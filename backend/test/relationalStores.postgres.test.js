@@ -204,6 +204,26 @@ if (!hasPostgres) {
     assert.equal(envAfterDelete.blueprint_id, null);
   });
 
+  test('environmentProvisioningService : provisionFromBlueprint — Kubernetes non configuré dans cet environnement de test, statut "skipped" honnête (pas "created")', async () => {
+    const { provisionFromBlueprint } = await import('../src/services/environmentProvisioningService.js');
+    const blueprint = await orgStore.createEnvironmentBlueprint({
+      orgId: org.id, name: 'Provision RS', slug: `provision-rs-${Date.now()}`, kind: 'preview',
+      namespacePattern: '{project}-{env}', replicas: 1, cpu: '250m', memory: '256Mi', storageGb: null,
+      ingressDomain: '', ttlMinutes: null, monitoringEnabled: false
+    });
+    const env = await orgStore.createEnvironment(project.id, { name: `provision-env-${Date.now()}`, kind: 'preview', blueprintId: blueprint.id });
+
+    const result = await provisionFromBlueprint(env, blueprint, project.slug);
+    assert.equal(result.status, 'skipped');
+    assert.match(result.message, /Kubernetes non configuré/);
+
+    // Le résultat réel est bien persisté sur l'environnement, pas seulement
+    // renvoyé à l'appelant — GET /:id/environments doit pouvoir l'afficher.
+    const stored = await orgStore.getEnvironment(env.id);
+    assert.equal(stored.provisioning_status, 'skipped');
+    assert.equal(stored.provisioned_at, null);
+  });
+
   test('orgStore (components) : le filtre "mine" (Developer Portal, ÉTAPE 25) isole ce dont u1 est responsable', async () => {
     // u1 est déjà owner de `org`/`project` (test.before) — pour distinguer
     // "responsable" de "visible par bypass owner/admin d'organisation" (le

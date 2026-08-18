@@ -191,6 +191,13 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                   <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'} env-badge-kind`}>{env.is_production ? 'Production' : env.kind}</span>
                   <strong>{env.name}</strong>
                   {env.blueprint_name && <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>({env.blueprint_name})</span>}
+                  {env.blueprint_id && (
+                    <div className="faint" style={{ fontSize: 11 }}>
+                      {env.provisioning_status === 'created' && <>Kubernetes : namespace <span className="mono">{env.provisioned_namespace}</span> appliqué</>}
+                      {env.provisioning_status === 'skipped' && <>Kubernetes : non provisionné — {env.provisioning_message}</>}
+                      {env.provisioning_status === 'failed' && <span style={{ color: 'var(--danger, #ef4444)' }}>Échec du provisioning : {env.provisioning_message}</span>}
+                    </div>
+                  )}
                   {env.source_branch && (
                     <div className="faint mono" style={{ fontSize: 11 }}>
                       {env.source_branch}{env.source_commit ? ` · ${env.source_commit.slice(0, 7)}` : ''}
