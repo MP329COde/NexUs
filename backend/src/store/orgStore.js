@@ -682,6 +682,20 @@ export async function listComponentsForProject(projectId) {
   return rows;
 }
 
+// API publique (ÉTAPE 24 IDP) : toutes les organisations de l'appelant ne
+// sont jamais pertinentes pour un Service Account — il est scopé à UNE
+// organisation à sa création (voir store/serviceAccountStore.js) et ne doit
+// jamais pouvoir lister les composants d'une autre.
+export async function listComponentsForOrg(orgId) {
+  const { rows } = await query(
+    `SELECT c.*, p.name AS project_name
+     FROM components c JOIN projects p ON p.id = c.project_id
+     WHERE p.org_id = $1 ORDER BY c.name`,
+    [orgId]
+  );
+  return rows;
+}
+
 export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId, mine } = {}) {
   const params = [userId];
   const conditions = ['(pm.user_id = $1 OR om.role IN (\'owner\', \'admin\'))'];

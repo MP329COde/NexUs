@@ -694,4 +694,62 @@ if (!hasPostgres) {
     assert.equal(recorded.sync_status, 'failed');
     assert.equal(recorded.synced_at, null); // seul un statut 'synced' pose synced_at
   });
+
+  test('serviceAccountStore : création, authentification par jeton, révocation — le token brut n\'est jamais retrouvable après coup', async () => {
+    const serviceAccountStore = await import('../src/store/serviceAccountStore.js');
+
+    // Scope inconnu refusé explicitement, jamais silencieusement ignoré.
+    await assert.rejects(
+      () => serviceAccountStore.createServiceAccount({ orgId: org.id, name: 'CI invalide', scopes: ['not:a:real:scope'], createdBy: 'u1' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /Scope/); return true; }
+    );
+
+    const { serviceAccount, token } = await serviceAccountStore.createServiceAccount({
+      orgId: org.id, name: 'CI GitHub Actions', scopes: ['catalog:read'], createdBy: 'u1'
+    });
+    assert.match(token, /^nxs_sa_[0-9a-f]{64}$/);
+    // Bug réel trouvé en testant en direct (POST renvoyait token_hash dans
+    // le JSON) : la valeur créée ne doit JAMAIS exposer le hash, comme la liste.
+    assert.equal(serviceAccount.token_hash, undefined);
+
+    // Authentification réelle par le jeton brut renvoyé à la création.
+    const found = await serviceAccountStore.findByToken(token);
+    assert.equal(found.id, serviceAccount.id);
+    assert.deepEqual(found.scopes, ['catalog:read']);
+
+    // Un jeton au mauvais format, ou simplement inconnu, ne renvoie jamais
+    // de compte — pas d'exception qui distinguerait les deux cas.
+    assert.equal(await serviceAccountStore.findByToken('nxs_sa_' + '0'.repeat(64)), null);
+    assert.equal(await serviceAccountStore.findByToken('n\'importe quoi'), null);
+
+    const listed = await serviceAccountStore.listServiceAccountsForOrg(org.id);
+    const inList = listed.find((sa) => sa.id === serviceAccount.id);
+    assert.ok(inList, 'doit apparaître dans la liste de l\'organisation');
+    assert.equal(inList.token_hash, undefined, 'la liste ne doit jamais exposer le hash du jeton');
+
+    // Révocation réelle : le même jeton cesse immédiatement de s'authentifier.
+    const revoked = await serviceAccountStore.revokeServiceAccount(serviceAccount.id);
+    assert.equal(revoked, true);
+    assert.equal(await serviceAccountStore.findByToken(token), null);
+
+    // Révoquer une deuxième fois ne fait rien silencieusement — signalé
+    // explicitement (déjà révoqué), jamais un faux succès.
+    const revokedAgain = await serviceAccountStore.revokeServiceAccount(serviceAccount.id);
+    assert.equal(revokedAgain, false);
+  });
+
+  test('orgStore.listComponentsForOrg : n\'expose que les composants des projets de CETTE organisation', async () => {
+    const otherOrg = await orgStore.createOrganization({ name: 'Other Org SA Isolation', slug: `other-org-sa-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const otherProject = await orgStore.createProject({ orgId: otherOrg.id, name: 'Other Project SA', slug: `other-project-sa-${Date.now()}`, legacyId: `other-legacy-sa-${Date.now()}` });
+      const ownComponent = await orgStore.createComponent({ projectId: project.id, name: 'sa-own-component', slug: `sa-own-component-${Date.now()}`, kind: 'api' });
+      const otherComponent = await orgStore.createComponent({ projectId: otherProject.id, name: 'sa-other-component', slug: `sa-other-component-${Date.now()}`, kind: 'api' });
+
+      const visible = await orgStore.listComponentsForOrg(org.id);
+      assert.ok(visible.some((c) => c.id === ownComponent.id));
+      assert.ok(!visible.some((c) => c.id === otherComponent.id), 'un composant d\'une autre organisation ne doit jamais apparaître');
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [otherOrg.id]);
+    }
+  });
 }
