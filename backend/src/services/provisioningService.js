@@ -12,12 +12,12 @@ const jobs = new Map();
 
 // `run` injectable : les tests unitaires remplacent l'exécution SSH réelle
 // par un double, sans avoir besoin d'un hôte accessible.
-export function startInstall({ toolId, address, port, sshUser }, { run = runScript } = {}) {
+export async function startInstall({ toolId, address, port, sshUser }, { run = runScript } = {}) {
   if (!address || !String(address).trim()) {
     throw Object.assign(new Error('Adresse de la machine requise'), { status: 400 });
   }
 
-  const host = hostsStore.createHost({ name: `Setup · ${toolId}`, address, port, sshUser });
+  const host = await hostsStore.createHost({ name: `Setup · ${toolId}`, address, port, sshUser });
   const id = uuid();
   const job = {
     id, toolId, hostId: host.id, address,

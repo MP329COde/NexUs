@@ -81,7 +81,8 @@ function readStats(host) {
 let cache = { at: null, byId: {} };
 
 async function refresh() {
-  const critical = store.listHosts().filter((h) => h.critical);
+  const hosts = await store.listHosts();
+  const critical = hosts.filter((h) => h.critical);
   const results = await Promise.all(critical.map(async (h) => {
     const reachable = await probeTcp(h.address, h.port);
     const stats = reachable ? await readStats(h) : null;
@@ -90,8 +91,9 @@ async function refresh() {
   cache = { at: new Date().toISOString(), byId: Object.fromEntries(results) };
 }
 
-export function getCriticalHostsSnapshot() {
-  const critical = store.listHosts().filter((h) => h.critical);
+export async function getCriticalHostsSnapshot() {
+  const hosts = await store.listHosts();
+  const critical = hosts.filter((h) => h.critical);
   return {
     generatedAt: cache.at,
     items: critical.map((h) => ({
