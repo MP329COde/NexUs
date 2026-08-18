@@ -886,11 +886,11 @@ export async function getPlatformRequest(id) {
   return rows[0] || null;
 }
 
-export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description }) {
+export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description, payload }) {
   const { rows } = await query(
-    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '')) RETURNING *`,
-    [orgId, projectId || null, requestedBy, kind, title, description || null]
+    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description, payload)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, ''), COALESCE($7::jsonb, '{}'::jsonb)) RETURNING *`,
+    [orgId, projectId || null, requestedBy, kind, title, description || null, payload ? JSON.stringify(payload) : null]
   );
   return rows[0];
 }
@@ -905,6 +905,19 @@ export async function reviewPlatformRequest(id, { status, reviewedBy, reviewNote
     `UPDATE platform_requests SET status = $2, reviewed_by = $3, reviewed_at = now(), review_note = $4
      WHERE id = $1 AND status = 'pending' RETURNING *`,
     [id, status, reviewedBy, reviewNote || null]
+  );
+  return rows[0] || null;
+}
+
+// Résultat RÉEL de l'action déclenchée par une approbation (ÉTAPE 12 IDP,
+// voir platformRequestActionService.js) — distinct de review_note (texte
+// libre laissé par l'approbateur) : ce champ est écrit par le système,
+// jamais par un humain, et reflète honnêtement ce qui s'est vraiment passé
+// (created/failed/skipped selon le type de demande).
+export async function setPlatformRequestResult(id, result) {
+  const { rows } = await query(
+    'UPDATE platform_requests SET result = $2 WHERE id = $1 RETURNING *',
+    [id, JSON.stringify(result)]
   );
   return rows[0] || null;
 }

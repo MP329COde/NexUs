@@ -4,11 +4,14 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
+import { applyApprovedRequest } from '../services/platformRequestActionService.js';
 
 // Platform Requests (ÉTAPE 17 IDP) : demandes d'un développeur à
-// l'organisation, tranchées explicitement par un owner/admin — jamais
-// exécutées automatiquement (voir migration 0017). Portée organisation,
-// comme teams/policies/environment_blueprints.
+// l'organisation, tranchées explicitement par un owner/admin. Depuis ÉTAPE
+// 12, l'approbation d'une demande 'create_production_env' déclenche
+// réellement le provisioning (voir platformRequestActionService.js) — les
+// autres types restent sans action automatique (result.status 'skipped').
+// Portée organisation, comme teams/policies/environment_blueprints.
 const router = Router();
 router.use(requireAuth);
 
@@ -47,12 +50,20 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', asyncHandler(async (req, res) => {
-  const { orgId, projectId, kind, title, description } = req.body || {};
+  const { orgId, projectId, kind, title, description, payload } = req.body || {};
   if (!orgId || !kind || !title) return res.status(400).json({ ok: false, error: 'orgId, kind et title requis' });
   if (!KINDS.includes(kind)) return res.status(400).json({ ok: false, error: 'Type de demande invalide' });
+  // create_production_env doit pouvoir être exécutée réellement à
+  // l'approbation (voir platformRequestActionService.js) : sans projectId
+  // ni nom d'environnement, elle échouerait systématiquement à
+  // l'approbation — autant le refuser explicitement à la création.
+  if (kind === 'create_production_env') {
+    if (!projectId) return res.status(400).json({ ok: false, error: 'projectId requis pour une demande "create_production_env"' });
+    if (!payload?.environmentName?.trim()) return res.status(400).json({ ok: false, error: 'payload.environmentName requis pour une demande "create_production_env"' });
+  }
   const role = await requireOrgMember(req, res, orgId);
   if (role === null && !isPlatformAdmin(req.user)) return;
-  const request = await orgStore.createPlatformRequest({ orgId, projectId, requestedBy: req.user.id, kind, title, description });
+  const request = await orgStore.createPlatformRequest({ orgId, projectId, requestedBy: req.user.id, kind, title, description, payload });
   logAudit(req, 'platform_request.create', { requestId: request.id, orgId, kind, title });
   res.status(201).json({ ok: true, request });
 }));
@@ -80,8 +91,10 @@ router.post('/:id/approve', asyncHandler(async (req, res) => {
     return res.status(403).json({ ok: false, error: "Réservé owner/admin de l'organisation" });
   }
   if (existing.status !== 'pending') return res.status(409).json({ ok: false, error: 'Seule une demande en attente peut être tranchée' });
-  const request = await orgStore.reviewPlatformRequest(req.params.id, { status: 'approved', reviewedBy: req.user.id, reviewNote: req.body?.note });
-  logAudit(req, 'platform_request.approve', { requestId: request.id });
+  let request = await orgStore.reviewPlatformRequest(req.params.id, { status: 'approved', reviewedBy: req.user.id, reviewNote: req.body?.note });
+  const result = await applyApprovedRequest(request);
+  request = await orgStore.setPlatformRequestResult(request.id, result);
+  logAudit(req, 'platform_request.approve', { requestId: request.id, resultStatus: result.status });
   res.json({ ok: true, request });
 }));
 

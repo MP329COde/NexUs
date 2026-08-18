@@ -461,6 +461,47 @@ if (!hasPostgres) {
     assert.equal(stillApproved.status, 'approved');
   });
 
+  test('platformRequestActionService : approuver "create_production_env" crée réellement l\'environnement — les autres types restent "skipped"', async () => {
+    const { applyApprovedRequest } = await import('../src/services/platformRequestActionService.js');
+
+    // Type sans action automatique définie : jamais de succès inventé.
+    const accessRequest = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod PRA' });
+    const accessResult = await applyApprovedRequest(accessRequest);
+    assert.equal(accessResult.status, 'skipped');
+    assert.match(accessResult.message, /access/);
+
+    // create_production_env : crée réellement l'environnement de production.
+    const envName = `prod-pra-${Date.now()}`;
+    const prodRequest = await orgStore.createPlatformRequest({
+      orgId: org.id, projectId: project.id, requestedBy: 'u1', kind: 'create_production_env',
+      title: 'Nouvel environnement de production', payload: { environmentName: envName }
+    });
+    const prodResult = await applyApprovedRequest(prodRequest);
+    assert.equal(prodResult.status, 'created');
+    assert.ok(prodResult.environmentId);
+    const created = await orgStore.getEnvironment(prodResult.environmentId);
+    assert.equal(created.name, envName);
+    assert.equal(created.is_production, true);
+    assert.equal(created.kind, 'production');
+
+    // Rejouer sur le même nom échoue proprement (jamais un doublon silencieux).
+    const duplicateRequest = await orgStore.createPlatformRequest({
+      orgId: org.id, projectId: project.id, requestedBy: 'u1', kind: 'create_production_env',
+      title: 'Doublon', payload: { environmentName: envName }
+    });
+    const duplicateResult = await applyApprovedRequest(duplicateRequest);
+    assert.equal(duplicateResult.status, 'failed');
+    assert.match(duplicateResult.message, /existe déjà/);
+
+    // setPlatformRequestResult persiste bien le résultat, visible via
+    // listPlatformRequestsForUser (ce qu'affiche PlatformRequestsPage.jsx).
+    const withResult = await orgStore.setPlatformRequestResult(prodRequest.id, prodResult);
+    assert.equal(withResult.result.status, 'created');
+    const mine = await orgStore.listPlatformRequestsForUser('u1');
+    const found = mine.find((r) => r.id === prodRequest.id);
+    assert.equal(found.result.environmentId, prodResult.environmentId);
+  });
+
   test('orgStore (preview environments) : expires_at hérité du TTL du blueprint, destruction manuelle, production protégée', async () => {
     const blueprint = await orgStore.createEnvironmentBlueprint({ orgId: org.id, name: 'Preview RS', slug: `preview-rs-${Date.now()}`, kind: 'preview', ttlMinutes: 60 });
     const before = Date.now();
