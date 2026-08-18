@@ -84,6 +84,8 @@ const ACTION_LABELS = {
   'catalog.scaffold': 'Service généré depuis un template',
   'catalog.dependency.create': 'Dépendance déclarée',
   'catalog.dependency.delete': 'Dépendance retirée',
+  'catalog.binding.create': 'Binding déclaré',
+  'catalog.binding.delete': 'Binding retiré',
   'platform_request.create': 'Demande envoyée',
   'platform_request.approve': 'Demande approuvée',
   'platform_request.reject': 'Demande rejetée',

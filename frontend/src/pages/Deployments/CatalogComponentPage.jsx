@@ -11,6 +11,7 @@ const LIFECYCLE_BADGE = { experimental: 'warn', production: 'ok', deprecated: 'm
 const LIFECYCLE_LABEL = { experimental: 'Expérimental', production: 'Production', deprecated: 'Déprécié' };
 const KIND_LABEL = { service: 'Service', api: 'API', website: 'Site web', worker: 'Worker', library: 'Librairie', cronjob: 'Tâche planifiée', infrastructure: 'Infrastructure' };
 const DEP_KIND_LABEL = { runtime: 'runtime', build: 'build', data: 'data' };
+const BINDING_TYPE_LABEL = { postgres: 'PostgreSQL', redis: 'Redis', object_storage: 'Stockage objet', api: 'API', other: 'Autre' };
 
 // Fiche composant : centre de travail du composant dans le Software
 // Catalog. Volontairement minimale pour l'instant (métadonnées + accès
@@ -31,6 +32,10 @@ export default function CatalogComponentPage() {
   const [depTarget, setDepTarget] = useState('');
   const [depKind, setDepKind] = useState('runtime');
   const [depBusy, setDepBusy] = useState(false);
+  const bindings = useApi(() => api.get(`/catalog/components/${id}/bindings`), [id]);
+  const [addingBinding, setAddingBinding] = useState(false);
+  const [bindingForm, setBindingForm] = useState({ bindingType: 'postgres', envVarName: '', vaultEntryId: '', description: '' });
+  const [bindingBusy, setBindingBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -39,6 +44,38 @@ export default function CatalogComponentPage() {
   const dependencyCandidates = (allComponents.data?.items || []).filter(
     (c) => c.id !== id && !dependsOn.some((d) => d.component_id === c.id)
   );
+  const projectVault = useApi(
+    () => (component?.project_legacy_id ? api.get(`/projects/${component.project_legacy_id}/vault`) : Promise.resolve(null)),
+    [component?.project_legacy_id]
+  );
+  const vaultEntries = projectVault.data?.items || [];
+  const componentBindings = bindings.data?.items || [];
+
+  async function addBinding(e) {
+    e.preventDefault();
+    setBindingBusy(true);
+    try {
+      await api.post(`/catalog/components/${id}/bindings`, { ...bindingForm, vaultEntryId: bindingForm.vaultEntryId || null });
+      notify('Binding ajouté', { type: 'ok' });
+      setBindingForm({ bindingType: 'postgres', envVarName: '', vaultEntryId: '', description: '' });
+      setAddingBinding(false);
+      bindings.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBindingBusy(false);
+    }
+  }
+
+  async function removeBinding(bindingId) {
+    try {
+      await api.del(`/catalog/components/${id}/bindings/${bindingId}`);
+      notify('Binding retiré', { type: 'info' });
+      bindings.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
 
   async function addDependency(e) {
     e.preventDefault();
@@ -267,6 +304,60 @@ export default function CatalogComponentPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="card catalog-detail-card">
+          <div className="catalog-deps-header">
+            <span className="faint">Service Bindings (ÉTAPE 15 IDP)</span>
+            {canManage && !addingBinding && (
+              <span className="btn-outline catalog-deps-add-btn" onClick={() => setAddingBinding(true)}>
+                <Icon name="plus" size={12} />Ajouter
+              </span>
+            )}
+          </div>
+
+          {addingBinding && (
+            <form onSubmit={addBinding} className="catalog-deps-form">
+              <select className="input" value={bindingForm.bindingType} onChange={(e) => setBindingForm((f) => ({ ...f, bindingType: e.target.value }))}>
+                {Object.entries(BINDING_TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+              <input
+                className="input mono"
+                required
+                placeholder="DATABASE_URL"
+                value={bindingForm.envVarName}
+                onChange={(e) => setBindingForm((f) => ({ ...f, envVarName: e.target.value.toUpperCase() }))}
+              />
+              <select className="input" value={bindingForm.vaultEntryId} onChange={(e) => setBindingForm((f) => ({ ...f, vaultEntryId: e.target.value }))}>
+                <option value="">Sans secret relié</option>
+                {vaultEntries.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              </select>
+              <input className="input" placeholder="Description (optionnel)" value={bindingForm.description} onChange={(e) => setBindingForm((f) => ({ ...f, description: e.target.value }))} />
+              <div className="projects-form-actions">
+                <span className="btn-outline" onClick={() => setAddingBinding(false)}>Annuler</span>
+                <button className="btn" type="submit" disabled={bindingBusy}>{bindingBusy ? 'Ajout…' : 'Ajouter'}</button>
+              </div>
+            </form>
+          )}
+
+          {componentBindings.length === 0 ? (
+            <p className="faint catalog-deps-empty">Aucun binding déclaré.</p>
+          ) : componentBindings.map((b) => (
+            <div key={b.id} className="catalog-deps-row">
+              <span className="catalog-deps-link mono">{b.env_var_name}</span>
+              <span className="badge badge-mut">{BINDING_TYPE_LABEL[b.binding_type]}</span>
+              {b.vault_entry_label ? (
+                <span className="faint" style={{ fontSize: 12 }}><Icon name="lock" size={11} />{b.vault_entry_label}</span>
+              ) : (
+                <span className="faint" style={{ fontSize: 12 }}>Sans secret relié</span>
+              )}
+              {canManage && (
+                <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeBinding(b.id)}>
+                  <Icon name="trash" size={11} />
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </>

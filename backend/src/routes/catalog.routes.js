@@ -10,6 +10,7 @@ import { scaffoldService } from '../services/scaffolderService.js';
 import * as jobService from '../services/jobService.js';
 import { computeScorecard } from '../services/catalogScorecard.js';
 import { evaluatePolicies } from '../services/policyEngine.js';
+import { findVaultEntry } from '../store/vaultStore.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -160,6 +161,71 @@ router.get('/components/:id/policy-check', asyncHandler(async (req, res) => {
   if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
   const policies = await orgStore.listPoliciesForOrg(component.org_id);
   res.json({ ok: true, ...evaluatePolicies(component, policies) });
+}));
+
+// Service Bindings (ÉTAPE 15 IDP) : un composant déclare un besoin
+// (PostgreSQL, Redis, stockage objet, API...) exposé sous un nom de
+// variable d'environnement — voir db/migrations/0019_component_bindings.sql.
+// Le secret lui-même ne transite JAMAIS ici : au mieux une référence vers
+// une entrée du coffre-fort du projet (store/vaultStore.js), validée
+// appartenir à CE projet avant d'être acceptée (jamais une référence vers
+// le coffre-fort d'un autre projet, même si l'appelant en connaît l'id).
+const BINDING_TYPES = ['postgres', 'redis', 'object_storage', 'api', 'other'];
+
+router.get('/components/:id/bindings', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const bindings = await orgStore.listBindingsForComponent(req.params.id);
+  // Label de l'entrée de coffre-fort jointe (jamais le secret — findVaultEntry
+  // renvoie l'entrée complète, on ne prend que le label) : évite d'obliger le
+  // frontend à connaître le projet legacy pour afficher un nom lisible.
+  const items = bindings.map((b) => ({ ...b, vault_entry_label: b.vault_entry_id ? (findVaultEntry(b.vault_entry_id)?.label || null) : null }));
+  res.json({ ok: true, items });
+}));
+
+router.post('/components/:id/bindings', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const { bindingType, envVarName, vaultEntryId, description } = req.body || {};
+  if (!bindingType || !envVarName) return res.status(400).json({ ok: false, error: 'bindingType et envVarName requis' });
+  if (!BINDING_TYPES.includes(bindingType)) return res.status(400).json({ ok: false, error: 'Type de binding invalide' });
+  if (!/^[A-Z][A-Z0-9_]*$/.test(envVarName)) return res.status(400).json({ ok: false, error: 'Nom de variable invalide (MAJUSCULES, chiffres, underscore, ex. DATABASE_URL)' });
+  if (vaultEntryId) {
+    const project = await orgStore.getProject(component.project_id);
+    const entry = findVaultEntry(vaultEntryId);
+    if (!entry || entry.tier !== 'project' || entry.projectId !== project?.legacy_id) {
+      return res.status(400).json({ ok: false, error: "Entrée du coffre-fort introuvable pour le projet de ce composant" });
+    }
+  }
+  let binding;
+  try {
+    binding = await orgStore.createBinding({ componentId: req.params.id, bindingType, envVarName, vaultEntryId, description });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ ok: false, error: `Une variable "${envVarName}" est déjà déclarée pour ce composant` });
+    throw err;
+  }
+  logAudit(req, 'catalog.binding.create', { componentId: req.params.id, bindingType, envVarName });
+  res.status(201).json({ ok: true, binding });
+}));
+
+router.delete('/components/:id/bindings/:bindingId', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const binding = await orgStore.getBinding(req.params.bindingId);
+  if (!binding || binding.component_id !== req.params.id) return res.status(404).json({ ok: false, error: 'Binding introuvable' });
+  await orgStore.deleteBinding(req.params.bindingId);
+  logAudit(req, 'catalog.binding.delete', { componentId: req.params.id, bindingId: req.params.bindingId });
+  res.json({ ok: true });
 }));
 
 // Export au format service.yaml — voir services/serviceManifest.js. Même
