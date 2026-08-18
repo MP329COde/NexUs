@@ -66,6 +66,7 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
   const [newEnv, setNewEnv] = useState({ name: '', kind: 'staging', blueprintId: '', sourceBranch: '', sourceCommit: '', sourcePrUrl: '' });
   const [creatingBusy, setCreatingBusy] = useState(false);
   const [destroying, setDestroying] = useState(null);
+  const [rollingBack, setRollingBack] = useState(null);
 
   // Les blueprints applicables à ce projet sont ceux de SON organisation
   // (voir EnvironmentBlueprintsPanel.jsx, Paramètres → Blueprints
@@ -141,6 +142,22 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
       notify(err.message, { type: 'crit' });
     } finally {
       setProvisionBusy(false);
+    }
+  }
+
+  async function doRollback(promotion) {
+    const label = promotion.revision ? promotion.revision.slice(0, 7) : promotion.id;
+    if (!window.confirm(`Revenir "${promotion.to_environment_name}" à la revision ${label} (promotion du ${formatDate(promotion.created_at)}) ?`)) return;
+    setRollingBack(promotion.id);
+    try {
+      const res = await api.post(`/projects/${project.id}/environments/${promotion.to_environment_id}/rollback`, { toPromotionId: promotion.id });
+      notify(res.rollback.status === 'synced' ? `Rollback réussi vers ${label}` : `Échec du rollback : ${res.rollback.message}`, { type: res.rollback.status === 'synced' ? 'ok' : 'crit' });
+      reload();
+      reloadPromotions();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRollingBack(null);
     }
   }
 
@@ -311,9 +328,17 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
               <div key={p.id} className="env-history-row">
                 <Icon name={p.status === 'synced' ? 'check' : 'xCircle'} size={13} className="env-history-icon" style={{ color: `var(--tone-${p.status === 'synced' ? 'ok' : 'crit'}-fg)` }} />
                 <div>
-                  <div>{p.from_environment_name ? `${p.from_environment_name} → ${p.to_environment_name}` : `Synchronisation directe → ${p.to_environment_name}`} <span className="mono faint">({p.argocd_app})</span></div>
+                  <div>
+                    {p.is_rollback && <span className="badge badge-mut" style={{ marginRight: 6 }}>Rollback</span>}
+                    {p.from_environment_name ? `${p.from_environment_name} → ${p.to_environment_name}` : `Synchronisation directe → ${p.to_environment_name}`} <span className="mono faint">({p.argocd_app})</span>
+                  </div>
                   <div className="faint mono env-history-meta">{formatDate(p.created_at)}{p.revision ? ` · ${p.revision.slice(0, 7)}` : ''} · {p.message}</div>
                 </div>
+                {p.status === 'synced' && p.revision && (
+                  <span className="btn-outline" style={{ marginLeft: 'auto', fontSize: 11 }} onClick={() => (rollingBack ? undefined : doRollback(p))}>
+                    {rollingBack === p.id ? 'Rollback…' : 'Rollback vers cette version'}
+                  </span>
+                )}
               </div>
             ))
           )}

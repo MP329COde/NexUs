@@ -396,6 +396,57 @@ if (!hasPostgres) {
     assert.equal(unchanged.argocd_app, null);
   });
 
+  test('environmentPromotionService : rollbackEnvironment — garde-fous (mauvais environnement, promotion non synchronisée) et échec honnête sans Argo CD', async () => {
+    const { rollbackEnvironment } = await import('../src/services/environmentPromotionService.js');
+    const envA = await orgStore.createEnvironment(project.id, { name: `rollback-a-${Date.now()}`, kind: 'staging' });
+    const envB = await orgStore.createEnvironment(project.id, { name: `rollback-b-${Date.now()}`, kind: 'staging' });
+    // argocd_app posé directement (même bypass que le test Policy Gate
+    // plus haut) : on vérifie rollbackEnvironment() lui-même, pas
+    // l'intégration Argo CD.
+    await orgStore.setEnvironmentArgocdApp(envA.id, 'fake-argocd-app-rollback-test');
+
+    const syncedPromo = await orgStore.recordPromotion({
+      projectId: project.id, fromEnvironmentId: null, toEnvironmentId: envA.id,
+      argocdApp: 'fake-argocd-app-rollback-test', revision: 'abcdef1234567890', status: 'synced', message: 'test fixture', triggeredBy: 'u1'
+    });
+    const blockedPromo = await orgStore.recordPromotion({
+      projectId: project.id, fromEnvironmentId: null, toEnvironmentId: envA.id,
+      argocdApp: 'fake-argocd-app-rollback-test', revision: null, status: 'blocked', message: 'test fixture bloquée', triggeredBy: 'u1'
+    });
+
+    // La promotion cible appartient à envA, mais on tente le rollback sur envB.
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envB.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 409); return true; } // envB non lié à Argo CD, échoue avant même de regarder la promotion
+    );
+
+    await orgStore.setEnvironmentArgocdApp(envB.id, 'fake-argocd-app-rollback-test-b');
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envB.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 404); assert.match(err.message, /introuvable pour cet environnement/); return true; }
+    );
+
+    // Promotion existante pour le bon environnement, mais jamais réussie :
+    // rien de réel à restaurer.
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envA.id, toPromotionId: blockedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 409); assert.match(err.message, /rien à restaurer/); return true; }
+    );
+
+    // Cas honnête : promotion valide, mais Argo CD non configuré dans cet
+    // environnement de test — jamais un "rollback réussi" simulé, et
+    // l'échec est bien consigné dans l'historique (is_rollback=true).
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envA.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 502); assert.match(err.message, /Argo CD non configuré/); return true; }
+    );
+    const history = await orgStore.listPromotions(project.id);
+    const recordedFailure = history.find((p) => p.rollback_of === syncedPromo.id);
+    assert.ok(recordedFailure, 'le rollback en échec doit être consigné dans l\'historique');
+    assert.equal(recordedFailure.status, 'error');
+    assert.equal(recordedFailure.is_rollback, true);
+  });
+
   test('previewEnvironmentWebhookService : cycle de vie complet d\'une PR (opened → synchronize → closed), sans doublon ni provisioning fantôme', async () => {
     const { handlePullRequestEvent } = await import('../src/services/previewEnvironmentWebhookService.js');
     const fakeReq = { user: null, ip: '127.0.0.1' };

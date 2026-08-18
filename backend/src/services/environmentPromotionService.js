@@ -1,4 +1,4 @@
-import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, listPromotions as listPromotionsStore, listEnvironments, getProject, listPoliciesForOrg, listComponentsForProject } from '../store/orgStore.js';
+import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, getPromotion, listPromotions as listPromotionsStore, listEnvironments, getProject, listPoliciesForOrg, listComponentsForProject } from '../store/orgStore.js';
 import { getApplication, syncApplication, upsertApplication } from './integrations/argocdService.js';
 import { IntegrationError } from './integrations/httpClient.js';
 import { listScans as listCodeScans } from '../store/codeScansStore.js';
@@ -168,4 +168,44 @@ export async function promote({ projectId, fromEnvironmentId, toEnvironmentId, t
 
 export function listPromotions(projectId) {
   return listPromotionsStore(projectId);
+}
+
+// Rollback réel (ÉTAPE 17 IDP) : jamais une "version" devinée ou
+// reconstruite depuis Git — uniquement une revision RÉELLEMENT synchronisée
+// à un moment donné, retrouvée dans l'historique de promotions déjà
+// enregistré (environment_promotions.revision, écrit après un vrai succès
+// Argo CD). Resynchronise l'environnement sur exactement cette revision et
+// consigne le résultat comme une entrée d'historique à part (is_rollback),
+// avec un lien vers la promotion restaurée (rollback_of) — jamais un
+// "rollback terminé" avant confirmation réelle d'Argo CD.
+export async function rollbackEnvironment({ projectId, environmentId, toPromotionId, triggeredBy }) {
+  const env = await getEnvironment(environmentId);
+  if (!env || env.project_id !== projectId) throw Object.assign(new Error('Environnement introuvable'), { status: 404 });
+  if (!env.argocd_app) throw Object.assign(new Error('Environnement non lié à une application Argo CD'), { status: 409 });
+
+  const target = await getPromotion(toPromotionId);
+  if (!target || target.project_id !== projectId || target.to_environment_id !== environmentId) {
+    throw Object.assign(new Error('Promotion cible introuvable pour cet environnement'), { status: 404 });
+  }
+  if (target.status !== 'synced' || !target.revision) {
+    throw Object.assign(new Error('Cette entrée d\'historique ne correspond à aucune synchronisation réussie — rien à restaurer'), { status: 409 });
+  }
+
+  try {
+    await syncApplication(env.argocd_app, target.revision);
+    return recordPromotion({
+      projectId, fromEnvironmentId: null, toEnvironmentId: environmentId,
+      argocdApp: env.argocd_app, revision: target.revision, status: 'synced',
+      message: `Rollback vers ${target.revision.slice(0, 7)} (promotion du ${new Date(target.created_at).toLocaleString('fr-FR')})`,
+      triggeredBy, isRollback: true, rollbackOf: target.id
+    });
+  } catch (err) {
+    const message = err instanceof IntegrationError ? err.message : (err.message || 'Échec du rollback');
+    await recordPromotion({
+      projectId, fromEnvironmentId: null, toEnvironmentId: environmentId,
+      argocdApp: env.argocd_app, revision: target.revision, status: 'error', message,
+      triggeredBy, isRollback: true, rollbackOf: target.id
+    });
+    throw Object.assign(new Error(message), { status: 502 });
+  }
 }

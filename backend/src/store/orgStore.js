@@ -469,13 +469,21 @@ export async function setEnvironmentArgocdApp(id, argocdApp) {
   return rows[0] || null;
 }
 
-export async function recordPromotion({ projectId, fromEnvironmentId, toEnvironmentId, argocdApp, revision, status, message, triggeredBy }) {
+export async function recordPromotion({ projectId, fromEnvironmentId, toEnvironmentId, argocdApp, revision, status, message, triggeredBy, isRollback, rollbackOf }) {
   const { rows } = await query(
-    `INSERT INTO environment_promotions (project_id, from_environment_id, to_environment_id, argocd_app, revision, status, message, triggered_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [projectId, fromEnvironmentId || null, toEnvironmentId, argocdApp, revision || null, status, message || null, triggeredBy]
+    `INSERT INTO environment_promotions (project_id, from_environment_id, to_environment_id, argocd_app, revision, status, message, triggered_by, is_rollback, rollback_of)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [projectId, fromEnvironmentId || null, toEnvironmentId, argocdApp, revision || null, status, message || null, triggeredBy, Boolean(isRollback), rollbackOf || null]
   );
   return rows[0];
+}
+
+// Promotion précise du projet, utilisée par rollbackEnvironment() pour
+// retrouver la revision réellement synchronisée à l'époque — jamais une
+// version devinée ou reconstruite depuis Git.
+export async function getPromotion(id) {
+  const { rows } = await query('SELECT * FROM environment_promotions WHERE id = $1', [id]);
+  return rows[0] || null;
 }
 
 export async function listPromotions(projectId, limit = 30) {

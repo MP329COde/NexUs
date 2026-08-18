@@ -18,7 +18,7 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
-import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp } from '../services/environmentPromotionService.js';
+import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp, rollbackEnvironment } from '../services/environmentPromotionService.js';
 import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
@@ -386,6 +386,23 @@ router.post('/:id/environments/:envId/promote', loadProjectAccess(), requireMinR
   });
   logAudit(req, 'project.environment.promote', { projectId: req.legacyProject.id, toEnvironmentId: req.params.envId, fromEnvironmentId: fromEnvironmentId || null, status: promotion.status });
   res.status(201).json({ ok: true, promotion });
+}));
+
+// Rollback réel (ÉTAPE 17 IDP, équivalent relationnel de
+// POST /deployments/:linkId/rollback) : réservé owner, comme le rollback
+// legacy — jamais seulement maintainer, quelle que soit la criticité de
+// l'environnement (contrairement à promote/sync qui l'exigent uniquement
+// pour la production, un rollback reste une action suffisamment sensible
+// pour rester au niveau le plus haut inconditionnellement).
+router.post('/:id/environments/:envId/rollback', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { toPromotionId } = req.body || {};
+  if (!toPromotionId) return res.status(400).json({ ok: false, error: 'toPromotionId requis' });
+  const rollback = await rollbackEnvironment({
+    projectId: req.pgProject.id, environmentId: req.params.envId, toPromotionId, triggeredBy: req.user.id
+  });
+  logAudit(req, 'project.environment.rollback', { projectId: req.legacyProject.id, environmentId: req.params.envId, toPromotionId, status: rollback.status });
+  res.status(201).json({ ok: true, rollback });
 }));
 
 // --- Espace de travail : agrège l'état réel des dépôts liés au projet
