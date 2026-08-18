@@ -94,8 +94,16 @@ export const router = createBrowserRouter([
             ]
           },
           {
+            // Portail développeur (ÉTAPE 20/21 IDP) : ces 4 domaines
+            // "administration infrastructure" étaient jusqu'ici accessibles
+            // par URL directe à TOUT utilisateur authentifié, nav comprise
+            // (seul /infrastructure/hosts était déjà gardé) — la matrice de
+            // permissions RBAC existe et fonctionne (voir GroupsPanel.jsx)
+            // mais ne conditionnait pas l'accès à ces domaines eux-mêmes.
+            // Même garde que /settings (RequirePermission), appliquée une
+            // fois au niveau du layout parent plutôt que page par page.
             path: 'infrastructure',
-            element: <InfrastructureLayout />,
+            element: <RequirePermission domain="infrastructure" level="read"><InfrastructureLayout /></RequirePermission>,
             handle: { title: 'Infrastructure' },
             children: [
               { index: true, element: <ProxmoxPage />, handle: { title: 'Proxmox' } },
@@ -104,7 +112,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'kubernetes',
-            element: <KubernetesLayout />,
+            element: <RequirePermission domain="kubernetes" level="read"><KubernetesLayout /></RequirePermission>,
             handle: { title: 'Kubernetes' },
             children: [
               { index: true, element: <KubernetesPage />, handle: { title: 'Charges de travail' } },
@@ -114,7 +122,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'network',
-            element: <NetworkLayout />,
+            element: <RequirePermission domain="network" level="read"><NetworkLayout /></RequirePermission>,
             handle: { title: 'Réseaux' },
             children: [
               { index: true, element: <TopologyPage />, handle: { title: 'Topologie' } },
@@ -125,8 +133,8 @@ export const router = createBrowserRouter([
               { path: 'firewall', element: <FirewallPage />, handle: { title: 'Pare-feu' } }
             ]
           },
-          { path: 'monitoring', element: <MonitoringPage />, handle: { title: 'Monitoring' } },
-          { path: 'security', element: <SecurityPage />, handle: { title: 'Cybersécurité' } },
+          { path: 'monitoring', element: <RequirePermission domain="monitoring" level="read"><MonitoringPage /></RequirePermission>, handle: { title: 'Monitoring' } },
+          { path: 'security', element: <RequirePermission domain="security" level="read"><SecurityPage /></RequirePermission>, handle: { title: 'Cybersécurité' } },
           { path: 'storage', element: <StoragePage />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },

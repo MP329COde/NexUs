@@ -204,6 +204,26 @@ if (!hasPostgres) {
     assert.equal(envAfterDelete.blueprint_id, null);
   });
 
+  test('environmentProvisioningService : provisionFromBlueprint — Kubernetes non configuré dans cet environnement de test, statut "skipped" honnête (pas "created")', async () => {
+    const { provisionFromBlueprint } = await import('../src/services/environmentProvisioningService.js');
+    const blueprint = await orgStore.createEnvironmentBlueprint({
+      orgId: org.id, name: 'Provision RS', slug: `provision-rs-${Date.now()}`, kind: 'preview',
+      namespacePattern: '{project}-{env}', replicas: 1, cpu: '250m', memory: '256Mi', storageGb: null,
+      ingressDomain: '', ttlMinutes: null, monitoringEnabled: false
+    });
+    const env = await orgStore.createEnvironment(project.id, { name: `provision-env-${Date.now()}`, kind: 'preview', blueprintId: blueprint.id });
+
+    const result = await provisionFromBlueprint(env, blueprint, project.slug);
+    assert.equal(result.status, 'skipped');
+    assert.match(result.message, /Kubernetes non configuré/);
+
+    // Le résultat réel est bien persisté sur l'environnement, pas seulement
+    // renvoyé à l'appelant — GET /:id/environments doit pouvoir l'afficher.
+    const stored = await orgStore.getEnvironment(env.id);
+    assert.equal(stored.provisioning_status, 'skipped');
+    assert.equal(stored.provisioned_at, null);
+  });
+
   test('orgStore (components) : le filtre "mine" (Developer Portal, ÉTAPE 25) isole ce dont u1 est responsable', async () => {
     // u1 est déjà owner de `org`/`project` (test.before) — pour distinguer
     // "responsable" de "visible par bypass owner/admin d'organisation" (le
@@ -351,6 +371,151 @@ if (!hasPostgres) {
     }
   });
 
+  test('environmentPromotionService : provisionArgocdApp — repoURL requis, namespace requis, Argo CD non configuré remonte une vraie erreur (jamais un succès simulé)', async () => {
+    const { provisionArgocdApp } = await import('../src/services/environmentPromotionService.js');
+    const env = await orgStore.createEnvironment(project.id, { name: `provision-argo-${Date.now()}`, kind: 'preview' });
+
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: '', destinationNamespace: 'x' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /repoURL requis/); return true; }
+    );
+
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: 'https://github.com/org/repo.git' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /destinationNamespace requis/); return true; }
+    );
+
+    // Argo CD n'est pas configuré dans cet environnement de test :
+    // upsertApplication doit lever une IntegrationError réelle (409), jamais
+    // un succès silencieux ni un environnement lié à une app qui n'existe pas.
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: 'https://github.com/org/repo.git', destinationNamespace: 'x' }),
+      (err) => { assert.match(err.message, /Argo CD non configuré/); return true; }
+    );
+    const unchanged = await orgStore.getEnvironment(env.id);
+    assert.equal(unchanged.argocd_app, null);
+  });
+
+  test('environmentPromotionService : rollbackEnvironment — garde-fous (mauvais environnement, promotion non synchronisée) et échec honnête sans Argo CD', async () => {
+    const { rollbackEnvironment } = await import('../src/services/environmentPromotionService.js');
+    const envA = await orgStore.createEnvironment(project.id, { name: `rollback-a-${Date.now()}`, kind: 'staging' });
+    const envB = await orgStore.createEnvironment(project.id, { name: `rollback-b-${Date.now()}`, kind: 'staging' });
+    // argocd_app posé directement (même bypass que le test Policy Gate
+    // plus haut) : on vérifie rollbackEnvironment() lui-même, pas
+    // l'intégration Argo CD.
+    await orgStore.setEnvironmentArgocdApp(envA.id, 'fake-argocd-app-rollback-test');
+
+    const syncedPromo = await orgStore.recordPromotion({
+      projectId: project.id, fromEnvironmentId: null, toEnvironmentId: envA.id,
+      argocdApp: 'fake-argocd-app-rollback-test', revision: 'abcdef1234567890', status: 'synced', message: 'test fixture', triggeredBy: 'u1'
+    });
+    const blockedPromo = await orgStore.recordPromotion({
+      projectId: project.id, fromEnvironmentId: null, toEnvironmentId: envA.id,
+      argocdApp: 'fake-argocd-app-rollback-test', revision: null, status: 'blocked', message: 'test fixture bloquée', triggeredBy: 'u1'
+    });
+
+    // La promotion cible appartient à envA, mais on tente le rollback sur envB.
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envB.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 409); return true; } // envB non lié à Argo CD, échoue avant même de regarder la promotion
+    );
+
+    await orgStore.setEnvironmentArgocdApp(envB.id, 'fake-argocd-app-rollback-test-b');
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envB.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 404); assert.match(err.message, /introuvable pour cet environnement/); return true; }
+    );
+
+    // Promotion existante pour le bon environnement, mais jamais réussie :
+    // rien de réel à restaurer.
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envA.id, toPromotionId: blockedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 409); assert.match(err.message, /rien à restaurer/); return true; }
+    );
+
+    // Cas honnête : promotion valide, mais Argo CD non configuré dans cet
+    // environnement de test — jamais un "rollback réussi" simulé, et
+    // l'échec est bien consigné dans l'historique (is_rollback=true).
+    await assert.rejects(
+      () => rollbackEnvironment({ projectId: project.id, environmentId: envA.id, toPromotionId: syncedPromo.id, triggeredBy: 'u1' }),
+      (err) => { assert.equal(err.status, 502); assert.match(err.message, /Argo CD non configuré/); return true; }
+    );
+    const history = await orgStore.listPromotions(project.id);
+    const recordedFailure = history.find((p) => p.rollback_of === syncedPromo.id);
+    assert.ok(recordedFailure, 'le rollback en échec doit être consigné dans l\'historique');
+    assert.equal(recordedFailure.status, 'error');
+    assert.equal(recordedFailure.is_rollback, true);
+  });
+
+  test('previewEnvironmentWebhookService : cycle de vie complet d\'une PR (opened → synchronize → closed), sans doublon ni provisioning fantôme', async () => {
+    const { handlePullRequestEvent } = await import('../src/services/previewEnvironmentWebhookService.js');
+    const fakeReq = { user: null, ip: '127.0.0.1' };
+    const prNumber = Math.floor(Math.random() * 1_000_000);
+    const pr = { number: prNumber, head: { ref: 'feature/x', sha: 'abc1234' }, html_url: 'https://github.com/org/repo/pull/' + prNumber };
+
+    // opened : crée l'environnement "pr-<n>". D'autres tests de ce fichier
+    // partagent la même organisation fixture (`org`) et y ont déjà créé un
+    // blueprint de kind 'preview' — celui-ci est donc réellement trouvé et
+    // un provisioning est tenté ; Kubernetes n'étant pas configuré dans cet
+    // environnement de test, le résultat honnête est 'skipped' (jamais
+    // 'created' sans preuve, jamais null alors qu'un blueprint existe).
+    const opened = await handlePullRequestEvent(project, 'opened', pr, fakeReq);
+    assert.equal(opened.action, 'created');
+    assert.equal(opened.provisioning.status, 'skipped');
+    const created = await orgStore.getEnvironment(opened.environmentId);
+    assert.equal(created.name, `pr-${prNumber}`);
+    assert.equal(created.kind, 'preview');
+    assert.equal(created.is_production, false);
+    assert.equal(created.source_commit, 'abc1234');
+
+    // synchronize sur la même PR : pas de second environnement créé
+    // (UNIQUE(project_id, name) le garantirait de toute façon), seule la
+    // référence de commit change.
+    const synced = await handlePullRequestEvent(project, 'synchronize', { ...pr, head: { ref: 'feature/x', sha: 'def5678' } }, fakeReq);
+    assert.equal(synced.action, 'updated');
+    assert.equal(synced.environmentId, opened.environmentId);
+    const afterSync = await orgStore.getEnvironment(opened.environmentId);
+    assert.equal(afterSync.source_commit, 'def5678');
+
+    // closed : détruit réellement l'environnement.
+    const closed = await handlePullRequestEvent(project, 'closed', pr, fakeReq);
+    assert.equal(closed.action, 'destroyed');
+    assert.equal(await orgStore.getEnvironment(opened.environmentId), null);
+
+    // closed une seconde fois (rejeu d'événement GitHub, arrive en
+    // pratique) : ne doit jamais planter, juste constater qu'il n'y a plus
+    // rien à détruire.
+    const closedAgain = await handlePullRequestEvent(project, 'closed', pr, fakeReq);
+    assert.equal(closedAgain.action, 'noop');
+  });
+
+  test('serviceYamlDiscoveryService : ne réagit qu\'à un push sur la branche par défaut modifiant service.yaml, échec honnête sans GitHub configuré', async () => {
+    const { handlePushEvent } = await import('../src/services/serviceYamlDiscoveryService.js');
+    const baseEvent = {
+      ref: 'refs/heads/main',
+      repository: { full_name: 'example/demo', default_branch: 'main' },
+      commits: [{ added: [], modified: ['service.yaml'] }]
+    };
+
+    // Push sur une branche de feature : jamais réagi, même si service.yaml
+    // est modifié — évite de polluer le catalogue avant merge.
+    const featureBranch = await handlePushEvent(project, { ...baseEvent, ref: 'refs/heads/feature/x' });
+    assert.equal(featureBranch.handled, false);
+
+    // Push sur la branche par défaut, mais service.yaml pas dans les
+    // fichiers modifiés de ce commit précis.
+    const noManifestChange = await handlePushEvent(project, { ...baseEvent, commits: [{ added: [], modified: ['README.md'] }] });
+    assert.equal(noManifestChange.handled, false);
+
+    // Push sur la branche par défaut ET service.yaml modifié : GitHub n'est
+    // pas configuré dans cet environnement de test — échec honnête, jamais
+    // un import silencieusement inventé.
+    const configured = await handlePushEvent(project, baseEvent);
+    assert.equal(configured.handled, true);
+    assert.equal(configured.status, 'failed');
+    assert.match(configured.message, /GitHub non configuré/);
+  });
+
   test('orgStore (platform requests) : cycle de vie complet + transition unique pending → tranchée', async () => {
     const request = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod RS', description: 'Besoin du vault projet' });
     assert.equal(request.status, 'pending');
@@ -372,6 +537,70 @@ if (!hasPostgres) {
     assert.equal(secondReview, null);
     const stillApproved = await orgStore.getPlatformRequest(request.id);
     assert.equal(stillApproved.status, 'approved');
+  });
+
+  test('platformRequestActionService : approuver "create_production_env" crée réellement l\'environnement — les autres types restent "skipped"', async () => {
+    const { applyApprovedRequest } = await import('../src/services/platformRequestActionService.js');
+
+    // Type sans action automatique définie : jamais de succès inventé.
+    const accessRequest = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod PRA' });
+    const accessResult = await applyApprovedRequest(accessRequest);
+    assert.equal(accessResult.status, 'skipped');
+    assert.match(accessResult.message, /access/);
+
+    // create_production_env : crée réellement l'environnement de production.
+    const envName = `prod-pra-${Date.now()}`;
+    const prodRequest = await orgStore.createPlatformRequest({
+      orgId: org.id, projectId: project.id, requestedBy: 'u1', kind: 'create_production_env',
+      title: 'Nouvel environnement de production', payload: { environmentName: envName }
+    });
+    const prodResult = await applyApprovedRequest(prodRequest);
+    assert.equal(prodResult.status, 'created');
+    assert.ok(prodResult.environmentId);
+    const created = await orgStore.getEnvironment(prodResult.environmentId);
+    assert.equal(created.name, envName);
+    assert.equal(created.is_production, true);
+    assert.equal(created.kind, 'production');
+
+    // Rejouer sur le même nom échoue proprement (jamais un doublon silencieux).
+    const duplicateRequest = await orgStore.createPlatformRequest({
+      orgId: org.id, projectId: project.id, requestedBy: 'u1', kind: 'create_production_env',
+      title: 'Doublon', payload: { environmentName: envName }
+    });
+    const duplicateResult = await applyApprovedRequest(duplicateRequest);
+    assert.equal(duplicateResult.status, 'failed');
+    assert.match(duplicateResult.message, /existe déjà/);
+
+    // setPlatformRequestResult persiste bien le résultat, visible via
+    // listPlatformRequestsForUser (ce qu'affiche PlatformRequestsPage.jsx).
+    const withResult = await orgStore.setPlatformRequestResult(prodRequest.id, prodResult);
+    assert.equal(withResult.result.status, 'created');
+    const mine = await orgStore.listPlatformRequestsForUser('u1');
+    const found = mine.find((r) => r.id === prodRequest.id);
+    assert.equal(found.result.environmentId, prodResult.environmentId);
+  });
+
+  test('platformRequestActionService : SÉCURITÉ — refuse de provisionner si le projet de la demande n\'appartient plus à l\'organisation qui l\'a approuvée', async () => {
+    const { applyApprovedRequest } = await import('../src/services/platformRequestActionService.js');
+    // Deuxième organisation, distincte de `org` (utilisée par le fixture
+    // partagé) et de son projet — simule une demande créée avant que
+    // routes/platformRequests.routes.js ne valide projectId contre orgId à
+    // la création (défense en profondeur, jamais confiance aveugle en une
+    // ligne déjà en base). Sans cette vérification, approuver la demande
+    // provisionnerait un environnement dans le projet d'une AUTRE
+    // organisation que celle dont l'admin a validé la demande.
+    const otherOrg = await orgStore.createOrganization({ name: 'Other Org PRA Security', slug: `other-org-pra-sec-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const crossOrgRequest = await orgStore.createPlatformRequest({
+        orgId: otherOrg.id, projectId: project.id /* appartient à `org`, pas `otherOrg` */, requestedBy: 'u1',
+        kind: 'create_production_env', title: 'Tentative cross-org', payload: { environmentName: `cross-org-${Date.now()}` }
+      });
+      const result = await applyApprovedRequest(crossOrgRequest);
+      assert.equal(result.status, 'failed');
+      assert.match(result.message, /n'appartient plus à l'organisation/);
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [otherOrg.id]);
+    }
   });
 
   test('orgStore (preview environments) : expires_at hérité du TTL du blueprint, destruction manuelle, production protégée', async () => {
@@ -435,5 +664,129 @@ if (!hasPostgres) {
     await orgStore.createBinding({ componentId: component.id, bindingType: 'redis', envVarName: 'REDIS_URL' });
     await orgStore.deleteComponent(component.id);
     assert.equal((await orgStore.listBindingsForComponent(component.id)).length, 0);
+  });
+
+  test('serviceBindingSyncService : échecs honnêtes (pas de secret relié, pas de namespace provisionné, secret introuvable) — jamais un "synced" sans preuve', async () => {
+    const { syncBindingSecret } = await import('../src/services/serviceBindingSyncService.js');
+    const component = await orgStore.createComponent({ projectId: project.id, name: 'sync-component', slug: `sync-component-${Date.now()}`, kind: 'api' });
+    const env = await orgStore.createEnvironment(project.id, { name: `sync-env-${Date.now()}`, kind: 'staging' });
+
+    const noSecretBinding = await orgStore.createBinding({ componentId: component.id, bindingType: 'postgres', envVarName: 'DATABASE_URL' });
+    const noSecretResult = await syncBindingSecret(noSecretBinding, component, env);
+    assert.equal(noSecretResult.status, 'failed');
+    assert.match(noSecretResult.message, /aucune entrée du coffre-fort/);
+
+    const withSecretBinding = await orgStore.createBinding({ componentId: component.id, bindingType: 'redis', envVarName: 'REDIS_URL', vaultEntryId: 'does-not-exist' });
+    // env sans namespace provisionné : doit échouer AVANT même de chercher
+    // le secret (pas d'appel Kubernetes inutile pour un binding qui
+    // échouerait de toute façon).
+    const noNamespaceResult = await syncBindingSecret(withSecretBinding, component, env);
+    assert.equal(noNamespaceResult.status, 'failed');
+    assert.match(noNamespaceResult.message, /namespace/);
+
+    const provisionedEnv = { ...env, provisioned_namespace: 'sync-test-ns' };
+    const missingEntryResult = await syncBindingSecret(withSecretBinding, component, provisionedEnv);
+    assert.equal(missingEntryResult.status, 'failed');
+    assert.match(missingEntryResult.message, /introuvable/);
+
+    // recordBindingSync persiste le résultat, jamais la valeur du secret.
+    const recorded = await orgStore.recordBindingSync(withSecretBinding.id, { environmentId: env.id, status: missingEntryResult.status, message: missingEntryResult.message });
+    assert.equal(recorded.sync_status, 'failed');
+    assert.equal(recorded.synced_at, null); // seul un statut 'synced' pose synced_at
+  });
+
+  test('serviceAccountStore : création, authentification par jeton, révocation — le token brut n\'est jamais retrouvable après coup', async () => {
+    const serviceAccountStore = await import('../src/store/serviceAccountStore.js');
+
+    // Scope inconnu refusé explicitement, jamais silencieusement ignoré.
+    await assert.rejects(
+      () => serviceAccountStore.createServiceAccount({ orgId: org.id, name: 'CI invalide', scopes: ['not:a:real:scope'], createdBy: 'u1' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /Scope/); return true; }
+    );
+
+    const { serviceAccount, token } = await serviceAccountStore.createServiceAccount({
+      orgId: org.id, name: 'CI GitHub Actions', scopes: ['catalog:read'], createdBy: 'u1'
+    });
+    assert.match(token, /^nxs_sa_[0-9a-f]{64}$/);
+    // Bug réel trouvé en testant en direct (POST renvoyait token_hash dans
+    // le JSON) : la valeur créée ne doit JAMAIS exposer le hash, comme la liste.
+    assert.equal(serviceAccount.token_hash, undefined);
+
+    // Authentification réelle par le jeton brut renvoyé à la création.
+    const found = await serviceAccountStore.findByToken(token);
+    assert.equal(found.id, serviceAccount.id);
+    assert.deepEqual(found.scopes, ['catalog:read']);
+
+    // Un jeton au mauvais format, ou simplement inconnu, ne renvoie jamais
+    // de compte — pas d'exception qui distinguerait les deux cas.
+    assert.equal(await serviceAccountStore.findByToken('nxs_sa_' + '0'.repeat(64)), null);
+    assert.equal(await serviceAccountStore.findByToken('n\'importe quoi'), null);
+
+    const listed = await serviceAccountStore.listServiceAccountsForOrg(org.id);
+    const inList = listed.find((sa) => sa.id === serviceAccount.id);
+    assert.ok(inList, 'doit apparaître dans la liste de l\'organisation');
+    assert.equal(inList.token_hash, undefined, 'la liste ne doit jamais exposer le hash du jeton');
+
+    // Révocation réelle : le même jeton cesse immédiatement de s'authentifier.
+    const revoked = await serviceAccountStore.revokeServiceAccount(serviceAccount.id);
+    assert.equal(revoked, true);
+    assert.equal(await serviceAccountStore.findByToken(token), null);
+
+    // Révoquer une deuxième fois ne fait rien silencieusement — signalé
+    // explicitement (déjà révoqué), jamais un faux succès.
+    const revokedAgain = await serviceAccountStore.revokeServiceAccount(serviceAccount.id);
+    assert.equal(revokedAgain, false);
+  });
+
+  test('orgStore.listComponentsForOrg : n\'expose que les composants des projets de CETTE organisation', async () => {
+    const otherOrg = await orgStore.createOrganization({ name: 'Other Org SA Isolation', slug: `other-org-sa-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const otherProject = await orgStore.createProject({ orgId: otherOrg.id, name: 'Other Project SA', slug: `other-project-sa-${Date.now()}`, legacyId: `other-legacy-sa-${Date.now()}` });
+      const ownComponent = await orgStore.createComponent({ projectId: project.id, name: 'sa-own-component', slug: `sa-own-component-${Date.now()}`, kind: 'api' });
+      const otherComponent = await orgStore.createComponent({ projectId: otherProject.id, name: 'sa-other-component', slug: `sa-other-component-${Date.now()}`, kind: 'api' });
+
+      const visible = await orgStore.listComponentsForOrg(org.id);
+      assert.ok(visible.some((c) => c.id === ownComponent.id));
+      assert.ok(!visible.some((c) => c.id === otherComponent.id), 'un composant d\'une autre organisation ne doit jamais apparaître');
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [otherOrg.id]);
+    }
+  });
+
+  test('quotaService : bloque proprement la création au-delà du quota (nombre d\'environnements, puis CPU) — silencieux sans quota défini', async () => {
+    const quotaService = await import('../src/services/quotaService.js');
+    // Organisation/projet dédiés et isolés : le fixture partagé `org` a déjà
+    // de nombreux environnements créés par d'autres tests de ce fichier,
+    // ce qui fausserait un quota par NOMBRE d'environnements.
+    const quotaOrg = await orgStore.createOrganization({ name: 'Quota Test Org', slug: `quota-org-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const quotaProject = await orgStore.createProject({ orgId: quotaOrg.id, name: 'Quota Test Project', slug: `quota-project-${Date.now()}`, legacyId: `quota-legacy-${Date.now()}` });
+
+      // Sans quota défini : silencieux, toujours autorisé.
+      const noQuota = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, null);
+      assert.equal(noQuota.allowed, true);
+
+      await quotaService.setOrgQuota(quotaOrg.id, { maxEnvironments: 1, updatedBy: 'u1' });
+      // createEnvironment crée déjà 'production'+'staging' automatiquement
+      // via orgStore.createProject — le quota de 1 est donc déjà dépassé.
+      const overCount = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, null);
+      assert.equal(overCount.allowed, false);
+      assert.match(overCount.reason, /environnements/);
+
+      // Quota CPU : un blueprint qui dépasserait la limite est refusé,
+      // un autre qui reste dessous est accepté (même org, quota relevé).
+      await quotaService.setOrgQuota(quotaOrg.id, { maxEnvironments: 100, maxCpuMillicores: 1000, updatedBy: 'u1' });
+      const usage = await quotaService.computeOrgUsage(quotaOrg.id);
+      assert.equal(usage.cpuMillicores, 0); // aucun des environnements existants n'a de blueprint
+
+      const tooMuchCpu = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, { cpu: '2' }); // 2000m > 1000m
+      assert.equal(tooMuchCpu.allowed, false);
+      assert.match(tooMuchCpu.reason, /CPU/);
+
+      const withinCpu = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, { cpu: '500m' });
+      assert.equal(withinCpu.allowed, true);
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [quotaOrg.id]);
+    }
   });
 }

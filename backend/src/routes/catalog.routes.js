@@ -4,13 +4,15 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
-import { parseServiceManifest, componentToManifest, ManifestError } from '../services/serviceManifest.js';
+import { componentToManifest } from '../services/serviceManifest.js';
+import { importServiceManifest, ManifestError } from '../services/serviceManifestImportService.js';
 import { listTemplatesSummary } from '../services/scaffolderTemplates.js';
 import { scaffoldService } from '../services/scaffolderService.js';
 import * as jobService from '../services/jobService.js';
 import { computeScorecard } from '../services/catalogScorecard.js';
 import { evaluatePolicies } from '../services/policyEngine.js';
 import { findVaultEntry } from '../store/vaultStore.js';
+import { syncBindingSecret } from '../services/serviceBindingSyncService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -228,6 +230,34 @@ router.delete('/components/:id/bindings/:bindingId', asyncHandler(async (req, re
   res.json({ ok: true });
 }));
 
+// Provisioning réel (ÉTAPE 15 IDP, suite — voir migration 0023) : synchronise
+// la valeur du secret référencé vers un vrai Secret Kubernetes dans le
+// namespace déjà provisionné de l'environnement choisi. La valeur ne
+// transite jamais dans la réponse HTTP ni dans les logs — seul le résultat
+// (synced/failed) l'est. Réservé maintainer+ comme les autres mutations de
+// bindings : ça touche un vrai cluster Kubernetes.
+router.post('/components/:id/bindings/:bindingId/sync', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const binding = await orgStore.getBinding(req.params.bindingId);
+  if (!binding || binding.component_id !== req.params.id) return res.status(404).json({ ok: false, error: 'Binding introuvable' });
+  const { environmentId } = req.body || {};
+  if (!environmentId) return res.status(400).json({ ok: false, error: 'environmentId requis' });
+  const environment = await orgStore.getEnvironment(environmentId);
+  if (!environment || environment.project_id !== component.project_id) {
+    return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  }
+
+  const result = await syncBindingSecret(binding, component, environment);
+  await orgStore.recordBindingSync(binding.id, { environmentId, status: result.status, message: result.message });
+  logAudit(req, 'catalog.binding.sync', { componentId: req.params.id, bindingId: binding.id, environmentId, resultStatus: result.status });
+  res.json({ ok: result.status === 'synced', result });
+}));
+
 // Export au format service.yaml — voir services/serviceManifest.js. Même
 // portée de lecture que GET /components/:id.
 router.get('/components/:id/manifest', asyncHandler(async (req, res) => {
@@ -253,43 +283,20 @@ router.post('/components/import', asyncHandler(async (req, res) => {
   }
   if (!projectId) return res.status(400).json({ ok: false, error: 'projectId (ou legacyProjectId) requis' });
 
-  let manifest;
-  try {
-    manifest = parseServiceManifest(yaml);
-  } catch (err) {
-    if (err instanceof ManifestError) return res.status(400).json({ ok: false, error: err.message });
-    throw err;
-  }
-
   const role = await orgStore.getProjectRole(projectId, req.user.id);
   if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
     return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
   }
 
-  let ownerTeamId = null;
-  if (manifest.ownerTeamSlug) {
-    const project = await orgStore.getProject(projectId);
-    const team = await orgStore.getTeamBySlug(project.org_id, manifest.ownerTeamSlug);
-    if (!team) return res.status(400).json({ ok: false, error: `Équipe introuvable pour spec.owner: "${manifest.ownerTeamSlug}" (créez-la d'abord depuis la fiche organisation)` });
-    ownerTeamId = team.id;
+  let result;
+  try {
+    result = await importServiceManifest({ projectId, yaml });
+  } catch (err) {
+    if (err instanceof ManifestError) return res.status(400).json({ ok: false, error: err.message });
+    throw err;
   }
-
-  const fields = {
-    ownerTeamId, name: manifest.name, kind: manifest.kind, lifecycle: manifest.lifecycle,
-    description: manifest.description, language: manifest.language, framework: manifest.framework,
-    repositoryProvider: manifest.repositoryProvider, repositoryUrl: manifest.repositoryUrl, tags: manifest.tags, links: manifest.links
-  };
-
-  const existing = await orgStore.getComponentBySlug(projectId, manifest.name);
-  let component;
-  if (existing) {
-    component = await orgStore.updateComponent(existing.id, fields);
-    logAudit(req, 'catalog.component.import.update', { componentId: component.id, projectId, name: manifest.name });
-  } else {
-    component = await orgStore.createComponent({ projectId, slug: manifest.name, ...fields });
-    logAudit(req, 'catalog.component.import.create', { componentId: component.id, projectId, name: manifest.name });
-  }
-  res.status(existing ? 200 : 201).json({ ok: true, component, created: !existing });
+  logAudit(req, result.created ? 'catalog.component.import.create' : 'catalog.component.import.update', { componentId: result.component.id, projectId, name: result.component.name });
+  res.status(result.created ? 201 : 200).json({ ok: true, component: result.component, created: result.created });
 }));
 
 // Golden paths (ÉTAPE 8/9 IDP) : liste statique, pas de permission
@@ -323,9 +330,9 @@ router.post('/scaffold', asyncHandler(async (req, res) => {
 
   const job = await jobService.enqueue(
     { type: 'catalog.scaffold', projectId, userId: req.user.id, payload: { templateId, name, repositoryProvider: repositoryProvider || 'none' } },
-    async (createdJob) => {
+    async (createdJob, { isCancelled }) => {
       const log = (step, status, detail) => jobService.appendJobStep(createdJob.id, step, status, detail);
-      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log });
+      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log, isCancelled });
       logAudit(req, 'catalog.scaffold', { componentId: result.component.id, projectId, templateId, name });
       return result;
     }

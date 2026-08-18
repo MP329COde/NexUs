@@ -78,13 +78,13 @@ router.post('/provision', requireAuth, requireRole('admin'), asyncHandler(async 
   if (!Array.isArray(tools) || tools.length === 0) {
     return res.status(400).json({ ok: false, error: 'Aucun outil à installer' });
   }
-  const startedJobs = tools.map(({ toolId, address, port, sshUser }) => {
+  const startedJobs = await Promise.all(tools.map(async ({ toolId, address, port, sshUser }) => {
     try {
-      return startInstall({ toolId, address, port, sshUser });
+      return await startInstall({ toolId, address, port, sshUser });
     } catch (err) {
       return { id: null, toolId, status: 'error', message: err.message };
     }
-  });
+  }));
   logAudit(req, 'setup.provision.start', { count: startedJobs.length, tools: startedJobs.map((j) => j.toolId) });
   res.status(202).json({ ok: true, jobs: startedJobs });
 }));

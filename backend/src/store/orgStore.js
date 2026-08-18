@@ -294,6 +294,14 @@ export async function createProject({ orgId, name, slug, description, tags, repo
         [project.id, ownerUserId, 'owner']
       );
     }
+    // Volontairement hors du chemin quotaService.checkQuotaBeforeCreate
+    // (ÉTAPE 26 IDP, audit sécurité) : ces deux environnements sont le socle
+    // minimal garanti de tout projet, pas une création discrétionnaire — un
+    // quota d'organisation trop bas ne doit jamais empêcher un projet
+    // d'exister avec au moins production+staging. Le quota s'applique aux
+    // environnements créés APRÈS coup (preview, blueprints...), jamais à ce
+    // socle de départ. Sans blueprint, aucun des deux ne consomme de CPU/
+    // mémoire compté par computeOrgUsage() de toute façon.
     await client.query(
       `INSERT INTO environments (project_id, name, kind, is_production) VALUES
         ($1, 'production', 'production', true),
@@ -374,6 +382,28 @@ export async function deleteEnvironment(id) {
   return rowCount > 0;
 }
 
+// Résolution par nom (UNIQUE(project_id, name)) — utilisée par le webhook
+// PR (ÉTAPE 10 : Preview Environments) pour retrouver l'environnement d'une
+// PR déjà ouverte plutôt que d'en recréer un doublon à chaque nouveau commit
+// poussé (voir routes/webhooks.routes.js, événement pull_request).
+export async function getEnvironmentByName(projectId, name) {
+  const { rows } = await query('SELECT * FROM environments WHERE project_id = $1 AND name = $2', [projectId, name]);
+  return rows[0] || null;
+}
+
+// Met à jour uniquement les métadonnées de source (branche/commit/PR) d'un
+// environnement déjà provisionné — un nouveau commit sur une PR ouverte ne
+// doit pas re-déclencher un provisioning Kubernetes (le namespace existe
+// déjà), seulement rafraîchir la référence affichée.
+export async function updateEnvironmentSource(id, { sourceBranch, sourceCommit, sourcePrUrl }) {
+  const { rows } = await query(
+    `UPDATE environments SET source_branch = COALESCE($2, source_branch), source_commit = COALESCE($3, source_commit), source_pr_url = COALESCE($4, source_pr_url)
+     WHERE id = $1 RETURNING *`,
+    [id, sourceBranch || null, sourceCommit || null, sourcePrUrl || null]
+  );
+  return rows[0] || null;
+}
+
 // Environnements expirés (expires_at dépassé) d'un projet — préviews
 // oubliées à nettoyer, affichées distinctement de "Détails & promotions"
 // sur EnvironmentsPage.jsx plutôt que mêlées silencieusement à la liste.
@@ -447,13 +477,21 @@ export async function setEnvironmentArgocdApp(id, argocdApp) {
   return rows[0] || null;
 }
 
-export async function recordPromotion({ projectId, fromEnvironmentId, toEnvironmentId, argocdApp, revision, status, message, triggeredBy }) {
+export async function recordPromotion({ projectId, fromEnvironmentId, toEnvironmentId, argocdApp, revision, status, message, triggeredBy, isRollback, rollbackOf }) {
   const { rows } = await query(
-    `INSERT INTO environment_promotions (project_id, from_environment_id, to_environment_id, argocd_app, revision, status, message, triggered_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [projectId, fromEnvironmentId || null, toEnvironmentId, argocdApp, revision || null, status, message || null, triggeredBy]
+    `INSERT INTO environment_promotions (project_id, from_environment_id, to_environment_id, argocd_app, revision, status, message, triggered_by, is_rollback, rollback_of)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [projectId, fromEnvironmentId || null, toEnvironmentId, argocdApp, revision || null, status, message || null, triggeredBy, Boolean(isRollback), rollbackOf || null]
   );
   return rows[0];
+}
+
+// Promotion précise du projet, utilisée par rollbackEnvironment() pour
+// retrouver la revision réellement synchronisée à l'époque — jamais une
+// version devinée ou reconstruite depuis Git.
+export async function getPromotion(id) {
+  const { rows } = await query('SELECT * FROM environment_promotions WHERE id = $1', [id]);
+  return rows[0] || null;
 }
 
 export async function listPromotions(projectId, limit = 30) {
@@ -639,7 +677,30 @@ export async function getWikiRevision(id) {
 // reste appliquée par listComponentsForUser() pour tout ce qui répond
 // directement à une requête HTTP authentifiée.
 export async function listComponentsForProject(projectId) {
-  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 ORDER BY name', [projectId]);
+  // project_linked_environment_count : même sous-requête que getComponent/
+  // listComponentsForUser, nécessaire ici aussi pour que la policy
+  // 'require_linked_environment' (évaluée par le Policy Gate d'une
+  // promotion — environmentPromotionService.js#checkPolicyGate) dispose du
+  // même signal que la fiche composant, pas une version dégradée.
+  const { rows } = await query(
+    `SELECT c.*, (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id AND env.argocd_app IS NOT NULL) AS project_linked_environment_count
+     FROM components c WHERE c.project_id = $1 ORDER BY c.name`,
+    [projectId]
+  );
+  return rows;
+}
+
+// API publique (ÉTAPE 24 IDP) : toutes les organisations de l'appelant ne
+// sont jamais pertinentes pour un Service Account — il est scopé à UNE
+// organisation à sa création (voir store/serviceAccountStore.js) et ne doit
+// jamais pouvoir lister les composants d'une autre.
+export async function listComponentsForOrg(orgId) {
+  const { rows } = await query(
+    `SELECT c.*, p.name AS project_name
+     FROM components c JOIN projects p ON p.id = c.project_id
+     WHERE p.org_id = $1 ORDER BY c.name`,
+    [orgId]
+  );
   return rows;
 }
 
@@ -666,7 +727,7 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
   }
   const { rows } = await query(
     `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
-        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id AND env.argocd_app IS NOT NULL) AS project_linked_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
@@ -682,7 +743,7 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
 export async function getComponent(id) {
   const { rows } = await query(
     `SELECT c.*, p.name AS project_name, p.org_id AS org_id, p.legacy_id AS project_legacy_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
-        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id AND env.argocd_app IS NOT NULL) AS project_linked_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN teams t ON t.id = c.owner_team_id
@@ -864,11 +925,11 @@ export async function getPlatformRequest(id) {
   return rows[0] || null;
 }
 
-export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description }) {
+export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description, payload }) {
   const { rows } = await query(
-    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '')) RETURNING *`,
-    [orgId, projectId || null, requestedBy, kind, title, description || null]
+    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description, payload)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, ''), COALESCE($7::jsonb, '{}'::jsonb)) RETURNING *`,
+    [orgId, projectId || null, requestedBy, kind, title, description || null, payload ? JSON.stringify(payload) : null]
   );
   return rows[0];
 }
@@ -883,6 +944,19 @@ export async function reviewPlatformRequest(id, { status, reviewedBy, reviewNote
     `UPDATE platform_requests SET status = $2, reviewed_by = $3, reviewed_at = now(), review_note = $4
      WHERE id = $1 AND status = 'pending' RETURNING *`,
     [id, status, reviewedBy, reviewNote || null]
+  );
+  return rows[0] || null;
+}
+
+// Résultat RÉEL de l'action déclenchée par une approbation (ÉTAPE 12 IDP,
+// voir platformRequestActionService.js) — distinct de review_note (texte
+// libre laissé par l'approbateur) : ce champ est écrit par le système,
+// jamais par un humain, et reflète honnêtement ce qui s'est vraiment passé
+// (created/failed/skipped selon le type de demande).
+export async function setPlatformRequestResult(id, result) {
+  const { rows } = await query(
+    'UPDATE platform_requests SET result = $2 WHERE id = $1 RETURNING *',
+    [id, JSON.stringify(result)]
   );
   return rows[0] || null;
 }
@@ -910,4 +984,17 @@ export async function createBinding({ componentId, bindingType, envVarName, vaul
 export async function deleteBinding(id) {
   const { rowCount } = await query('DELETE FROM component_bindings WHERE id = $1', [id]);
   return rowCount > 0;
+}
+
+// Résultat RÉEL de la synchronisation d'un binding vers un Secret
+// Kubernetes (ÉTAPE 15 IDP, voir services/serviceBindingSyncService.js) —
+// jamais la valeur du secret elle-même, seulement où/quand/si ça a marché.
+export async function recordBindingSync(id, { environmentId, status, message }) {
+  const { rows } = await query(
+    `UPDATE component_bindings SET last_synced_environment_id = $2, sync_status = $3, sync_message = $4,
+       synced_at = CASE WHEN $3 = 'synced' THEN now() ELSE synced_at END
+     WHERE id = $1 RETURNING *`,
+    [id, environmentId, status, message || '']
+  );
+  return rows[0] || null;
 }

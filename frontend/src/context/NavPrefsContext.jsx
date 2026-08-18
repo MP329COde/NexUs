@@ -42,9 +42,14 @@ export function NavPrefsProvider({ children }) {
   const [prefs, setPrefs] = useState(loadPrefs);
 
   const SETTINGS_DOMAINS = ['settings', 'identity', 'users', 'inventory'];
+  // Portail développeur (ÉTAPE 20/21 IDP) : même garde RBAC que les routes
+  // elles-mêmes (voir App.jsx) — un domaine masqué de la nav mais toujours
+  // accessible par URL directe serait une fausse protection.
+  const RBAC_NAV_DOMAIN = { inf: 'infrastructure', k8s: 'kubernetes', net: 'network', mon: 'monitoring', sec: 'security' };
   const builtins = DOMAINS.filter((d) => {
     if (d.id === 'home' && homeRestrictedToAdmins) return user?.role === 'admin';
     if (d.id === 'adm') return user?.role === 'admin' || SETTINGS_DOMAINS.some((domain) => hasPermission(domain, 'read'));
+    if (RBAC_NAV_DOMAIN[d.id]) return hasPermission(RBAC_NAV_DOMAIN[d.id], 'read');
     return !d.adminOnly || user?.role === 'admin';
   });
 

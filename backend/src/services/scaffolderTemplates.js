@@ -1,41 +1,19 @@
+import { buildCiWorkflow } from './ciWorkflowService.js';
+
 // Golden paths minimaux : chaque template décrit le jeu de fichiers de
 // départ qu'un développeur obtiendrait normalement en configurant lui-même
 // dépôt + Dockerfile + CI + service.yaml. Volontairement statique (pas de
 // stockage en base) — un template n'est pas une donnée métier, c'est du
 // code de génération, comme le reste de ce fichier.
-const CI_NODE = `name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci
-      - run: npm test
-`;
-
-const CI_PYTHON = `name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r requirements.txt
-      - run: pytest
-`;
+//
+// La CI générée réutilise ciWorkflowService.js (ÉTAPE 5 IDP) — le même
+// générateur que POST /repos/:key/workflows/generate-ci — plutôt qu'une
+// version au rabais propre au Scaffolder : un service scaffoldé obtient
+// dès sa création lint/test/build + SAST Semgrep + SCA Trivy + secret
+// scanning + (si un Dockerfile est présent) build/scan/SBOM d'image réel.
+const CI_NODE = buildCiWorkflow({ stack: ['Node.js / JavaScript'], packageManager: 'npm', hasDockerfile: true });
+const CI_PYTHON = buildCiWorkflow({ stack: ['Python'], packageManager: null, hasDockerfile: true });
+const CI_GENERIC = buildCiWorkflow({ stack: [], packageManager: null, hasDockerfile: true });
 
 function serviceYaml({ name, description, kind, lifecycle, ownerTeamSlug, language, framework }) {
   const lines = [
@@ -139,7 +117,7 @@ export const SCAFFOLDER_TEMPLATES = [
       'Dockerfile': `FROM alpine:3.20\nCMD ["echo", "Remplacez ce Dockerfile par votre runtime réel"]\n`,
       'k8s/deployment.yaml': `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ${vars.name}\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: ${vars.name}\n  template:\n    metadata:\n      labels:\n        app: ${vars.name}\n    spec:\n      containers:\n        - name: ${vars.name}\n          image: ${vars.name}:latest\n          ports:\n            - containerPort: 8080\n`,
       'k8s/service.yaml': `apiVersion: v1\nkind: Service\nmetadata:\n  name: ${vars.name}\nspec:\n  selector:\n    app: ${vars.name}\n  ports:\n    - port: 80\n      targetPort: 8080\n`,
-      '.github/workflows/ci.yml': CI_NODE
+      '.github/workflows/ci.yml': CI_GENERIC
     })
   }
 ];

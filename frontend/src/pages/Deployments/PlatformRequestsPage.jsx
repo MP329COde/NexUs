@@ -15,15 +15,17 @@ const KINDS = [
 ];
 const STATUS_BADGE = { pending: 'warn', approved: 'ok', rejected: 'crit', cancelled: 'mut', expired: 'mut' };
 const STATUS_LABEL = { pending: 'En attente', approved: 'Approuvée', rejected: 'Rejetée', cancelled: 'Annulée', expired: 'Expirée' };
-const EMPTY_FORM = { orgId: '', kind: 'access', title: '', description: '' };
+const EMPTY_FORM = { orgId: '', projectId: '', kind: 'access', title: '', description: '', environmentName: '' };
 
 function kindLabel(v) { return KINDS.find((k) => k.value === v)?.label || v; }
 
 // Platform Requests (ÉTAPE 17 IDP) : un développeur demande quelque chose à
 // l'organisation (accès, ressources, environnement de production),
-// approuvé/rejeté explicitement par un owner/admin — jamais exécuté
-// automatiquement (voir db/migrations/0017_platform_requests.sql : aucune
-// action d'infrastructure réelle ne part d'une approbation).
+// approuvé/rejeté explicitement par un owner/admin. Depuis ÉTAPE 12,
+// approuver une demande "create_production_env" déclenche réellement la
+// création + le provisioning Kubernetes de l'environnement (voir
+// platformRequestActionService.js côté backend) — les autres types restent
+// sans action automatique, honnêtement signalé (r.result.status "skipped").
 export default function PlatformRequestsPage() {
   const notify = useNotify();
   const mine = useApi(() => api.get('/platform-requests/mine'), []);
@@ -33,16 +35,22 @@ export default function PlatformRequestsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const orgProjects = useApi(() => (form.orgId ? api.get(`/organizations/${form.orgId}/projects`) : Promise.resolve(null)), [form.orgId]);
 
   const myRequests = mine.data?.items || [];
   const allOrgs = orgs.data?.items || [];
   const pendingForReview = toReview.data?.items || [];
+  const availableProjects = orgProjects.data?.items || [];
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.post('/platform-requests', form);
+      const { orgId, projectId, kind, title, description, environmentName } = form;
+      await api.post('/platform-requests', {
+        orgId, projectId: projectId || null, kind, title, description,
+        payload: kind === 'create_production_env' ? { environmentName } : undefined
+      });
       notify('Demande envoyée', { type: 'ok' });
       setForm(EMPTY_FORM);
       setFormOpen(false);
@@ -98,6 +106,20 @@ export default function PlatformRequestsPage() {
             <select className="input" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} style={{ marginBottom: 12 }}>
               {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
             </select>
+            {form.kind === 'create_production_env' && (
+              <>
+                <label className="projects-form-label">Projet</label>
+                <select className="input" required value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={{ marginBottom: 12 }} disabled={!form.orgId}>
+                  <option value="">{form.orgId ? 'Sélectionner un projet…' : 'Choisissez d\'abord une organisation'}</option>
+                  {availableProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <label className="projects-form-label">Nom de l'environnement</label>
+                <input className="input mono" required value={form.environmentName} onChange={(e) => setForm((f) => ({ ...f, environmentName: e.target.value }))} placeholder="production-eu" style={{ marginBottom: 12 }} />
+                <p className="faint" style={{ marginTop: -8, marginBottom: 12, fontSize: 12 }}>
+                  Si approuvée, cet environnement sera réellement créé (et provisionné sur Kubernetes si un blueprint de production existe pour l'organisation).
+                </p>
+              </>
+            )}
             <label className="projects-form-label">Titre</label>
             <input className="input" required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Augmenter les replicas de billing-api" style={{ marginBottom: 12 }} />
             <label className="projects-form-label">Description</label>
@@ -125,6 +147,11 @@ export default function PlatformRequestsPage() {
               {r.project_name && <span>· {r.project_name}</span>}
               {r.review_note && <span>· note : {r.review_note}</span>}
             </div>
+            {r.result && (
+              <p className="faint" style={{ fontSize: 12, marginTop: 4, color: r.result.status === 'failed' ? 'var(--danger, #ef4444)' : undefined }}>
+                {r.result.status === 'created' ? '✓ ' : r.result.status === 'failed' ? '✗ ' : ''}{r.result.message}
+              </p>
+            )}
             {r.status === 'pending' && (
               <span className="btn-outline pr-cancel-btn" onClick={() => cancel(r.id)}>Annuler</span>
             )}

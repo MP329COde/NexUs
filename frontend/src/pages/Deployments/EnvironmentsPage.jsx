@@ -57,12 +57,16 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
   const promotions = promoData?.items || [];
   const [linking, setLinking] = useState(null);
   const [appInput, setAppInput] = useState('');
+  const [provisioning, setProvisioning] = useState(null);
+  const [provisionForm, setProvisionForm] = useState({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: '' });
+  const [provisionBusy, setProvisionBusy] = useState(false);
   const [promoting, setPromoting] = useState(null);
   const [promoteFrom, setPromoteFrom] = useState({});
   const [creating, setCreating] = useState(false);
   const [newEnv, setNewEnv] = useState({ name: '', kind: 'staging', blueprintId: '', sourceBranch: '', sourceCommit: '', sourcePrUrl: '' });
   const [creatingBusy, setCreatingBusy] = useState(false);
   const [destroying, setDestroying] = useState(null);
+  const [rollingBack, setRollingBack] = useState(null);
 
   // Les blueprints applicables à ce projet sont ceux de SON organisation
   // (voir EnvironmentBlueprintsPanel.jsx, Paramètres → Blueprints
@@ -118,6 +122,42 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
+    }
+  }
+
+  async function submitProvision(env) {
+    setProvisionBusy(true);
+    try {
+      const res = await api.post(`/projects/${project.id}/environments/${env.id}/provision-argocd-app`, {
+        repoURL: provisionForm.repoURL.trim(),
+        path: provisionForm.path.trim() || '.',
+        targetRevision: provisionForm.targetRevision.trim() || undefined,
+        destinationNamespace: provisionForm.destinationNamespace.trim() || undefined
+      });
+      notify(`Application Argo CD "${res.environment.argocd_app}" provisionnée pour ${env.name}`, { type: 'ok' });
+      setProvisioning(null);
+      setProvisionForm({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: '' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setProvisionBusy(false);
+    }
+  }
+
+  async function doRollback(promotion) {
+    const label = promotion.revision ? promotion.revision.slice(0, 7) : promotion.id;
+    if (!window.confirm(`Revenir "${promotion.to_environment_name}" à la revision ${label} (promotion du ${formatDate(promotion.created_at)}) ?`)) return;
+    setRollingBack(promotion.id);
+    try {
+      const res = await api.post(`/projects/${project.id}/environments/${promotion.to_environment_id}/rollback`, { toPromotionId: promotion.id });
+      notify(res.rollback.status === 'synced' ? `Rollback réussi vers ${label}` : `Échec du rollback : ${res.rollback.message}`, { type: res.rollback.status === 'synced' ? 'ok' : 'crit' });
+      reload();
+      reloadPromotions();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setRollingBack(null);
     }
   }
 
@@ -191,6 +231,13 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                   <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'} env-badge-kind`}>{env.is_production ? 'Production' : env.kind}</span>
                   <strong>{env.name}</strong>
                   {env.blueprint_name && <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>({env.blueprint_name})</span>}
+                  {env.blueprint_id && (
+                    <div className="faint" style={{ fontSize: 11 }}>
+                      {env.provisioning_status === 'created' && <>Kubernetes : namespace <span className="mono">{env.provisioned_namespace}</span> appliqué</>}
+                      {env.provisioning_status === 'skipped' && <>Kubernetes : non provisionné — {env.provisioning_message}</>}
+                      {env.provisioning_status === 'failed' && <span style={{ color: 'var(--danger, #ef4444)' }}>Échec du provisioning : {env.provisioning_message}</span>}
+                    </div>
+                  )}
                   {env.source_branch && (
                     <div className="faint mono" style={{ fontSize: 11 }}>
                       {env.source_branch}{env.source_commit ? ` · ${env.source_commit.slice(0, 7)}` : ''}
@@ -204,10 +251,23 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                       <input className="input mono env-link-input" placeholder="nom app Argo CD" value={appInput} onChange={(e) => setAppInput(e.target.value)} />
                       <button className="btn env-link-save-btn" type="button" onClick={() => saveLink(env)}>OK</button>
                     </span>
+                  ) : provisioning === env.id ? (
+                    <div className="env-link-form" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, minWidth: 220 }}>
+                      <input className="input mono" placeholder="https://github.com/org/repo.git" value={provisionForm.repoURL} onChange={(e) => setProvisionForm((f) => ({ ...f, repoURL: e.target.value }))} />
+                      <input className="input mono" placeholder="chemin des manifestes (.)" value={provisionForm.path} onChange={(e) => setProvisionForm((f) => ({ ...f, path: e.target.value }))} />
+                      <input className="input mono" placeholder={`namespace (${env.provisioned_namespace || 'requis'})`} value={provisionForm.destinationNamespace} onChange={(e) => setProvisionForm((f) => ({ ...f, destinationNamespace: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn" type="button" disabled={provisionBusy || !provisionForm.repoURL.trim()} onClick={() => submitProvision(env)}>{provisionBusy ? '…' : 'Provisionner'}</button>
+                        <span className="btn-outline" onClick={() => setProvisioning(null)}>Annuler</span>
+                      </div>
+                    </div>
                   ) : env.argocd_app ? (
                     <span className="mono env-link-value" onClick={() => { setLinking(env.id); setAppInput(env.argocd_app); }}>{env.argocd_app}</span>
                   ) : (
-                    <span className="btn-outline env-link-btn" onClick={() => { setLinking(env.id); setAppInput(''); }}>Lier une app</span>
+                    <span style={{ display: 'flex', gap: 6 }}>
+                      <span className="btn-outline env-link-btn" onClick={() => { setLinking(env.id); setAppInput(''); }}>Lier une app existante</span>
+                      <span className="btn-outline env-link-btn" onClick={() => { setProvisioning(env.id); setProvisionForm({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: env.provisioned_namespace || '' }); }}>Provisionner</span>
+                    </span>
                   )}
                 </td>
                 <td className="env-table-cell">
@@ -268,9 +328,17 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
               <div key={p.id} className="env-history-row">
                 <Icon name={p.status === 'synced' ? 'check' : 'xCircle'} size={13} className="env-history-icon" style={{ color: `var(--tone-${p.status === 'synced' ? 'ok' : 'crit'}-fg)` }} />
                 <div>
-                  <div>{p.from_environment_name ? `${p.from_environment_name} → ${p.to_environment_name}` : `Synchronisation directe → ${p.to_environment_name}`} <span className="mono faint">({p.argocd_app})</span></div>
+                  <div>
+                    {p.is_rollback && <span className="badge badge-mut" style={{ marginRight: 6 }}>Rollback</span>}
+                    {p.from_environment_name ? `${p.from_environment_name} → ${p.to_environment_name}` : `Synchronisation directe → ${p.to_environment_name}`} <span className="mono faint">({p.argocd_app})</span>
+                  </div>
                   <div className="faint mono env-history-meta">{formatDate(p.created_at)}{p.revision ? ` · ${p.revision.slice(0, 7)}` : ''} · {p.message}</div>
                 </div>
+                {p.status === 'synced' && p.revision && (
+                  <span className="btn-outline" style={{ marginLeft: 'auto', fontSize: 11 }} onClick={() => (rollingBack ? undefined : doRollback(p))}>
+                    {rollingBack === p.id ? 'Rollback…' : 'Rollback vers cette version'}
+                  </span>
+                )}
               </div>
             ))
           )}

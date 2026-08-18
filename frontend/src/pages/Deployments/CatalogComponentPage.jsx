@@ -13,12 +13,33 @@ const KIND_LABEL = { service: 'Service', api: 'API', website: 'Site web', worker
 const DEP_KIND_LABEL = { runtime: 'runtime', build: 'build', data: 'data' };
 const BINDING_TYPE_LABEL = { postgres: 'PostgreSQL', redis: 'Redis', object_storage: 'Stockage objet', api: 'API', other: 'Autre' };
 
+// Observabilité (ÉTAPE 18 IDP) : pods RÉELS du namespace provisionné pour
+// cet environnement (voir environmentProvisioningService.js) — accès en
+// lecture Kubernetes ouvert à tout utilisateur authentifié (voir
+// routes/kubernetes.routes.js), aucune nouvelle route backend nécessaire.
+// Composant séparé (pas une boucle useApi dans le parent) : chaque
+// environnement a son propre namespace, donc son propre appel indépendant.
+function EnvironmentPodsSummary({ namespace }) {
+  const pods = useApi(() => api.get(`/kubernetes/pods?namespace=${encodeURIComponent(namespace)}`), [namespace]);
+  if (pods.loading) return <span className="faint">…</span>;
+  if (pods.error) return <span className="faint">{pods.error.message}</span>;
+  const items = pods.data?.items || [];
+  if (items.length === 0) return <span className="faint">Aucun pod dans « {namespace} »</span>;
+  const running = items.filter((p) => p.phase === 'Running').length;
+  return (
+    <Link to={`/kubernetes?ns=${encodeURIComponent(namespace)}`} className="faint mono" style={{ textDecoration: 'none' }}>
+      {running}/{items.length} pod(s) Running
+    </Link>
+  );
+}
+
 // Fiche composant : centre de travail du composant dans le Software
-// Catalog. Volontairement minimale pour l'instant (métadonnées + accès
-// rapide au projet parent) — les onglets déploiements/observabilité/sécurité
-// se rattacheront ici au fur et à mesure que ces briques existeront pour de
-// vrai côté backend (voir todo IDP : ne jamais afficher un onglet vide comme
-// s'il fonctionnait).
+// Catalog. Le runtime (section "Environnements du projet" ci-dessous)
+// réutilise les environnements du PROJET parent — un composant n'a pas ses
+// propres environnements, il partage ceux du projet qui le porte. Les
+// autres onglets (observabilité/sécurité) se rattacheront ici au fur et à
+// mesure que ces briques existeront pour de vrai côté backend (voir todo
+// IDP : ne jamais afficher un onglet vide comme s'il fonctionnait).
 export default function CatalogComponentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -36,6 +57,9 @@ export default function CatalogComponentPage() {
   const [addingBinding, setAddingBinding] = useState(false);
   const [bindingForm, setBindingForm] = useState({ bindingType: 'postgres', envVarName: '', vaultEntryId: '', description: '' });
   const [bindingBusy, setBindingBusy] = useState(false);
+  const [syncing, setSyncing] = useState(null);
+  const [syncEnvId, setSyncEnvId] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -49,6 +73,15 @@ export default function CatalogComponentPage() {
     [component?.project_legacy_id]
   );
   const vaultEntries = projectVault.data?.items || [];
+  // Runtime : les environnements sont rattachés au PROJET, pas au composant
+  // (un projet peut porter plusieurs composants qui partagent ses
+  // environnements) — même endpoint que EnvironmentsPage.jsx, statut Argo CD
+  // réel inclus (listEnvironmentsWithStatus côté backend).
+  const projectEnvironments = useApi(
+    () => (component?.project_legacy_id ? api.get(`/projects/${component.project_legacy_id}/environments`) : Promise.resolve(null)),
+    [component?.project_legacy_id]
+  );
+  const environments = projectEnvironments.data?.items || [];
   const componentBindings = bindings.data?.items || [];
 
   async function addBinding(e) {
@@ -74,6 +107,21 @@ export default function CatalogComponentPage() {
       bindings.reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
+    }
+  }
+
+  async function doSync(binding) {
+    setSyncBusy(true);
+    try {
+      const res = await api.post(`/catalog/components/${id}/bindings/${binding.id}/sync`, { environmentId: syncEnvId });
+      notify(res.result.message, { type: res.result.status === 'synced' ? 'ok' : 'crit' });
+      setSyncing(null);
+      setSyncEnvId('');
+      bindings.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setSyncBusy(false);
     }
   }
 
@@ -216,6 +264,37 @@ export default function CatalogComponentPage() {
           </div>
         )}
 
+        {environments.length > 0 && (
+          <div className="card catalog-detail-card">
+            <div className="catalog-deps-header">
+              <span className="faint">Runtime — Environnements du projet</span>
+              <Link to={`/deployments/projects/${component.project_legacy_id}`} className="btn-outline catalog-deps-add-btn">
+                Voir le projet
+              </Link>
+            </div>
+            <div className="catalog-detail-list">
+              {environments.map((env) => (
+                <div key={env.id} className="catalog-detail-row">
+                  <span>
+                    <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'}`} style={{ marginRight: 6 }}>{env.is_production ? 'Production' : env.kind}</span>
+                    {env.name}
+                  </span>
+                  <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    {env.argocd_app ? (
+                      <span className="faint">
+                        {env.app?.error ? env.app.error : `${env.app?.syncStatus || '—'} · ${env.app?.healthStatus || '—'}${env.app?.revision ? ` · ${env.app.revision}` : ''}`}
+                      </span>
+                    ) : (
+                      <span className="faint">Non lié à une application Argo CD</span>
+                    )}
+                    {env.provisioned_namespace && <EnvironmentPodsSummary namespace={env.provisioned_namespace} />}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {policyCheck.data && (
           <div className="card catalog-detail-card">
             <div className="catalog-deps-header">
@@ -343,18 +422,40 @@ export default function CatalogComponentPage() {
           {componentBindings.length === 0 ? (
             <p className="faint catalog-deps-empty">Aucun binding déclaré.</p>
           ) : componentBindings.map((b) => (
-            <div key={b.id} className="catalog-deps-row">
-              <span className="catalog-deps-link mono">{b.env_var_name}</span>
-              <span className="badge badge-mut">{BINDING_TYPE_LABEL[b.binding_type]}</span>
-              {b.vault_entry_label ? (
-                <span className="faint" style={{ fontSize: 12 }}><Icon name="lock" size={11} />{b.vault_entry_label}</span>
-              ) : (
-                <span className="faint" style={{ fontSize: 12 }}>Sans secret relié</span>
+            <div key={b.id}>
+              <div className="catalog-deps-row">
+                <span className="catalog-deps-link mono">{b.env_var_name}</span>
+                <span className="badge badge-mut">{BINDING_TYPE_LABEL[b.binding_type]}</span>
+                {b.vault_entry_label ? (
+                  <span className="faint" style={{ fontSize: 12 }}><Icon name="lock" size={11} />{b.vault_entry_label}</span>
+                ) : (
+                  <span className="faint" style={{ fontSize: 12 }}>Sans secret relié</span>
+                )}
+                {canManage && b.vault_entry_label && environments.length > 0 && (
+                  <span className="btn-outline catalog-deps-add-btn" onClick={() => setSyncing(syncing === b.id ? null : b.id)}>
+                    Synchroniser
+                  </span>
+                )}
+                {canManage && (
+                  <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeBinding(b.id)}>
+                    <Icon name="trash" size={11} />
+                  </span>
+                )}
+              </div>
+              {b.sync_status !== 'never' && (
+                <p className="faint" style={{ fontSize: 11, marginLeft: 4, color: b.sync_status === 'failed' ? 'var(--danger, #ef4444)' : undefined }}>
+                  {b.sync_status === 'synced' ? '✓ ' : '✗ '}{b.sync_message}
+                </p>
               )}
-              {canManage && (
-                <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeBinding(b.id)}>
-                  <Icon name="trash" size={11} />
-                </span>
+              {syncing === b.id && (
+                <div className="catalog-deps-form" style={{ marginBottom: 8 }}>
+                  <select className="input" value={syncEnvId} onChange={(e) => setSyncEnvId(e.target.value)}>
+                    <option value="">Environnement cible…</option>
+                    {environments.map((env) => <option key={env.id} value={env.id}>{env.name}{env.provisioned_namespace ? '' : ' (aucun namespace provisionné)'}</option>)}
+                  </select>
+                  <button className="btn" type="button" disabled={syncBusy || !syncEnvId} onClick={() => doSync(b)}>{syncBusy ? '…' : 'Synchroniser le secret'}</button>
+                  <span className="btn-outline" onClick={() => setSyncing(null)}>Annuler</span>
+                </div>
               )}
             </div>
           ))}

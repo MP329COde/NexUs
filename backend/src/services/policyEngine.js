@@ -20,6 +20,17 @@ function evaluateOne(policy, component) {
       return { passed: Boolean(component.description?.trim()), detail: component.description?.trim() ? null : 'Description vide' };
     case 'require_repository':
       return { passed: Boolean(component.repository_url), detail: component.repository_url ? null : 'Aucun dépôt relié' };
+    case 'require_linked_environment':
+      // Même signal que le check "environments" du Scorecard (ÉTAPE 22) —
+      // au moins un environnement du projet réellement relié à Argo CD
+      // (linkEnvironment vérifie l'existence de l'application avant
+      // d'accepter le lien, voir environmentPromotionService.js). Existence
+      // seule des environnements ne compte plus : ils sont auto-créés pour
+      // tout projet, ce ne serait jamais un signal utile.
+      return {
+        passed: Number(component.project_linked_environment_count || 0) > 0,
+        detail: Number(component.project_linked_environment_count || 0) > 0 ? null : 'Aucun environnement du projet relié à une application Argo CD'
+      };
     case 'block_critical_code_scan': {
       const last = listCodeScans()[0];
       const errors = last?.counts?.ERROR ?? 0;

@@ -18,7 +18,9 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
-import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } from '../services/environmentPromotionService.js';
+import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp, rollbackEnvironment } from '../services/environmentPromotionService.js';
+import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
+import { checkQuotaBeforeCreate } from '../services/quotaService.js';
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
@@ -305,9 +307,28 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   // inexistant, et un blueprint d'une AUTRE organisation resterait de
   // toute façon invisible/inutilisable côté UI (sélecteur alimenté par
   // GET /environment-blueprints?orgId=<org du projet>).
+  const blueprint = blueprintId ? await orgStore.getEnvironmentBlueprint(blueprintId) : null;
+
+  // Quotas (ÉTAPE 26 IDP) : vérifié AVANT toute écriture — jamais un
+  // environnement créé puis annulé après coup. Silencieux si l'organisation
+  // n'a défini aucun quota (comportement inchangé par défaut).
+  const quotaCheck = await checkQuotaBeforeCreate(req.pgProject.org_id, blueprint);
+  if (!quotaCheck.allowed) return res.status(409).json({ ok: false, error: quotaCheck.reason });
+
   const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl });
-  logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
-  res.status(201).json({ ok: true, environment });
+
+  // Provisioning réel (ÉTAPE 7 IDP) : uniquement si un blueprint a été
+  // choisi — un environnement créé sans blueprint reste purement déclaratif,
+  // comme avant. Ne bloque jamais la réponse HTTP sur un échec Kubernetes
+  // (voir environmentProvisioningService, qui n'a jamais lancé) : le
+  // résultat réel est déjà consigné sur l'environnement au retour.
+  let provisioning = { status: 'skipped', message: 'Aucun blueprint sélectionné' };
+  if (blueprint) {
+    provisioning = await provisionFromBlueprint(environment, blueprint, req.pgProject.slug);
+  }
+
+  logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name, provisioning: provisioning.status });
+  res.status(201).json({ ok: true, environment: { ...environment, provisioning_status: provisioning.status, provisioning_message: provisioning.message, provisioned_namespace: provisioning.namespace || null } });
 }));
 
 // Destroy Preview (ÉTAPE 11) : suppression manuelle, jamais la production
@@ -326,10 +347,36 @@ router.delete('/:id/environments/:envId', loadProjectAccess(), requireMinRole('m
 
 router.put('/:id/environments/:envId/link', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  // IDOR corrigé (audit sécurité) : linkEnvironment() ne vérifie lui-même
+  // que l'existence de l'environnement, jamais son project_id — sans ce
+  // contrôle ici, un maintainer d'un projet A pouvait modifier le lien Argo
+  // CD d'un environnement appartenant à un projet B en devinant/énumérant
+  // son id, malgré loadProjectAccess() qui n'autorise que le rôle sur A.
+  const target = await orgStore.getEnvironment(req.params.envId);
+  if (!target || target.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  await guardProductionEnvironment(req, req.params.envId);
   const { argocdApp } = req.body || {};
   const environment = await linkEnvironment(req.params.envId, argocdApp || null);
   logAudit(req, 'project.environment.link', { projectId: req.legacyProject.id, environmentId: req.params.envId, argocdApp: argocdApp || null });
   res.json({ ok: true, environment });
+}));
+
+// Provisionne réellement l'application Argo CD (voir
+// environmentPromotionService.provisionArgocdApp) — équivalent, pour le
+// socle relationnel, de POST /deployments/:id/provision-argocd-app.
+router.post('/:id/environments/:envId/provision-argocd-app', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const environment = await orgStore.getEnvironment(req.params.envId);
+  if (!environment || environment.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  // Même garde que sync/rollback/promote (audit sécurité) : provisionner
+  // (créer/reconfigurer) l'Application Argo CD d'un environnement de
+  // production est une action au moins aussi sensible qu'une simple
+  // synchronisation — pas de raison qu'elle échappe à guardProductionEnvironment.
+  await guardProductionEnvironment(req, req.params.envId);
+  const { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync } = req.body || {};
+  const updated = await provisionArgocdApp(req.params.envId, req.pgProject.slug, { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync });
+  logAudit(req, 'project.environment.provision_argocd_app', { projectId: req.legacyProject.id, environmentId: req.params.envId, appName: updated.argocd_app });
+  res.status(201).json({ ok: true, environment: updated });
 }));
 
 router.get('/:id/environments/promotions', loadProjectAccess(), asyncHandler(async (req, res) => {
@@ -347,6 +394,23 @@ router.post('/:id/environments/:envId/promote', loadProjectAccess(), requireMinR
   });
   logAudit(req, 'project.environment.promote', { projectId: req.legacyProject.id, toEnvironmentId: req.params.envId, fromEnvironmentId: fromEnvironmentId || null, status: promotion.status });
   res.status(201).json({ ok: true, promotion });
+}));
+
+// Rollback réel (ÉTAPE 17 IDP, équivalent relationnel de
+// POST /deployments/:linkId/rollback) : réservé owner, comme le rollback
+// legacy — jamais seulement maintainer, quelle que soit la criticité de
+// l'environnement (contrairement à promote/sync qui l'exigent uniquement
+// pour la production, un rollback reste une action suffisamment sensible
+// pour rester au niveau le plus haut inconditionnellement).
+router.post('/:id/environments/:envId/rollback', loadProjectAccess(), requireMinRole('owner'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { toPromotionId } = req.body || {};
+  if (!toPromotionId) return res.status(400).json({ ok: false, error: 'toPromotionId requis' });
+  const rollback = await rollbackEnvironment({
+    projectId: req.pgProject.id, environmentId: req.params.envId, toPromotionId, triggeredBy: req.user.id
+  });
+  logAudit(req, 'project.environment.rollback', { projectId: req.legacyProject.id, environmentId: req.params.envId, toPromotionId, status: rollback.status });
+  res.status(201).json({ ok: true, rollback });
 }));
 
 // --- Espace de travail : agrège l'état réel des dépôts liés au projet
@@ -605,6 +669,19 @@ router.post('/:id/jobs/:jobId/retry', loadProjectAccess(), requireMinRole('maint
   }
 
   res.status(400).json({ ok: false, error: `Type de job non re-lançable : "${original.type}"` });
+}));
+
+// Annulation coopérative (voir services/jobService.js) : même rôle minimum
+// que retry — un job de projet (scaffolding, sync, rollback...) engage des
+// ressources réelles, pas un simple viewer.
+router.post('/:id/jobs/:jobId/cancel', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const original = await jobService.getJob(req.params.jobId);
+  if (!original || original.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
+  const cancelled = await jobService.cancelJob(req.params.jobId);
+  if (!cancelled) return res.status(409).json({ ok: false, error: 'Seul un job en attente ou en cours peut être annulé' });
+  logAudit(req, 'job.cancel', { jobId: cancelled.id, type: cancelled.type, projectId: req.pgProject.id });
+  res.json({ ok: true, job: cancelled });
 }));
 
 // --- Incidents : suivi opérationnel (gravité, état, ressource affectée,

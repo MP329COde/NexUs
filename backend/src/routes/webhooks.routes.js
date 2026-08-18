@@ -6,6 +6,8 @@ import * as orgStore from '../store/orgStore.js';
 import * as incidentStore from '../store/incidentStore.js';
 import { logAudit } from '../services/auditService.js';
 import { logger } from '../utils/logger.js';
+import { handlePullRequestEvent } from '../services/previewEnvironmentWebhookService.js';
+import { handlePushEvent as handleServiceYamlPush } from '../services/serviceYamlDiscoveryService.js';
 
 // Points d'entrée publics (pas de requireAuth : GitLab/GitHub ne peuvent pas
 // s'authentifier comme un utilisateur Nexus) mais jamais des portes non
@@ -102,6 +104,21 @@ router.post('/github/:legacyProjectId', asyncHandler(async (req, res) => {
       resourceRef: String(event.workflow_run.id || ''),
       createdBy: 'webhook:github'
     });
+  }
+
+  // Preview Environments (ÉTAPE 10 IDP) — voir previewEnvironmentWebhookService.js
+  // pour la logique réelle (provisioning Kubernetes/destruction), testée
+  // indépendamment de ce routeur HTTP.
+  if (githubEvent === 'pull_request') {
+    await handlePullRequestEvent(project, event.action, event.pull_request, { user: { email: 'webhook:github' }, ip: req.ip });
+  }
+
+  // Auto-discovery service.yaml (ÉTAPE 22 IDP) — voir serviceYamlDiscoveryService.js.
+  if (githubEvent === 'push') {
+    const discovery = await handleServiceYamlPush(project, event);
+    if (discovery.handled) {
+      logAudit({ user: { email: 'webhook:github' }, ip: req.ip }, 'webhook.service_yaml.discover', { projectId: project.legacy_id, status: discovery.status, componentId: discovery.componentId });
+    }
   }
 
   res.json({ ok: true });

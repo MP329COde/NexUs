@@ -4,6 +4,7 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
+import { getOrgQuota, setOrgQuota, computeOrgUsage } from '../services/quotaService.js';
 
 const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$|^$/u;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -134,6 +135,29 @@ router.get('/:id/projects', asyncHandler(async (req, res) => {
   if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
   const items = await orgStore.listProjectsForUser(req.user.id);
   res.json({ ok: true, items: items.filter((p) => p.org_id === req.params.id) });
+}));
+
+// Quotas (ÉTAPE 26 IDP) : lecture ouverte à tout membre (utile pour
+// comprendre pourquoi une création est refusée), écriture réservée
+// owner/admin — même politique que Policies/Environment Blueprints.
+router.get('/:id/quota', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  const quota = await getOrgQuota(req.params.id);
+  const usage = await computeOrgUsage(req.params.id);
+  res.json({ ok: true, quota, usage });
+}));
+
+router.put('/:id/quota', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
+    return res.status(403).json({ ok: false, error: "Réservé owner/admin de l'organisation" });
+  }
+  const { maxEnvironments, maxCpuMillicores, maxMemoryBytes } = req.body || {};
+  const quota = await setOrgQuota(req.params.id, { maxEnvironments, maxCpuMillicores, maxMemoryBytes, updatedBy: req.user.id });
+  logAudit(req, 'organization.quota.update', { orgId: req.params.id, maxEnvironments, maxCpuMillicores, maxMemoryBytes });
+  res.json({ ok: true, quota });
 }));
 
 export default router;

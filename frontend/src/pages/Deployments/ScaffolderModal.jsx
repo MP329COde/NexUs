@@ -36,6 +36,7 @@ export default function ScaffolderModal({ template, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [job, setJob] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const pollRef = useRef(null);
 
   const projectDetail = useApi(() => (legacyProjectId ? api.get(`/projects/${legacyProjectId}`) : Promise.resolve(null)), [legacyProjectId]);
@@ -50,7 +51,7 @@ export default function ScaffolderModal({ template, onClose }) {
       try {
         const res = await api.get(`/projects/${legacyProjectId}/jobs/${jobId}`);
         setJob(res.job);
-        if (res.job.status === 'succeeded' || res.job.status === 'failed') clearInterval(pollRef.current);
+        if (['succeeded', 'failed', 'cancelled'].includes(res.job.status)) clearInterval(pollRef.current);
       } catch {
         clearInterval(pollRef.current);
       }
@@ -71,6 +72,19 @@ export default function ScaffolderModal({ template, onClose }) {
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function cancel() {
+    setCancelling(true);
+    try {
+      const res = await api.post(`/projects/${legacyProjectId}/jobs/${job.id}/cancel`);
+      setJob(res.job);
+      clearInterval(pollRef.current);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -152,11 +166,22 @@ export default function ScaffolderModal({ template, onClose }) {
             </div>
           )}
 
+          {job.status === 'cancelled' && (
+            <div className="card" style={{ padding: 12, borderColor: 'var(--text-faint)' }}>
+              <p className="faint">Création annulée.</p>
+            </div>
+          )}
+
           {(job.status === 'pending' || job.status === 'running') && (
             <p className="faint">Création en cours…</p>
           )}
 
           <div className="projects-form-actions" style={{ marginTop: 12 }}>
+            {(job.status === 'pending' || job.status === 'running') && (
+              <span className="btn-outline" onClick={cancelling ? undefined : cancel}>
+                {cancelling ? 'Annulation…' : 'Annuler'}
+              </span>
+            )}
             <span className="btn-outline" onClick={onClose}>Fermer</span>
           </div>
         </div>

@@ -1,0 +1,15 @@
+{
+  "name": "nexus-cli",
+  "version": "0.1.0",
+  "description": "CLI Nexus Console — scripte l'API publique/console depuis la ligne de commande (CI/CD externe ou usage local).",
+  "type": "module",
+  "bin": {
+    "nexus": "./bin/nexus.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -109,4 +109,31 @@ if (!hasPostgres) {
     assert.ok(all.some((j) => j.type === 'test.scope.admin'));
     await query("DELETE FROM jobs WHERE type LIKE 'test.scope.%'");
   });
+
+  test('cancelJob : lève le flag coopératif pendant que run() tourne, et le succès arrivé après coup n\'écrase pas l\'annulation', async () => {
+    let sawCancelled = false;
+    const job = await jobService.enqueue({ type: 'test.cancel', projectId: null, userId: 'u1' }, async (_job, { isCancelled }) => {
+      await new Promise((r) => setTimeout(r, 20));
+      sawCancelled = isCancelled();
+      return 'devrait-etre-ignore';
+    });
+    const cancelled = await jobService.cancelJob(job.id);
+    assert.equal(cancelled.status, 'cancelled');
+    await new Promise((r) => setTimeout(r, 60)); // laisse run() se terminer
+    assert.equal(sawCancelled, true);
+    const { rows } = await query('SELECT status, result FROM jobs WHERE id = $1', [job.id]);
+    assert.equal(rows[0].status, 'cancelled');
+    assert.equal(rows[0].result, null);
+  });
+
+  test('cancelJob : un job déjà terminé (succeeded) ne peut plus être annulé', async () => {
+    const { rows } = await query(
+      `INSERT INTO jobs (type, status, created_by, result) VALUES ('test.cancel.done', 'succeeded', 'u1', '"ok"') RETURNING *`
+    );
+    const done = rows[0];
+    const result = await jobService.cancelJob(done.id);
+    assert.equal(result, null);
+    const { rows: after } = await query('SELECT status FROM jobs WHERE id = $1', [done.id]);
+    assert.equal(after[0].status, 'succeeded');
+  });
 }

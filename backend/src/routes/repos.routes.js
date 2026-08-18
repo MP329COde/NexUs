@@ -6,6 +6,7 @@ import * as github from '../services/integrations/githubService.js';
 import * as gitea from '../services/integrations/giteaService.js';
 import * as meta from '../store/repoMetaStore.js';
 import { logAudit } from '../services/auditService.js';
+import { buildCiWorkflow } from '../services/ciWorkflowService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -212,72 +213,11 @@ router.post('/:key/propose-change', asyncHandler(async (req, res) => {
 }));
 
 // Génère un workflow GitHub Actions prêt à l'emploi (lint/test/build + SAST
-// Semgrep + SCA Trivy + secret scanning GitGuardian, via de vraies actions
-// publiées, pas un appel fictif) et l'ouvre en pull request — l'admin n'a
-// pas à écrire le fichier lui-même (voir base-dev/developement item 13).
-// GitHub Actions uniquement : GitLab a son .gitlab-ci.yml natif équivalent.
-function buildCiWorkflow({ stack, packageManager }) {
-  const isNode = stack.includes('Node.js / JavaScript');
-  const installCmd = packageManager === 'pnpm' ? 'pnpm install --frozen-lockfile' : packageManager === 'yarn' ? 'yarn install --frozen-lockfile' : 'npm ci';
-  const buildJob = isNode ? `
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: ${installCmd}
-      - run: npm run lint --if-present
-      - run: npm test --if-present
-      - run: npm run build --if-present` : `
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "Aucune stack Node.js détectée — adaptez ce job (lint/test/build) à votre langage."`;
-
-  return `# Généré par Nexus Console depuis la structure détectée du dépôt.
-# Adaptez les jobs ci-dessous à vos besoins ; les jobs de sécurité utilisent
-# de vraies actions GitHub tierces (pas un service Nexus) — GITGUARDIAN_API_KEY
-# doit être ajouté aux secrets du dépôt pour activer le scan de secrets.
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:${buildJob}
-
-  sast-semgrep:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: semgrep/semgrep-action@v1
-        with:
-          config: auto
-
-  sca-trivy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          severity: CRITICAL,HIGH
-
-  secret-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: GitGuardian/ggshield-action@v1
-        env:
-          GITGUARDIAN_API_KEY: \${{ secrets.GITGUARDIAN_API_KEY }}
-`;
-}
-
+// Semgrep + SCA Trivy + secret scanning GitGuardian + build/scan/SBOM
+// d'image si un Dockerfile est détecté — voir services/ciWorkflowService.js,
+// partagé avec le Scaffolder) et l'ouvre en pull request — l'admin n'a pas à
+// écrire le fichier lui-même (voir base-dev/developement item 13). GitHub
+// Actions uniquement : GitLab a son .gitlab-ci.yml natif équivalent.
 router.post('/:key/workflows/generate-ci', asyncHandler(async (req, res) => {
   const { provider, id } = parseKey(req.params.key);
   if (provider !== 'github') return res.status(400).json({ ok: false, error: 'La génération de workflow GitHub Actions ne concerne que les dépôts GitHub.' });
@@ -291,7 +231,7 @@ router.post('/:key/workflows/generate-ci', asyncHandler(async (req, res) => {
   const packageManager = PACKAGE_MANAGER_SIGNALS.find((s) => names.has(s.file))?.manager || null;
 
   const branch = `nexus/github-actions-ci-${Date.now()}`;
-  const workflow = buildCiWorkflow({ stack, packageManager });
+  const workflow = buildCiWorkflow({ stack, packageManager, hasDockerfile: names.has('Dockerfile') });
   await github.createBranch(owner, repo, branch, baseBranch);
   await github.commitFile(owner, repo, branch, '.github/workflows/ci.yml', workflow, 'Ajoute un workflow CI (Nexus Console)');
   const pr = await github.createPullRequest(owner, repo, branch, baseBranch, 'Ajoute un workflow GitHub Actions CI');

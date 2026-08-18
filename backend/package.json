@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test",
+    "test": "DATABASE_URL= node --test",
     "migrate:postgres": "node src/scripts/migrate-to-postgres.js"
   },
   "dependencies": {

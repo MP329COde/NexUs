@@ -11,6 +11,7 @@ const KINDS = [
   { value: 'require_production_lifecycle', label: 'Cycle de vie "production" requis', threshold: false },
   { value: 'require_description', label: 'Documentation requise', threshold: false },
   { value: 'require_repository', label: 'Dépôt relié requis', threshold: false },
+  { value: 'require_linked_environment', label: 'Environnement relié à Argo CD requis', threshold: false },
   { value: 'block_critical_code_scan', label: 'Bloque si erreurs sur le dernier scan de code', threshold: true },
   { value: 'block_high_dast_scan', label: 'Bloque si alertes élevées sur le dernier scan DAST', threshold: true }
 ];
