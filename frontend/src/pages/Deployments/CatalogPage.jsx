@@ -23,7 +23,7 @@ const LIFECYCLES = [
   { value: 'production', label: 'Production', badge: 'ok' },
   { value: 'deprecated', label: 'Déprécié', badge: 'mut' }
 ];
-const EMPTY_FORM = { legacyProjectId: '', name: '', description: '', kind: 'service', lifecycle: 'experimental', language: '', framework: '', repositoryUrl: '' };
+const EMPTY_FORM = { legacyProjectId: '', ownerTeamId: '', name: '', description: '', kind: 'service', lifecycle: 'experimental', language: '', framework: '', repositoryUrl: '' };
 
 function lifecycleMeta(v) { return LIFECYCLES.find((l) => l.value === v) || LIFECYCLES[0]; }
 function kindLabel(v) { return KINDS.find((k) => k.value === v)?.label || v; }
@@ -40,6 +40,13 @@ export default function CatalogPage() {
   const projects = useApi(() => api.get('/projects'), []);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  // L'équipe propriétaire proposée dépend de l'organisation du projet
+  // sélectionné (une équipe appartient à une organisation, voir
+  // store/orgStore.js) — récupérée en deux temps : projet → orgId → équipes.
+  const projectDetail = useApi(() => (form.legacyProjectId ? api.get(`/projects/${form.legacyProjectId}`) : Promise.resolve(null)), [form.legacyProjectId]);
+  const orgId = projectDetail.data?.project?.orgId;
+  const teams = useApi(() => (orgId ? api.get(`/teams/org/${orgId}`) : Promise.resolve(null)), [orgId]);
+  const availableTeams = teams.data?.items || [];
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('');
@@ -121,10 +128,22 @@ export default function CatalogPage() {
         <Modal title="Déclarer un composant" sub="Enregistre un service/API/worker existant dans le catalogue" onClose={() => setFormOpen(false)} width={520}>
           <form onSubmit={createComponent}>
             <label className="projects-form-label">Projet</label>
-            <select className="input" required value={form.legacyProjectId} onChange={(e) => setForm((f) => ({ ...f, legacyProjectId: e.target.value }))} style={{ marginBottom: 12 }}>
+            <select className="input" required value={form.legacyProjectId} onChange={(e) => setForm((f) => ({ ...f, legacyProjectId: e.target.value, ownerTeamId: '' }))} style={{ marginBottom: 12 }}>
               <option value="">Sélectionner un projet…</option>
               {allProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+            {form.legacyProjectId && (
+              <>
+                <label className="projects-form-label">Équipe propriétaire (optionnel)</label>
+                <select className="input" value={form.ownerTeamId} onChange={(e) => setForm((f) => ({ ...f, ownerTeamId: e.target.value }))} style={{ marginBottom: 12 }}>
+                  <option value="">Aucune équipe définie</option>
+                  {availableTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {orgId && availableTeams.length === 0 && (
+                  <p className="faint" style={{ marginTop: -8, marginBottom: 12 }}>Aucune équipe dans cette organisation — créez-en une depuis la fiche organisation.</p>
+                )}
+              </>
+            )}
             <div className="projects-form-row">
               <div className="projects-form-field-name">
                 <label className="projects-form-label">Nom</label>

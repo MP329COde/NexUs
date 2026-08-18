@@ -105,4 +105,23 @@ if (!hasPostgres) {
     const afterDelete = await orgStore.getComponent(component.id);
     assert.equal(afterDelete, null);
   });
+
+  // listTeamsForOrg mélangeait GROUP BY et window function (COUNT(...) OVER
+  // PARTITION BY) de façon invalide en SQL — jamais détecté car aucune
+  // interface frontend n'appelait cette route avant l'ajout de TeamsModal.jsx
+  // (voir todo.md, "teams sans UI"). Postgres refusait la requête avec
+  // "column tm2.user_id must appear in the GROUP BY clause", corrigé par une
+  // sous-requête de comptage.
+  test('orgStore (teams) : listTeamsForOrg ne lève plus d\'erreur SQL et rapporte le bon effectif', async () => {
+    const team = await orgStore.createTeam({ orgId: org.id, name: 'Team Finance RS', slug: `team-finance-rs-${Date.now()}`, ownerUserId: 'u1' });
+    const teams = await orgStore.listTeamsForOrg(org.id, 'u1');
+    const found = teams.find((t) => t.id === team.id);
+    assert.ok(found, 'équipe créée absente de la liste');
+    assert.equal(found.my_role, 'lead');
+    assert.equal(Number(found.member_count), 1);
+
+    await orgStore.addTeamMember(team.id, 'u2', 'member');
+    const teamsAfterAdd = await orgStore.listTeamsForOrg(org.id, 'u1');
+    assert.equal(Number(teamsAfterAdd.find((t) => t.id === team.id).member_count), 2);
+  });
 }

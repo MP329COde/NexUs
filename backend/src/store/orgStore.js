@@ -398,12 +398,11 @@ export async function listTeamsForOrg(orgId, userId) {
   // filtrée par appartenance : voir teams.routes.js pour la vérification
   // d'accès (membre de l'organisation).
   const { rows } = await query(
-    `SELECT t.*, tm.role AS my_role, COUNT(tm2.user_id) OVER (PARTITION BY t.id) AS member_count
+    `SELECT t.*, tm.role AS my_role,
+        (SELECT COUNT(*) FROM team_members tm2 WHERE tm2.team_id = t.id) AS member_count
      FROM teams t
      LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = $2
-     LEFT JOIN team_members tm2 ON tm2.team_id = t.id
      WHERE t.org_id = $1
-     GROUP BY t.id, tm.role
      ORDER BY t.name`,
     [orgId, userId]
   );

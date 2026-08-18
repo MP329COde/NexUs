@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import OrgMembersModal from './OrgMembersModal.jsx';
+import TeamsModal from './TeamsModal.jsx';
 import './OrganizationDetailPage.css';
 
 const ROLE_LABEL = { owner: 'Propriétaire', admin: 'Admin', member: 'Membre' };
@@ -21,6 +22,7 @@ export default function OrganizationDetailPage() {
   const { data, error } = useApi(() => api.get(`/organizations/${id}`), [id]);
   const projects = useApi(() => api.get(`/organizations/${id}/projects`), [id]);
   const [managingMembers, setManagingMembers] = useState(false);
+  const [managingTeams, setManagingTeams] = useState(false);
 
   const org = data?.organization;
   const canManage = user?.role === 'admin' || org?.my_role === 'owner' || org?.my_role === 'admin';
@@ -62,6 +64,13 @@ export default function OrganizationDetailPage() {
             </div>
           </div>
         )}
+        <div className="card odp-menu-item" onClick={() => setManagingTeams(true)} role="button">
+          <Icon name="layers" size={20} />
+          <div>
+            <div className="odp-menu-item-title">Équipes</div>
+            <div className="faint odp-menu-item-sub">Regroupements utilisés comme propriétaires de composants</div>
+          </div>
+        </div>
       </div>
 
       <Panel title="Projets de l'organisation" sub={`${projects.data?.items?.length ?? 0} projet(s)`} span={12}>
@@ -87,6 +96,10 @@ export default function OrganizationDetailPage() {
           canManageUsers={user?.role === 'admin'}
           onClose={() => setManagingMembers(false)}
         />
+      )}
+
+      {managingTeams && (
+        <TeamsModal org={org} canManage={canManage} onClose={() => setManagingTeams(false)} />
       )}
     </>
   );
