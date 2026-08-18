@@ -1,5 +1,6 @@
 import * as orgStore from '../store/orgStore.js';
 import { provisionFromBlueprint } from './environmentProvisioningService.js';
+import { checkQuotaBeforeCreate } from './quotaService.js';
 
 // Relie les Platform Requests aux vrais workflows de provisioning (ÉTAPE 12
 // IDP) : jusqu'ici approuver une demande ne faisait que changer son statut
@@ -47,6 +48,11 @@ export async function applyApprovedRequest(request) {
     blueprint = await orgStore.getEnvironmentBlueprint(payload.blueprintId);
     if (!blueprint) return { status: 'failed', message: `Blueprint "${payload.blueprintId}" introuvable.` };
   }
+
+  // Quotas (ÉTAPE 26 IDP) : une approbation ne doit pas pouvoir dépasser la
+  // limite de l'organisation — même vérification que la création manuelle.
+  const quotaCheck = await checkQuotaBeforeCreate(request.org_id, blueprint);
+  if (!quotaCheck.allowed) return { status: 'failed', message: quotaCheck.reason };
 
   const environment = await orgStore.createEnvironment(request.project_id, {
     name: environmentName, kind: 'production', isProduction: true, blueprintId: blueprint?.id || null

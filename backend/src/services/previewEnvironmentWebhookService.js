@@ -1,5 +1,6 @@
 import * as orgStore from '../store/orgStore.js';
 import { provisionFromBlueprint } from './environmentProvisioningService.js';
+import { checkQuotaBeforeCreate } from './quotaService.js';
 import { logAudit } from './auditService.js';
 
 // Preview Environments (ÉTAPE 10 IDP) : traite un événement GitHub
@@ -32,6 +33,15 @@ export async function handlePullRequestEvent(project, action, pr, reqLike = {}) 
     }
     const blueprints = await orgStore.listEnvironmentBlueprintsForOrg(project.org_id);
     const previewBlueprint = blueprints.find((b) => b.kind === 'preview') || null;
+
+    // Quotas (ÉTAPE 26 IDP) : une rafale de PR ne doit pas pouvoir
+    // contourner la limite de l'organisation — même vérification que la
+    // création manuelle (routes/projects.routes.js).
+    const quotaCheck = await checkQuotaBeforeCreate(project.org_id, previewBlueprint);
+    if (!quotaCheck.allowed) {
+      return { handled: true, action: 'rejected', reason: quotaCheck.reason };
+    }
+
     const environment = await orgStore.createEnvironment(project.id, {
       name: envName, kind: 'preview', isProduction: false,
       blueprintId: previewBlueprint?.id || null,

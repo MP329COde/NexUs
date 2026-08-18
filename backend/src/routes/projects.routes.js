@@ -20,6 +20,7 @@ import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
 import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp, rollbackEnvironment } from '../services/environmentPromotionService.js';
 import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
+import { checkQuotaBeforeCreate } from '../services/quotaService.js';
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { getMinPasswordLength } from '../store/identityStore.js';
@@ -306,6 +307,14 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   // inexistant, et un blueprint d'une AUTRE organisation resterait de
   // toute façon invisible/inutilisable côté UI (sélecteur alimenté par
   // GET /environment-blueprints?orgId=<org du projet>).
+  const blueprint = blueprintId ? await orgStore.getEnvironmentBlueprint(blueprintId) : null;
+
+  // Quotas (ÉTAPE 26 IDP) : vérifié AVANT toute écriture — jamais un
+  // environnement créé puis annulé après coup. Silencieux si l'organisation
+  // n'a défini aucun quota (comportement inchangé par défaut).
+  const quotaCheck = await checkQuotaBeforeCreate(req.pgProject.org_id, blueprint);
+  if (!quotaCheck.allowed) return res.status(409).json({ ok: false, error: quotaCheck.reason });
+
   const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl });
 
   // Provisioning réel (ÉTAPE 7 IDP) : uniquement si un blueprint a été
@@ -314,8 +323,7 @@ router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer
   // (voir environmentProvisioningService, qui n'a jamais lancé) : le
   // résultat réel est déjà consigné sur l'environnement au retour.
   let provisioning = { status: 'skipped', message: 'Aucun blueprint sélectionné' };
-  if (blueprintId) {
-    const blueprint = await orgStore.getEnvironmentBlueprint(blueprintId);
+  if (blueprint) {
     provisioning = await provisionFromBlueprint(environment, blueprint, req.pgProject.slug);
   }
 

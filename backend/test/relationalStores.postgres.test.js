@@ -752,4 +752,41 @@ if (!hasPostgres) {
       await query('DELETE FROM organizations WHERE id = $1', [otherOrg.id]);
     }
   });
+
+  test('quotaService : bloque proprement la création au-delà du quota (nombre d\'environnements, puis CPU) — silencieux sans quota défini', async () => {
+    const quotaService = await import('../src/services/quotaService.js');
+    // Organisation/projet dédiés et isolés : le fixture partagé `org` a déjà
+    // de nombreux environnements créés par d'autres tests de ce fichier,
+    // ce qui fausserait un quota par NOMBRE d'environnements.
+    const quotaOrg = await orgStore.createOrganization({ name: 'Quota Test Org', slug: `quota-org-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const quotaProject = await orgStore.createProject({ orgId: quotaOrg.id, name: 'Quota Test Project', slug: `quota-project-${Date.now()}`, legacyId: `quota-legacy-${Date.now()}` });
+
+      // Sans quota défini : silencieux, toujours autorisé.
+      const noQuota = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, null);
+      assert.equal(noQuota.allowed, true);
+
+      await quotaService.setOrgQuota(quotaOrg.id, { maxEnvironments: 1, updatedBy: 'u1' });
+      // createEnvironment crée déjà 'production'+'staging' automatiquement
+      // via orgStore.createProject — le quota de 1 est donc déjà dépassé.
+      const overCount = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, null);
+      assert.equal(overCount.allowed, false);
+      assert.match(overCount.reason, /environnements/);
+
+      // Quota CPU : un blueprint qui dépasserait la limite est refusé,
+      // un autre qui reste dessous est accepté (même org, quota relevé).
+      await quotaService.setOrgQuota(quotaOrg.id, { maxEnvironments: 100, maxCpuMillicores: 1000, updatedBy: 'u1' });
+      const usage = await quotaService.computeOrgUsage(quotaOrg.id);
+      assert.equal(usage.cpuMillicores, 0); // aucun des environnements existants n'a de blueprint
+
+      const tooMuchCpu = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, { cpu: '2' }); // 2000m > 1000m
+      assert.equal(tooMuchCpu.allowed, false);
+      assert.match(tooMuchCpu.reason, /CPU/);
+
+      const withinCpu = await quotaService.checkQuotaBeforeCreate(quotaOrg.id, { cpu: '500m' });
+      assert.equal(withinCpu.allowed, true);
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [quotaOrg.id]);
+    }
+  });
 }
