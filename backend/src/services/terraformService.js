@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dataDir } from '../config/paths.js';
 import { getRawIntegration } from '../store/settingsStore.js';
+import { encryptSecret, decryptSecret } from '../utils/crypto.js';
 
 // Infrastructure as Code réelle : génère un espace de travail Terraform
 // (provider bpg/proxmox, open source) par ressource déclarée depuis Nexus,
@@ -123,6 +124,46 @@ export function removeWorkspaceFiles(id) {
   fs.rmSync(workspaceDir(id), { recursive: true, force: true });
 }
 
+// Le state Terraform embarque en clair, par conception du format, les mêmes
+// identifiants sensibles que terraform.tfvars (voir buildTfvars) — il n'était
+// jusqu'ici protégé que par les permissions Unix (0600), jamais par
+// encryptSecret/decryptSecret comme le reste des secrets applicatifs (voir
+// utils/crypto.js). Le binaire `terraform` ne sait lire/écrire que du JSON en
+// clair : on le déchiffre juste avant chaque commande qui peut le lire
+// (plan/apply/destroy) et on le rechiffre juste après, pour ne jamais le
+// laisser en clair au repos entre deux exécutions.
+const STATE_FILE = 'terraform.tfstate';
+const ENCRYPTED_STATE_FILE = 'terraform.tfstate.enc';
+
+function statePath(id) {
+  return path.join(workspaceDir(id), STATE_FILE);
+}
+
+function encryptedStatePath(id) {
+  return path.join(workspaceDir(id), ENCRYPTED_STATE_FILE);
+}
+
+function decryptStateForRun(id) {
+  const encPath = encryptedStatePath(id);
+  if (!fs.existsSync(encPath)) return;
+  const plain = decryptSecret(fs.readFileSync(encPath, 'utf8'));
+  if (plain != null) fs.writeFileSync(statePath(id), plain, { mode: 0o600 });
+}
+
+function encryptStateAfterRun(id) {
+  const plainPath = statePath(id);
+  if (fs.existsSync(plainPath)) {
+    const plain = fs.readFileSync(plainPath, 'utf8');
+    fs.writeFileSync(encryptedStatePath(id), encryptSecret(plain), { mode: 0o600 });
+    fs.rmSync(plainPath, { force: true });
+  }
+  // Sauvegarde générée par terraform avant chaque écriture d'état (contient
+  // le même contenu sensible) : jamais utilisée en lecture par Nexus, pas
+  // besoin de la rechiffrer — supprimée pour ne pas la laisser en clair.
+  const backupPath = `${plainPath}.backup`;
+  fs.rmSync(backupPath, { force: true });
+}
+
 function execTerraform(id, args) {
   return new Promise((resolve, reject) => {
     execFile('terraform', args, { cwd: workspaceDir(id), timeout: RUN_TIMEOUT_MS, maxBuffer: MAX_BUFFER }, (err, stdout, stderr) => {
@@ -144,23 +185,38 @@ async function init(id) {
 // changements sont détectés, 0 quand rien ne change, tout le reste est un
 // véritable échec (config invalide, identifiants Proxmox refusés...).
 export async function plan(id) {
-  await init(id);
-  const { err, stdout, stderr } = await execTerraform(id, ['plan', '-input=false', '-no-color']);
-  if (err && err.code !== 2) {
-    throw Object.assign(new Error(`Échec du plan Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
+  decryptStateForRun(id);
+  try {
+    await init(id);
+    const { err, stdout, stderr } = await execTerraform(id, ['plan', '-input=false', '-no-color']);
+    if (err && err.code !== 2) {
+      throw Object.assign(new Error(`Échec du plan Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
+    }
+    return { output: stdout, hasChanges: err?.code === 2 };
+  } finally {
+    encryptStateAfterRun(id);
   }
-  return { output: stdout, hasChanges: err?.code === 2 };
 }
 
 export async function apply(id) {
-  await init(id);
-  const { err, stdout, stderr } = await execTerraform(id, ['apply', '-input=false', '-auto-approve', '-no-color']);
-  if (err) throw Object.assign(new Error(`Échec de l'application Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
-  return { output: stdout };
+  decryptStateForRun(id);
+  try {
+    await init(id);
+    const { err, stdout, stderr } = await execTerraform(id, ['apply', '-input=false', '-auto-approve', '-no-color']);
+    if (err) throw Object.assign(new Error(`Échec de l'application Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
+    return { output: stdout };
+  } finally {
+    encryptStateAfterRun(id);
+  }
 }
 
 export async function destroy(id) {
-  const { err, stdout, stderr } = await execTerraform(id, ['destroy', '-input=false', '-auto-approve', '-no-color']);
-  if (err) throw Object.assign(new Error(`Échec de la destruction Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
-  return { output: stdout };
+  decryptStateForRun(id);
+  try {
+    const { err, stdout, stderr } = await execTerraform(id, ['destroy', '-input=false', '-auto-approve', '-no-color']);
+    if (err) throw Object.assign(new Error(`Échec de la destruction Terraform : ${(stderr || '').trim().split('\n').filter(Boolean).slice(-1)[0] || err.message}`), { status: 502 });
+    return { output: stdout };
+  } finally {
+    encryptStateAfterRun(id);
+  }
 }
