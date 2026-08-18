@@ -334,18 +334,66 @@ export async function removeMember(projectId, userId) {
 
 export async function listEnvironments(projectId) {
   const { rows } = await query(
-    'SELECT * FROM environments WHERE project_id = $1 ORDER BY is_production DESC, name',
+    `SELECT e.*, b.name AS blueprint_name
+     FROM environments e
+     LEFT JOIN environment_blueprints b ON b.id = e.blueprint_id
+     WHERE e.project_id = $1 ORDER BY e.is_production DESC, e.name`,
     [projectId]
   );
   return rows;
 }
 
-export async function createEnvironment(projectId, { name, kind, isProduction }) {
+export async function createEnvironment(projectId, { name, kind, isProduction, blueprintId }) {
   const { rows } = await query(
-    `INSERT INTO environments (project_id, name, kind, is_production) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [projectId, name, kind || 'custom', Boolean(isProduction)]
+    `INSERT INTO environments (project_id, name, kind, is_production, blueprint_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [projectId, name, kind || 'custom', Boolean(isProduction), blueprintId || null]
   );
   return rows[0];
+}
+
+// --- Environment Blueprints ------------------------------------------
+export async function listEnvironmentBlueprintsForOrg(orgId) {
+  const { rows } = await query('SELECT * FROM environment_blueprints WHERE org_id = $1 ORDER BY name', [orgId]);
+  return rows;
+}
+
+export async function getEnvironmentBlueprint(id) {
+  const { rows } = await query('SELECT * FROM environment_blueprints WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createEnvironmentBlueprint({ orgId, name, slug, kind, namespacePattern, replicas, cpu, memory, storageGb, ingressDomain, ttlMinutes, monitoringEnabled }) {
+  const { rows } = await query(
+    `INSERT INTO environment_blueprints (org_id, name, slug, kind, namespace_pattern, replicas, cpu, memory, storage_gb, ingress_domain, ttl_minutes, monitoring_enabled)
+     VALUES ($1, $2, $3, COALESCE($4, 'custom'), COALESCE($5, ''), COALESCE($6, 1), COALESCE($7, ''), COALESCE($8, ''), $9, COALESCE($10, ''), $11, COALESCE($12, true))
+     RETURNING *`,
+    [orgId, name, slug, kind || null, namespacePattern || null, replicas ?? null, cpu || null, memory || null, storageGb ?? null, ingressDomain || null, ttlMinutes ?? null, monitoringEnabled ?? null]
+  );
+  return rows[0];
+}
+
+export async function updateEnvironmentBlueprint(id, { name, kind, namespacePattern, replicas, cpu, memory, storageGb, ingressDomain, ttlMinutes, monitoringEnabled }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (name !== undefined) set('name', name);
+  if (kind !== undefined) set('kind', kind);
+  if (namespacePattern !== undefined) set('namespace_pattern', namespacePattern);
+  if (replicas !== undefined) set('replicas', replicas);
+  if (cpu !== undefined) set('cpu', cpu);
+  if (memory !== undefined) set('memory', memory);
+  if (storageGb !== undefined) set('storage_gb', storageGb);
+  if (ingressDomain !== undefined) set('ingress_domain', ingressDomain);
+  if (ttlMinutes !== undefined) set('ttl_minutes', ttlMinutes);
+  if (monitoringEnabled !== undefined) set('monitoring_enabled', monitoringEnabled);
+  params.push(id);
+  const { rows } = await query(`UPDATE environment_blueprints SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deleteEnvironmentBlueprint(id) {
+  const { rowCount } = await query('DELETE FROM environment_blueprints WHERE id = $1', [id]);
+  return rowCount > 0;
 }
 
 export async function getEnvironment(id) {

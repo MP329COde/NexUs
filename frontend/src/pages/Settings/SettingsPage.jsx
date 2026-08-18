@@ -10,6 +10,7 @@ import UsersPanel from './UsersPanel.jsx';
 import GroupsPanel from './GroupsPanel.jsx';
 import InventoryPanel from './InventoryPanel.jsx';
 import PlatformPanel from './PlatformPanel.jsx';
+import EnvironmentBlueprintsPanel from './EnvironmentBlueprintsPanel.jsx';
 import IdentityPanel from './IdentityPanel.jsx';
 import GitServicesPanel from './GitServicesPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'groups', label: 'Groupes & permissions', domain: 'users', level: 'admin' },
   { id: 'inventory', label: 'Inventaire', domain: 'inventory', level: 'admin', primaryAdminOnly: true },
   { id: 'platform', label: 'Plateforme', domain: 'settings', level: 'admin' },
+  { id: 'environment-blueprints', label: "Blueprints d'environnement", domain: 'settings', level: 'admin' },
   { id: 'identity', label: 'Connexion & identité', domain: 'identity', level: 'admin' },
   { id: 'git', label: 'Services Git', adminOnly: true },
   { id: 'system', label: 'Système', adminOnly: true },
@@ -92,6 +94,7 @@ export default function SettingsPage() {
       {tab === 'groups' && <GroupsPanel />}
       {tab === 'inventory' && <InventoryPanel />}
       {tab === 'platform' && <PlatformPanel data={data} error={error} reload={reload} />}
+      {tab === 'environment-blueprints' && <EnvironmentBlueprintsPanel />}
       {tab === 'identity' && <IdentityPanel />}
       {tab === 'git' && <GitServicesPanel />}
       {tab === 'system' && <SystemPanel />}

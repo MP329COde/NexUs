@@ -1,0 +1,57 @@
+.ebp-org-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.ebp-empty {
+  padding: 16px 0;
+}
+
+.ebp-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ebp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.ebp-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.ebp-row-name {
+  font-weight: 600;
+}
+
+.ebp-row-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+  font-size: 12px;
+}
+
+.ebp-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ebp-form {
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}

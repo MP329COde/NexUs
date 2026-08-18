@@ -169,4 +169,38 @@ if (!hasPostgres) {
     });
     assert.equal(result.component.owner_team_id, team.id);
   });
+
+  test('orgStore (environment blueprints) : create/update/delete + application à un environnement', async () => {
+    const blueprint = await orgStore.createEnvironmentBlueprint({
+      orgId: org.id, name: 'Staging RS', slug: `staging-rs-${Date.now()}`, kind: 'staging',
+      namespacePattern: '{project}-staging', replicas: 2, cpu: '500m', memory: '512Mi', storageGb: 10,
+      ingressDomain: 'staging.example.com', ttlMinutes: null, monitoringEnabled: true
+    });
+    assert.equal(blueprint.replicas, 2);
+    assert.equal(blueprint.monitoring_enabled, true);
+
+    const listed = await orgStore.listEnvironmentBlueprintsForOrg(org.id);
+    assert.ok(listed.some((b) => b.id === blueprint.id));
+
+    const updated = await orgStore.updateEnvironmentBlueprint(blueprint.id, { replicas: 3, ttlMinutes: 60 });
+    assert.equal(updated.replicas, 3);
+    assert.equal(updated.ttl_minutes, 60);
+
+    // Un environnement créé avec ce blueprint le référence par id, et
+    // listEnvironments() rapporte son nom via jointure — c'est ce
+    // qu'affiche EnvironmentsPage.jsx à côté du nom de l'environnement.
+    const env = await orgStore.createEnvironment(project.id, { name: `preview-rs-${Date.now()}`, kind: 'preview', blueprintId: blueprint.id });
+    assert.equal(env.blueprint_id, blueprint.id);
+    const envs = await orgStore.listEnvironments(project.id);
+    const found = envs.find((e) => e.id === env.id);
+    assert.equal(found.blueprint_name, 'Staging RS');
+
+    const deleted = await orgStore.deleteEnvironmentBlueprint(blueprint.id);
+    assert.equal(deleted, true);
+    // ON DELETE SET NULL : l'environnement survit à la suppression du
+    // blueprint, seule la référence est retirée (jamais l'environnement
+    // lui-même supprimé en cascade à cause d'un blueprint effacé).
+    const envAfterDelete = await orgStore.getEnvironment(env.id);
+    assert.equal(envAfterDelete.blueprint_id, null);
+  });
 }
