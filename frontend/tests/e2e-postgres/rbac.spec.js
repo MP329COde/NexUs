@@ -37,10 +37,21 @@ test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
 
   test.beforeAll(async ({ playwright }) => {
     const rawAdmin = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
+    // Ce backend jetable est partagé avec d'autres fichiers *.spec.js de ce
+    // même dossier (fullyParallel: false n'empêche pas deux FICHIERS de
+    // s'exécuter sur des workers différents, voir ultimate.spec.js) :
+    // /api/setup ne peut réussir qu'une fois — condition de course réelle
+    // si les deux beforeAll partent en même temps. Repli sur une simple
+    // connexion avec les mêmes identifiants si un autre fichier a déjà
+    // gagné la course, plutôt qu'un échec non déterministe selon l'ordre
+    // d'exécution des workers.
     const setup = await rawAdmin.post('/api/setup', {
       data: { organisation: { consoleName: 'RBAC PG Test' }, admin: { email: 'admin@rbac-pg.test', password: 'AdminPassword123!', name: 'Admin' } }
     });
-    expect(setup.ok()).toBeTruthy();
+    if (!setup.ok()) {
+      const login = await rawAdmin.post('/api/auth/login', { data: { email: 'admin@rbac-pg.test', password: 'AdminPassword123!' } });
+      expect(login.ok()).toBeTruthy();
+    }
     adminApi = withCsrf(rawAdmin);
 
     const alice = await adminApi.post('/api/users', { data: { email: 'alice@rbac-pg.test', password: 'AlicePassword123!', name: 'Alice', role: 'user', skipOnboarding: true } });
