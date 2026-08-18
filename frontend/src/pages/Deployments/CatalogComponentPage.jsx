@@ -13,6 +13,26 @@ const KIND_LABEL = { service: 'Service', api: 'API', website: 'Site web', worker
 const DEP_KIND_LABEL = { runtime: 'runtime', build: 'build', data: 'data' };
 const BINDING_TYPE_LABEL = { postgres: 'PostgreSQL', redis: 'Redis', object_storage: 'Stockage objet', api: 'API', other: 'Autre' };
 
+// Observabilité (ÉTAPE 18 IDP) : pods RÉELS du namespace provisionné pour
+// cet environnement (voir environmentProvisioningService.js) — accès en
+// lecture Kubernetes ouvert à tout utilisateur authentifié (voir
+// routes/kubernetes.routes.js), aucune nouvelle route backend nécessaire.
+// Composant séparé (pas une boucle useApi dans le parent) : chaque
+// environnement a son propre namespace, donc son propre appel indépendant.
+function EnvironmentPodsSummary({ namespace }) {
+  const pods = useApi(() => api.get(`/kubernetes/pods?namespace=${encodeURIComponent(namespace)}`), [namespace]);
+  if (pods.loading) return <span className="faint">…</span>;
+  if (pods.error) return <span className="faint">{pods.error.message}</span>;
+  const items = pods.data?.items || [];
+  if (items.length === 0) return <span className="faint">Aucun pod dans « {namespace} »</span>;
+  const running = items.filter((p) => p.phase === 'Running').length;
+  return (
+    <Link to={`/kubernetes?ns=${encodeURIComponent(namespace)}`} className="faint mono" style={{ textDecoration: 'none' }}>
+      {running}/{items.length} pod(s) Running
+    </Link>
+  );
+}
+
 // Fiche composant : centre de travail du composant dans le Software
 // Catalog. Le runtime (section "Environnements du projet" ci-dessous)
 // réutilise les environnements du PROJET parent — un composant n'a pas ses
@@ -259,13 +279,16 @@ export default function CatalogComponentPage() {
                     <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'}`} style={{ marginRight: 6 }}>{env.is_production ? 'Production' : env.kind}</span>
                     {env.name}
                   </span>
-                  {env.argocd_app ? (
-                    <span className="faint">
-                      {env.app?.error ? env.app.error : `${env.app?.syncStatus || '—'} · ${env.app?.healthStatus || '—'}${env.app?.revision ? ` · ${env.app.revision}` : ''}`}
-                    </span>
-                  ) : (
-                    <span className="faint">Non lié à une application Argo CD</span>
-                  )}
+                  <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    {env.argocd_app ? (
+                      <span className="faint">
+                        {env.app?.error ? env.app.error : `${env.app?.syncStatus || '—'} · ${env.app?.healthStatus || '—'}${env.app?.revision ? ` · ${env.app.revision}` : ''}`}
+                      </span>
+                    ) : (
+                      <span className="faint">Non lié à une application Argo CD</span>
+                    )}
+                    {env.provisioned_namespace && <EnvironmentPodsSummary namespace={env.provisioned_namespace} />}
+                  </span>
                 </div>
               ))}
             </div>
