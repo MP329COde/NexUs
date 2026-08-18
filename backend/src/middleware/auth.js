@@ -8,7 +8,7 @@ export const SESSION_COOKIE = 'nexus_session';
 const JWT_ALGORITHM = 'HS256';
 
 export function signSession(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
+  return jwt.sign({ sub: user.id, role: user.role, tv: user.tokenVersion || 0 }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
 }
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
@@ -34,6 +34,12 @@ export function requireAuth(req, res, next) {
     const payload = jwt.verify(token, env.jwtSecret, { algorithms: [JWT_ALGORITHM] });
     const user = findUserById(payload.sub);
     if (!user || user.active === false) return res.status(401).json({ ok: false, error: 'Session invalide' });
+    // Session révoquée (logout serveur ou changement de mot de passe depuis
+    // l'émission de ce token) : le token reste signé valide mais ne
+    // correspond plus à la version courante de l'utilisateur.
+    if ((payload.tv || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ ok: false, error: 'Session révoquée' });
+    }
     const validityError = validityWindowError(user);
     if (validityError) return res.status(401).json({ ok: false, error: validityError });
     req.user = toPublicUser(user);

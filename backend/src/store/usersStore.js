@@ -95,6 +95,11 @@ export function createUser({ email, password, name, username, role = 'user', mus
     // transférable. Donne accès à l'Inventaire même sans permission RBAC
     // explicite (voir routes/inventory.routes.js).
     isPrimaryAdmin,
+    // Incrémenté au logout et au changement de mot de passe ; comparé au
+    // "tv" embarqué dans le JWT (voir signSession/requireAuth dans
+    // middleware/auth.js) pour révoquer les sessions déjà émises sans
+    // attendre leur expiration naturelle.
+    tokenVersion: 0,
     createdAt: new Date().toISOString()
   };
   users.push(user);
@@ -167,6 +172,21 @@ export function updatePassword(id, passwordHash) {
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return null;
   users[idx].passwordHash = passwordHash;
+  // Un changement de mot de passe révoque toutes les sessions déjà émises
+  // (y compris celle en cours, qui devra se réauthentifier après re-login).
+  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
+  writeStore('users', users);
+  return users[idx];
+}
+
+// Révoque toutes les sessions actives de l'utilisateur (logout serveur) sans
+// toucher au mot de passe. Idempotent : appeler plusieurs fois n'a pas
+// d'effet de bord au-delà de la revocation.
+export function incrementTokenVersion(id) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
   writeStore('users', users);
   return users[idx];
 }

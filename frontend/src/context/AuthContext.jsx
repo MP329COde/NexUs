@@ -32,8 +32,14 @@ export function AuthProvider({ children }) {
   const setUserFromSession = useCallback((u) => setUser(u), []);
 
   const logout = useCallback(async () => {
-    await api.post('/auth/logout');
-    setUser(null);
+    // La session côté serveur peut déjà être invalide (cookie expiré, révoquée
+    // ailleurs) — /auth/logout répond alors 401. On déconnecte quand même
+    // localement dans tous les cas.
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
   }, []);
 
   const updateProfile = useCallback(async (patch) => {

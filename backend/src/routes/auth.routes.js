@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
-import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError } from '../store/usersStore.js';
+import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
@@ -101,7 +101,11 @@ router.post('/login', asyncHandler(async (req, res) => {
   res.json({ ok: true, user: toPublicUser(user) });
 }));
 
-router.post('/logout', (req, res) => {
+router.post('/logout', requireAuth, (req, res) => {
+  // Révoque le token courant côté serveur (voir tokenVersion dans
+  // requireAuth) : sans ça, un JWT volé avant le logout resterait exploitable
+  // jusqu'à son expiration naturelle malgré le cookie effacé.
+  incrementTokenVersion(req.user.id);
   res.clearCookie(SESSION_COOKIE);
   res.json({ ok: true });
 });
