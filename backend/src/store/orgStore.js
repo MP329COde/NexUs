@@ -343,12 +343,46 @@ export async function listEnvironments(projectId) {
   return rows;
 }
 
-export async function createEnvironment(projectId, { name, kind, isProduction, blueprintId }) {
+// expiresAt calculé ici (pas laissé au client) à partir du TTL du blueprint
+// choisi — voir environment_blueprints.ttl_minutes (migration 0014) : une
+// Preview Environment créée depuis un blueprint à TTL expire vraiment sans
+// action manuelle nécessaire pour la marquer comme telle (voir
+// listExpiredEnvironments ci-dessous, consommé par EnvironmentsPage.jsx
+// pour afficher "Expiré" et proposer sa destruction).
+export async function createEnvironment(projectId, { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl }) {
+  let expiresAt = null;
+  if (blueprintId) {
+    const blueprint = await getEnvironmentBlueprint(blueprintId);
+    if (blueprint?.ttl_minutes != null) {
+      expiresAt = new Date(Date.now() + blueprint.ttl_minutes * 60_000).toISOString();
+    }
+  }
   const { rows } = await query(
-    `INSERT INTO environments (project_id, name, kind, is_production, blueprint_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [projectId, name, kind || 'custom', Boolean(isProduction), blueprintId || null]
+    `INSERT INTO environments (project_id, name, kind, is_production, blueprint_id, source_branch, source_commit, source_pr_url, expires_at)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, ''), COALESCE($7, ''), COALESCE($8, ''), $9) RETURNING *`,
+    [projectId, name, kind || 'custom', Boolean(isProduction), blueprintId || null, sourceBranch || null, sourceCommit || null, sourcePrUrl || null, expiresAt]
   );
   return rows[0];
+}
+
+// Suppression manuelle d'un environnement (ÉTAPE 11 : "Destroy Preview") —
+// jamais la production, par sécurité au niveau du store lui-même et pas
+// seulement côté route (défense en profondeur : n'importe quel appelant
+// futur de cette fonction hérite de la même garde).
+export async function deleteEnvironment(id) {
+  const { rowCount } = await query('DELETE FROM environments WHERE id = $1 AND is_production = false', [id]);
+  return rowCount > 0;
+}
+
+// Environnements expirés (expires_at dépassé) d'un projet — préviews
+// oubliées à nettoyer, affichées distinctement de "Détails & promotions"
+// sur EnvironmentsPage.jsx plutôt que mêlées silencieusement à la liste.
+export async function listExpiredEnvironments(projectId) {
+  const { rows } = await query(
+    `SELECT * FROM environments WHERE project_id = $1 AND expires_at IS NOT NULL AND expires_at < now() ORDER BY expires_at`,
+    [projectId]
+  );
+  return rows;
 }
 
 // --- Environment Blueprints ------------------------------------------

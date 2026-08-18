@@ -95,6 +95,7 @@ const ACTION_LABELS = {
   'environment_blueprint.update': "Blueprint d'environnement modifié",
   'environment_blueprint.delete': "Blueprint d'environnement supprimé",
   'project.environment.create': 'Environnement créé',
+  'project.environment.delete': 'Environnement détruit',
   'project.environment.link': 'Environnement lié à Argo CD',
   'project.environment.promote': 'Environnement promu'
 };
