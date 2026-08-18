@@ -226,6 +226,18 @@ export default function CatalogPage() {
                   <span className="projects-card-meta-item"><Icon name="layers" size={12} />{c.project_name}</span>
                   {c.owner_team_name && <><span>·</span><span className="projects-card-meta-item"><Icon name="users" size={12} />{c.owner_team_name}</span></>}
                 </div>
+                {c.scorecard && (
+                  <div className="catalog-card-scorecard">
+                    <span className={`catalog-score-badge catalog-score-${c.scorecard.score >= 80 ? 'good' : c.scorecard.score >= 50 ? 'mid' : 'low'}`}>
+                      {c.scorecard.score}/100
+                    </span>
+                    {c.scorecard.productionEligible ? (
+                      <span className="faint">Production eligible</span>
+                    ) : (
+                      <span className="faint">Production blocked</span>
+                    )}
+                  </div>
+                )}
               </Link>
             );
           })}

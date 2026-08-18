@@ -8,6 +8,7 @@ import { parseServiceManifest, componentToManifest, ManifestError } from '../ser
 import { listTemplatesSummary } from '../services/scaffolderTemplates.js';
 import { scaffoldService } from '../services/scaffolderService.js';
 import * as jobService from '../services/jobService.js';
+import { computeScorecard } from '../services/catalogScorecard.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -34,7 +35,7 @@ router.get('/components', asyncHandler(async (req, res) => {
   if (kind && !KINDS.includes(kind)) return res.status(400).json({ ok: false, error: 'Type invalide' });
   if (lifecycle && !LIFECYCLES.includes(lifecycle)) return res.status(400).json({ ok: false, error: 'Cycle de vie invalide' });
   const items = await orgStore.listComponentsForUser(req.user.id, { q, kind, lifecycle, ownerTeamId, projectId });
-  res.json({ ok: true, items });
+  res.json({ ok: true, items: items.map((c) => ({ ...c, scorecard: computeScorecard(c) })) });
 }));
 
 router.get('/components/:id', asyncHandler(async (req, res) => {
@@ -42,7 +43,7 @@ router.get('/components/:id', asyncHandler(async (req, res) => {
   if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
   const role = await orgStore.getProjectRole(component.project_id, req.user.id);
   if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
-  res.json({ ok: true, component: { ...component, my_role: role } });
+  res.json({ ok: true, component: { ...component, my_role: role, scorecard: computeScorecard(component) } });
 }));
 
 // Écriture réservée maintainer+ du projet (ou owner/admin d'organisation via

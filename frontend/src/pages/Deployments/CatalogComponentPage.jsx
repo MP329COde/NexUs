@@ -117,6 +117,27 @@ export default function CatalogComponentPage() {
             ) : <span>—</span>}
           </div>
         </div>
+
+        {component.scorecard && (
+          <div className="card catalog-detail-card">
+            <div className="catalog-scorecard-header">
+              <span className={`catalog-score-badge catalog-score-${component.scorecard.score >= 80 ? 'good' : component.scorecard.score >= 50 ? 'mid' : 'low'}`} style={{ fontSize: 16, padding: '4px 10px' }}>
+                {component.scorecard.score}/100
+              </span>
+              <span className={`badge ${component.scorecard.productionEligible ? 'badge-ok' : 'badge-crit'}`}>
+                <span className="dot" />{component.scorecard.productionEligible ? 'Production eligible' : 'Production blocked'}
+              </span>
+            </div>
+            <div className="catalog-scorecard-checks">
+              {component.scorecard.checks.map((c) => (
+                <div key={c.id} className="catalog-scorecard-check">
+                  <Icon name={c.passed ? 'check' : 'x'} size={14} color={c.passed ? 'var(--tone-ok-fg, #10b981)' : 'var(--tone-crit-fg, #ef4444)'} />
+                  <span>{c.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

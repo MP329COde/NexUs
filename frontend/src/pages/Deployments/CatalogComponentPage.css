@@ -29,3 +29,23 @@
   border-bottom: none;
   padding-bottom: 0;
 }
+
+.catalog-scorecard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.catalog-scorecard-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.catalog-scorecard-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}

@@ -608,7 +608,8 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
   if (ownerTeamId) { params.push(ownerTeamId); conditions.push(`c.owner_team_id = $${params.length}`); }
   if (projectId) { params.push(projectId); conditions.push(`c.project_id = $${params.length}`); }
   const { rows } = await query(
-    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug
+    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
@@ -623,7 +624,8 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
 
 export async function getComponent(id) {
   const { rows } = await query(
-    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug
+    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id
      LEFT JOIN teams t ON t.id = c.owner_team_id
