@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
@@ -18,7 +18,7 @@ router.use((req, res, next) => {
 });
 
 async function requireOrgMembership(req, res, orgId) {
-  if (req.user.role === 'admin') return 'owner';
+  if (isPlatformAdmin(req.user)) return 'owner';
   const role = await orgStore.getOrgRole(orgId, req.user.id);
   if (!role) {
     res.status(404).json({ ok: false, error: 'Organisation introuvable' });
@@ -52,7 +52,7 @@ async function loadTeamWithRole(req, res) {
   if (!team) { res.status(404).json({ ok: false, error: 'Équipe introuvable' }); return null; }
   const orgRole = await requireOrgMembership(req, res, team.org_id);
   if (!orgRole) return null;
-  const teamRole = req.user.role === 'admin' ? 'lead' : (await orgStore.getTeamRole(team.id, req.user.id) || (['owner', 'admin'].includes(orgRole) ? 'lead' : null));
+  const teamRole = isPlatformAdmin(req.user) ? 'lead' : (await orgStore.getTeamRole(team.id, req.user.id) || (['owner', 'admin'].includes(orgRole) ? 'lead' : null));
   return { team, orgRole, teamRole };
 }
 

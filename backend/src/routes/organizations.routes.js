@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
@@ -26,7 +26,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (!role && req.user.role !== 'admin') return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
   const org = await orgStore.getOrganization(req.params.id);
   if (!org) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
   res.json({ ok: true, organization: { ...org, my_role: role } });
@@ -45,7 +45,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
     return res.status(403).json({ ok: false, error: 'Rôle insuffisant pour modifier cette organisation' });
   }
   const { name, icon, color } = req.body || {};
@@ -64,7 +64,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 // (confirmation explicite avant une action destructrice de grande ampleur).
 router.delete('/:id', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (role !== 'owner' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'owner')) {
     return res.status(403).json({ ok: false, error: 'Seul le propriétaire de cette organisation (ou un administrateur) peut la supprimer' });
   }
   const projectCount = await orgStore.countOrgProjects(req.params.id);
@@ -83,13 +83,13 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 // réservés owner/admin de l'organisation (ou admin plateforme).
 router.get('/:id/members', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (!role && req.user.role !== 'admin') return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
   res.json({ ok: true, items: await orgStore.listOrgMembers(req.params.id) });
 }));
 
 router.post('/:id/members', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
     return res.status(403).json({ ok: false, error: "Réservé owner/admin de l'organisation" });
   }
   const { userId, role: newRole = 'member' } = req.body || {};
@@ -102,7 +102,7 @@ router.post('/:id/members', asyncHandler(async (req, res) => {
 
 router.put('/:id/members/:userId', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
     return res.status(403).json({ ok: false, error: "Réservé owner/admin de l'organisation" });
   }
   const { role: newRole } = req.body || {};
@@ -117,7 +117,7 @@ router.put('/:id/members/:userId', asyncHandler(async (req, res) => {
 
 router.delete('/:id/members/:userId', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
     return res.status(403).json({ ok: false, error: "Réservé owner/admin de l'organisation" });
   }
   if ((await orgStore.getOrgRole(req.params.id, req.params.userId)) === 'owner' && (await orgStore.countOrgOwners(req.params.id)) <= 1) {
@@ -131,7 +131,7 @@ router.delete('/:id/members/:userId', asyncHandler(async (req, res) => {
 
 router.get('/:id/projects', asyncHandler(async (req, res) => {
   const role = await orgStore.getOrgRole(req.params.id, req.user.id);
-  if (!role && req.user.role !== 'admin') return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
   const items = await orgStore.listProjectsForUser(req.user.id);
   res.json({ ok: true, items: items.filter((p) => p.org_id === req.params.id) });
 }));

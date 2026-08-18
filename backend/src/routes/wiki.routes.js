@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
@@ -19,7 +19,7 @@ router.use((req, res, next) => {
 
 async function requireOrgMember(req, res, orgId) {
   const role = await orgStore.getOrgRole(orgId, req.user.id);
-  if (!role && req.user.role !== 'admin') {
+  if (!role && !isPlatformAdmin(req.user)) {
     res.status(404).json({ ok: false, error: 'Organisation introuvable' });
     return null;
   }
@@ -36,7 +36,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const { orgId, projectId, q } = req.query;
   if (!orgId) return res.status(400).json({ ok: false, error: 'orgId requis' });
   const role = await requireOrgMember(req, res, orgId);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   const items = q ? await orgStore.searchWikiPages(orgId, q) : await orgStore.listWikiPages(orgId, projectId || null);
   res.json({ ok: true, items });
 }));
@@ -45,7 +45,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const page = await orgStore.getWikiPage(req.params.id);
   if (!page) return res.status(404).json({ ok: false, error: 'Page introuvable' });
   const role = await requireOrgMember(req, res, page.org_id);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   res.json({ ok: true, page });
 }));
 
@@ -53,7 +53,7 @@ router.get('/:id/revisions', asyncHandler(async (req, res) => {
   const page = await orgStore.getWikiPage(req.params.id);
   if (!page) return res.status(404).json({ ok: false, error: 'Page introuvable' });
   const role = await requireOrgMember(req, res, page.org_id);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   res.json({ ok: true, items: await orgStore.listWikiRevisions(req.params.id) });
 }));
 
@@ -61,7 +61,7 @@ router.get('/:id/revisions/:revisionId', asyncHandler(async (req, res) => {
   const page = await orgStore.getWikiPage(req.params.id);
   if (!page) return res.status(404).json({ ok: false, error: 'Page introuvable' });
   const role = await requireOrgMember(req, res, page.org_id);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   const revision = await orgStore.getWikiRevision(req.params.revisionId);
   if (!revision || revision.page_id !== page.id) return res.status(404).json({ ok: false, error: 'Révision introuvable' });
   res.json({ ok: true, revision });
@@ -74,7 +74,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const { orgId, projectId, title, content } = req.body || {};
   if (!orgId || !title) return res.status(400).json({ ok: false, error: 'orgId et title requis' });
   const role = await requireOrgMember(req, res, orgId);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   const page = await orgStore.createWikiPage({ orgId, projectId: projectId || null, slug: slugify(title), title, content, userId: req.user.id });
   logAudit(req, 'wiki.page.create', { pageId: page.id, orgId, title });
   res.status(201).json({ ok: true, page });
@@ -84,7 +84,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const existing = await orgStore.getWikiPage(req.params.id);
   if (!existing) return res.status(404).json({ ok: false, error: 'Page introuvable' });
   const role = await requireOrgMember(req, res, existing.org_id);
-  if (role === null && req.user.role !== 'admin') return;
+  if (role === null && !isPlatformAdmin(req.user)) return;
   const { title, content } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'title requis' });
   const page = await orgStore.updateWikiPage(req.params.id, { title, content: content || '', userId: req.user.id });
@@ -100,7 +100,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const existing = await orgStore.getWikiPage(req.params.id);
   if (!existing) return res.status(404).json({ ok: false, error: 'Page introuvable' });
   const role = await orgStore.getOrgRole(existing.org_id, req.user.id);
-  if (role !== 'owner' && role !== 'admin' && req.user.role !== 'admin') {
+  if (!isPlatformAdmin(req.user) && !orgStore.orgRoleAtLeast(role, 'admin')) {
     return res.status(403).json({ ok: false, error: 'Rôle insuffisant pour supprimer cette page' });
   }
   await orgStore.deleteWikiPage(req.params.id);

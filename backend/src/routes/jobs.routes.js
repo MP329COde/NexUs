@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { getJob, listRecentJobs } from '../services/jobService.js';
 
 // Suivi des jobs sans portée projet (ex. scan réseau — voir
@@ -19,7 +19,7 @@ router.use(requireAuth);
 // jamais pouvoir lister ce qu'il ne pourrait pas consulter par id.
 router.get('/', asyncHandler(async (req, res) => {
   const status = ['pending', 'running', 'succeeded', 'failed'].includes(req.query.status) ? req.query.status : undefined;
-  const ownerId = req.user.role === 'admin' ? undefined : req.user.id;
+  const ownerId = isPlatformAdmin(req.user) ? undefined : req.user.id;
   res.json({ ok: true, items: await listRecentJobs({ status, ownerId }) });
 }));
 
@@ -27,7 +27,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const job = await getJob(req.params.id);
   if (!job) return res.status(404).json({ ok: false, error: 'Job introuvable' });
   if (job.project_id) return res.status(404).json({ ok: false, error: 'Job introuvable' }); // passe par /projects/:id/jobs/:jobId
-  if (job.created_by !== req.user.id && req.user.role !== 'admin') {
+  if (job.created_by !== req.user.id && !isPlatformAdmin(req.user)) {
     return res.status(404).json({ ok: false, error: 'Job introuvable' });
   }
   res.json({ ok: true, job });

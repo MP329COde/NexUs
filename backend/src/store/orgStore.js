@@ -61,6 +61,18 @@ export async function getOrgRole(orgId, userId) {
   return rows[0]?.role || null;
 }
 
+const ORG_ROLE_RANK = { member: 1, admin: 2, owner: 3 };
+
+// Remplace la vérification `role !== 'owner' && role !== 'admin'` répétée
+// dans routes/organizations.routes.js et routes/wiki.routes.js — à
+// combiner avec middleware/auth.js#isPlatformAdmin(req.user) pour le
+// bypass admin plateforme, que cette fonction ne connaît pas (portée
+// volontairement limitée au seul rôle organisation).
+export function orgRoleAtLeast(role, min) {
+  if (!role) return false;
+  return (ORG_ROLE_RANK[role] || 0) >= (ORG_ROLE_RANK[min] || 0);
+}
+
 export async function updateOrganization(orgId, { name, icon, color }) {
   // icon n'était pas protégé par COALESCE (contrairement à name/color) : une
   // mise à jour ne renseignant pas l'icône (ex. juste renommer l'organisation)

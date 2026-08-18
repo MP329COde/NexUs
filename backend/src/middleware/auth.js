@@ -98,6 +98,16 @@ export function requireAuth(req, res, next) {
 // À chaîner après requireAuth. Réserve une route à un rôle donné (typiquement
 // 'admin' pour les intégrations d'infrastructure et la gestion des utilisateurs) :
 // le reste de la console reste accessible à tout utilisateur authentifié.
+// Bascule "admin plateforme = accès complet" utilisée dans plusieurs
+// domaines qui ont chacun leur propre hiérarchie de rôle (organisation,
+// équipe, page de wiki, job...) — centralisée ici plutôt que réimplémentée
+// en `req.user.role === 'admin'` dans chaque route (voir teams.routes.js,
+// organizations.routes.js, wiki.routes.js, jobs.routes.js), pour qu'un futur
+// changement de ce bypass n'ait qu'un seul endroit à corriger.
+export function isPlatformAdmin(user) {
+  return user?.role === 'admin';
+}
+
 export function requireRole(role) {
   return (req, res, next) => {
     if (req.user?.role !== role) {
