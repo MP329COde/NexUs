@@ -34,6 +34,13 @@ export async function applyApprovedRequest(request) {
 
   const project = await orgStore.getProject(request.project_id);
   if (!project) return { status: 'failed', message: 'Projet introuvable (a pu être supprimé depuis la demande).' };
+  // Défense en profondeur : routes/platformRequests.routes.js vérifie déjà
+  // à la création que projectId appartient à orgId, mais cette fonction ne
+  // doit jamais faire confiance aveuglément à une ligne déjà en base (ex.
+  // demande créée avant ce contrôle, ou projet déplacé/recréé depuis).
+  if (project.org_id !== request.org_id) {
+    return { status: 'failed', message: "Le projet de cette demande n'appartient plus à l'organisation qui l'a validée." };
+  }
 
   let blueprint = null;
   if (payload.blueprintId) {

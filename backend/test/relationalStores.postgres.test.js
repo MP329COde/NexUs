@@ -502,6 +502,29 @@ if (!hasPostgres) {
     assert.equal(found.result.environmentId, prodResult.environmentId);
   });
 
+  test('platformRequestActionService : SÉCURITÉ — refuse de provisionner si le projet de la demande n\'appartient plus à l\'organisation qui l\'a approuvée', async () => {
+    const { applyApprovedRequest } = await import('../src/services/platformRequestActionService.js');
+    // Deuxième organisation, distincte de `org` (utilisée par le fixture
+    // partagé) et de son projet — simule une demande créée avant que
+    // routes/platformRequests.routes.js ne valide projectId contre orgId à
+    // la création (défense en profondeur, jamais confiance aveugle en une
+    // ligne déjà en base). Sans cette vérification, approuver la demande
+    // provisionnerait un environnement dans le projet d'une AUTRE
+    // organisation que celle dont l'admin a validé la demande.
+    const otherOrg = await orgStore.createOrganization({ name: 'Other Org PRA Security', slug: `other-org-pra-sec-${Date.now()}`, ownerUserId: 'u1' });
+    try {
+      const crossOrgRequest = await orgStore.createPlatformRequest({
+        orgId: otherOrg.id, projectId: project.id /* appartient à `org`, pas `otherOrg` */, requestedBy: 'u1',
+        kind: 'create_production_env', title: 'Tentative cross-org', payload: { environmentName: `cross-org-${Date.now()}` }
+      });
+      const result = await applyApprovedRequest(crossOrgRequest);
+      assert.equal(result.status, 'failed');
+      assert.match(result.message, /n'appartient plus à l'organisation/);
+    } finally {
+      await query('DELETE FROM organizations WHERE id = $1', [otherOrg.id]);
+    }
+  });
+
   test('orgStore (preview environments) : expires_at hérité du TTL du blueprint, destruction manuelle, production protégée', async () => {
     const blueprint = await orgStore.createEnvironmentBlueprint({ orgId: org.id, name: 'Preview RS', slug: `preview-rs-${Date.now()}`, kind: 'preview', ttlMinutes: 60 });
     const before = Date.now();

@@ -63,6 +63,18 @@ router.post('/', asyncHandler(async (req, res) => {
   }
   const role = await requireOrgMember(req, res, orgId);
   if (role === null && !isPlatformAdmin(req.user)) return;
+  // projectId doit appartenir à CETTE organisation — sans cette
+  // vérification, un membre de l'organisation A pourrait soumettre une
+  // demande visible et approuvable par un admin de l'organisation A, mais
+  // ciblant un projet de l'organisation B : applyApprovedRequest()
+  // provisionnerait alors un environnement dans un projet qui n'appartient
+  // pas à l'organisation qui a validé la demande.
+  if (projectId) {
+    const targetProject = await orgStore.getProject(projectId);
+    if (!targetProject || targetProject.org_id !== orgId) {
+      return res.status(400).json({ ok: false, error: "projectId ne correspond à aucun projet de cette organisation" });
+    }
+  }
   const request = await orgStore.createPlatformRequest({ orgId, projectId, requestedBy: req.user.id, kind, title, description, payload });
   logAudit(req, 'platform_request.create', { requestId: request.id, orgId, kind, title });
   res.status(201).json({ ok: true, request });
