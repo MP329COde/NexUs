@@ -374,6 +374,28 @@ export async function deleteEnvironment(id) {
   return rowCount > 0;
 }
 
+// Résolution par nom (UNIQUE(project_id, name)) — utilisée par le webhook
+// PR (ÉTAPE 10 : Preview Environments) pour retrouver l'environnement d'une
+// PR déjà ouverte plutôt que d'en recréer un doublon à chaque nouveau commit
+// poussé (voir routes/webhooks.routes.js, événement pull_request).
+export async function getEnvironmentByName(projectId, name) {
+  const { rows } = await query('SELECT * FROM environments WHERE project_id = $1 AND name = $2', [projectId, name]);
+  return rows[0] || null;
+}
+
+// Met à jour uniquement les métadonnées de source (branche/commit/PR) d'un
+// environnement déjà provisionné — un nouveau commit sur une PR ouverte ne
+// doit pas re-déclencher un provisioning Kubernetes (le namespace existe
+// déjà), seulement rafraîchir la référence affichée.
+export async function updateEnvironmentSource(id, { sourceBranch, sourceCommit, sourcePrUrl }) {
+  const { rows } = await query(
+    `UPDATE environments SET source_branch = COALESCE($2, source_branch), source_commit = COALESCE($3, source_commit), source_pr_url = COALESCE($4, source_pr_url)
+     WHERE id = $1 RETURNING *`,
+    [id, sourceBranch || null, sourceCommit || null, sourcePrUrl || null]
+  );
+  return rows[0] || null;
+}
+
 // Environnements expirés (expires_at dépassé) d'un projet — préviews
 // oubliées à nettoyer, affichées distinctement de "Détails & promotions"
 // sur EnvironmentsPage.jsx plutôt que mêlées silencieusement à la liste.

@@ -396,6 +396,48 @@ if (!hasPostgres) {
     assert.equal(unchanged.argocd_app, null);
   });
 
+  test('previewEnvironmentWebhookService : cycle de vie complet d\'une PR (opened → synchronize → closed), sans doublon ni provisioning fantôme', async () => {
+    const { handlePullRequestEvent } = await import('../src/services/previewEnvironmentWebhookService.js');
+    const fakeReq = { user: null, ip: '127.0.0.1' };
+    const prNumber = Math.floor(Math.random() * 1_000_000);
+    const pr = { number: prNumber, head: { ref: 'feature/x', sha: 'abc1234' }, html_url: 'https://github.com/org/repo/pull/' + prNumber };
+
+    // opened : crée l'environnement "pr-<n>". D'autres tests de ce fichier
+    // partagent la même organisation fixture (`org`) et y ont déjà créé un
+    // blueprint de kind 'preview' — celui-ci est donc réellement trouvé et
+    // un provisioning est tenté ; Kubernetes n'étant pas configuré dans cet
+    // environnement de test, le résultat honnête est 'skipped' (jamais
+    // 'created' sans preuve, jamais null alors qu'un blueprint existe).
+    const opened = await handlePullRequestEvent(project, 'opened', pr, fakeReq);
+    assert.equal(opened.action, 'created');
+    assert.equal(opened.provisioning.status, 'skipped');
+    const created = await orgStore.getEnvironment(opened.environmentId);
+    assert.equal(created.name, `pr-${prNumber}`);
+    assert.equal(created.kind, 'preview');
+    assert.equal(created.is_production, false);
+    assert.equal(created.source_commit, 'abc1234');
+
+    // synchronize sur la même PR : pas de second environnement créé
+    // (UNIQUE(project_id, name) le garantirait de toute façon), seule la
+    // référence de commit change.
+    const synced = await handlePullRequestEvent(project, 'synchronize', { ...pr, head: { ref: 'feature/x', sha: 'def5678' } }, fakeReq);
+    assert.equal(synced.action, 'updated');
+    assert.equal(synced.environmentId, opened.environmentId);
+    const afterSync = await orgStore.getEnvironment(opened.environmentId);
+    assert.equal(afterSync.source_commit, 'def5678');
+
+    // closed : détruit réellement l'environnement.
+    const closed = await handlePullRequestEvent(project, 'closed', pr, fakeReq);
+    assert.equal(closed.action, 'destroyed');
+    assert.equal(await orgStore.getEnvironment(opened.environmentId), null);
+
+    // closed une seconde fois (rejeu d'événement GitHub, arrive en
+    // pratique) : ne doit jamais planter, juste constater qu'il n'y a plus
+    // rien à détruire.
+    const closedAgain = await handlePullRequestEvent(project, 'closed', pr, fakeReq);
+    assert.equal(closedAgain.action, 'noop');
+  });
+
   test('orgStore (platform requests) : cycle de vie complet + transition unique pending → tranchée', async () => {
     const request = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod RS', description: 'Besoin du vault projet' });
     assert.equal(request.status, 'pending');
