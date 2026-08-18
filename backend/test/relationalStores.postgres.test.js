@@ -350,4 +350,27 @@ if (!hasPostgres) {
       writeStore('dastScans', savedDastScans);
     }
   });
+
+  test('orgStore (platform requests) : cycle de vie complet + transition unique pending → tranchée', async () => {
+    const request = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod RS', description: 'Besoin du vault projet' });
+    assert.equal(request.status, 'pending');
+
+    const mine = await orgStore.listPlatformRequestsForUser('u1');
+    assert.ok(mine.some((r) => r.id === request.id));
+
+    const orgRequests = await orgStore.listPlatformRequestsForOrg(org.id, { status: 'pending' });
+    assert.ok(orgRequests.some((r) => r.id === request.id));
+
+    const approved = await orgStore.reviewPlatformRequest(request.id, { status: 'approved', reviewedBy: 'u1', reviewNote: 'ok' });
+    assert.equal(approved.status, 'approved');
+    assert.equal(approved.reviewed_by, 'u1');
+
+    // Une demande déjà tranchée ne se rouvre jamais : la clause WHERE
+    // status='pending' de reviewPlatformRequest() doit renvoyer null
+    // (aucune ligne mise à jour), pas écraser silencieusement la décision.
+    const secondReview = await orgStore.reviewPlatformRequest(request.id, { status: 'rejected', reviewedBy: 'u2' });
+    assert.equal(secondReview, null);
+    const stillApproved = await orgStore.getPlatformRequest(request.id);
+    assert.equal(stillApproved.status, 'approved');
+  });
 }

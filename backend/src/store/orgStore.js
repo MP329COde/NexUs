@@ -800,3 +800,55 @@ export async function deletePolicy(id) {
   const { rowCount } = await query('DELETE FROM policies WHERE id = $1', [id]);
   return rowCount > 0;
 }
+
+// --- Platform Requests (ÉTAPE 17) ------------------------------------
+const REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'expired'];
+
+export async function listPlatformRequestsForOrg(orgId, { status } = {}) {
+  const params = [orgId];
+  const conditions = ['r.org_id = $1'];
+  if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+  const { rows } = await query(
+    `SELECT r.*, p.name AS project_name FROM platform_requests r LEFT JOIN projects p ON p.id = r.project_id
+     WHERE ${conditions.join(' AND ')} ORDER BY r.created_at DESC`,
+    params
+  );
+  return rows;
+}
+
+export async function listPlatformRequestsForUser(userId) {
+  const { rows } = await query(
+    `SELECT r.*, p.name AS project_name FROM platform_requests r LEFT JOIN projects p ON p.id = r.project_id
+     WHERE r.requested_by = $1 ORDER BY r.created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function getPlatformRequest(id) {
+  const { rows } = await query('SELECT * FROM platform_requests WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description }) {
+  const { rows } = await query(
+    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '')) RETURNING *`,
+    [orgId, projectId || null, requestedBy, kind, title, description || null]
+  );
+  return rows[0];
+}
+
+// Transition unique (pending → approved/rejected/cancelled) : une demande
+// déjà tranchée ne se rouvre jamais, elle se reproduit (nouvelle demande) —
+// même logique que le retry de job (jobService.js), qui crée un nouveau job
+// plutôt que de muter l'original pour garder l'historique complet.
+export async function reviewPlatformRequest(id, { status, reviewedBy, reviewNote }) {
+  if (!REQUEST_STATUSES.includes(status)) throw new Error(`Statut invalide : ${status}`);
+  const { rows } = await query(
+    `UPDATE platform_requests SET status = $2, reviewed_by = $3, reviewed_at = now(), review_note = $4
+     WHERE id = $1 AND status = 'pending' RETURNING *`,
+    [id, status, reviewedBy, reviewNote || null]
+  );
+  return rows[0] || null;
+}
