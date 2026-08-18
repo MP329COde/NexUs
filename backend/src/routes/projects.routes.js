@@ -50,9 +50,23 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ ok: true, items: await listMyProjects(req.user) });
 }));
 
-router.get('/:id', loadProjectAccess(), (req, res) => {
-  res.json({ ok: true, project: req.legacyProject, role: req.projectRole });
-});
+// orgId / relationalProjectId : résolus via le projet relationnel miroir
+// (legacy_id, voir POST / ci-dessous qui le provisionne à la création) —
+// permet au frontend de relier ce projet à son wiki d'organisation
+// (routes/wiki.routes.js, GET /wiki?orgId=...&projectId=...) sans exposer
+// tout le socle relationnel ici. IMPORTANT : wiki_pages.project_id référence
+// projects.id (l'id RELATIONNEL), jamais le legacy_id utilisé partout
+// ailleurs dans cette API — les deux sont distincts, d'où l'exposition des
+// deux champs séparément plutôt que de réutiliser req.legacyProject.id.
+// null si Postgres n'est pas configuré ou si le provisioning a échoué.
+router.get('/:id', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const pgProject = pool ? await orgStore.getProjectByLegacyId(req.legacyProject.id) : null;
+  res.json({
+    ok: true,
+    project: { ...req.legacyProject, orgId: pgProject?.org_id || null, relationalProjectId: pgProject?.id || null },
+    role: req.projectRole
+  });
+}));
 
 // Vue d'ensemble "mes projets" : équivalent de GET /system/overview (réservé
 // aux admins) mais pour un membre ordinaire — n'agrège que ce qui concerne

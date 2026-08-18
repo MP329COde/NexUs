@@ -85,6 +85,16 @@
   font-weight: 500;
 }
 
+.pd-row-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pd-row-link:hover {
+  background: var(--surface-2, var(--bg));
+}
+
 .pd-row-date {
   font-size: 11px;
 }

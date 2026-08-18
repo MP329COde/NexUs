@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
@@ -18,6 +18,12 @@ import './WikiPage.css';
 // "hors contexte".
 export default function WikiPage() {
   const { id: routeOrgId } = useParams();
+  // Arrivée depuis la page d'un projet (voir ProjectDetailPage.jsx, panneau
+  // Documentation) : ne montre que les pages rattachées à ce projet plutôt
+  // que tout le wiki de l'organisation — reste désactivable ("Toutes les
+  // pages") pour ne pas enfermer l'utilisateur dans ce filtre.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const projectIdFilter = searchParams.get('projectId') || '';
   const { data: orgsData } = useApi(() => api.get('/organizations'), []);
   const organizations = orgsData?.items || [];
   const [orgId, setOrgId] = useState(routeOrgId || '');
@@ -30,7 +36,7 @@ export default function WikiPage() {
   }, [organizations, orgId, routeOrgId]);
 
   const [q, setQ] = useState('');
-  const pages = useApi(() => (orgId ? api.get(`/wiki?orgId=${orgId}${q ? `&q=${encodeURIComponent(q)}` : ''}`) : Promise.resolve({ items: [] })), [orgId, q]);
+  const pages = useApi(() => (orgId ? api.get(`/wiki?orgId=${orgId}${projectIdFilter ? `&projectId=${projectIdFilter}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`) : Promise.resolve({ items: [] })), [orgId, q, projectIdFilter]);
   const items = pages.data?.items || [];
 
   const [selectedId, setSelectedId] = useState(null);
@@ -41,7 +47,7 @@ export default function WikiPage() {
 
   async function createPage(title) {
     try {
-      const res = await api.post('/wiki', { orgId, title, content: '' });
+      const res = await api.post('/wiki', { orgId, projectId: projectIdFilter || null, title, content: '' });
       notify('Page créée', { type: 'ok' });
       setCreating(false);
       pages.reload();
@@ -91,6 +97,17 @@ export default function WikiPage() {
             <div className="wiki-search-wrap">
               <input className="input wiki-search-input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
+            {projectIdFilter && (
+              <div className="wiki-project-filter">
+                Filtré sur ce projet
+                <span
+                  className="wiki-project-filter-clear"
+                  onClick={() => setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete('projectId'); return next; })}
+                >
+                  Toutes les pages
+                </span>
+              </div>
+            )}
             {items.length === 0 ? (
               <div className="wiki-pages-empty">Aucune page</div>
             ) : (

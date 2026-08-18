@@ -233,6 +233,10 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="pd-grid-row">
+        <DocumentationPanel orgId={p.orgId} projectId={p.relationalProjectId} />
+      </div>
+
+      <div className="pd-grid-row">
         <ChangesPanel
           changes={changes.data?.items || []}
           environments={environments.data?.items || []}
@@ -369,6 +373,53 @@ const STATUS_LABEL = { open: 'Ouvert', investigating: 'En cours', resolved: 'Ré
 // documenter la résolution (le backend le revérifie — voir
 // routes/projects.routes.js PUT /:id/incidents/:incidentId), jamais une
 // simple bascule d'état silencieuse.
+// Relie ce projet au wiki d'équipe de son organisation (voir WikiPage.jsx) :
+// jusqu'ici trois îlots de données séparés (projets, wiki, runbook des
+// incidents ci-dessus) sans aucun lien entre eux dans l'UI, alors que le
+// backend supporte déjà un projectId optionnel sur une page wiki (voir
+// routes/wiki.routes.js, orgStore.listWikiPages). orgId/projectId viennent
+// de GET /projects/:id (résolus via le projet relationnel miroir — voir
+// routes/projects.routes.js) : projectId ici est l'id RELATIONNEL du projet
+// (jamais le legacy id utilisé dans l'URL de cette page), requis par la
+// contrainte de clé étrangère de wiki_pages.project_id. L'un ou l'autre
+// peut être null si Postgres n'est pas configuré, ou si ce projet n'a
+// jamais été provisionné côté socle relationnel (échec silencieux à la
+// création — voir routes/projects.routes.js POST /).
+function DocumentationPanel({ orgId, projectId }) {
+  const pages = useApi(
+    () => (orgId && projectId ? api.get(`/wiki?orgId=${orgId}&projectId=${projectId}`) : Promise.resolve({ items: [] })),
+    [orgId, projectId]
+  );
+  const items = pages.data?.items || [];
+  const wikiLink = orgId ? `/deployments/organizations/${orgId}/wiki${projectId ? `?projectId=${projectId}` : ''}` : null;
+
+  return (
+    <Panel
+      title="Documentation"
+      sub={orgId && projectId ? `${items.length} page(s) liée(s) à ce projet` : 'Organisation non rattachée'}
+      span={12}
+      actions={wikiLink && (
+        <Link to={wikiLink} className="btn-outline pd-header-action-btn">Ouvrir le wiki</Link>
+      )}
+    >
+      {!orgId || !projectId ? (
+        <div className="pd-empty">Ce projet n'est rattaché à aucune organisation — le wiki d'équipe n'est disponible que pour les projets liés à une organisation (voir Organisations).</div>
+      ) : items.length === 0 ? (
+        <div className="pd-empty">Aucune page wiki liée à ce projet pour le moment.</div>
+      ) : (
+        <div className="pd-list">
+          {items.map((page) => (
+            <Link key={page.id} to={wikiLink} className="pd-row pd-row-link">
+              <span className="pd-row-title">{page.title}</span>
+              <span className="faint pd-row-date">{new Date(page.updated_at).toLocaleDateString('fr-FR')}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function IncidentsPanel({ incidents, projectId, role, onChanged }) {
   const notify = useNotify();
   const [open, setOpen] = useState(false);

@@ -126,4 +126,39 @@ test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
     const body = await rollback.json();
     expect(body.error).toMatch(/owner/i);
   });
+
+  // Lien projet ↔ wiki d'organisation (voir ProjectDetailPage.jsx,
+  // panneau Documentation) : jusqu'ici trois îlots de données séparés
+  // (projets, wiki, runbook des incidents) sans lien dans l'UI, alors que
+  // le backend supportait déjà un projectId optionnel sur une page wiki.
+  // Vérifie le vrai flux dans le navigateur, pas seulement l'API : id
+  // relationnel du projet (distinct du legacy id de l'URL) correctement
+  // résolu et transmis au filtre wiki.
+  test('le panneau Documentation du projet montre une page wiki qui lui est liée, et seulement celle-là', async ({ page }) => {
+    const detail = await adminApi.get(`/api/projects/${projectId}`);
+    const { project: fullProject } = await detail.json();
+    expect(fullProject.orgId).toBeTruthy();
+    expect(fullProject.relationalProjectId).toBeTruthy();
+
+    const linked = await adminApi.post('/api/wiki', {
+      data: { orgId: fullProject.orgId, projectId: fullProject.relationalProjectId, title: 'Runbook RBAC Project', content: 'procédure' }
+    });
+    expect(linked.ok()).toBeTruthy();
+    const unrelated = await adminApi.post('/api/wiki', {
+      data: { orgId: fullProject.orgId, title: 'Page générale sans projet', content: 'autre' }
+    });
+    expect(unrelated.ok()).toBeTruthy();
+
+    await page.goto('/login');
+    await page.locator('.login-field-email').fill('admin@rbac-pg.test');
+    await page.locator('.login-field-password').fill('AdminPassword123!');
+    await page.locator('button[type=submit]').click();
+    await page.waitForURL(/\/$/, { timeout: 10000 });
+
+    await page.goto(`/deployments/projects/${projectId}`);
+    const docPanel = page.locator('.card', { has: page.getByText('Documentation', { exact: true }) }).first();
+    await docPanel.scrollIntoViewIfNeeded();
+    await expect(docPanel.getByText('Runbook RBAC Project')).toBeVisible();
+    await expect(docPanel.getByText('Page générale sans projet')).toHaveCount(0);
+  });
 });
