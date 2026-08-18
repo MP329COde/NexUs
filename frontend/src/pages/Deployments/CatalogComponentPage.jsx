@@ -14,11 +14,12 @@ const DEP_KIND_LABEL = { runtime: 'runtime', build: 'build', data: 'data' };
 const BINDING_TYPE_LABEL = { postgres: 'PostgreSQL', redis: 'Redis', object_storage: 'Stockage objet', api: 'API', other: 'Autre' };
 
 // Fiche composant : centre de travail du composant dans le Software
-// Catalog. Volontairement minimale pour l'instant (métadonnées + accès
-// rapide au projet parent) — les onglets déploiements/observabilité/sécurité
-// se rattacheront ici au fur et à mesure que ces briques existeront pour de
-// vrai côté backend (voir todo IDP : ne jamais afficher un onglet vide comme
-// s'il fonctionnait).
+// Catalog. Le runtime (section "Environnements du projet" ci-dessous)
+// réutilise les environnements du PROJET parent — un composant n'a pas ses
+// propres environnements, il partage ceux du projet qui le porte. Les
+// autres onglets (observabilité/sécurité) se rattacheront ici au fur et à
+// mesure que ces briques existeront pour de vrai côté backend (voir todo
+// IDP : ne jamais afficher un onglet vide comme s'il fonctionnait).
 export default function CatalogComponentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -49,6 +50,15 @@ export default function CatalogComponentPage() {
     [component?.project_legacy_id]
   );
   const vaultEntries = projectVault.data?.items || [];
+  // Runtime : les environnements sont rattachés au PROJET, pas au composant
+  // (un projet peut porter plusieurs composants qui partagent ses
+  // environnements) — même endpoint que EnvironmentsPage.jsx, statut Argo CD
+  // réel inclus (listEnvironmentsWithStatus côté backend).
+  const projectEnvironments = useApi(
+    () => (component?.project_legacy_id ? api.get(`/projects/${component.project_legacy_id}/environments`) : Promise.resolve(null)),
+    [component?.project_legacy_id]
+  );
+  const environments = projectEnvironments.data?.items || [];
   const componentBindings = bindings.data?.items || [];
 
   async function addBinding(e) {
@@ -210,6 +220,34 @@ export default function CatalogComponentPage() {
                 <div key={c.id} className="catalog-scorecard-check">
                   <Icon name={c.passed ? 'check' : 'x'} size={14} color={c.passed ? 'var(--tone-ok-fg, #10b981)' : 'var(--tone-crit-fg, #ef4444)'} />
                   <span>{c.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {environments.length > 0 && (
+          <div className="card catalog-detail-card">
+            <div className="catalog-deps-header">
+              <span className="faint">Runtime — Environnements du projet</span>
+              <Link to={`/deployments/projects/${component.project_legacy_id}`} className="btn-outline catalog-deps-add-btn">
+                Voir le projet
+              </Link>
+            </div>
+            <div className="catalog-detail-list">
+              {environments.map((env) => (
+                <div key={env.id} className="catalog-detail-row">
+                  <span>
+                    <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'}`} style={{ marginRight: 6 }}>{env.is_production ? 'Production' : env.kind}</span>
+                    {env.name}
+                  </span>
+                  {env.argocd_app ? (
+                    <span className="faint">
+                      {env.app?.error ? env.app.error : `${env.app?.syncStatus || '—'} · ${env.app?.healthStatus || '—'}${env.app?.revision ? ` · ${env.app.revision}` : ''}`}
+                    </span>
+                  ) : (
+                    <span className="faint">Non lié à une application Argo CD</span>
+                  )}
                 </div>
               ))}
             </div>
