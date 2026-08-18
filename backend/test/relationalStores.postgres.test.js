@@ -18,6 +18,7 @@ if (!hasPostgres) {
   const orgStore = await import('../src/store/orgStore.js');
   const maintenanceStore = await import('../src/store/maintenanceStore.js');
   const incidentStore = await import('../src/store/incidentStore.js');
+  const { scaffoldService, ScaffolderError } = await import('../src/services/scaffolderService.js');
 
   await runMigrations();
 
@@ -123,5 +124,49 @@ if (!hasPostgres) {
     await orgStore.addTeamMember(team.id, 'u2', 'member');
     const teamsAfterAdd = await orgStore.listTeamsForOrg(org.id, 'u1');
     assert.equal(Number(teamsAfterAdd.find((t) => t.id === team.id).member_count), 2);
+  });
+
+  test('scaffolderService : provider "none" génère les fichiers, journalise les étapes dans l\'ordre et enregistre le composant', async () => {
+    const steps = [];
+    const result = await scaffoldService({
+      templateId: 'nodejs-api', name: 'scaffold-test-svc', description: 'Service de test', projectId: project.id,
+      ownerTeamId: null, repositoryProvider: 'none', log: async (step, status, detail) => { steps.push({ step, status, detail }); }
+    });
+    assert.equal(result.component.slug, 'scaffold-test-svc');
+    assert.equal(result.component.kind, 'api');
+    assert.equal(result.repository, null);
+    assert.ok(result.files.includes('service.yaml'));
+
+    // Les étapes doivent apparaître dans un ordre chronologique cohérent
+    // (running avant done, jamais l'inverse) — c'est précisément le bug
+    // trouvé et corrigé (emit() non attendu) lors du test manuel via curl.
+    const stepIndex = (step, status) => steps.findIndex((s) => s.step === step && s.status === status);
+    assert.ok(stepIndex('validate', 'running') < stepIndex('validate', 'done'));
+    assert.ok(stepIndex('validate', 'done') < stepIndex('generate', 'running'));
+    assert.ok(stepIndex('generate', 'done') < stepIndex('register_catalog', 'running'));
+    assert.ok(stepIndex('create_repo', 'skipped') >= 0);
+
+    const stored = await orgStore.getComponent(result.component.id);
+    assert.ok(stored, 'composant introuvable en base après scaffolding');
+  });
+
+  test('scaffolderService : refuse un template inconnu et un nom déjà pris dans le projet', async () => {
+    await assert.rejects(
+      () => scaffoldService({ templateId: 'does-not-exist', name: 'x', projectId: project.id, repositoryProvider: 'none', log: async () => {} }),
+      ScaffolderError
+    );
+    await orgStore.createComponent({ projectId: project.id, name: 'already-taken', slug: 'already-taken', kind: 'service' });
+    await assert.rejects(
+      () => scaffoldService({ templateId: 'worker', name: 'already-taken', projectId: project.id, repositoryProvider: 'none', log: async () => {} }),
+      ScaffolderError
+    );
+  });
+
+  test('scaffolderService : résout l\'équipe propriétaire par id et la référence dans service.yaml généré', async () => {
+    const team = await orgStore.createTeam({ orgId: org.id, name: 'Team Scaffold', slug: `team-scaffold-${Date.now()}`, ownerUserId: 'u1' });
+    const result = await scaffoldService({
+      templateId: 'worker', name: 'owned-worker', projectId: project.id, ownerTeamId: team.id, repositoryProvider: 'none', log: async () => {}
+    });
+    assert.equal(result.component.owner_team_id, team.id);
   });
 }

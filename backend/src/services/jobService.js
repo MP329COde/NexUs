@@ -82,6 +82,22 @@ export async function getJob(id) {
   return rows[0] || null;
 }
 
+// Progression en direct pour un job à plusieurs étapes (voir
+// services/scaffolderService.js) : append d'une entrée { step, status,
+// detail, at } dans payload.steps, consultable par un client qui interroge
+// GET /projects/:id/jobs/:jobId pendant que run() s'exécute encore — sans
+// ce mécanisme, un job de plusieurs secondes (création de dépôt distant,
+// plusieurs commits) resterait une boîte noire jusqu'à sa fin.
+export async function appendJobStep(jobId, step, status, detail) {
+  await query(
+    `UPDATE jobs SET payload = jsonb_set(
+       payload, '{steps}',
+       COALESCE(payload->'steps', '[]'::jsonb) || $2::jsonb
+     ) WHERE id = $1`,
+    [jobId, JSON.stringify([{ step, status, detail: detail ?? null, at: new Date().toISOString() }])]
+  );
+}
+
 export async function listJobsForProject(projectId, limit = 50) {
   const { rows } = await query(
     'SELECT * FROM jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT $2',

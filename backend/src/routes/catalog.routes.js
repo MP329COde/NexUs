@@ -5,6 +5,9 @@ import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
 import { parseServiceManifest, componentToManifest, ManifestError } from '../services/serviceManifest.js';
+import { listTemplatesSummary } from '../services/scaffolderTemplates.js';
+import { scaffoldService } from '../services/scaffolderService.js';
+import * as jobService from '../services/jobService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -149,6 +152,47 @@ router.post('/components/import', asyncHandler(async (req, res) => {
     logAudit(req, 'catalog.component.import.create', { componentId: component.id, projectId, name: manifest.name });
   }
   res.status(existing ? 200 : 201).json({ ok: true, component, created: !existing });
+}));
+
+// Golden paths (ÉTAPE 8/9 IDP) : liste statique, pas de permission
+// particulière au-delà d'être authentifié (comme parcourir un catalogue de
+// templates n'importe où ailleurs).
+router.get('/templates', asyncHandler(async (req, res) => {
+  res.json({ ok: true, items: listTemplatesSummary() });
+}));
+
+// Scaffolder : génère les fichiers du template, crée le dépôt distant si un
+// provider réel est demandé, enregistre le composant — le tout dans un job
+// suivi (voir services/scaffolderService.js) plutôt que dans la requête
+// HTTP elle-même, la création de dépôt + plusieurs commits pouvant prendre
+// plusieurs secondes. Progression consultable via
+// GET /projects/:id/jobs/:jobId (routes/projects.routes.js), déjà exposé —
+// le job est rattaché au projet relationnel cible comme n'importe quel
+// autre job de projet.
+router.post('/scaffold', asyncHandler(async (req, res) => {
+  const { templateId, legacyProjectId, projectId: rawProjectId, name, description, ownerTeamId, repositoryProvider } = req.body || {};
+  let projectId = rawProjectId;
+  if (!projectId && legacyProjectId) {
+    const pgProject = await orgStore.getProjectByLegacyId(legacyProjectId);
+    if (!pgProject) return res.status(404).json({ ok: false, error: 'Projet introuvable ou pas encore relié au socle organisations' });
+    projectId = pgProject.id;
+  }
+  if (!projectId || !templateId || !name) return res.status(400).json({ ok: false, error: 'projectId (ou legacyProjectId), templateId et name requis' });
+  const role = await orgStore.getProjectRole(projectId, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+
+  const job = await jobService.enqueue(
+    { type: 'catalog.scaffold', projectId, userId: req.user.id, payload: { templateId, name, repositoryProvider: repositoryProvider || 'none' } },
+    async (createdJob) => {
+      const log = (step, status, detail) => jobService.appendJobStep(createdJob.id, step, status, detail);
+      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log });
+      logAudit(req, 'catalog.scaffold', { componentId: result.component.id, projectId, templateId, name });
+      return result;
+    }
+  );
+  res.status(202).json({ ok: true, job });
 }));
 
 router.delete('/components/:id', asyncHandler(async (req, res) => {
