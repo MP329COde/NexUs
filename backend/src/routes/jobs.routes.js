@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { getJob, listRecentJobs } from '../services/jobService.js';
 
 // Suivi des jobs sans portée projet (ex. scan réseau — voir
@@ -12,12 +12,15 @@ import { getJob, listRecentJobs } from '../services/jobService.js';
 const router = Router();
 router.use(requireAuth);
 
-// Vue globale tous projets confondus (jobs en cours, échoués récemment...) :
-// réservée aux administrateurs, cohérent avec le reste de la supervision
-// transverse de la plateforme (audit, hôtes, sauvegardes...).
-router.get('/', requireRole('admin'), asyncHandler(async (req, res) => {
+// Vue tous projets confondus (jobs en cours, échoués récemment...) : un
+// admin voit tout (supervision transverse de la plateforme, cohérent avec
+// audit/hôtes/sauvegardes) ; un utilisateur non-admin ne voit que ses
+// propres jobs sans projet — même portée que GET /:id ci-dessous, pour ne
+// jamais pouvoir lister ce qu'il ne pourrait pas consulter par id.
+router.get('/', asyncHandler(async (req, res) => {
   const status = ['pending', 'running', 'succeeded', 'failed'].includes(req.query.status) ? req.query.status : undefined;
-  res.json({ ok: true, items: await listRecentJobs({ status }) });
+  const ownerId = req.user.role === 'admin' ? undefined : req.user.id;
+  res.json({ ok: true, items: await listRecentJobs({ status, ownerId }) });
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {

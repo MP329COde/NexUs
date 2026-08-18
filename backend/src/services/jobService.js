@@ -90,19 +90,31 @@ export async function listJobsForProject(projectId, limit = 50) {
   return rows;
 }
 
-// Vue globale (tous projets confondus) réservée aux administrateurs — voir
-// routes/jobs.routes.js GET /. Permet de répondre à "qu'est-ce qui est en
-// cours / a échoué sur toute la plateforme en ce moment", explicitement
-// demandé pour le tableau de bord d'un responsable système.
-export async function listRecentJobs({ status, limit = 100 } = {}) {
+// Vue tous projets confondus — voir routes/jobs.routes.js GET /. Sans
+// ownerId (admin), répond à "qu'est-ce qui est en cours / a échoué sur
+// toute la plateforme en ce moment", explicitement demandé pour le tableau
+// de bord d'un responsable système. Avec ownerId (non-admin), la liste est
+// restreinte aux jobs sans projet créés par cet utilisateur — même portée
+// que celle déjà appliquée par GET /:id (voir jobs.routes.js), pour ne pas
+// laisser un utilisateur lister ce qu'il ne pourrait pas consulter par id.
+export async function listRecentJobs({ status, limit = 100, ownerId } = {}) {
+  const conditions = [];
+  const params = [];
   if (status) {
-    const { rows } = await query(
-      'SELECT * FROM jobs WHERE status = $1 ORDER BY created_at DESC LIMIT $2',
-      [status, limit]
-    );
-    return rows;
+    params.push(status);
+    conditions.push(`status = $${params.length}`);
   }
-  const { rows } = await query('SELECT * FROM jobs ORDER BY created_at DESC LIMIT $1', [limit]);
+  if (ownerId) {
+    params.push(ownerId);
+    conditions.push(`created_by = $${params.length}`);
+    conditions.push('project_id IS NULL');
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  params.push(limit);
+  const { rows } = await query(
+    `SELECT * FROM jobs ${where} ORDER BY created_at DESC LIMIT $${params.length}`,
+    params
+  );
   return rows;
 }
 

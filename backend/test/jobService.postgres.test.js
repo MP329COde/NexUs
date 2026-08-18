@@ -75,4 +75,38 @@ if (!hasPostgres) {
     const { rows } = await query("SELECT status FROM jobs WHERE type = 'test.recover' ORDER BY status");
     assert.deepEqual(rows.map((r) => r.status).sort(), ['failed', 'succeeded']);
   });
+
+  // Portée de GET /jobs pour un non-admin (voir routes/jobs.routes.js) :
+  // avec ownerId, ne doit renvoyer ni les jobs d'un autre utilisateur, ni
+  // les jobs rattachés à un projet (consultés via /projects/:id/jobs à la
+  // place) — même périmètre que GET /jobs/:id.
+  test('listRecentJobs avec ownerId : ne renvoie que les jobs sans projet créés par cet utilisateur', async () => {
+    await query("INSERT INTO jobs (type, status, created_by, project_id) VALUES ('test.scope.mine', 'succeeded', 'owner-a', NULL)");
+    await query("INSERT INTO jobs (type, status, created_by, project_id) VALUES ('test.scope.other', 'succeeded', 'owner-b', NULL)");
+    const orgRow = await query("INSERT INTO organizations (name, slug) VALUES ('test-jobs-scope-org', 'test-jobs-scope-org') RETURNING id");
+    const orgId = orgRow.rows[0].id;
+    const projectRow = await query(
+      "INSERT INTO projects (org_id, name, slug) VALUES ($1, 'test-jobs-scope-project', 'test-jobs-scope-project') RETURNING id",
+      [orgId]
+    );
+    const projectId = projectRow.rows[0].id;
+    await query("INSERT INTO jobs (type, status, created_by, project_id) VALUES ('test.scope.project', 'succeeded', 'owner-a', $1)", [projectId]);
+
+    const mine = await jobService.listRecentJobs({ ownerId: 'owner-a' });
+    const types = mine.map((j) => j.type);
+    assert.ok(types.includes('test.scope.mine'));
+    assert.ok(!types.includes('test.scope.other'));
+    assert.ok(!types.includes('test.scope.project'));
+
+    await query("DELETE FROM jobs WHERE type LIKE 'test.scope.%'");
+    await query('DELETE FROM projects WHERE id = $1', [projectId]);
+    await query('DELETE FROM organizations WHERE id = $1', [orgId]);
+  });
+
+  test('listRecentJobs sans ownerId (admin) : voit tous les jobs, y compris ceux rattachés à un projet', async () => {
+    await query("INSERT INTO jobs (type, status, created_by, project_id) VALUES ('test.scope.admin', 'succeeded', 'owner-a', NULL)");
+    const all = await jobService.listRecentJobs({});
+    assert.ok(all.some((j) => j.type === 'test.scope.admin'));
+    await query("DELETE FROM jobs WHERE type LIKE 'test.scope.%'");
+  });
 }
