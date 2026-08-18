@@ -203,4 +203,39 @@ if (!hasPostgres) {
     const envAfterDelete = await orgStore.getEnvironment(env.id);
     assert.equal(envAfterDelete.blueprint_id, null);
   });
+
+  test('orgStore (components) : le filtre "mine" (Developer Portal, ÉTAPE 25) isole ce dont u1 est responsable', async () => {
+    // u1 est déjà owner de `org`/`project` (test.before) — pour distinguer
+    // "responsable" de "visible par bypass owner/admin d'organisation" (le
+    // cas que ce filtre doit justement exclure), on utilise un second
+    // projet dont u1 n'est PAS membre direct, dans la même organisation.
+    const otherProject = await orgStore.createProject({ orgId: org.id, name: 'Other Project Mine', slug: `other-project-mine-${Date.now()}`, legacyId: `other-legacy-mine-${Date.now()}` });
+    // `project` (fixture partagée, test.before) n'a jamais reçu u1 en
+    // project_members direct — seul son accès owner d'organisation le rend
+    // visible aujourd'hui. On l'ajoute explicitement ici pour distinguer
+    // "membre direct" (doit ressortir dans "mine") de ce bypass d'org (ne
+    // doit PAS ressortir), sans modifier la fixture partagée par les autres
+    // tests de ce fichier.
+    await orgStore.setMemberRole(project.id, 'u1', 'maintainer');
+
+    const teamOfU1 = await orgStore.createTeam({ orgId: org.id, name: 'Team Mine', slug: `team-mine-${Date.now()}`, ownerUserId: 'u1' });
+    // Composant du second projet, propriété de l'équipe de u1 → doit apparaître (owner_team_id).
+    const ownedByTeam = await orgStore.createComponent({ projectId: otherProject.id, name: 'owned-by-my-team', slug: 'owned-by-my-team', kind: 'service', ownerTeamId: teamOfU1.id });
+    // Composant du second projet, sans équipe, u1 pas membre direct → ne doit PAS apparaître malgré le bypass owner d'org.
+    const notMine = await orgStore.createComponent({ projectId: otherProject.id, name: 'not-mine-at-all', slug: 'not-mine-at-all', kind: 'service' });
+    // Composant du projet historique où u1 EST membre direct (créateur) → doit apparaître.
+    const directMember = await orgStore.createComponent({ projectId: project.id, name: 'direct-member-component', slug: 'direct-member-component', kind: 'service' });
+
+    const mine = await orgStore.listComponentsForUser('u1', { mine: true });
+    const mineIds = mine.map((c) => c.id);
+    assert.ok(mineIds.includes(ownedByTeam.id), 'composant propriété de mon équipe absent du filtre "mine"');
+    assert.ok(mineIds.includes(directMember.id), 'composant de mon projet direct absent du filtre "mine"');
+    assert.ok(!mineIds.includes(notMine.id), 'composant sans lien avec u1 présent à tort dans le filtre "mine"');
+
+    // Sans le filtre, notMine redevient visible (bypass owner d'organisation) —
+    // confirme que "mine" retire bien un résultat qui serait sinon présent,
+    // pas seulement qu'il n'ajoute rien.
+    const all = await orgStore.listComponentsForUser('u1', {});
+    assert.ok(all.map((c) => c.id).includes(notMine.id));
+  });
 }

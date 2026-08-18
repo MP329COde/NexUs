@@ -599,7 +599,7 @@ export async function getWikiRevision(id) {
 // Même portée de visibilité que listProjectsForUser : un composant est
 // visible par quiconque a accès à son projet (membre direct ou owner/admin
 // de l'organisation), jamais par tous les utilisateurs de la plateforme.
-export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId } = {}) {
+export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId, mine } = {}) {
   const params = [userId];
   const conditions = ['(pm.user_id = $1 OR om.role IN (\'owner\', \'admin\'))'];
   if (q) { params.push(`%${q.toLowerCase()}%`); conditions.push(`(LOWER(c.name) LIKE $${params.length} OR LOWER(c.description) LIKE $${params.length})`); }
@@ -607,6 +607,19 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
   if (lifecycle) { params.push(lifecycle); conditions.push(`c.lifecycle = $${params.length}`); }
   if (ownerTeamId) { params.push(ownerTeamId); conditions.push(`c.owner_team_id = $${params.length}`); }
   if (projectId) { params.push(projectId); conditions.push(`c.project_id = $${params.length}`); }
+  // "Mes services" (ÉTAPE 25 IDP, Developer Portal) : ce dont CET
+  // utilisateur est réellement responsable — son équipe en est propriétaire,
+  // OU il est membre EXPLICITE du projet (pas seulement visible par bypass
+  // owner/admin d'organisation, qui donne accès à tout sans en faire le
+  // responsable). Distinct du filtre par projet/équipe ci-dessus : ceux-là
+  // ciblent un projet/une équipe précis, celui-ci répond à "qu'est-ce qui
+  // est à moi ?" quel que soit le projet.
+  if (mine) {
+    conditions.push(
+      `(c.owner_team_id IN (SELECT team_id FROM team_members WHERE user_id = $1)
+        OR EXISTS (SELECT 1 FROM project_members pm2 WHERE pm2.project_id = c.project_id AND pm2.user_id = $1))`
+    );
+  }
   const { rows } = await query(
     `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
         (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count

@@ -37,7 +37,8 @@ function kindLabel(v) { return KINDS.find((k) => k.value === v)?.label || v; }
 // seulement pour les projets auxquels l'utilisateur a accès, comme /projects.
 export default function CatalogPage() {
   const notify = useNotify();
-  const { data, reload, loading, error } = useApi(() => api.get('/catalog/components'), []);
+  const [mineOnly, setMineOnly] = useState(false);
+  const { data, reload, loading, error } = useApi(() => api.get(`/catalog/components${mineOnly ? '?mine=true' : ''}`), [mineOnly]);
   const projects = useApi(() => api.get('/projects'), []);
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -129,6 +130,13 @@ export default function CatalogPage() {
             </span>
           ))}
         </div>
+        <div className="projects-status-tabs">
+          {[{ value: false, label: 'Tout le catalogue' }, { value: true, label: 'Mes services' }].map((f) => (
+            <span key={String(f.value)} onClick={() => setMineOnly(f.value)} className={`projects-status-tab${mineOnly === f.value ? ' projects-status-tab-active' : ''}`}>
+              {f.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {formOpen && (
@@ -203,7 +211,9 @@ export default function CatalogPage() {
         <div className="card catalog-empty">Chargement du catalogue…</div>
       ) : components.length === 0 ? (
         <div className="card catalog-empty">
-          {allComponents.length === 0 ? 'Aucun composant déclaré — commencez par en ajouter un.' : 'Aucun composant ne correspond à ce filtre.'}
+          {allComponents.length === 0
+            ? (mineOnly ? "Aucun composant dont vous êtes responsable (équipe propriétaire ou membre direct du projet)." : 'Aucun composant déclaré — commencez par en ajouter un.')
+            : 'Aucun composant ne correspond à ce filtre.'}
         </div>
       ) : (
         <div className="projects-grid">

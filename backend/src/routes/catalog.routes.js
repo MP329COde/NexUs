@@ -31,10 +31,10 @@ function slugify(name) {
 }
 
 router.get('/components', asyncHandler(async (req, res) => {
-  const { q, kind, lifecycle, ownerTeamId, projectId } = req.query;
+  const { q, kind, lifecycle, ownerTeamId, projectId, mine } = req.query;
   if (kind && !KINDS.includes(kind)) return res.status(400).json({ ok: false, error: 'Type invalide' });
   if (lifecycle && !LIFECYCLES.includes(lifecycle)) return res.status(400).json({ ok: false, error: 'Cycle de vie invalide' });
-  const items = await orgStore.listComponentsForUser(req.user.id, { q, kind, lifecycle, ownerTeamId, projectId });
+  const items = await orgStore.listComponentsForUser(req.user.id, { q, kind, lifecycle, ownerTeamId, projectId, mine: mine === 'true' });
   res.json({ ok: true, items: items.map((c) => ({ ...c, scorecard: computeScorecard(c) })) });
 }));
 
