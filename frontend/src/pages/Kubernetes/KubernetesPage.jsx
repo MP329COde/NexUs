@@ -16,14 +16,18 @@ import DiagnosticsModal from './DiagnosticsModal.jsx';
 import './KubernetesPage.css';
 
 export default function KubernetesPage() {
-  const [namespace, setNamespace] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Pré-rempli depuis ?ns=<namespace> (lien direct depuis la fiche composant
+  // du Software Catalog, voir CatalogComponentPage.jsx#EnvironmentPodsSummary) —
+  // sans ça, le lien "N pod(s) Running" ouvrait la page sans jamais filtrer
+  // sur le namespace annoncé.
+  const [namespace, setNamespace] = useState(() => searchParams.get('ns') || '');
   const [logsPod, setLogsPod] = useState(null);
   const [detailPod, setDetailPod] = useState(null); // { pod, tab }
   const [diagnosing, setDiagnosing] = useState(null); // { namespace, name }
   const [scaling, setScaling] = useState(null); // "ns/name" en cours d'édition
   const [scaleValue, setScaleValue] = useState('');
   const [pending, setPending] = useState(null); // action en attente de confirmation
-  const [searchParams, setSearchParams] = useSearchParams();
   const status = useApi(() => api.get('/kubernetes/status'), []);
   const namespaces = useApi(() => api.get('/kubernetes/namespaces'), [], { pollMs: 30000 });
   const deployments = useApi(() => api.get(`/kubernetes/deployments${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
