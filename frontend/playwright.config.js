@@ -11,6 +11,13 @@ const dataDir = path.join(__dirname, '.pw-data');
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
+  // Un seul worker, explicitement : plusieurs fichiers de test partagent le
+  // même backend jetable et le même compte admin créé par setup.spec.js
+  // (voir smokeNavigation.spec.js) — sans ce réglage, Playwright peut lancer
+  // les fichiers dans des workers séparés en parallèle par défaut, et un
+  // fichier qui suppose l'admin déjà créé échouerait de façon non
+  // déterministe selon l'ordre d'exécution réel.
+  workers: 1,
   retries: 0,
   reporter: [['list']],
   use: {
