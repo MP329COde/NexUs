@@ -3,13 +3,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config/env.js';
 import { dataDir } from '../config/paths.js';
+import { logger } from './logger.js';
 
 const keyFile = path.join(dataDir, '.master.key');
 
+// En repli sans NEXUS_MASTER_KEY, la clé de chiffrement des secrets vit dans
+// le même volume que les secrets qu'elle protège (data/.master.key) : un
+// accès au volume (backup, snapshot, conteneur compromis) livre la clé et
+// les données chiffrées ensemble. Acceptable en dev, à bannir en prod — d'où
+// l'avertissement bruyant ci-dessous plutôt qu'un silence qui masquerait le
+// problème jusqu'à un incident réel.
 function loadOrCreateKey() {
   if (env.masterKey) return Buffer.from(env.masterKey, 'hex').length === 32
     ? Buffer.from(env.masterKey, 'hex')
     : crypto.createHash('sha256').update(env.masterKey).digest();
+
+  const warn = process.env.NODE_ENV === 'production' ? logger.error.bind(logger) : logger.warn.bind(logger);
+  warn(
+    `NEXUS_MASTER_KEY n'est pas défini : la clé de chiffrement est générée/lue depuis ${keyFile}, `
+    + 'dans le même volume que les secrets qu\'elle protège. Définissez NEXUS_MASTER_KEY '
+    + '(variable d\'environnement distincte, hors du volume de données) avant tout déploiement en production.'
+  );
 
   fs.mkdirSync(dataDir, { recursive: true });
   if (fs.existsSync(keyFile)) {
