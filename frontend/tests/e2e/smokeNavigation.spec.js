@@ -29,6 +29,8 @@ async function login(page) {
 // rbac.spec.js) et nécessitent une entité existante pour être pertinentes.
 const ROUTES = [
   '/deployments',
+  '/deployments/catalog',
+  '/deployments/templates',
   '/deployments/projects',
   '/deployments/organizations',
   '/deployments/repos',
