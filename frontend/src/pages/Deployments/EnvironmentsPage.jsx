@@ -60,8 +60,9 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
   const [promoting, setPromoting] = useState(null);
   const [promoteFrom, setPromoteFrom] = useState({});
   const [creating, setCreating] = useState(false);
-  const [newEnv, setNewEnv] = useState({ name: '', kind: 'staging', blueprintId: '' });
+  const [newEnv, setNewEnv] = useState({ name: '', kind: 'staging', blueprintId: '', sourceBranch: '', sourceCommit: '', sourcePrUrl: '' });
   const [creatingBusy, setCreatingBusy] = useState(false);
+  const [destroying, setDestroying] = useState(null);
 
   // Les blueprints applicables à ce projet sont ceux de SON organisation
   // (voir EnvironmentBlueprintsPanel.jsx, Paramètres → Blueprints
@@ -75,15 +76,36 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
     e.preventDefault();
     setCreatingBusy(true);
     try {
-      await api.post(`/projects/${project.id}/environments`, { name: newEnv.name, kind: newEnv.kind, blueprintId: newEnv.blueprintId || null });
+      await api.post(`/projects/${project.id}/environments`, {
+        name: newEnv.name, kind: newEnv.kind, blueprintId: newEnv.blueprintId || null,
+        sourceBranch: newEnv.sourceBranch || null, sourceCommit: newEnv.sourceCommit || null, sourcePrUrl: newEnv.sourcePrUrl || null
+      });
       notify(`Environnement "${newEnv.name}" créé`, { type: 'ok' });
-      setNewEnv({ name: '', kind: 'staging', blueprintId: '' });
+      setNewEnv({ name: '', kind: 'staging', blueprintId: '', sourceBranch: '', sourceCommit: '', sourcePrUrl: '' });
       setCreating(false);
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
     } finally {
       setCreatingBusy(false);
+    }
+  }
+
+  // Destroy Preview (ÉTAPE 11) : jamais proposé pour la production (le
+  // backend le refuserait de toute façon — voir orgStore.deleteEnvironment,
+  // qui exclut is_production=true — mais autant ne pas afficher un bouton
+  // qui échouerait systématiquement).
+  async function destroyEnvironment(env) {
+    if (!window.confirm(`Détruire l'environnement « ${env.name} » ? Cette action est irréversible.`)) return;
+    setDestroying(env.id);
+    try {
+      await api.del(`/projects/${project.id}/environments/${env.id}`);
+      notify(`Environnement "${env.name}" détruit`, { type: 'info' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setDestroying(null);
     }
   }
 
@@ -140,8 +162,15 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
           </select>
           <select className="input" value={newEnv.blueprintId} onChange={(e) => setNewEnv((f) => ({ ...f, blueprintId: e.target.value }))}>
             <option value="">Sans blueprint</option>
-            {availableBlueprints.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {availableBlueprints.map((b) => <option key={b.id} value={b.id}>{b.name}{b.ttl_minutes != null ? ` (TTL ${b.ttl_minutes} min)` : ''}</option>)}
           </select>
+          {newEnv.kind === 'preview' && (
+            <>
+              <input className="input" placeholder="Branche (ex. feature/x)" value={newEnv.sourceBranch} onChange={(e) => setNewEnv((f) => ({ ...f, sourceBranch: e.target.value }))} />
+              <input className="input" placeholder="Commit" value={newEnv.sourceCommit} onChange={(e) => setNewEnv((f) => ({ ...f, sourceCommit: e.target.value }))} />
+              <input className="input" placeholder="URL de la PR/MR" value={newEnv.sourcePrUrl} onChange={(e) => setNewEnv((f) => ({ ...f, sourcePrUrl: e.target.value }))} />
+            </>
+          )}
           <button className="btn" type="submit" disabled={creatingBusy}>{creatingBusy ? 'Création…' : 'Créer'}</button>
         </form>
       )}
@@ -150,8 +179,8 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
         <table className="env-table">
           <thead>
             <tr>
-              {['Environnement', 'App Argo CD', 'Synchro', 'Santé', 'Revision', 'Promouvoir depuis', ''].map((c) => (
-                <th key={c} className="env-table-head">{c}</th>
+              {['Environnement', 'App Argo CD', 'Synchro', 'Santé', 'Revision', 'Expire', 'Promouvoir depuis', 'Promotion', 'Destruction'].map((c) => (
+                <th key={c} className="env-table-head">{c === 'Promotion' || c === 'Destruction' ? '' : c}</th>
               ))}
             </tr>
           </thead>
@@ -162,6 +191,12 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                   <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'} env-badge-kind`}>{env.is_production ? 'Production' : env.kind}</span>
                   <strong>{env.name}</strong>
                   {env.blueprint_name && <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>({env.blueprint_name})</span>}
+                  {env.source_branch && (
+                    <div className="faint mono" style={{ fontSize: 11 }}>
+                      {env.source_branch}{env.source_commit ? ` · ${env.source_commit.slice(0, 7)}` : ''}
+                      {env.source_pr_url && <> · <a href={env.source_pr_url} target="_blank" rel="noreferrer">PR</a></>}
+                    </div>
+                  )}
                 </td>
                 <td className="env-table-cell">
                   {linking === env.id ? (
@@ -185,6 +220,15 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                 </td>
                 <td className="env-table-cell mono muted">{env.app?.revision || '—'}</td>
                 <td className="env-table-cell">
+                  {env.expires_at ? (
+                    new Date(env.expires_at).getTime() < Date.now() ? (
+                      <span className="badge badge-crit"><span className="dot" />Expiré</span>
+                    ) : (
+                      <span className="faint mono" style={{ fontSize: 11 }}>{formatDate(env.expires_at)}</span>
+                    )
+                  ) : <span className="faint">—</span>}
+                </td>
+                <td className="env-table-cell">
                   {env.argocd_app && (
                     <select className="input env-promote-select" value={promoteFrom[env.id] || ''} onChange={(e) => setPromoteFrom((prev) => ({ ...prev, [env.id]: e.target.value }))}>
                       <option value="">(re-sync direct)</option>
@@ -198,6 +242,13 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                   {env.argocd_app && (
                     <button className="btn env-promote-btn" type="button" disabled={promoting === env.id} onClick={() => doPromote(env)}>
                       {promoting === env.id ? '…' : 'Promouvoir'}
+                    </button>
+                  )}
+                </td>
+                <td className="env-table-cell">
+                  {!env.is_production && (
+                    <button className="btn-outline env-promote-btn" type="button" disabled={destroying === env.id} onClick={() => destroyEnvironment(env)}>
+                      {destroying === env.id ? '…' : 'Détruire'}
                     </button>
                   )}
                 </td>

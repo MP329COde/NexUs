@@ -373,4 +373,38 @@ if (!hasPostgres) {
     const stillApproved = await orgStore.getPlatformRequest(request.id);
     assert.equal(stillApproved.status, 'approved');
   });
+
+  test('orgStore (preview environments) : expires_at hérité du TTL du blueprint, destruction manuelle, production protégée', async () => {
+    const blueprint = await orgStore.createEnvironmentBlueprint({ orgId: org.id, name: 'Preview RS', slug: `preview-rs-${Date.now()}`, kind: 'preview', ttlMinutes: 60 });
+    const before = Date.now();
+    const preview = await orgStore.createEnvironment(project.id, {
+      name: `preview-rs-${Date.now()}`, kind: 'preview', blueprintId: blueprint.id,
+      sourceBranch: 'feature/x', sourceCommit: 'deadbee', sourcePrUrl: 'https://example.com/pr/1'
+    });
+    assert.equal(preview.source_branch, 'feature/x');
+    assert.ok(preview.expires_at, 'expires_at doit être calculé quand le blueprint a un TTL');
+    const deltaMinutes = (new Date(preview.expires_at).getTime() - before) / 60_000;
+    assert.ok(deltaMinutes > 59 && deltaMinutes < 61, `expires_at doit être ~60 min dans le futur (obtenu : ${deltaMinutes})`);
+
+    // Un environnement créé SANS blueprint (ou avec un blueprint sans TTL,
+    // comme "Staging standard" dans les tests précédents) n'expire jamais :
+    // pas de valeur inventée en son absence.
+    const noTtl = await orgStore.createEnvironment(project.id, { name: `no-ttl-rs-${Date.now()}`, kind: 'custom' });
+    assert.equal(noTtl.expires_at, null);
+
+    const expiredList = await orgStore.listExpiredEnvironments(project.id);
+    assert.ok(!expiredList.some((e) => e.id === preview.id), 'un environnement qui expire dans 60 min ne doit pas apparaître comme déjà expiré');
+
+    const deleted = await orgStore.deleteEnvironment(preview.id);
+    assert.equal(deleted, true);
+    assert.equal(await orgStore.getEnvironment(preview.id), null);
+
+    // La production ne se supprime JAMAIS par cette fonction, quel que soit
+    // l'appelant — défense en profondeur vérifiée directement au niveau store.
+    const prodEnvs = await orgStore.listEnvironments(project.id);
+    const prod = prodEnvs.find((e) => e.is_production);
+    const prodDeleteAttempt = await orgStore.deleteEnvironment(prod.id);
+    assert.equal(prodDeleteAttempt, false);
+    assert.ok(await orgStore.getEnvironment(prod.id), "l'environnement de production doit toujours exister après la tentative");
+  });
 }

@@ -298,16 +298,30 @@ router.get('/:id/environments', loadProjectAccess(), asyncHandler(async (req, re
 
 router.post('/:id/environments', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
-  const { name, kind, isProduction, blueprintId } = req.body || {};
+  const { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
   // blueprintId non validé ici contre l'organisation du projet : la
   // contrainte FK (environments.blueprint_id) suffit à rejeter un id
   // inexistant, et un blueprint d'une AUTRE organisation resterait de
   // toute façon invisible/inutilisable côté UI (sélecteur alimenté par
   // GET /environment-blueprints?orgId=<org du projet>).
-  const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction, blueprintId });
+  const environment = await orgStore.createEnvironment(req.pgProject.id, { name, kind, isProduction, blueprintId, sourceBranch, sourceCommit, sourcePrUrl });
   logAudit(req, 'project.environment.create', { projectId: req.legacyProject.id, name });
   res.status(201).json({ ok: true, environment });
+}));
+
+// Destroy Preview (ÉTAPE 11) : suppression manuelle, jamais la production
+// (voir orgStore.deleteEnvironment, qui refuse déjà is_production=true —
+// la vérification ici évite en plus un message d'erreur générique et donne
+// une raison claire à l'appelant).
+router.delete('/:id/environments/:envId', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const environment = await orgStore.getEnvironment(req.params.envId);
+  if (!environment || environment.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  if (environment.is_production) return res.status(403).json({ ok: false, error: 'Un environnement de production ne peut pas être supprimé depuis cette action' });
+  await orgStore.deleteEnvironment(req.params.envId);
+  logAudit(req, 'project.environment.delete', { projectId: req.legacyProject.id, environmentId: req.params.envId, name: environment.name });
+  res.json({ ok: true });
 }));
 
 router.put('/:id/environments/:envId/link', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
