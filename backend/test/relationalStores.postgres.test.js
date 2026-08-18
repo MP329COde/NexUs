@@ -371,6 +371,31 @@ if (!hasPostgres) {
     }
   });
 
+  test('environmentPromotionService : provisionArgocdApp — repoURL requis, namespace requis, Argo CD non configuré remonte une vraie erreur (jamais un succès simulé)', async () => {
+    const { provisionArgocdApp } = await import('../src/services/environmentPromotionService.js');
+    const env = await orgStore.createEnvironment(project.id, { name: `provision-argo-${Date.now()}`, kind: 'preview' });
+
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: '', destinationNamespace: 'x' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /repoURL requis/); return true; }
+    );
+
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: 'https://github.com/org/repo.git' }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /destinationNamespace requis/); return true; }
+    );
+
+    // Argo CD n'est pas configuré dans cet environnement de test :
+    // upsertApplication doit lever une IntegrationError réelle (409), jamais
+    // un succès silencieux ni un environnement lié à une app qui n'existe pas.
+    await assert.rejects(
+      () => provisionArgocdApp(env.id, project.slug, { repoURL: 'https://github.com/org/repo.git', destinationNamespace: 'x' }),
+      (err) => { assert.match(err.message, /Argo CD non configuré/); return true; }
+    );
+    const unchanged = await orgStore.getEnvironment(env.id);
+    assert.equal(unchanged.argocd_app, null);
+  });
+
   test('orgStore (platform requests) : cycle de vie complet + transition unique pending → tranchée', async () => {
     const request = await orgStore.createPlatformRequest({ orgId: org.id, requestedBy: 'u1', kind: 'access', title: 'Accès prod RS', description: 'Besoin du vault projet' });
     assert.equal(request.status, 'pending');

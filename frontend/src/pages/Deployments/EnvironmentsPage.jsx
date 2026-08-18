@@ -57,6 +57,9 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
   const promotions = promoData?.items || [];
   const [linking, setLinking] = useState(null);
   const [appInput, setAppInput] = useState('');
+  const [provisioning, setProvisioning] = useState(null);
+  const [provisionForm, setProvisionForm] = useState({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: '' });
+  const [provisionBusy, setProvisionBusy] = useState(false);
   const [promoting, setPromoting] = useState(null);
   const [promoteFrom, setPromoteFrom] = useState({});
   const [creating, setCreating] = useState(false);
@@ -118,6 +121,26 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
+    }
+  }
+
+  async function submitProvision(env) {
+    setProvisionBusy(true);
+    try {
+      const res = await api.post(`/projects/${project.id}/environments/${env.id}/provision-argocd-app`, {
+        repoURL: provisionForm.repoURL.trim(),
+        path: provisionForm.path.trim() || '.',
+        targetRevision: provisionForm.targetRevision.trim() || undefined,
+        destinationNamespace: provisionForm.destinationNamespace.trim() || undefined
+      });
+      notify(`Application Argo CD "${res.environment.argocd_app}" provisionnée pour ${env.name}`, { type: 'ok' });
+      setProvisioning(null);
+      setProvisionForm({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: '' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setProvisionBusy(false);
     }
   }
 
@@ -211,10 +234,23 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                       <input className="input mono env-link-input" placeholder="nom app Argo CD" value={appInput} onChange={(e) => setAppInput(e.target.value)} />
                       <button className="btn env-link-save-btn" type="button" onClick={() => saveLink(env)}>OK</button>
                     </span>
+                  ) : provisioning === env.id ? (
+                    <div className="env-link-form" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, minWidth: 220 }}>
+                      <input className="input mono" placeholder="https://github.com/org/repo.git" value={provisionForm.repoURL} onChange={(e) => setProvisionForm((f) => ({ ...f, repoURL: e.target.value }))} />
+                      <input className="input mono" placeholder="chemin des manifestes (.)" value={provisionForm.path} onChange={(e) => setProvisionForm((f) => ({ ...f, path: e.target.value }))} />
+                      <input className="input mono" placeholder={`namespace (${env.provisioned_namespace || 'requis'})`} value={provisionForm.destinationNamespace} onChange={(e) => setProvisionForm((f) => ({ ...f, destinationNamespace: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn" type="button" disabled={provisionBusy || !provisionForm.repoURL.trim()} onClick={() => submitProvision(env)}>{provisionBusy ? '…' : 'Provisionner'}</button>
+                        <span className="btn-outline" onClick={() => setProvisioning(null)}>Annuler</span>
+                      </div>
+                    </div>
                   ) : env.argocd_app ? (
                     <span className="mono env-link-value" onClick={() => { setLinking(env.id); setAppInput(env.argocd_app); }}>{env.argocd_app}</span>
                   ) : (
-                    <span className="btn-outline env-link-btn" onClick={() => { setLinking(env.id); setAppInput(''); }}>Lier une app</span>
+                    <span style={{ display: 'flex', gap: 6 }}>
+                      <span className="btn-outline env-link-btn" onClick={() => { setLinking(env.id); setAppInput(''); }}>Lier une app existante</span>
+                      <span className="btn-outline env-link-btn" onClick={() => { setProvisioning(env.id); setProvisionForm({ repoURL: '', path: '.', targetRevision: '', destinationNamespace: env.provisioned_namespace || '' }); }}>Provisionner</span>
+                    </span>
                   )}
                 </td>
                 <td className="env-table-cell">

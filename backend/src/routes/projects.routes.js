@@ -18,7 +18,7 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
-import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions } from '../services/environmentPromotionService.js';
+import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp } from '../services/environmentPromotionService.js';
 import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
 import { listResourceGrants, setResourceGrant } from '../store/orgStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
@@ -343,6 +343,19 @@ router.put('/:id/environments/:envId/link', loadProjectAccess(), requireMinRole(
   const environment = await linkEnvironment(req.params.envId, argocdApp || null);
   logAudit(req, 'project.environment.link', { projectId: req.legacyProject.id, environmentId: req.params.envId, argocdApp: argocdApp || null });
   res.json({ ok: true, environment });
+}));
+
+// Provisionne réellement l'application Argo CD (voir
+// environmentPromotionService.provisionArgocdApp) — équivalent, pour le
+// socle relationnel, de POST /deployments/:id/provision-argocd-app.
+router.post('/:id/environments/:envId/provision-argocd-app', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const environment = await orgStore.getEnvironment(req.params.envId);
+  if (!environment || environment.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  const { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync } = req.body || {};
+  const updated = await provisionArgocdApp(req.params.envId, req.pgProject.slug, { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync });
+  logAudit(req, 'project.environment.provision_argocd_app', { projectId: req.legacyProject.id, environmentId: req.params.envId, appName: updated.argocd_app });
+  res.status(201).json({ ok: true, environment: updated });
 }));
 
 router.get('/:id/environments/promotions', loadProjectAccess(), asyncHandler(async (req, res) => {

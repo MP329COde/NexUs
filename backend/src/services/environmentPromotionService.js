@@ -1,5 +1,5 @@
 import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, listPromotions as listPromotionsStore, listEnvironments, getProject, listPoliciesForOrg, listComponentsForProject } from '../store/orgStore.js';
-import { getApplication, syncApplication } from './integrations/argocdService.js';
+import { getApplication, syncApplication, upsertApplication } from './integrations/argocdService.js';
 import { IntegrationError } from './integrations/httpClient.js';
 import { listScans as listCodeScans } from '../store/codeScansStore.js';
 import { listScans as listDastScans } from '../store/dastScansStore.js';
@@ -87,6 +87,31 @@ export async function linkEnvironment(environmentId, argocdApp) {
   const env = await setEnvironmentArgocdApp(environmentId, argocdApp);
   if (!env) throw Object.assign(new Error('Environnement introuvable'), { status: 404 });
   return env;
+}
+
+// Crée (ou met à jour) réellement l'Application dans Argo CD pour un
+// environnement du socle relationnel, puis le lie — équivalent, pour les
+// environnements relationnels, de POST /deployments/:id/provision-argocd-app
+// (routes/deployments.routes.js) sur le socle legacy. Contrairement au
+// legacy, un environnement relationnel n'est pas rattaché à UN dépôt : le
+// dépôt source reste un choix explicite de l'appelant (repoURL), un projet
+// pouvant porter plusieurs composants avec des dépôts différents. Le
+// namespace cible retombe sur celui déjà réellement provisionné depuis un
+// blueprint (voir environmentProvisioningService.js) si aucun n'est fourni
+// explicitement — jamais un namespace deviné au hasard.
+export async function provisionArgocdApp(environmentId, projectSlug, { appName, repoURL, path, targetRevision, destinationNamespace, automatedSync }) {
+  const env = await getEnvironment(environmentId);
+  if (!env) throw Object.assign(new Error('Environnement introuvable'), { status: 404 });
+  if (!repoURL) throw Object.assign(new Error('repoURL requis (dépôt source des manifestes)'), { status: 400 });
+  const namespace = destinationNamespace || env.provisioned_namespace;
+  if (!namespace) throw Object.assign(new Error('destinationNamespace requis (aucun namespace déjà provisionné pour cet environnement)'), { status: 400 });
+
+  const name = (appName || `${projectSlug}-${env.name}`).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  await upsertApplication({
+    name, repoURL, path: path || '.', targetRevision: targetRevision || 'HEAD',
+    destinationNamespace: namespace, automatedSync: automatedSync !== false
+  });
+  return linkEnvironment(environmentId, name);
 }
 
 export async function promote({ projectId, fromEnvironmentId, toEnvironmentId, triggeredBy }) {
