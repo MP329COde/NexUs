@@ -599,6 +599,16 @@ export async function getWikiRevision(id) {
 // Même portée de visibilité que listProjectsForUser : un composant est
 // visible par quiconque a accès à son projet (membre direct ou owner/admin
 // de l'organisation), jamais par tous les utilisateurs de la plateforme.
+// Sans filtre par utilisateur : réservé aux usages serveur qui n'agissent
+// pas au nom d'une session (ex. le Policy Gate de promotion — voir
+// services/environmentPromotionService.js). La visibilité par utilisateur
+// reste appliquée par listComponentsForUser() pour tout ce qui répond
+// directement à une requête HTTP authentifiée.
+export async function listComponentsForProject(projectId) {
+  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 ORDER BY name', [projectId]);
+  return rows;
+}
+
 export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId, mine } = {}) {
   const params = [userId];
   const conditions = ['(pm.user_id = $1 OR om.role IN (\'owner\', \'admin\'))'];

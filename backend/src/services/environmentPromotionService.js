@@ -1,8 +1,9 @@
-import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, listPromotions as listPromotionsStore, listEnvironments } from '../store/orgStore.js';
+import { getEnvironment, setEnvironmentArgocdApp, recordPromotion, listPromotions as listPromotionsStore, listEnvironments, getProject, listPoliciesForOrg, listComponentsForProject } from '../store/orgStore.js';
 import { getApplication, syncApplication } from './integrations/argocdService.js';
 import { IntegrationError } from './integrations/httpClient.js';
 import { listScans as listCodeScans } from '../store/codeScansStore.js';
 import { listScans as listDastScans } from '../store/dastScansStore.js';
+import { evaluatePolicies } from './policyEngine.js';
 
 // Security Gate réel (pas seulement l'indicateur visuel de Supply Chain
 // Security) : bloque une promotion vers un environnement de production si
@@ -21,6 +22,32 @@ function checkSecurityGate() {
   }
   if (zapHigh > 0) {
     return `Security Gate : ${zapHigh} alerte(s) à risque élevé sur le dernier scan OWASP ZAP (voir Supply Chain Security).`;
+  }
+  return null;
+}
+
+// Policy Gate (ÉTAPE 16 IDP) : en plus du Security Gate ci-dessus, bloque la
+// promotion si un composant du Software Catalog RATTACHÉ À CE PROJET
+// échoue une policy activée de son organisation (voir services/policyEngine.js).
+// Silencieux si le projet n'a encore aucun composant déclaré au catalogue —
+// même principe que le Security Gate sans scan : on ne pénalise jamais une
+// absence de données, seulement un signal réel et défavorable. S'arrête au
+// premier composant en échec (message actionnable plutôt qu'un mur de
+// texte) ; l'admin retrouve le détail complet sur la fiche du composant
+// concerné (panneau Policy Engine, CatalogComponentPage.jsx).
+async function checkPolicyGate(projectId) {
+  const project = await getProject(projectId);
+  if (!project) return null;
+  const [policies, components] = await Promise.all([
+    listPoliciesForOrg(project.org_id),
+    listComponentsForProject(projectId)
+  ]);
+  for (const component of components) {
+    const { allowed, results } = evaluatePolicies(component, policies);
+    if (!allowed) {
+      const failed = results.filter((r) => !r.passed).map((r) => r.name).join(', ');
+      return `Policy Gate : composant "${component.name}" bloqué (${failed}) — voir sa fiche dans le Software Catalog.`;
+    }
   }
   return null;
 }
@@ -75,6 +102,15 @@ export async function promote({ projectId, fromEnvironmentId, toEnvironmentId, t
         argocdApp: toEnv.argocd_app, revision: null, status: 'blocked', message: gateError, triggeredBy
       });
       throw Object.assign(new Error(gateError), { status: 422 });
+    }
+
+    const policyError = await checkPolicyGate(projectId);
+    if (policyError) {
+      await recordPromotion({
+        projectId, fromEnvironmentId: fromEnvironmentId || null, toEnvironmentId,
+        argocdApp: toEnv.argocd_app, revision: null, status: 'blocked', message: policyError, triggeredBy
+      });
+      throw Object.assign(new Error(policyError), { status: 422 });
     }
   }
 

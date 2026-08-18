@@ -289,4 +289,65 @@ if (!hasPostgres) {
     assert.equal(deleted, true);
     assert.equal(await orgStore.getPolicy(policy.id), null);
   });
+
+  test('environmentPromotionService : le Policy Gate bloque une promotion de production quand un composant du projet échoue une policy activée', async () => {
+    const { promote } = await import('../src/services/environmentPromotionService.js');
+    const { readStore, writeStore } = await import('../src/store/jsonStore.js');
+
+    // Le Security Gate (déjà existant, voir checkSecurityGate) s'exécute
+    // AVANT le Policy Gate et lit le même genre de données JSON partagées
+    // (codeScans/dastScans) : cette instance de dev a un vrai scan Semgrep
+    // à 3 ERROR enregistré, qui bloquerait la promotion pour une tout autre
+    // raison et masquerait ce qu'on veut vérifier ici. Neutralisé le temps
+    // du test puis restauré exactement (save → mutate → restore), pour ne
+    // vérifier QUE le Policy Gate sans toucher aux données réelles au-delà
+    // de ce test.
+    const savedCodeScans = readStore('codeScans');
+    const savedDastScans = readStore('dastScans');
+    writeStore('codeScans', []);
+    writeStore('dastScans', []);
+
+    try {
+      const policy = await orgStore.createPolicy({ orgId: org.id, name: 'Owner requis PG', slug: `owner-requis-pg-${Date.now()}`, kind: 'require_owner_team' });
+      const violating = await orgStore.createComponent({ projectId: project.id, name: 'violates-policy-gate', slug: `violates-policy-gate-${Date.now()}`, kind: 'service' });
+      assert.equal(violating.owner_team_id, null);
+
+      const prodEnv = await orgStore.createEnvironment(project.id, { name: `prod-pg-${Date.now()}`, kind: 'production', isProduction: true });
+      // argocd_app posé directement (bypass de la validation d'existence
+      // faite par linkEnvironment()) : ce test vérifie le Policy Gate
+      // lui-même, pas l'intégration Argo CD — le gate doit bloquer AVANT
+      // tout appel réel à Argo CD, ce qui est précisément ce qu'on vérifie
+      // ici (aucune requête réseau Argo CD n'est nécessaire pour que ce
+      // test soit valide).
+      await orgStore.setEnvironmentArgocdApp(prodEnv.id, 'fake-argocd-app-policy-gate-test');
+
+      await assert.rejects(
+        () => promote({ projectId: project.id, fromEnvironmentId: null, toEnvironmentId: prodEnv.id, triggeredBy: 'u1' }),
+        (err) => {
+          // Le composant nommé dans le message peut être n'importe lequel
+          // des composants sans équipe propriétaire déjà créés dans ce
+          // fixture partagé `project` par d'autres tests de ce fichier — le
+          // gate s'arrête au premier trouvé (voir checkPolicyGate) : on ne
+          // fige pas LEQUEL, seulement que le mécanisme bloque bien pour
+          // cette raison précise.
+          assert.equal(err.status, 422);
+          assert.match(err.message, /Policy Gate/);
+          assert.match(err.message, /Owner requis PG/);
+          return true;
+        }
+      );
+
+      // La promotion bloquée doit être journalisée comme telle (visible dans
+      // l'historique de promotions de EnvironmentsPage.jsx), pas silencieusement avalée.
+      const promotions = await orgStore.listPromotions(project.id);
+      const blocked = promotions.find((p) => p.to_environment_id === prodEnv.id && p.status === 'blocked');
+      assert.ok(blocked, 'la promotion bloquée doit être enregistrée avec le statut "blocked"');
+      assert.match(blocked.message, /Policy Gate/);
+
+      await orgStore.deletePolicy(policy.id);
+    } finally {
+      writeStore('codeScans', savedCodeScans);
+      writeStore('dastScans', savedDastScans);
+    }
+  });
 }
