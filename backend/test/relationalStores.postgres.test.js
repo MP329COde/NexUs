@@ -266,4 +266,27 @@ if (!hasPostgres) {
     assert.equal((await orgStore.listDependencies(frontend.id)).length, 0);
     assert.equal((await orgStore.listDependents(db.id)).length, 0);
   });
+
+  test('orgStore (policies) : create/list/update/delete + application réelle via policyEngine', async () => {
+    const { evaluatePolicies } = await import('../src/services/policyEngine.js');
+
+    const policy = await orgStore.createPolicy({ orgId: org.id, name: 'Owner requis RS', slug: `owner-requis-rs-${Date.now()}`, kind: 'require_owner_team' });
+    assert.equal(policy.enabled, true);
+
+    const listed = await orgStore.listPoliciesForOrg(org.id);
+    assert.ok(listed.some((p) => p.id === policy.id));
+
+    const withoutOwner = await orgStore.createComponent({ projectId: project.id, name: 'no-owner-policy-test', slug: `no-owner-policy-test-${Date.now()}`, kind: 'service' });
+    const blocked = evaluatePolicies(withoutOwner, listed);
+    assert.equal(blocked.allowed, false);
+
+    const disabled = await orgStore.updatePolicy(policy.id, { enabled: false });
+    assert.equal(disabled.enabled, false);
+    const allowedAfterDisable = evaluatePolicies(withoutOwner, [disabled]);
+    assert.equal(allowedAfterDisable.allowed, true);
+
+    const deleted = await orgStore.deletePolicy(policy.id);
+    assert.equal(deleted, true);
+    assert.equal(await orgStore.getPolicy(policy.id), null);
+  });
 }

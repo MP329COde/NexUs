@@ -754,3 +754,39 @@ export async function deleteDependency(id) {
   const { rowCount } = await query('DELETE FROM component_dependencies WHERE id = $1', [id]);
   return rowCount > 0;
 }
+
+// --- Policy Engine (policies) ----------------------------------------
+export async function listPoliciesForOrg(orgId) {
+  const { rows } = await query('SELECT * FROM policies WHERE org_id = $1 ORDER BY name', [orgId]);
+  return rows;
+}
+
+export async function getPolicy(id) {
+  const { rows } = await query('SELECT * FROM policies WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createPolicy({ orgId, name, slug, kind, enabled, threshold }) {
+  const { rows } = await query(
+    `INSERT INTO policies (org_id, name, slug, kind, enabled, threshold) VALUES ($1, $2, $3, $4, COALESCE($5, true), $6) RETURNING *`,
+    [orgId, name, slug, kind, enabled ?? null, threshold ?? null]
+  );
+  return rows[0];
+}
+
+export async function updatePolicy(id, { name, enabled, threshold }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (name !== undefined) set('name', name);
+  if (enabled !== undefined) set('enabled', enabled);
+  if (threshold !== undefined) set('threshold', threshold);
+  params.push(id);
+  const { rows } = await query(`UPDATE policies SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deletePolicy(id) {
+  const { rowCount } = await query('DELETE FROM policies WHERE id = $1', [id]);
+  return rowCount > 0;
+}

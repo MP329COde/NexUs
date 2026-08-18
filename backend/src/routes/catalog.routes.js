@@ -9,6 +9,7 @@ import { listTemplatesSummary } from '../services/scaffolderTemplates.js';
 import { scaffoldService } from '../services/scaffolderService.js';
 import * as jobService from '../services/jobService.js';
 import { computeScorecard } from '../services/catalogScorecard.js';
+import { evaluatePolicies } from '../services/policyEngine.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -146,6 +147,19 @@ router.delete('/components/:id/dependencies/:depId', asyncHandler(async (req, re
   await orgStore.deleteDependency(req.params.depId);
   logAudit(req, 'catalog.dependency.delete', { componentId: req.params.id, dependencyId: req.params.depId });
   res.json({ ok: true });
+}));
+
+// Policy Engine (ÉTAPE 16 IDP) : évalue les policies ACTIVÉES de
+// l'organisation du composant contre ses données réelles — voir
+// services/policyEngine.js. Même portée de lecture que GET /components/:id
+// (aucune écriture ici, une évaluation ne modifie rien).
+router.get('/components/:id/policy-check', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const policies = await orgStore.listPoliciesForOrg(component.org_id);
+  res.json({ ok: true, ...evaluatePolicies(component, policies) });
 }));
 
 // Export au format service.yaml — voir services/serviceManifest.js. Même

@@ -25,6 +25,7 @@ export default function CatalogComponentPage() {
   const { data, error, loading } = useApi(() => api.get(`/catalog/components/${id}`), [id]);
   const [deleting, setDeleting] = useState(false);
   const deps = useApi(() => api.get(`/catalog/components/${id}/dependencies`), [id]);
+  const policyCheck = useApi(() => api.get(`/catalog/components/${id}/policy-check`), [id]);
   const allComponents = useApi(() => api.get('/catalog/components'), []);
   const [addingDep, setAddingDep] = useState(false);
   const [depTarget, setDepTarget] = useState('');
@@ -175,6 +176,34 @@ export default function CatalogComponentPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {policyCheck.data && (
+          <div className="card catalog-detail-card">
+            <div className="catalog-deps-header">
+              <span className="faint">Policy Engine (ÉTAPE 16 IDP)</span>
+              <span className="btn-outline catalog-deps-add-btn" onClick={() => policyCheck.reload()}>
+                <Icon name="sync" size={12} />Réévaluer
+              </span>
+            </div>
+            {policyCheck.data.results.length === 0 ? (
+              <p className="faint catalog-deps-empty">Aucune policy activée pour l'organisation de ce composant — voir Paramètres → Policies.</p>
+            ) : (
+              <>
+                <span className={`badge ${policyCheck.data.allowed ? 'badge-ok' : 'badge-crit'}`} style={{ marginBottom: 10, display: 'inline-flex' }}>
+                  <span className="dot" />{policyCheck.data.allowed ? 'ALLOWED' : 'BLOCKED'}
+                </span>
+                <div className="catalog-scorecard-checks">
+                  {policyCheck.data.results.map((r) => (
+                    <div key={r.policyId} className="catalog-scorecard-check">
+                      <Icon name={r.passed ? 'check' : 'x'} size={14} color={r.passed ? 'var(--tone-ok-fg, #10b981)' : 'var(--tone-crit-fg, #ef4444)'} />
+                      <span>{r.name}{r.detail ? ` — ${r.detail}` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
