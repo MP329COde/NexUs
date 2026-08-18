@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
+import { requireAuth, toPublicUser, issueSessionCookies, clearSessionCookies } from '../middleware/auth.js';
 import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
-import { getSessionMinutes, getMinPasswordLength } from '../store/identityStore.js';
+import { getMinPasswordLength } from '../store/identityStore.js';
 import { banIp, normalizeIp } from '../store/banlistStore.js';
 import { permissionsForUser } from '../store/groupsStore.js';
 import { createNotification } from '../store/notificationsStore.js';
@@ -86,17 +86,12 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   recordLoginSuccess(user.id);
-  const token = signSession(user);
-  res.cookie(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    // Reflète la connexion réelle (via X-Forwarded-Proto derrière nginx/Traefik,
-    // cf. trust proxy dans index.js) plutôt qu'un simple NODE_ENV : sur un LAN
-    // homelab sans TLS, un cookie "Secure" ne serait jamais renvoyé par le
-    // navigateur et la connexion échouerait silencieusement.
-    secure: req.secure,
-    maxAge: getSessionMinutes() * 60 * 1000
-  });
+  // Reflète la connexion réelle (via X-Forwarded-Proto derrière nginx/Traefik,
+  // cf. trust proxy dans index.js) plutôt qu'un simple NODE_ENV : sur un LAN
+  // homelab sans TLS, un cookie "Secure" ne serait jamais renvoyé par le
+  // navigateur et la connexion échouerait silencieusement (voir secure: req.secure
+  // dans issueSessionCookies).
+  issueSessionCookies(res, req, user);
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login', {});
   res.json({ ok: true, user: toPublicUser(user) });
 }));
@@ -106,7 +101,7 @@ router.post('/logout', requireAuth, (req, res) => {
   // requireAuth) : sans ça, un JWT volé avant le logout resterait exploitable
   // jusqu'à son expiration naturelle malgré le cookie effacé.
   incrementTokenVersion(req.user.id);
-  res.clearCookie(SESSION_COOKIE);
+  clearSessionCookies(res);
   res.json({ ok: true });
 });
 

@@ -21,6 +21,7 @@ import { scheduleClusterHealthChecks } from './services/kubernetesAlertService.j
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
+import { csrfProtection } from './middleware/auth.js';
 import router from './routes/index.js';
 
 await runMigrations();
@@ -136,7 +137,11 @@ app.use('/api/webhooks', webhookLimiter);
 const provisionLimiter = rateLimit({ windowMs: 10 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
 app.use('/api/setup/provision', provisionLimiter);
 
-app.use('/api', router);
+// Double-submit CSRF : seules les requêtes authentifiées par cookie de
+// session sont concernées (voir middleware/auth.js#csrfProtection) — les
+// webhooks signés HMAC (routes/webhooks.routes.js) n'envoient jamais ce
+// cookie et ne sont donc pas affectés.
+app.use('/api', csrfProtection, router);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

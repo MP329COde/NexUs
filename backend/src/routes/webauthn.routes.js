@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { requireAuth, signSession, toPublicUser, SESSION_COOKIE } from '../middleware/auth.js';
+import { requireAuth, toPublicUser, issueSessionCookies } from '../middleware/auth.js';
 import { findUserById, findUserByIdentifier, recordLoginSuccess } from '../store/usersStore.js';
 import { listCredentialsForUser, findCredentialById, addCredential, updateCounter, removeCredential } from '../store/webauthnStore.js';
-import { getSessionMinutes } from '../store/identityStore.js';
 import { env } from '../config/env.js';
 import { logAudit } from '../services/auditService.js';
 
@@ -137,10 +136,7 @@ router.post('/login-verify', asyncHandler(async (req, res) => {
 
   updateCounter(record.credentialId, verification.authenticationInfo.newCounter);
   recordLoginSuccess(user.id);
-  const token = signSession(user);
-  res.cookie(SESSION_COOKIE, token, {
-    httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: getSessionMinutes() * 60 * 1000
-  });
+  issueSessionCookies(res, req, user);
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.webauthn.login', { credentialId: record.credentialId });
   res.json({ ok: true, user: toPublicUser(user) });
 }));

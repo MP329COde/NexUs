@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { signSession, SESSION_COOKIE, toPublicUser, requireAuth, requireRole } from '../middleware/auth.js';
+import { toPublicUser, requireAuth, requireRole, issueSessionCookies } from '../middleware/auth.js';
 import { hasAnyUser, createUser } from '../store/usersStore.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
-import { getSessionMinutes } from '../store/identityStore.js';
 import { logAudit } from '../services/auditService.js';
 import { startInstall, getJobs } from '../services/provisioningService.js';
 import { listInstallableIds } from '../services/serviceCatalog.js';
@@ -61,8 +60,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const user = createUser({ email, password, name, username, role: 'admin' });
 
-  const token = signSession(user);
-  res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: getSessionMinutes() * 60 * 1000 });
+  issueSessionCookies(res, req, user);
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'setup.completed', {});
   res.status(201).json({ ok: true, user: toPublicUser(user) });
 }));

@@ -19,12 +19,28 @@ function notifyGlobalError(message) {
   globalErrorHandler(message);
 }
 
+// Double-submit CSRF (voir backend/src/middleware/auth.js#csrfProtection) :
+// le cookie nexus_csrf n'est pas httpOnly, on le relit ici pour le renvoyer
+// tel quel en en-tête sur toute requête mutative.
+function readCsrfCookie() {
+  const match = document.cookie.match(/(?:^|; )nexus_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 async function request(path, options = {}) {
   let res;
   try {
+    const method = options.method || 'GET';
+    const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null;
     res = await fetch(`/api${path}`, {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...(options.headers || {})
+      },
       ...options,
       body: options.body ? JSON.stringify(options.body) : undefined
     });

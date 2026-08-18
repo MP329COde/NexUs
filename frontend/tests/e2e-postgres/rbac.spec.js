@@ -9,6 +9,25 @@ test.skip(!process.env.DATABASE_URL, 'DATABASE_URL non défini — suite Postgre
 
 test.describe.configure({ mode: 'serial' });
 
+// Voir tests/e2e/setup.spec.js : un appel API direct (hors navigateur)
+// n'attache jamais l'en-tête CSRF automatiquement, contrairement au
+// frontend réel (lib/apiClient.js) — on le rejoue ici depuis le cookie
+// nexus_csrf posé par le login.
+function withCsrf(context) {
+  async function csrfHeaders() {
+    const state = await context.storageState();
+    const cookie = state.cookies.find((c) => c.name === 'nexus_csrf');
+    return cookie ? { 'X-CSRF-Token': cookie.value } : {};
+  }
+  return {
+    get: (url, opts) => context.get(url, opts),
+    post: async (url, opts = {}) => context.post(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    put: async (url, opts = {}) => context.put(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    delete: async (url, opts = {}) => context.delete(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    dispose: () => context.dispose()
+  };
+}
+
 test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
   let adminApi;
   let aliceApi;
@@ -17,21 +36,24 @@ test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
   let linkId;
 
   test.beforeAll(async ({ playwright }) => {
-    adminApi = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
-    const setup = await adminApi.post('/api/setup', {
+    const rawAdmin = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
+    const setup = await rawAdmin.post('/api/setup', {
       data: { organisation: { consoleName: 'RBAC PG Test' }, admin: { email: 'admin@rbac-pg.test', password: 'AdminPassword123!', name: 'Admin' } }
     });
     expect(setup.ok()).toBeTruthy();
+    adminApi = withCsrf(rawAdmin);
 
     const alice = await adminApi.post('/api/users', { data: { email: 'alice@rbac-pg.test', password: 'AlicePassword123!', name: 'Alice', role: 'user', skipOnboarding: true } });
     expect(alice.ok()).toBeTruthy();
     const bob = await adminApi.post('/api/users', { data: { email: 'bob@rbac-pg.test', password: 'BobPassword123!', name: 'Bob', role: 'user', skipOnboarding: true } });
     expect(bob.ok()).toBeTruthy();
 
-    aliceApi = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
-    await aliceApi.post('/api/auth/login', { data: { email: 'alice@rbac-pg.test', password: 'AlicePassword123!' } });
-    bobApi = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
-    await bobApi.post('/api/auth/login', { data: { email: 'bob@rbac-pg.test', password: 'BobPassword123!' } });
+    const rawAlice = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
+    await rawAlice.post('/api/auth/login', { data: { email: 'alice@rbac-pg.test', password: 'AlicePassword123!' } });
+    aliceApi = withCsrf(rawAlice);
+    const rawBob = await playwright.request.newContext({ baseURL: 'http://localhost:4056' });
+    await rawBob.post('/api/auth/login', { data: { email: 'bob@rbac-pg.test', password: 'BobPassword123!' } });
+    bobApi = withCsrf(rawBob);
 
     const org = await adminApi.post('/api/organizations', { data: { name: 'RBAC Org', slug: `rbac-org-${Date.now()}` } });
     const { organization } = await org.json();

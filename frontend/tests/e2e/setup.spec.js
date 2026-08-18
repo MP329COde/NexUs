@@ -1,5 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+// Les appels API directs (playwright.request, hors navigateur) n'attachent
+// jamais automatiquement l'en-tête CSRF que le frontend ajoute lui-même
+// (voir lib/apiClient.js) — on le rejoue ici manuellement à partir du cookie
+// nexus_csrf posé par le login, pour les mêmes raisons qu'un vrai client API
+// authentifié par cookie devrait le faire (voir middleware/auth.js#csrfProtection).
+function withCsrf(context) {
+  async function csrfHeaders() {
+    const state = await context.storageState();
+    const cookie = state.cookies.find((c) => c.name === 'nexus_csrf');
+    return cookie ? { 'X-CSRF-Token': cookie.value } : {};
+  }
+  return {
+    get: (url, opts) => context.get(url, opts),
+    post: async (url, opts = {}) => context.post(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    put: async (url, opts = {}) => context.put(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    delete: async (url, opts = {}) => context.delete(url, { ...opts, headers: { ...(opts.headers || {}), ...(await csrfHeaders()) } }),
+    dispose: () => context.dispose()
+  };
+}
+
 // La console de test démarre sans aucun utilisateur (voir playwright.config.js,
 // NEXUS_DATA_DIR jetable + ADMIN_EMAIL vide). Les tests s'exécutent en série
 // (fullyParallel: false) et partagent le même backend jetable. Le compte
@@ -128,9 +148,13 @@ test.describe('Isolation inter-projets (API)', () => {
   let projectBobId;
 
   test.beforeAll(async ({ playwright }) => {
-    adminApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
-    const login = await adminApi.post('/api/auth/login', { data: { email: 'alex@nexus.lan', password: 'SuperSecurePass123!' } });
+    const rawAdmin = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    // Login : aucun cookie de session encore posé à cet instant, donc pas
+    // concerné par le CSRF (voir middleware/auth.js#csrfProtection) — envoyé
+    // sur le contexte brut, avant l'enveloppe withCsrf.
+    const login = await rawAdmin.post('/api/auth/login', { data: { email: 'alex@nexus.lan', password: 'SuperSecurePass123!' } });
     expect(login.ok()).toBeTruthy();
+    adminApi = withCsrf(rawAdmin);
   });
 
   test.afterAll(async () => {
@@ -162,9 +186,10 @@ test.describe('Isolation inter-projets (API)', () => {
   });
 
   test('Alice ne voit que son propre projet dans la liste', async ({ playwright }) => {
-    aliceApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
-    const login = await aliceApi.post('/api/auth/login', { data: { email: 'alice@nexus.lan', password: 'AlicePassword1' } });
+    const rawAlice = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const login = await rawAlice.post('/api/auth/login', { data: { email: 'alice@nexus.lan', password: 'AlicePassword1' } });
     expect(login.ok()).toBeTruthy();
+    aliceApi = withCsrf(rawAlice);
     const res = await aliceApi.get('/api/projects');
     const { items } = await res.json();
     const ids = items.map((p) => p.id);
@@ -193,9 +218,10 @@ test.describe('Isolation inter-projets (API)', () => {
   });
 
   test('Bob, symétriquement, ne peut pas accéder au projet d’Alice', async ({ playwright }) => {
-    bobApi = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
-    const login = await bobApi.post('/api/auth/login', { data: { email: 'bob@nexus.lan', password: 'BobPassword123' } });
+    const rawBob = await playwright.request.newContext({ baseURL: 'http://localhost:5199' });
+    const login = await rawBob.post('/api/auth/login', { data: { email: 'bob@nexus.lan', password: 'BobPassword123' } });
     expect(login.ok()).toBeTruthy();
+    bobApi = withCsrf(rawBob);
     const res = await bobApi.get(`/api/projects/${projectAliceId}`);
     expect(res.status()).toBe(404);
   });

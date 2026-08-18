@@ -1,14 +1,60 @@
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { findUserById, validityWindowError } from '../store/usersStore.js';
 import { getSessionMinutes } from '../store/identityStore.js';
 
 export const SESSION_COOKIE = 'nexus_session';
+// Cookie CSRF (double-submit) : volontairement PAS httpOnly — le frontend
+// doit pouvoir le lire pour le renvoyer en en-tête (voir lib/apiClient.js).
+// Sa seule protection est que sameSite=lax + le renvoi manuel en en-tête
+// empêchent un site tiers de le rejouer : un attaquant ne peut ni le lire
+// (cross-origin) ni le forger côté navigateur de la victime.
+export const CSRF_COOKIE = 'nexus_csrf';
+export const CSRF_HEADER = 'x-csrf-token';
 
 const JWT_ALGORITHM = 'HS256';
 
 export function signSession(user) {
   return jwt.sign({ sub: user.id, role: user.role, tv: user.tokenVersion || 0 }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
+}
+
+function baseCookieOptions(req) {
+  return { sameSite: 'lax', secure: req.secure, maxAge: getSessionMinutes() * 60 * 1000 };
+}
+
+// Point unique d'émission de session : pose à la fois le cookie JWT
+// (httpOnly) et le cookie CSRF associé — appelé par les trois routes qui
+// délivrent une session (login classique, WebAuthn, configuration initiale).
+export function issueSessionCookies(res, req, user) {
+  const token = signSession(user);
+  res.cookie(SESSION_COOKIE, token, { ...baseCookieOptions(req), httpOnly: true });
+  res.cookie(CSRF_COOKIE, crypto.randomBytes(32).toString('hex'), { ...baseCookieOptions(req), httpOnly: false });
+  return token;
+}
+
+export function clearSessionCookies(res) {
+  res.clearCookie(SESSION_COOKIE);
+  res.clearCookie(CSRF_COOKIE);
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+// Double-submit cookie : n'a de sens que pour les requêtes authentifiées par
+// cookie (seul mécanisme qu'un navigateur envoie automatiquement cross-site
+// et donc vulnérable au CSRF) — un appel via Authorization: Bearer n'est pas
+// concerné, le navigateur ne rejoue jamais cet en-tête tout seul.
+export function csrfProtection(req, res, next) {
+  if (SAFE_METHODS.has(req.method)) return next();
+  const sessionCookie = req.cookies?.[SESSION_COOKIE];
+  const hasBearer = /^Bearer\s+/i.test(req.headers.authorization || '');
+  if (!sessionCookie || hasBearer) return next();
+  const cookieToken = req.cookies?.[CSRF_COOKIE];
+  const headerToken = req.headers[CSRF_HEADER];
+  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+    return res.status(403).json({ ok: false, error: 'Jeton CSRF invalide ou manquant' });
+  }
+  next();
 }
 
 // Vue "publique" d'un utilisateur : jamais passwordHash, exposée à /auth/me, /auth/login, /auth/profile.
