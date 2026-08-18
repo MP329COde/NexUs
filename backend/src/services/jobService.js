@@ -24,6 +24,14 @@ import { logger } from '../utils/logger.js';
 //
 // retryOf (optionnelle) : id du job d'origine dont celui-ci est la
 // relance — pure traçabilité (`retry_of`), n'affecte pas l'exécution.
+// Annulation coopérative (voir migration 0020_job_cancel.sql) : un job en
+// cours ne peut pas être tué à mi-exécution (pas de worker séparé à
+// interrompre), mais run() peut vérifier isCancelled() entre deux étapes
+// pour s'arrêter de lui-même — voir scaffolderService.js. La map ne vit que
+// pour la durée du process : après un redémarrage, recoverInterruptedJobs()
+// marque déjà tout job resté 'running' en échec, donc rien à annuler.
+const cancellationFlags = new Map();
+
 export async function enqueue({ type, projectId, userId, payload = {}, idempotencyKey = null, retryOf = null }, run) {
   if (idempotencyKey) {
     const { rows: existing } = await query(
@@ -57,24 +65,49 @@ export async function enqueue({ type, projectId, userId, payload = {}, idempoten
   // arrière-plan pendant que la réponse HTTP 202 part déjà. Toute erreur non
   // interceptée par run() elle-même est capturée ici pour ne jamais planter
   // le process avec une rejection non gérée.
+  const flag = { cancelled: false };
+  cancellationFlags.set(job.id, flag);
+
   (async () => {
     await query(`UPDATE jobs SET status = 'running', started_at = now() WHERE id = $1`, [job.id]);
     try {
-      const result = await run(job);
+      const result = await run(job, { isCancelled: () => flag.cancelled });
+      // Ne cible que 'running' : si cancelJob() a déjà écrit 'cancelled'
+      // pendant que run() terminait son travail, cette annulation gagne —
+      // le résultat obtenu après coup n'est pas affiché comme un succès.
       await query(
-        `UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now() WHERE id = $1`,
+        `UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now() WHERE id = $1 AND status = 'running'`,
         [job.id, JSON.stringify(result ?? null)]
       );
     } catch (err) {
       logger.error({ err, jobId: job.id, type }, 'Échec de job asynchrone');
       await query(
-        `UPDATE jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`,
+        `UPDATE jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1 AND status = 'running'`,
         [job.id, err.message || 'Erreur inconnue']
       );
+    } finally {
+      cancellationFlags.delete(job.id);
     }
   })();
 
   return job;
+}
+
+// Demande d'annulation d'un job 'pending' ou 'running'. Coopérative : si le
+// job tourne déjà dans ce process, le flag est levé pour que run() puisse
+// s'arrêter à la prochaine étape qu'il vérifie ; dans tous les cas, l'état
+// en base passe immédiatement à 'cancelled' pour que le client cesse
+// d'afficher le job comme actif, quelle que soit la rapidité de run() à
+// réagir. Renvoie null si le job n'existe pas ou n'est plus annulable.
+export async function cancelJob(id) {
+  const flag = cancellationFlags.get(id);
+  if (flag) flag.cancelled = true;
+  const { rows } = await query(
+    `UPDATE jobs SET status = 'cancelled', error = 'Annulé', finished_at = now()
+     WHERE id = $1 AND status IN ('pending', 'running') RETURNING *`,
+    [id]
+  );
+  return rows[0] || null;
 }
 
 export async function getJob(id) {

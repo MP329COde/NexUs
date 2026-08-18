@@ -607,6 +607,19 @@ router.post('/:id/jobs/:jobId/retry', loadProjectAccess(), requireMinRole('maint
   res.status(400).json({ ok: false, error: `Type de job non re-lançable : "${original.type}"` });
 }));
 
+// Annulation coopérative (voir services/jobService.js) : même rôle minimum
+// que retry — un job de projet (scaffolding, sync, rollback...) engage des
+// ressources réelles, pas un simple viewer.
+router.post('/:id/jobs/:jobId/cancel', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const original = await jobService.getJob(req.params.jobId);
+  if (!original || original.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'Job introuvable pour ce projet' });
+  const cancelled = await jobService.cancelJob(req.params.jobId);
+  if (!cancelled) return res.status(409).json({ ok: false, error: 'Seul un job en attente ou en cours peut être annulé' });
+  logAudit(req, 'job.cancel', { jobId: cancelled.id, type: cancelled.type, projectId: req.pgProject.id });
+  res.json({ ok: true, job: cancelled });
+}));
+
 // --- Incidents : suivi opérationnel (gravité, état, ressource affectée,
 // résolution) — voir store/incidentStore.js. Un incident peut référencer un
 // job en échec (jobId) pour garder le lien entre la cause technique et

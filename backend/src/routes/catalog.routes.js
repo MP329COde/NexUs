@@ -323,9 +323,9 @@ router.post('/scaffold', asyncHandler(async (req, res) => {
 
   const job = await jobService.enqueue(
     { type: 'catalog.scaffold', projectId, userId: req.user.id, payload: { templateId, name, repositoryProvider: repositoryProvider || 'none' } },
-    async (createdJob) => {
+    async (createdJob, { isCancelled }) => {
       const log = (step, status, detail) => jobService.appendJobStep(createdJob.id, step, status, detail);
-      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log });
+      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log, isCancelled });
       logAudit(req, 'catalog.scaffold', { componentId: result.component.id, projectId, templateId, name });
       return result;
     }

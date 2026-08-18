@@ -20,7 +20,7 @@ const PROVIDERS = ['none', 'github'];
 // case à cocher qui échouerait silencieusement, l'API les refuse
 // explicitement (voir validation ci-dessous) — cohérent avec la consigne de
 // ne jamais simuler une réussite pour une intégration non branchée.
-export async function scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log }) {
+export async function scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log, isCancelled }) {
   // Attend chaque écriture de log avant de continuer : sans ce await, les
   // appels à jobService.appendJobStep() (une requête UPDATE chacun) partent
   // en parallèle et se terminent dans un ordre non déterministe côté base —
@@ -62,6 +62,15 @@ export async function scaffoldService({ templateId, name, description, projectId
     await emit('push_files', 'running');
     let pushed = 0;
     for (const [path, content] of Object.entries(files)) {
+      // Point de vérification coopératif (voir jobService.cancelJob) : un
+      // dépôt distant existe déjà après create_repo, donc on n'abandonne
+      // jamais au milieu d'un fichier — seulement entre deux commits, pour
+      // ne jamais laisser le dépôt dans un état de fichiers à moitié écrit
+      // sans le dire clairement dans le log du job.
+      if (isCancelled?.()) {
+        await emit('push_files', 'cancelled', { pushed, total: Object.keys(files).length });
+        throw new ScaffolderError('Annulé par l’utilisateur pendant la génération du dépôt');
+      }
       await githubService.commitFile(owner, repoName, 'main', path, content, `feat: scaffold ${path} (template ${template.id})`);
       pushed += 1;
       await emit('push_files', 'progress', { pushed, total: Object.keys(files).length });
