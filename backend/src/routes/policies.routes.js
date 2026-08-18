@@ -19,7 +19,7 @@ router.use((req, res, next) => {
   next();
 });
 
-const KINDS = ['require_owner_team', 'require_production_lifecycle', 'require_description', 'require_repository', 'block_critical_code_scan', 'block_high_dast_scan'];
+const KINDS = ['require_owner_team', 'require_production_lifecycle', 'require_description', 'require_repository', 'require_linked_environment', 'block_critical_code_scan', 'block_high_dast_scan'];
 
 function slugify(name) {
   return name.toLowerCase().trim()

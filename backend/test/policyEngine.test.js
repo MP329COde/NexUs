@@ -61,3 +61,19 @@ test('evaluatePolicies : block_critical_code_scan et block_high_dast_scan passen
   ]);
   assert.equal(result.allowed, true);
 });
+
+test('evaluatePolicies : require_linked_environment — existence d\'environnements ne suffit plus, il en faut un réellement relié à Argo CD', () => {
+  const policy = [{ id: 'p7', name: 'Environnement relié requis', kind: 'require_linked_environment', enabled: true }];
+  const noneLinked = evaluatePolicies({ project_linked_environment_count: 0 }, policy);
+  assert.equal(noneLinked.allowed, false);
+  assert.match(noneLinked.results[0].detail, /Aucun environnement/);
+
+  const oneLinked = evaluatePolicies({ project_linked_environment_count: 1 }, policy);
+  assert.equal(oneLinked.allowed, true);
+  assert.equal(oneLinked.results[0].detail, null);
+
+  // Comme project_environment_count ailleurs : Postgres renvoie parfois un
+  // COUNT sous forme de chaîne ("0"), jamais confondu avec un nombre truthy.
+  const stringZero = evaluatePolicies({ project_linked_environment_count: '0' }, policy);
+  assert.equal(stringZero.allowed, false);
+});

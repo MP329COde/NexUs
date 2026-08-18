@@ -661,7 +661,16 @@ export async function getWikiRevision(id) {
 // reste appliquée par listComponentsForUser() pour tout ce qui répond
 // directement à une requête HTTP authentifiée.
 export async function listComponentsForProject(projectId) {
-  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 ORDER BY name', [projectId]);
+  // project_linked_environment_count : même sous-requête que getComponent/
+  // listComponentsForUser, nécessaire ici aussi pour que la policy
+  // 'require_linked_environment' (évaluée par le Policy Gate d'une
+  // promotion — environmentPromotionService.js#checkPolicyGate) dispose du
+  // même signal que la fiche composant, pas une version dégradée.
+  const { rows } = await query(
+    `SELECT c.*, (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id AND env.argocd_app IS NOT NULL) AS project_linked_environment_count
+     FROM components c WHERE c.project_id = $1 ORDER BY c.name`,
+    [projectId]
+  );
   return rows;
 }
 
