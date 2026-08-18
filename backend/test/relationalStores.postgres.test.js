@@ -407,4 +407,33 @@ if (!hasPostgres) {
     assert.equal(prodDeleteAttempt, false);
     assert.ok(await orgStore.getEnvironment(prod.id), "l'environnement de production doit toujours exister après la tentative");
   });
+
+  test('orgStore (service bindings) : create/list/delete + contrainte d\'unicité par variable', async () => {
+    const component = await orgStore.createComponent({ projectId: project.id, name: 'bound-component', slug: `bound-component-${Date.now()}`, kind: 'api' });
+
+    const binding = await orgStore.createBinding({ componentId: component.id, bindingType: 'postgres', envVarName: 'DATABASE_URL', vaultEntryId: 'some-vault-id', description: 'DB principale' });
+    assert.equal(binding.env_var_name, 'DATABASE_URL');
+    assert.equal(binding.vault_entry_id, 'some-vault-id');
+
+    const listed = await orgStore.listBindingsForComponent(component.id);
+    assert.equal(listed.length, 1);
+
+    // Même variable déclarée deux fois pour le même composant → conflit
+    // (contrainte UNIQUE (component_id, env_var_name)) : un composant ne
+    // peut pas avoir deux définitions différentes de DATABASE_URL.
+    await assert.rejects(
+      () => orgStore.createBinding({ componentId: component.id, bindingType: 'postgres', envVarName: 'DATABASE_URL' }),
+      (err) => { assert.equal(err.code, '23505'); return true; }
+    );
+
+    const deleted = await orgStore.deleteBinding(binding.id);
+    assert.equal(deleted, true);
+    assert.equal((await orgStore.listBindingsForComponent(component.id)).length, 0);
+
+    // Supprimer le composant doit faire disparaître ses bindings restants
+    // (ON DELETE CASCADE), sans qu'il soit nécessaire de les supprimer un à un.
+    await orgStore.createBinding({ componentId: component.id, bindingType: 'redis', envVarName: 'REDIS_URL' });
+    await orgStore.deleteComponent(component.id);
+    assert.equal((await orgStore.listBindingsForComponent(component.id)).length, 0);
+  });
 }

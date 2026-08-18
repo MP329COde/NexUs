@@ -681,7 +681,7 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
 
 export async function getComponent(id) {
   const { rows } = await query(
-    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, p.legacy_id AS project_legacy_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
         (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id
@@ -885,4 +885,29 @@ export async function reviewPlatformRequest(id, { status, reviewedBy, reviewNote
     [id, status, reviewedBy, reviewNote || null]
   );
   return rows[0] || null;
+}
+
+// --- Service Bindings (ÉTAPE 15) --------------------------------------
+export async function listBindingsForComponent(componentId) {
+  const { rows } = await query('SELECT * FROM component_bindings WHERE component_id = $1 ORDER BY env_var_name', [componentId]);
+  return rows;
+}
+
+export async function getBinding(id) {
+  const { rows } = await query('SELECT * FROM component_bindings WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createBinding({ componentId, bindingType, envVarName, vaultEntryId, description }) {
+  const { rows } = await query(
+    `INSERT INTO component_bindings (component_id, binding_type, env_var_name, vault_entry_id, description)
+     VALUES ($1, $2, $3, $4, COALESCE($5, '')) RETURNING *`,
+    [componentId, bindingType, envVarName, vaultEntryId || null, description || null]
+  );
+  return rows[0];
+}
+
+export async function deleteBinding(id) {
+  const { rowCount } = await query('DELETE FROM component_bindings WHERE id = $1', [id]);
+  return rowCount > 0;
 }
