@@ -294,6 +294,14 @@ export async function createProject({ orgId, name, slug, description, tags, repo
         [project.id, ownerUserId, 'owner']
       );
     }
+    // Volontairement hors du chemin quotaService.checkQuotaBeforeCreate
+    // (ÉTAPE 26 IDP, audit sécurité) : ces deux environnements sont le socle
+    // minimal garanti de tout projet, pas une création discrétionnaire — un
+    // quota d'organisation trop bas ne doit jamais empêcher un projet
+    // d'exister avec au moins production+staging. Le quota s'applique aux
+    // environnements créés APRÈS coup (preview, blueprints...), jamais à ce
+    // socle de départ. Sans blueprint, aucun des deux ne consomme de CPU/
+    // mémoire compté par computeOrgUsage() de toute façon.
     await client.query(
       `INSERT INTO environments (project_id, name, kind, is_production) VALUES
         ($1, 'production', 'production', true),
