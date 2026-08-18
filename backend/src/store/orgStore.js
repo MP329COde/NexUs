@@ -547,3 +547,77 @@ export async function getWikiRevision(id) {
   const { rows } = await query('SELECT * FROM wiki_page_revisions WHERE id = $1', [id]);
   return rows[0] || null;
 }
+
+// --- Software Catalog (components) ---------------------------------------
+// Même portée de visibilité que listProjectsForUser : un composant est
+// visible par quiconque a accès à son projet (membre direct ou owner/admin
+// de l'organisation), jamais par tous les utilisateurs de la plateforme.
+export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId } = {}) {
+  const params = [userId];
+  const conditions = ['(pm.user_id = $1 OR om.role IN (\'owner\', \'admin\'))'];
+  if (q) { params.push(`%${q.toLowerCase()}%`); conditions.push(`(LOWER(c.name) LIKE $${params.length} OR LOWER(c.description) LIKE $${params.length})`); }
+  if (kind) { params.push(kind); conditions.push(`c.kind = $${params.length}`); }
+  if (lifecycle) { params.push(lifecycle); conditions.push(`c.lifecycle = $${params.length}`); }
+  if (ownerTeamId) { params.push(ownerTeamId); conditions.push(`c.owner_team_id = $${params.length}`); }
+  if (projectId) { params.push(projectId); conditions.push(`c.project_id = $${params.length}`); }
+  const { rows } = await query(
+    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name
+     FROM components c
+     JOIN projects p ON p.id = c.project_id
+     LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+     LEFT JOIN org_members om ON om.org_id = p.org_id AND om.user_id = $1
+     LEFT JOIN teams t ON t.id = c.owner_team_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY c.name`,
+    params
+  );
+  return rows;
+}
+
+export async function getComponent(id) {
+  const { rows } = await query(
+    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name
+     FROM components c
+     JOIN projects p ON p.id = c.project_id
+     LEFT JOIN teams t ON t.id = c.owner_team_id
+     WHERE c.id = $1`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+export async function createComponent({ projectId, ownerTeamId, name, slug, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links }) {
+  const { rows } = await query(
+    `INSERT INTO components (project_id, owner_team_id, name, slug, kind, lifecycle, description, language, framework, repository_provider, repository_url, tags, links)
+     VALUES ($1, $2, $3, $4, COALESCE($5, 'service'), COALESCE($6, 'experimental'), COALESCE($7, ''), COALESCE($8, ''), COALESCE($9, ''), COALESCE($10, ''), COALESCE($11, ''), COALESCE($12::jsonb, '[]'::jsonb), COALESCE($13::jsonb, '[]'::jsonb))
+     RETURNING *`,
+    [projectId, ownerTeamId || null, name, slug, kind || null, lifecycle || null, description || null, language || null, framework || null,
+      repositoryProvider || null, repositoryUrl || null, tags ? JSON.stringify(tags) : null, links ? JSON.stringify(links) : null]
+  );
+  return rows[0];
+}
+
+export async function updateComponent(id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (ownerTeamId !== undefined) set('owner_team_id', ownerTeamId || null);
+  if (name !== undefined) set('name', name);
+  if (kind !== undefined) set('kind', kind);
+  if (lifecycle !== undefined) set('lifecycle', lifecycle);
+  if (description !== undefined) set('description', description);
+  if (language !== undefined) set('language', language);
+  if (framework !== undefined) set('framework', framework);
+  if (repositoryProvider !== undefined) set('repository_provider', repositoryProvider);
+  if (repositoryUrl !== undefined) set('repository_url', repositoryUrl);
+  if (tags !== undefined) set('tags', JSON.stringify(tags));
+  if (links !== undefined) set('links', JSON.stringify(links));
+  params.push(id);
+  const { rows } = await query(`UPDATE components SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deleteComponent(id) {
+  const { rowCount } = await query('DELETE FROM components WHERE id = $1', [id]);
+  return rowCount > 0;
+}

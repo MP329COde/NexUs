@@ -15,6 +15,7 @@ const GROUPS = [
   {
     label: 'Gestion',
     items: [
+      { to: '/deployments/catalog', label: 'Catalogue logiciel', icon: 'box' },
       { to: '/deployments/projects', label: 'Projets', icon: 'layers' },
       { to: '/deployments/organizations', label: 'Organisations', icon: 'users' }
     ]

@@ -72,4 +72,37 @@ if (!hasPostgres) {
     const updated = await incidentStore.update(created.id, { runbookUrl: 'https://wiki.example/updated' });
     assert.equal(updated.runbook_url, 'https://wiki.example/updated');
   });
+
+  test('orgStore (components/Software Catalog) : create/list/filter/update/delete + visibilité par rôle projet', async () => {
+    const component = await orgStore.createComponent({
+      projectId: project.id, name: 'Billing API', slug: 'billing-api', kind: 'api', lifecycle: 'production',
+      description: 'API de facturation', language: 'TypeScript', tags: ['finance', 'critical']
+    });
+    assert.equal(component.slug, 'billing-api');
+    assert.equal(component.kind, 'api');
+    assert.equal(component.lifecycle, 'production');
+    assert.deepEqual(component.tags, ['finance', 'critical']);
+
+    // u1 est owner du projet (créateur) : visible dans son catalogue.
+    const visible = await orgStore.listComponentsForUser('u1');
+    assert.ok(visible.some((c) => c.id === component.id));
+
+    // Un utilisateur sans aucun accès à l'organisation/projet ne doit rien voir.
+    const invisible = await orgStore.listComponentsForUser('u-outsider');
+    assert.ok(!invisible.some((c) => c.id === component.id));
+
+    // Filtre par kind
+    const filtered = await orgStore.listComponentsForUser('u1', { kind: 'api' });
+    assert.ok(filtered.some((c) => c.id === component.id));
+    const filteredOut = await orgStore.listComponentsForUser('u1', { kind: 'worker' });
+    assert.ok(!filteredOut.some((c) => c.id === component.id));
+
+    const updated = await orgStore.updateComponent(component.id, { lifecycle: 'deprecated', description: 'Remplacée par billing-api-v2' });
+    assert.equal(updated.lifecycle, 'deprecated');
+
+    const deleted = await orgStore.deleteComponent(component.id);
+    assert.equal(deleted, true);
+    const afterDelete = await orgStore.getComponent(component.id);
+    assert.equal(afterDelete, null);
+  });
 }

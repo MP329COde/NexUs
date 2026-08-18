@@ -1,0 +1,13 @@
+.catalog-filters-row {
+  flex-wrap: wrap;
+}
+
+.catalog-filter-select {
+  max-width: 200px;
+}
+
+.catalog-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
