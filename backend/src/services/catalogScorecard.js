@@ -12,7 +12,15 @@ const CHECKS = [
   { id: 'owner', label: 'Équipe propriétaire', test: (c) => Boolean(c.owner_team_id) },
   { id: 'repository', label: 'Dépôt relié', test: (c) => Boolean(c.repository_url) },
   { id: 'stack', label: 'Stack technique déclarée', test: (c) => Boolean(c.language && c.framework) },
-  { id: 'environments', label: 'Environnements configurés', test: (c) => Number(c.project_environment_count || 0) > 0 },
+  // "Environnements configurés" vérifiait seulement leur EXISTENCE — vrai
+  // pour absolument tous les projets (production+staging auto-créés,
+  // voir orgStore.createProject), donc jamais un signal utile. Depuis que
+  // la liaison Argo CD est réellement vérifiée à l'écriture
+  // (linkEnvironment appelle getApplication avant d'accepter le lien —
+  // voir environmentPromotionService.js), exiger qu'AU MOINS UN
+  // environnement du projet soit réellement relié est un signal GitOps
+  // sincère plutôt qu'un acquis automatique.
+  { id: 'environments', label: 'Environnement relié à Argo CD', test: (c) => Number(c.project_linked_environment_count || 0) > 0 },
   { id: 'lifecycle', label: 'Cycle de vie en production', test: (c) => c.lifecycle === 'production' }
 ];
 

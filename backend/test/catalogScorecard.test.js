@@ -4,7 +4,7 @@ import { computeScorecard } from '../src/services/catalogScorecard.js';
 
 const FULL_COMPONENT = {
   description: 'API de facturation', owner_team_id: 'team-1', repository_url: 'https://github.com/x/y',
-  language: 'TypeScript', framework: 'NestJS', project_environment_count: 2, lifecycle: 'production'
+  language: 'TypeScript', framework: 'NestJS', project_linked_environment_count: 1, lifecycle: 'production'
 };
 
 test('computeScorecard : un composant complet obtient 100 et est production eligible', () => {
@@ -15,14 +15,19 @@ test('computeScorecard : un composant complet obtient 100 et est production elig
 });
 
 test('computeScorecard : un composant vide obtient 0 et n\'est pas production eligible', () => {
-  const result = computeScorecard({ description: '', owner_team_id: null, repository_url: '', language: '', framework: '', project_environment_count: 0, lifecycle: 'experimental' });
+  const result = computeScorecard({ description: '', owner_team_id: null, repository_url: '', language: '', framework: '', project_linked_environment_count: 0, lifecycle: 'experimental' });
   assert.equal(result.score, 0);
   assert.equal(result.productionEligible, false);
   assert.ok(result.checks.every((c) => !c.passed));
 });
 
-test('computeScorecard : project_environment_count "0" (chaîne, comme renvoyé par Postgres COUNT) est traité comme absent', () => {
-  const result = computeScorecard({ ...FULL_COMPONENT, project_environment_count: '0' });
+test('computeScorecard : project_linked_environment_count "0" (chaîne, comme renvoyé par Postgres COUNT) est traité comme absent', () => {
+  const result = computeScorecard({ ...FULL_COMPONENT, project_linked_environment_count: '0' });
+  assert.equal(result.checks.find((c) => c.id === 'environments').passed, false);
+});
+
+test('computeScorecard : des environnements existent mais AUCUN n\'est réellement relié à Argo CD — le check échoue (existence seule ne suffit plus)', () => {
+  const result = computeScorecard({ ...FULL_COMPONENT, project_linked_environment_count: 0 });
   assert.equal(result.checks.find((c) => c.id === 'environments').passed, false);
 });
 
