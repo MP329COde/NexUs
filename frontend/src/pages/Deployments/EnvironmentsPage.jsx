@@ -59,6 +59,33 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
   const [appInput, setAppInput] = useState('');
   const [promoting, setPromoting] = useState(null);
   const [promoteFrom, setPromoteFrom] = useState({});
+  const [creating, setCreating] = useState(false);
+  const [newEnv, setNewEnv] = useState({ name: '', kind: 'staging', blueprintId: '' });
+  const [creatingBusy, setCreatingBusy] = useState(false);
+
+  // Les blueprints applicables à ce projet sont ceux de SON organisation
+  // (voir EnvironmentBlueprintsPanel.jsx, Paramètres → Blueprints
+  // d'environnement) — récupérée via la fiche projet, qui expose déjà orgId.
+  const projectDetail = useApi(() => api.get(`/projects/${project.id}`), [project.id]);
+  const orgId = projectDetail.data?.project?.orgId;
+  const blueprints = useApi(() => (orgId ? api.get(`/environment-blueprints?orgId=${orgId}`) : Promise.resolve(null)), [orgId]);
+  const availableBlueprints = blueprints.data?.items || [];
+
+  async function createEnvironment(e) {
+    e.preventDefault();
+    setCreatingBusy(true);
+    try {
+      await api.post(`/projects/${project.id}/environments`, { name: newEnv.name, kind: newEnv.kind, blueprintId: newEnv.blueprintId || null });
+      notify(`Environnement "${newEnv.name}" créé`, { type: 'ok' });
+      setNewEnv({ name: '', kind: 'staging', blueprintId: '' });
+      setCreating(false);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setCreatingBusy(false);
+    }
+  }
 
   async function saveLink(env) {
     try {
@@ -94,8 +121,31 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
       title={(<Link to={`/deployments/projects/${project.id}`} className="env-project-link">{project.name}</Link>)}
       sub={`${environments.length} environnement(s)`}
       span={12}
-      actions={<span className="btn-outline env-toggle-btn" onClick={onToggle}>{expanded ? 'Réduire' : 'Détails & promotions'}</span>}
+      actions={(
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span className="btn-outline env-toggle-btn" onClick={() => setCreating((v) => !v)}>Nouvel environnement</span>
+          <span className="btn-outline env-toggle-btn" onClick={onToggle}>{expanded ? 'Réduire' : 'Détails & promotions'}</span>
+        </div>
+      )}
     >
+      {creating && (
+        <form onSubmit={createEnvironment} className="env-create-form">
+          <input className="input" required placeholder="Nom (ex. qa)" value={newEnv.name} onChange={(e) => setNewEnv((f) => ({ ...f, name: e.target.value }))} />
+          <select className="input" value={newEnv.kind} onChange={(e) => setNewEnv((f) => ({ ...f, kind: e.target.value }))}>
+            <option value="development">Développement</option>
+            <option value="preview">Preview</option>
+            <option value="staging">Staging</option>
+            <option value="production">Production</option>
+            <option value="custom">Personnalisé</option>
+          </select>
+          <select className="input" value={newEnv.blueprintId} onChange={(e) => setNewEnv((f) => ({ ...f, blueprintId: e.target.value }))}>
+            <option value="">Sans blueprint</option>
+            {availableBlueprints.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <button className="btn" type="submit" disabled={creatingBusy}>{creatingBusy ? 'Création…' : 'Créer'}</button>
+        </form>
+      )}
+
       <div className="env-table-wrap">
         <table className="env-table">
           <thead>
@@ -111,6 +161,7 @@ function ProjectEnvironments({ project, expanded, onToggle, notify }) {
                 <td className="env-table-cell">
                   <span className={`badge ${env.is_production ? 'badge-crit' : 'badge-mut'} env-badge-kind`}>{env.is_production ? 'Production' : env.kind}</span>
                   <strong>{env.name}</strong>
+                  {env.blueprint_name && <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>({env.blueprint_name})</span>}
                 </td>
                 <td className="env-table-cell">
                   {linking === env.id ? (

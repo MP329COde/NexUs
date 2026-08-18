@@ -1,0 +1,54 @@
+.teams-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.teams-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.teams-modal-row:hover {
+  background: var(--border-soft);
+}
+
+.teams-modal-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-weight: 500;
+}
+
+.teams-modal-role {
+  font-size: 12px;
+}
+
+.teams-modal-delete-btn {
+  padding: 4px 7px;
+}
+
+.teams-modal-new-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.teams-modal-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teams-modal-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

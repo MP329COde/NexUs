@@ -40,12 +40,29 @@ export function clearSessionCookies(res) {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+// Routes qui ÉMETTENT une nouvelle session (issueSessionCookies) plutôt que
+// d'agir au nom d'une session existante : le double-submit CSRF protège une
+// action mutative jouée via une session déjà établie, pas la création de
+// cette session elle-même. Les exempter évite un vrai verrou sans issue :
+// un client qui a perdu son cookie nexus_csrf (purge partielle du navigateur,
+// ITP Safari...) tout en gardant un nexus_session encore valide ne pouvait
+// plus JAMAIS se reconnecter — /auth/login retombait dans la branche
+// "session cookie présent" ci-dessous et exigeait un jeton CSRF introuvable,
+// sans aucun moyen de s'en sortir (le logout, mutatif lui aussi, était tout
+// autant bloqué). Bug trouvé en testant le Software Catalog avec un onglet
+// resté connecté longtemps. SameSite=Lax empêche déjà un navigateur
+// d'envoyer ces cookies sur une requête POST cross-site déclenchée par un
+// autre site, donc ces routes n'ont pas besoin d'une protection double-submit
+// en plus.
+const SESSION_ISSUING_PATHS = new Set(['/auth/login', '/auth/webauthn/login-verify', '/setup']);
+
 // Double-submit cookie : n'a de sens que pour les requêtes authentifiées par
 // cookie (seul mécanisme qu'un navigateur envoie automatiquement cross-site
 // et donc vulnérable au CSRF) — un appel via Authorization: Bearer n'est pas
 // concerné, le navigateur ne rejoue jamais cet en-tête tout seul.
 export function csrfProtection(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
+  if (SESSION_ISSUING_PATHS.has(req.path)) return next();
   const sessionCookie = req.cookies?.[SESSION_COOKIE];
   const hasBearer = /^Bearer\s+/i.test(req.headers.authorization || '');
   if (!sessionCookie || hasBearer) return next();

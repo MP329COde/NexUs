@@ -17,6 +17,7 @@ app.use(cookieParser());
 app.use(csrfProtection);
 app.get('/ping', (req, res) => res.json({ ok: true }));
 app.post('/mutate', (req, res) => res.json({ ok: true }));
+app.post('/auth/login', (req, res) => res.json({ ok: true }));
 
 async function withServer(fn) {
   const server = app.listen(0);
@@ -67,6 +68,23 @@ test('une requête mutative avec cookie et en-tête CSRF correspondants est acce
     const res = await fetch(`${base}/mutate`, {
       method: 'POST',
       headers: { Cookie: `${SESSION_COOKIE}=fake-session-token; ${CSRF_COOKIE}=abc123`, 'X-CSRF-Token': 'abc123' }
+    });
+    assert.equal(res.status, 200);
+  });
+});
+
+// Reproduit le vrai verrou trouvé en testant le Software Catalog à la
+// souris : un onglet resté connecté longtemps avec un nexus_session encore
+// valide mais un nexus_csrf disparu (purge partielle du navigateur) ne
+// pouvait plus jamais se reconnecter, /auth/login exigeant lui aussi un
+// jeton CSRF introuvable — sans issue puisque le logout est tout aussi
+// mutatif. /auth/login émet une NOUVELLE session, il n'a donc pas besoin de
+// prouver la connaissance d'un jeton CSRF lié à l'ancienne.
+test("POST /auth/login passe sans jeton CSRF même avec un cookie de session périmé présent", async () => {
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/auth/login`, {
+      method: 'POST',
+      headers: { Cookie: `${SESSION_COOKIE}=stale-session-token` }
     });
     assert.equal(res.status, 200);
   });

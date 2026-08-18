@@ -1,0 +1,45 @@
+.catalog-filters-row {
+  flex-wrap: wrap;
+}
+
+.catalog-filter-select {
+  max-width: 200px;
+}
+
+.catalog-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.catalog-card-scorecard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+
+.catalog-score-badge {
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.catalog-score-good {
+  background: var(--tone-ok-bg, rgba(16, 185, 129, 0.15));
+  color: var(--tone-ok-fg, #10b981);
+}
+
+.catalog-score-mid {
+  background: var(--tone-warn-bg, rgba(245, 158, 11, 0.15));
+  color: var(--tone-warn-fg, #f59e0b);
+}
+
+.catalog-score-low {
+  background: var(--tone-crit-bg, rgba(239, 68, 68, 0.15));
+  color: var(--tone-crit-fg, #ef4444);
+}

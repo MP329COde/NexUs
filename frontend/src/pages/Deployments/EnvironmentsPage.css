@@ -131,3 +131,14 @@
 .env-history-meta {
   font-size: 10.5px;
 }
+
+.env-create-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}

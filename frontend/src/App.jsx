@@ -25,6 +25,10 @@ import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
 import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
 import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
 import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
+import CatalogPage from './pages/Deployments/CatalogPage.jsx';
+import CatalogComponentPage from './pages/Deployments/CatalogComponentPage.jsx';
+import TemplatesPage from './pages/Deployments/TemplatesPage.jsx';
+import PlatformRequestsPage from './pages/Deployments/PlatformRequestsPage.jsx';
 import OrganizationsPage from './pages/Deployments/OrganizationsPage.jsx';
 import OrganizationDetailPage from './pages/Deployments/OrganizationDetailPage.jsx';
 import WikiPage from './pages/Deployments/WikiPage.jsx';
@@ -67,6 +71,10 @@ export const router = createBrowserRouter([
             handle: { title: 'Développement' },
             children: [
               { index: true, element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
+              { path: 'catalog', element: <CatalogPage />, handle: { title: 'Catalogue logiciel' } },
+              { path: 'catalog/:id', element: <CatalogComponentPage />, handle: { title: 'Composant' } },
+              { path: 'templates', element: <TemplatesPage />, handle: { title: 'Templates' } },
+              { path: 'requests', element: <PlatformRequestsPage />, handle: { title: 'Demandes' } },
               { path: 'projects', element: <ProjectsPage />, handle: { title: 'Projets' } },
               { path: 'organizations', element: <OrganizationsPage />, handle: { title: 'Organisations' } },
               { path: 'organizations/:id', element: <OrganizationDetailPage />, handle: { title: 'Organisation' } },

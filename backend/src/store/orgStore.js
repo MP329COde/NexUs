@@ -334,18 +334,66 @@ export async function removeMember(projectId, userId) {
 
 export async function listEnvironments(projectId) {
   const { rows } = await query(
-    'SELECT * FROM environments WHERE project_id = $1 ORDER BY is_production DESC, name',
+    `SELECT e.*, b.name AS blueprint_name
+     FROM environments e
+     LEFT JOIN environment_blueprints b ON b.id = e.blueprint_id
+     WHERE e.project_id = $1 ORDER BY e.is_production DESC, e.name`,
     [projectId]
   );
   return rows;
 }
 
-export async function createEnvironment(projectId, { name, kind, isProduction }) {
+export async function createEnvironment(projectId, { name, kind, isProduction, blueprintId }) {
   const { rows } = await query(
-    `INSERT INTO environments (project_id, name, kind, is_production) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [projectId, name, kind || 'custom', Boolean(isProduction)]
+    `INSERT INTO environments (project_id, name, kind, is_production, blueprint_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [projectId, name, kind || 'custom', Boolean(isProduction), blueprintId || null]
   );
   return rows[0];
+}
+
+// --- Environment Blueprints ------------------------------------------
+export async function listEnvironmentBlueprintsForOrg(orgId) {
+  const { rows } = await query('SELECT * FROM environment_blueprints WHERE org_id = $1 ORDER BY name', [orgId]);
+  return rows;
+}
+
+export async function getEnvironmentBlueprint(id) {
+  const { rows } = await query('SELECT * FROM environment_blueprints WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createEnvironmentBlueprint({ orgId, name, slug, kind, namespacePattern, replicas, cpu, memory, storageGb, ingressDomain, ttlMinutes, monitoringEnabled }) {
+  const { rows } = await query(
+    `INSERT INTO environment_blueprints (org_id, name, slug, kind, namespace_pattern, replicas, cpu, memory, storage_gb, ingress_domain, ttl_minutes, monitoring_enabled)
+     VALUES ($1, $2, $3, COALESCE($4, 'custom'), COALESCE($5, ''), COALESCE($6, 1), COALESCE($7, ''), COALESCE($8, ''), $9, COALESCE($10, ''), $11, COALESCE($12, true))
+     RETURNING *`,
+    [orgId, name, slug, kind || null, namespacePattern || null, replicas ?? null, cpu || null, memory || null, storageGb ?? null, ingressDomain || null, ttlMinutes ?? null, monitoringEnabled ?? null]
+  );
+  return rows[0];
+}
+
+export async function updateEnvironmentBlueprint(id, { name, kind, namespacePattern, replicas, cpu, memory, storageGb, ingressDomain, ttlMinutes, monitoringEnabled }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (name !== undefined) set('name', name);
+  if (kind !== undefined) set('kind', kind);
+  if (namespacePattern !== undefined) set('namespace_pattern', namespacePattern);
+  if (replicas !== undefined) set('replicas', replicas);
+  if (cpu !== undefined) set('cpu', cpu);
+  if (memory !== undefined) set('memory', memory);
+  if (storageGb !== undefined) set('storage_gb', storageGb);
+  if (ingressDomain !== undefined) set('ingress_domain', ingressDomain);
+  if (ttlMinutes !== undefined) set('ttl_minutes', ttlMinutes);
+  if (monitoringEnabled !== undefined) set('monitoring_enabled', monitoringEnabled);
+  params.push(id);
+  const { rows } = await query(`UPDATE environment_blueprints SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deleteEnvironmentBlueprint(id) {
+  const { rowCount } = await query('DELETE FROM environment_blueprints WHERE id = $1', [id]);
+  return rowCount > 0;
 }
 
 export async function getEnvironment(id) {
@@ -398,12 +446,11 @@ export async function listTeamsForOrg(orgId, userId) {
   // filtrée par appartenance : voir teams.routes.js pour la vérification
   // d'accès (membre de l'organisation).
   const { rows } = await query(
-    `SELECT t.*, tm.role AS my_role, COUNT(tm2.user_id) OVER (PARTITION BY t.id) AS member_count
+    `SELECT t.*, tm.role AS my_role,
+        (SELECT COUNT(*) FROM team_members tm2 WHERE tm2.team_id = t.id) AS member_count
      FROM teams t
      LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = $2
-     LEFT JOIN team_members tm2 ON tm2.team_id = t.id
      WHERE t.org_id = $1
-     GROUP BY t.id, tm.role
      ORDER BY t.name`,
     [orgId, userId]
   );
@@ -545,5 +592,263 @@ export async function listWikiRevisions(pageId) {
 
 export async function getWikiRevision(id) {
   const { rows } = await query('SELECT * FROM wiki_page_revisions WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+// --- Software Catalog (components) ---------------------------------------
+// Même portée de visibilité que listProjectsForUser : un composant est
+// visible par quiconque a accès à son projet (membre direct ou owner/admin
+// de l'organisation), jamais par tous les utilisateurs de la plateforme.
+// Sans filtre par utilisateur : réservé aux usages serveur qui n'agissent
+// pas au nom d'une session (ex. le Policy Gate de promotion — voir
+// services/environmentPromotionService.js). La visibilité par utilisateur
+// reste appliquée par listComponentsForUser() pour tout ce qui répond
+// directement à une requête HTTP authentifiée.
+export async function listComponentsForProject(projectId) {
+  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 ORDER BY name', [projectId]);
+  return rows;
+}
+
+export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerTeamId, projectId, mine } = {}) {
+  const params = [userId];
+  const conditions = ['(pm.user_id = $1 OR om.role IN (\'owner\', \'admin\'))'];
+  if (q) { params.push(`%${q.toLowerCase()}%`); conditions.push(`(LOWER(c.name) LIKE $${params.length} OR LOWER(c.description) LIKE $${params.length})`); }
+  if (kind) { params.push(kind); conditions.push(`c.kind = $${params.length}`); }
+  if (lifecycle) { params.push(lifecycle); conditions.push(`c.lifecycle = $${params.length}`); }
+  if (ownerTeamId) { params.push(ownerTeamId); conditions.push(`c.owner_team_id = $${params.length}`); }
+  if (projectId) { params.push(projectId); conditions.push(`c.project_id = $${params.length}`); }
+  // "Mes services" (ÉTAPE 25 IDP, Developer Portal) : ce dont CET
+  // utilisateur est réellement responsable — son équipe en est propriétaire,
+  // OU il est membre EXPLICITE du projet (pas seulement visible par bypass
+  // owner/admin d'organisation, qui donne accès à tout sans en faire le
+  // responsable). Distinct du filtre par projet/équipe ci-dessus : ceux-là
+  // ciblent un projet/une équipe précis, celui-ci répond à "qu'est-ce qui
+  // est à moi ?" quel que soit le projet.
+  if (mine) {
+    conditions.push(
+      `(c.owner_team_id IN (SELECT team_id FROM team_members WHERE user_id = $1)
+        OR EXISTS (SELECT 1 FROM project_members pm2 WHERE pm2.project_id = c.project_id AND pm2.user_id = $1))`
+    );
+  }
+  const { rows } = await query(
+    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
+     FROM components c
+     JOIN projects p ON p.id = c.project_id
+     LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+     LEFT JOIN org_members om ON om.org_id = p.org_id AND om.user_id = $1
+     LEFT JOIN teams t ON t.id = c.owner_team_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY c.name`,
+    params
+  );
+  return rows;
+}
+
+export async function getComponent(id) {
+  const { rows } = await query(
+    `SELECT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+        (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id) AS project_environment_count
+     FROM components c
+     JOIN projects p ON p.id = c.project_id
+     LEFT JOIN teams t ON t.id = c.owner_team_id
+     WHERE c.id = $1`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+// Résolution utilisée par l'import service.yaml (services/serviceManifest.js) :
+// spec.owner y référence une équipe par son slug (lisible, stable dans un
+// fichier versionné), jamais par son UUID interne.
+export async function getTeamBySlug(orgId, slug) {
+  const { rows } = await query('SELECT * FROM teams WHERE org_id = $1 AND slug = $2', [orgId, slug]);
+  return rows[0] || null;
+}
+
+// Upsert du même composant (même projet + même slug) : c'est ce qui permet
+// à un import service.yaml répété (CI, ou nouveau collage manuel après
+// modification du fichier) de mettre à jour la fiche existante plutôt que
+// d'échouer sur la contrainte UNIQUE (project_id, slug) ou de créer un
+// doublon.
+export async function getComponentBySlug(projectId, slug) {
+  const { rows } = await query('SELECT * FROM components WHERE project_id = $1 AND slug = $2', [projectId, slug]);
+  return rows[0] || null;
+}
+
+export async function createComponent({ projectId, ownerTeamId, name, slug, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links }) {
+  const { rows } = await query(
+    `INSERT INTO components (project_id, owner_team_id, name, slug, kind, lifecycle, description, language, framework, repository_provider, repository_url, tags, links)
+     VALUES ($1, $2, $3, $4, COALESCE($5, 'service'), COALESCE($6, 'experimental'), COALESCE($7, ''), COALESCE($8, ''), COALESCE($9, ''), COALESCE($10, ''), COALESCE($11, ''), COALESCE($12::jsonb, '[]'::jsonb), COALESCE($13::jsonb, '[]'::jsonb))
+     RETURNING *`,
+    [projectId, ownerTeamId || null, name, slug, kind || null, lifecycle || null, description || null, language || null, framework || null,
+      repositoryProvider || null, repositoryUrl || null, tags ? JSON.stringify(tags) : null, links ? JSON.stringify(links) : null]
+  );
+  return rows[0];
+}
+
+export async function updateComponent(id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (ownerTeamId !== undefined) set('owner_team_id', ownerTeamId || null);
+  if (name !== undefined) set('name', name);
+  if (kind !== undefined) set('kind', kind);
+  if (lifecycle !== undefined) set('lifecycle', lifecycle);
+  if (description !== undefined) set('description', description);
+  if (language !== undefined) set('language', language);
+  if (framework !== undefined) set('framework', framework);
+  if (repositoryProvider !== undefined) set('repository_provider', repositoryProvider);
+  if (repositoryUrl !== undefined) set('repository_url', repositoryUrl);
+  if (tags !== undefined) set('tags', JSON.stringify(tags));
+  if (links !== undefined) set('links', JSON.stringify(links));
+  params.push(id);
+  const { rows } = await query(`UPDATE components SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deleteComponent(id) {
+  const { rowCount } = await query('DELETE FROM components WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+// --- Dependency Graph (component_dependencies) ----------------------------
+// Dépendances DIRECTES uniquement (pas de fermeture transitive calculée
+// côté base) : dependsOn = ce dont CE composant a besoin pour fonctionner,
+// dependents = ce qui casserait si CE composant tombait. Les deux sens sont
+// interrogés séparément (pas de UNION) car ce sont deux questions
+// différentes pour l'utilisateur ("de quoi dépend billing-api ?" vs
+// "qu'est-ce qui dépend de billing-api ?").
+export async function listDependencies(componentId) {
+  const { rows } = await query(
+    `SELECT d.id, d.kind, d.created_at, c.id AS component_id, c.name, c.slug, c.kind AS component_kind, c.lifecycle, p.name AS project_name
+     FROM component_dependencies d
+     JOIN components c ON c.id = d.depends_on_component_id
+     JOIN projects p ON p.id = c.project_id
+     WHERE d.component_id = $1
+     ORDER BY c.name`,
+    [componentId]
+  );
+  return rows;
+}
+
+export async function listDependents(componentId) {
+  const { rows } = await query(
+    `SELECT d.id, d.kind, d.created_at, c.id AS component_id, c.name, c.slug, c.kind AS component_kind, c.lifecycle, p.name AS project_name
+     FROM component_dependencies d
+     JOIN components c ON c.id = d.component_id
+     JOIN projects p ON p.id = c.project_id
+     WHERE d.depends_on_component_id = $1
+     ORDER BY c.name`,
+    [componentId]
+  );
+  return rows;
+}
+
+export async function createDependency({ componentId, dependsOnComponentId, kind }) {
+  const { rows } = await query(
+    `INSERT INTO component_dependencies (component_id, depends_on_component_id, kind)
+     VALUES ($1, $2, COALESCE($3, 'runtime'))
+     RETURNING *`,
+    [componentId, dependsOnComponentId, kind || null]
+  );
+  return rows[0];
+}
+
+export async function getDependency(id) {
+  const { rows } = await query('SELECT * FROM component_dependencies WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function deleteDependency(id) {
+  const { rowCount } = await query('DELETE FROM component_dependencies WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+// --- Policy Engine (policies) ----------------------------------------
+export async function listPoliciesForOrg(orgId) {
+  const { rows } = await query('SELECT * FROM policies WHERE org_id = $1 ORDER BY name', [orgId]);
+  return rows;
+}
+
+export async function getPolicy(id) {
+  const { rows } = await query('SELECT * FROM policies WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createPolicy({ orgId, name, slug, kind, enabled, threshold }) {
+  const { rows } = await query(
+    `INSERT INTO policies (org_id, name, slug, kind, enabled, threshold) VALUES ($1, $2, $3, $4, COALESCE($5, true), $6) RETURNING *`,
+    [orgId, name, slug, kind, enabled ?? null, threshold ?? null]
+  );
+  return rows[0];
+}
+
+export async function updatePolicy(id, { name, enabled, threshold }) {
+  const sets = ['updated_at = now()'];
+  const params = [];
+  const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+  if (name !== undefined) set('name', name);
+  if (enabled !== undefined) set('enabled', enabled);
+  if (threshold !== undefined) set('threshold', threshold);
+  params.push(id);
+  const { rows } = await query(`UPDATE policies SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+  return rows[0] || null;
+}
+
+export async function deletePolicy(id) {
+  const { rowCount } = await query('DELETE FROM policies WHERE id = $1', [id]);
+  return rowCount > 0;
+}
+
+// --- Platform Requests (ÉTAPE 17) ------------------------------------
+const REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'expired'];
+
+export async function listPlatformRequestsForOrg(orgId, { status } = {}) {
+  const params = [orgId];
+  const conditions = ['r.org_id = $1'];
+  if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+  const { rows } = await query(
+    `SELECT r.*, p.name AS project_name FROM platform_requests r LEFT JOIN projects p ON p.id = r.project_id
+     WHERE ${conditions.join(' AND ')} ORDER BY r.created_at DESC`,
+    params
+  );
+  return rows;
+}
+
+export async function listPlatformRequestsForUser(userId) {
+  const { rows } = await query(
+    `SELECT r.*, p.name AS project_name FROM platform_requests r LEFT JOIN projects p ON p.id = r.project_id
+     WHERE r.requested_by = $1 ORDER BY r.created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function getPlatformRequest(id) {
+  const { rows } = await query('SELECT * FROM platform_requests WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createPlatformRequest({ orgId, projectId, requestedBy, kind, title, description }) {
+  const { rows } = await query(
+    `INSERT INTO platform_requests (org_id, project_id, requested_by, kind, title, description)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '')) RETURNING *`,
+    [orgId, projectId || null, requestedBy, kind, title, description || null]
+  );
+  return rows[0];
+}
+
+// Transition unique (pending → approved/rejected/cancelled) : une demande
+// déjà tranchée ne se rouvre jamais, elle se reproduit (nouvelle demande) —
+// même logique que le retry de job (jobService.js), qui crée un nouveau job
+// plutôt que de muter l'original pour garder l'historique complet.
+export async function reviewPlatformRequest(id, { status, reviewedBy, reviewNote }) {
+  if (!REQUEST_STATUSES.includes(status)) throw new Error(`Statut invalide : ${status}`);
+  const { rows } = await query(
+    `UPDATE platform_requests SET status = $2, reviewed_by = $3, reviewed_at = now(), review_note = $4
+     WHERE id = $1 AND status = 'pending' RETURNING *`,
+    [id, status, reviewedBy, reviewNote || null]
+  );
   return rows[0] || null;
 }
