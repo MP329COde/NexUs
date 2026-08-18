@@ -11,6 +11,7 @@ import * as jobService from '../services/jobService.js';
 import { computeScorecard } from '../services/catalogScorecard.js';
 import { evaluatePolicies } from '../services/policyEngine.js';
 import { findVaultEntry } from '../store/vaultStore.js';
+import { syncBindingSecret } from '../services/serviceBindingSyncService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -226,6 +227,34 @@ router.delete('/components/:id/bindings/:bindingId', asyncHandler(async (req, re
   await orgStore.deleteBinding(req.params.bindingId);
   logAudit(req, 'catalog.binding.delete', { componentId: req.params.id, bindingId: req.params.bindingId });
   res.json({ ok: true });
+}));
+
+// Provisioning réel (ÉTAPE 15 IDP, suite — voir migration 0023) : synchronise
+// la valeur du secret référencé vers un vrai Secret Kubernetes dans le
+// namespace déjà provisionné de l'environnement choisi. La valeur ne
+// transite jamais dans la réponse HTTP ni dans les logs — seul le résultat
+// (synced/failed) l'est. Réservé maintainer+ comme les autres mutations de
+// bindings : ça touche un vrai cluster Kubernetes.
+router.post('/components/:id/bindings/:bindingId/sync', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const binding = await orgStore.getBinding(req.params.bindingId);
+  if (!binding || binding.component_id !== req.params.id) return res.status(404).json({ ok: false, error: 'Binding introuvable' });
+  const { environmentId } = req.body || {};
+  if (!environmentId) return res.status(400).json({ ok: false, error: 'environmentId requis' });
+  const environment = await orgStore.getEnvironment(environmentId);
+  if (!environment || environment.project_id !== component.project_id) {
+    return res.status(404).json({ ok: false, error: 'Environnement introuvable pour ce projet' });
+  }
+
+  const result = await syncBindingSecret(binding, component, environment);
+  await orgStore.recordBindingSync(binding.id, { environmentId, status: result.status, message: result.message });
+  logAudit(req, 'catalog.binding.sync', { componentId: req.params.id, bindingId: binding.id, environmentId, resultStatus: result.status });
+  res.json({ ok: result.status === 'synced', result });
 }));
 
 // Export au format service.yaml — voir services/serviceManifest.js. Même

@@ -564,4 +564,33 @@ if (!hasPostgres) {
     await orgStore.deleteComponent(component.id);
     assert.equal((await orgStore.listBindingsForComponent(component.id)).length, 0);
   });
+
+  test('serviceBindingSyncService : échecs honnêtes (pas de secret relié, pas de namespace provisionné, secret introuvable) — jamais un "synced" sans preuve', async () => {
+    const { syncBindingSecret } = await import('../src/services/serviceBindingSyncService.js');
+    const component = await orgStore.createComponent({ projectId: project.id, name: 'sync-component', slug: `sync-component-${Date.now()}`, kind: 'api' });
+    const env = await orgStore.createEnvironment(project.id, { name: `sync-env-${Date.now()}`, kind: 'staging' });
+
+    const noSecretBinding = await orgStore.createBinding({ componentId: component.id, bindingType: 'postgres', envVarName: 'DATABASE_URL' });
+    const noSecretResult = await syncBindingSecret(noSecretBinding, component, env);
+    assert.equal(noSecretResult.status, 'failed');
+    assert.match(noSecretResult.message, /aucune entrée du coffre-fort/);
+
+    const withSecretBinding = await orgStore.createBinding({ componentId: component.id, bindingType: 'redis', envVarName: 'REDIS_URL', vaultEntryId: 'does-not-exist' });
+    // env sans namespace provisionné : doit échouer AVANT même de chercher
+    // le secret (pas d'appel Kubernetes inutile pour un binding qui
+    // échouerait de toute façon).
+    const noNamespaceResult = await syncBindingSecret(withSecretBinding, component, env);
+    assert.equal(noNamespaceResult.status, 'failed');
+    assert.match(noNamespaceResult.message, /namespace/);
+
+    const provisionedEnv = { ...env, provisioned_namespace: 'sync-test-ns' };
+    const missingEntryResult = await syncBindingSecret(withSecretBinding, component, provisionedEnv);
+    assert.equal(missingEntryResult.status, 'failed');
+    assert.match(missingEntryResult.message, /introuvable/);
+
+    // recordBindingSync persiste le résultat, jamais la valeur du secret.
+    const recorded = await orgStore.recordBindingSync(withSecretBinding.id, { environmentId: env.id, status: missingEntryResult.status, message: missingEntryResult.message });
+    assert.equal(recorded.sync_status, 'failed');
+    assert.equal(recorded.synced_at, null); // seul un statut 'synced' pose synced_at
+  });
 }

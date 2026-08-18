@@ -37,6 +37,9 @@ export default function CatalogComponentPage() {
   const [addingBinding, setAddingBinding] = useState(false);
   const [bindingForm, setBindingForm] = useState({ bindingType: 'postgres', envVarName: '', vaultEntryId: '', description: '' });
   const [bindingBusy, setBindingBusy] = useState(false);
+  const [syncing, setSyncing] = useState(null);
+  const [syncEnvId, setSyncEnvId] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -84,6 +87,21 @@ export default function CatalogComponentPage() {
       bindings.reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
+    }
+  }
+
+  async function doSync(binding) {
+    setSyncBusy(true);
+    try {
+      const res = await api.post(`/catalog/components/${id}/bindings/${binding.id}/sync`, { environmentId: syncEnvId });
+      notify(res.result.message, { type: res.result.status === 'synced' ? 'ok' : 'crit' });
+      setSyncing(null);
+      setSyncEnvId('');
+      bindings.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setSyncBusy(false);
     }
   }
 
@@ -381,18 +399,40 @@ export default function CatalogComponentPage() {
           {componentBindings.length === 0 ? (
             <p className="faint catalog-deps-empty">Aucun binding déclaré.</p>
           ) : componentBindings.map((b) => (
-            <div key={b.id} className="catalog-deps-row">
-              <span className="catalog-deps-link mono">{b.env_var_name}</span>
-              <span className="badge badge-mut">{BINDING_TYPE_LABEL[b.binding_type]}</span>
-              {b.vault_entry_label ? (
-                <span className="faint" style={{ fontSize: 12 }}><Icon name="lock" size={11} />{b.vault_entry_label}</span>
-              ) : (
-                <span className="faint" style={{ fontSize: 12 }}>Sans secret relié</span>
+            <div key={b.id}>
+              <div className="catalog-deps-row">
+                <span className="catalog-deps-link mono">{b.env_var_name}</span>
+                <span className="badge badge-mut">{BINDING_TYPE_LABEL[b.binding_type]}</span>
+                {b.vault_entry_label ? (
+                  <span className="faint" style={{ fontSize: 12 }}><Icon name="lock" size={11} />{b.vault_entry_label}</span>
+                ) : (
+                  <span className="faint" style={{ fontSize: 12 }}>Sans secret relié</span>
+                )}
+                {canManage && b.vault_entry_label && environments.length > 0 && (
+                  <span className="btn-outline catalog-deps-add-btn" onClick={() => setSyncing(syncing === b.id ? null : b.id)}>
+                    Synchroniser
+                  </span>
+                )}
+                {canManage && (
+                  <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeBinding(b.id)}>
+                    <Icon name="trash" size={11} />
+                  </span>
+                )}
+              </div>
+              {b.sync_status !== 'never' && (
+                <p className="faint" style={{ fontSize: 11, marginLeft: 4, color: b.sync_status === 'failed' ? 'var(--danger, #ef4444)' : undefined }}>
+                  {b.sync_status === 'synced' ? '✓ ' : '✗ '}{b.sync_message}
+                </p>
               )}
-              {canManage && (
-                <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeBinding(b.id)}>
-                  <Icon name="trash" size={11} />
-                </span>
+              {syncing === b.id && (
+                <div className="catalog-deps-form" style={{ marginBottom: 8 }}>
+                  <select className="input" value={syncEnvId} onChange={(e) => setSyncEnvId(e.target.value)}>
+                    <option value="">Environnement cible…</option>
+                    {environments.map((env) => <option key={env.id} value={env.id}>{env.name}{env.provisioned_namespace ? '' : ' (aucun namespace provisionné)'}</option>)}
+                  </select>
+                  <button className="btn" type="button" disabled={syncBusy || !syncEnvId} onClick={() => doSync(b)}>{syncBusy ? '…' : 'Synchroniser le secret'}</button>
+                  <span className="btn-outline" onClick={() => setSyncing(null)}>Annuler</span>
+                </div>
               )}
             </div>
           ))}

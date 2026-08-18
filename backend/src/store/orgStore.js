@@ -946,3 +946,16 @@ export async function deleteBinding(id) {
   const { rowCount } = await query('DELETE FROM component_bindings WHERE id = $1', [id]);
   return rowCount > 0;
 }
+
+// Résultat RÉEL de la synchronisation d'un binding vers un Secret
+// Kubernetes (ÉTAPE 15 IDP, voir services/serviceBindingSyncService.js) —
+// jamais la valeur du secret elle-même, seulement où/quand/si ça a marché.
+export async function recordBindingSync(id, { environmentId, status, message }) {
+  const { rows } = await query(
+    `UPDATE component_bindings SET last_synced_environment_id = $2, sync_status = $3, sync_message = $4,
+       synced_at = CASE WHEN $3 = 'synced' THEN now() ELSE synced_at END
+     WHERE id = $1 RETURNING *`,
+    [id, environmentId, status, message || '']
+  );
+  return rows[0] || null;
+}
