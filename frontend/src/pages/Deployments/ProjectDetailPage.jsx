@@ -98,6 +98,15 @@ export default function ProjectDetailPage() {
       notify(err.message, { type: 'crit' });
     }
   }
+  async function saveDescriptionAndTags(description, tags) {
+    try {
+      await api.put(`/projects/${id}`, { description, tags });
+      notify('Fiche projet mise à jour', { type: 'ok' });
+      project.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
 
   const taskItems = tasks.data?.items || [];
 
@@ -133,6 +142,14 @@ export default function ProjectDetailPage() {
           </div>
         )}
       />
+
+      <div className="pd-grid-row">
+        <DescriptionTagsPanel
+          project={p}
+          canManage={user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)}
+          onSave={saveDescriptionAndTags}
+        />
+      </div>
 
       <div className="pd-grid-row">
         <Panel title="Backlog" sub="Tâches d'équipe — chacun peut s'assigner" span={8}>
@@ -952,6 +969,84 @@ function ResolveIncidentModal({ incident, onClose, onResolved, projectId, notify
         <button className="btn" type="submit" disabled={busy}>{busy ? 'Envoi…' : 'Clore l\'incident'}</button>
       </form>
     </Modal>
+  );
+}
+
+// Description libre + étiquettes technologiques (langages/frameworks/outils)
+// du projet. Le backend supporte déjà ces deux champs sur PUT /projects/:id
+// (store/projectsStore.js, orgStore.updateProjectByLegacyId) — seule l'UI
+// d'édition manquait.
+function DescriptionTagsPanel({ project, canManage, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [description, setDescription] = useState(project.description || '');
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState(project.tags || []);
+
+  function startEditing() {
+    setDescription(project.description || '');
+    setTags(project.tags || []);
+    setEditing(true);
+  }
+  function addTag(e) {
+    e.preventDefault();
+    const value = tagInput.trim();
+    if (!value || tags.includes(value)) { setTagInput(''); return; }
+    setTags([...tags, value]);
+    setTagInput('');
+  }
+  function removeTag(value) {
+    setTags(tags.filter((t) => t !== value));
+  }
+  async function save() {
+    await onSave(description, tags);
+    setEditing(false);
+  }
+
+  return (
+    <Panel
+      title="Aperçu"
+      sub="Description et étiquettes technologiques"
+      span={12}
+      actions={canManage && !editing ? (
+        <span className="btn-outline pd-action-btn" onClick={startEditing}>Modifier</span>
+      ) : null}
+    >
+      {editing ? (
+        <div className="pd-list-loose">
+          <textarea
+            className="input"
+            rows={3}
+            placeholder="Description du projet…"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <form onSubmit={addTag} className="pd-form-row">
+            <input className="input pd-form-input" placeholder="Ajouter une étiquette (ex. React, PostgreSQL)…" value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
+            <button className="btn" type="submit">Ajouter</button>
+          </form>
+          <div className="pd-list-loose" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {tags.map((t) => (
+              <span key={t} className="badge badge-vio" style={{ cursor: 'pointer' }} onClick={() => removeTag(t)} title="Retirer">{t} ×</span>
+            ))}
+          </div>
+          <div className="pd-form-row">
+            <button className="btn" onClick={save}>Enregistrer</button>
+            <span className="btn-outline pd-action-btn" onClick={() => setEditing(false)}>Annuler</span>
+          </div>
+        </div>
+      ) : (
+        <div className="pd-list-loose">
+          <p>{project.description || <span className="pd-empty">Aucune description</span>}</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(project.tags || []).length === 0 ? (
+              <span className="pd-empty">Aucune étiquette technologique</span>
+            ) : (
+              (project.tags || []).map((t) => <span key={t} className="badge badge-mut">{t}</span>)
+            )}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 

@@ -62,6 +62,7 @@ import pipelinesRoutes from './pipelines.routes.js';
 import shortcutsRoutes from './shortcuts.routes.js';
 import terminalRoutes from './terminal.routes.js';
 import wikiRoutes from './wiki.routes.js';
+import pluginsRoutes from './plugins.routes.js';
 
 const router = Router();
 
@@ -128,5 +129,6 @@ router.use('/pipelines', pipelinesRoutes);
 router.use('/shortcuts', shortcutsRoutes);
 router.use('/terminal', terminalRoutes);
 router.use('/wiki', wikiRoutes);
+router.use('/plugins', pluginsRoutes);
 
 export default router;

@@ -8,7 +8,7 @@ import { readStore, writeStore } from './jsonStore.js';
 export const PERMISSION_DOMAINS = [
   'infrastructure', 'network', 'security', 'automation',
   'monitoring', 'terminal', 'identity', 'users', 'settings', 'inventory', 'vault', 'kubernetes',
-  'hosts', 'backups', 'audit', 'proxmox'
+  'hosts', 'backups', 'audit', 'proxmox', 'plugins'
 ];
 export const PERMISSION_LEVELS = ['none', 'read', 'write', 'admin'];
 const LEVEL_RANK = { none: 0, read: 1, write: 2, admin: 3 };
