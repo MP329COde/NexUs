@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
@@ -66,6 +67,9 @@ export default function TeamsModal({ org, canManage, onClose }) {
             <div key={t.id} className="teams-modal-row" onClick={() => setOpenTeam(t)} role="button">
               <span className="teams-modal-name"><Icon name="users" size={14} />{t.name}</span>
               <span className="faint teams-modal-role">{t.my_role === 'lead' ? 'Lead' : t.my_role === 'member' ? 'Membre' : ''}</span>
+              <Link to={`/deployments/teams/${t.id}`} onClick={(e) => e.stopPropagation()} className="btn-outline teams-modal-delete-btn" title="Ouvrir l'espace d'équipe">
+                <Icon name="externalLink" size={12} />
+              </Link>
               {canManage && (
                 <span className="btn-outline teams-modal-delete-btn" onClick={(e) => { e.stopPropagation(); deleteTeam(t); }}>
                   <Icon name="trash" size={12} />
