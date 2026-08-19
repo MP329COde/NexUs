@@ -23,7 +23,7 @@ function parseArgs(argv) {
   return { positional, options };
 }
 
-const TWO_WORD_VERBS = new Set(['catalog', 'service', 'env']);
+const TWO_WORD_VERBS = new Set(['catalog', 'service', 'env', 'plugin']);
 
 async function main() {
   const [, , ...argv] = process.argv;
@@ -76,6 +76,14 @@ Usage :
   nexus rollback <legacyProjectId> <envId> <toPromotionId>
 
   nexus logs <namespace> <pod> [--tail <n>]
+
+  nexus plugin create <nom>              Génère un squelette de plugin (manifest, backend/, frontend/)
+  nexus plugin validate [dir]            Valide le manifest en local (défaut : .)
+  nexus plugin build [dir]               Vérifie manifest + points d'entrée avant publication
+  nexus plugin install [dir]             Installe le plugin auprès de l'instance connectée
+  nexus plugin update [dir]              Réinstalle (désinstalle puis installe) le manifest local
+  nexus plugin remove <id>               Désinstalle un plugin par son id
+  nexus plugin dev [dir]                 Revalide et réinstalle à chaque sauvegarde (Ctrl+C pour arrêter)
 `);
 }
 
