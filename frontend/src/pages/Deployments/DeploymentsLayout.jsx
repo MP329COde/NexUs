@@ -10,54 +10,34 @@ const COLLAPSE_KEY = 'nexus-dev-nav-collapsed';
 const GROUPS = [
   {
     label: 'Aperçu',
-    items: [
-      { to: '/deployments/my-work', label: 'Mon travail', icon: 'users' },
-      { to: '/deployments', label: 'Accès aux outils', icon: 'globe', end: true }
-    ]
+    items: [{ to: '/deployments/my-work', label: 'Mon travail', icon: 'users' }]
   },
   {
-    label: 'Gestion',
+    label: 'Catalogue',
+    items: [{ to: '/deployments/catalog', label: 'Catalogue', icon: 'box' }]
+  },
+  {
+    label: 'Projets',
     items: [
-      { to: '/deployments/catalog', label: 'Catalogue logiciel', icon: 'box' },
-      { to: '/deployments/templates', label: 'Templates', icon: 'cube' },
-      { to: '/deployments/requests', label: 'Demandes', icon: 'event' },
       { to: '/deployments/projects', label: 'Projets', icon: 'layers' },
       { to: '/deployments/organizations', label: 'Organisations', icon: 'users' }
     ]
   },
   {
     label: 'Code',
-    items: [
-      { to: '/deployments/repos', label: 'Dépôts Git', icon: 'gitBranch' },
-      { to: '/deployments/reviews', label: 'Revue de code', icon: 'check' }
-    ]
+    items: [{ to: '/deployments/repos', label: 'Code', icon: 'gitBranch' }]
   },
   {
     label: 'Livraison',
-    items: [
-      { to: '/deployments/pipelines', label: 'Pipelines CI/CD', icon: 'sync' },
-      { to: '/deployments/environments', label: 'Environnements', icon: 'server' },
-      { to: '/deployments/releases', label: 'Déploiements', icon: 'box' },
-      { to: '/deployments/iac', label: 'Infrastructure as Code', icon: 'inf' }
-    ]
+    items: [{ to: '/deployments/pipelines', label: 'Livraison', icon: 'sync' }]
   },
   {
-    label: 'Qualité',
-    items: [{ to: '/deployments/tests', label: 'Tests & qualité', icon: 'flask' }]
+    label: 'Qualité & sécurité',
+    items: [{ to: '/deployments/tests', label: 'Qualité & sécurité', icon: 'flask' }]
   },
   {
-    label: 'Exécution',
-    items: [
-      { to: '/deployments/containers', label: 'Conteneurs', icon: 'cube' },
-      { to: '/deployments/images', label: 'Images & registry', icon: 'image' }
-    ]
-  },
-  {
-    label: 'Sécurité',
-    items: [
-      { to: '/deployments/secrets', label: 'Secrets & variables', icon: 'lock' },
-      { to: '/deployments/supply-chain', label: 'Supply Chain Security', icon: 'shield' }
-    ]
+    label: 'Outils',
+    items: [{ to: '/deployments', label: 'Outils', icon: 'globe', end: true }]
   }
 ];
 

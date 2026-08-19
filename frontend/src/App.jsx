@@ -48,6 +48,10 @@ import ContainersPage from './pages/Deployments/ContainersPage.jsx';
 import ImagesRegistryPage from './pages/Deployments/ImagesRegistryPage.jsx';
 import SecretsPage from './pages/Deployments/SecretsPage.jsx';
 import SupplyChainPage from './pages/Deployments/SupplyChainPage.jsx';
+import CatalogLayout from './pages/Deployments/CatalogLayout.jsx';
+import CodeLayout from './pages/Deployments/CodeLayout.jsx';
+import DeliveryLayout from './pages/Deployments/DeliveryLayout.jsx';
+import QualitySecurityLayout from './pages/Deployments/QualitySecurityLayout.jsx';
 import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
@@ -76,10 +80,16 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
               { path: 'my-work', element: <MyWorkPage />, handle: { title: 'Mon travail' } },
-              { path: 'catalog', element: <CatalogPage />, handle: { title: 'Catalogue logiciel' } },
-              { path: 'catalog/:id', element: <CatalogComponentPage />, handle: { title: 'Composant' } },
-              { path: 'templates', element: <TemplatesPage />, handle: { title: 'Templates' } },
-              { path: 'requests', element: <PlatformRequestsPage />, handle: { title: 'Demandes' } },
+              {
+                element: <CatalogLayout />,
+                handle: { title: 'Catalogue' },
+                children: [
+                  { path: 'catalog', element: <CatalogPage />, handle: { title: 'Catalogue logiciel' } },
+                  { path: 'catalog/:id', element: <CatalogComponentPage />, handle: { title: 'Composant' } },
+                  { path: 'templates', element: <TemplatesPage />, handle: { title: 'Templates' } },
+                  { path: 'requests', element: <PlatformRequestsPage />, handle: { title: 'Demandes' } }
+                ]
+              },
               { path: 'projects', element: <ProjectsPage />, handle: { title: 'Projets' } },
               { path: 'organizations', element: <OrganizationsPage />, handle: { title: 'Organisations' } },
               { path: 'organizations/:id', element: <OrganizationDetailPage />, handle: { title: 'Organisation' } },
@@ -87,18 +97,36 @@ export const router = createBrowserRouter([
               { path: 'teams/:teamId', element: <TeamWorkspacePage />, handle: { title: 'Équipe' } },
               { path: 'projects/:id', element: <ProjectDetailPage />, handle: { title: 'Projet' } },
               { path: 'projects/:id/getting-started', element: <GettingStartedPage />, handle: { title: 'Commencer à développer' } },
-              { path: 'repos', element: <GitReposPage />, handle: { title: 'Dépôts Git' } },
-              { path: 'repos/:key', element: <RepoDetailPage />, handle: { title: 'Dépôt' } },
-              { path: 'reviews', element: <CodeReviewsPage />, handle: { title: 'Revue de code' } },
-              { path: 'pipelines', element: <PipelinesPage />, handle: { title: 'Pipelines CI/CD' } },
-              { path: 'environments', element: <EnvironmentsPage />, handle: { title: 'Environnements' } },
-              { path: 'releases', element: <ReleasesPage />, handle: { title: 'Déploiements' } },
-              { path: 'iac', element: <IacPage />, handle: { title: 'Infrastructure as Code' } },
-              { path: 'tests', element: <TestsQualityPage />, handle: { title: 'Tests & qualité' } },
-              { path: 'containers', element: <ContainersPage />, handle: { title: 'Conteneurs' } },
-              { path: 'images', element: <ImagesRegistryPage />, handle: { title: 'Images & registry' } },
-              { path: 'secrets', element: <SecretsPage />, handle: { title: 'Secrets & variables' } },
-              { path: 'supply-chain', element: <SupplyChainPage />, handle: { title: 'Supply Chain Security' } }
+              {
+                element: <CodeLayout />,
+                handle: { title: 'Code' },
+                children: [
+                  { path: 'repos', element: <GitReposPage />, handle: { title: 'Dépôts Git' } },
+                  { path: 'repos/:key', element: <RepoDetailPage />, handle: { title: 'Dépôt' } },
+                  { path: 'reviews', element: <CodeReviewsPage />, handle: { title: 'Revue de code' } }
+                ]
+              },
+              {
+                element: <DeliveryLayout />,
+                handle: { title: 'Livraison' },
+                children: [
+                  { path: 'pipelines', element: <PipelinesPage />, handle: { title: 'Pipelines CI/CD' } },
+                  { path: 'environments', element: <EnvironmentsPage />, handle: { title: 'Environnements' } },
+                  { path: 'releases', element: <ReleasesPage />, handle: { title: 'Déploiements' } }
+                ]
+              },
+              {
+                element: <QualitySecurityLayout />,
+                handle: { title: 'Qualité & sécurité' },
+                children: [
+                  { path: 'iac', element: <IacPage />, handle: { title: 'Infrastructure as Code' } },
+                  { path: 'tests', element: <TestsQualityPage />, handle: { title: 'Tests & qualité' } },
+                  { path: 'containers', element: <ContainersPage />, handle: { title: 'Conteneurs' } },
+                  { path: 'images', element: <ImagesRegistryPage />, handle: { title: 'Images & registry' } },
+                  { path: 'secrets', element: <SecretsPage />, handle: { title: 'Secrets & variables' } },
+                  { path: 'supply-chain', element: <SupplyChainPage />, handle: { title: 'Supply Chain Security' } }
+                ]
+              }
             ]
           },
           {
