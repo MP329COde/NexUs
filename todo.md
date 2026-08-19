@@ -261,3 +261,58 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
     formule existante en base) a été repéré sur la liste des projets ; il s'affiche correctement
     (titre qui wrap, badge de statut qui reste aligné) et n'a pas été modifié — c'est une donnée de
     test volontaire, pas un défaut visuel.
+
+- [x] **Design System — composants Tabs et Loading state (Lot 48)** : comble les deux lacunes
+  identifiées à l'Étape 13 (todo.md ligne ~105, Lot 34) sans reconstruire ce qui existe déjà (Modal,
+  Panel, StatusBadge, EmptyState, ToastStack, DataTable...). `frontend/src/components/ui/Tabs.jsx`
+  (nouveau) reprend exactement le style déjà établi et réimplémenté à la main trois fois (bordure
+  inférieure active, couleur primaire) ; `frontend/src/components/ui/LoadingState.jsx` (nouveau)
+  réutilise le spinner `.spin`/icône `refresh` déjà présents dans `theme.css`/`AdminOverviewPanel.jsx`
+  mais jamais partagés. Appliqués à 4 endroits pour prouver que ça fonctionne réellement, sans tout
+  remplacer d'un coup : `PodDetailDialog.jsx` (3 onglets Décrire/Événements/Métriques + 3 loadings),
+  `ContainersPage.jsx` (onglets Kubernetes/Docker), `ManifestExplorerModal.jsx` (onglets
+  Modifier/Aperçu/Diff, `Tabs` étendu avec une prop `right` pour le badge "Modifié" affiché à côté),
+  `OpenAlertsPanel.jsx` et `WikiPage.jsx` (loading uniquement). Les anciennes classes CSS dupliquées
+  (`.pdd-tab`, `.cnp-tab`, `.mem-tab`...) supprimées des fichiers concernés. `SettingsPage.jsx` a été
+  volontairement laissé tel quel : ses onglets sont un style « pilule » différent et intentionnel
+  (`settings-tabs`, fond arrondi), pas la même convention visuelle — pas de faux renommage.
+  **Bug réel trouvé et corrigé en testant** (pas seulement visuel — crash complet de l'application) :
+  les trois onglets de `PodDetailDialog.jsx` affichaient `{error}` directement comme enfant JSX, mais
+  `useApi.js` renvoie un objet `{status, message}`, pas une chaîne — React lève
+  "Objects are not valid as a React child" et casse toute la page dès qu'une des trois requêtes échoue
+  (reproduit en ouvrant l'onglet Métriques sans render conditionnel testé jusqu'ici). Corrigé en
+  affichant `error.message` dans les trois cas. Vérifié via Playwright de bout en bout sur le vrai
+  cluster k3d du Lot 46 (toujours actif) : onglets Kubernetes/Docker de `ContainersPage.jsx` cliquables
+  clair/sombre, `PodDetailDialog.jsx` ouvert sur un vrai pod (`coredns-8db54c48d-s229w`) avec ses trois
+  onglets fonctionnels — Décrire (données réelles), Métriques (CPU/mémoire réels, metrics-server étant
+  installé sur ce cluster de test, le crash était bien reproduit puis corrigé), build Vite complet sans
+  erreur. `frontend/src/components/ui/Tabs.jsx`, `Tabs.css`, `LoadingState.jsx`, `LoadingState.css`
+  (nouveaux), `frontend/src/pages/Kubernetes/PodDetailDialog.jsx(.css)`,
+  `frontend/src/pages/Deployments/ContainersPage.jsx(.css)`,
+  `frontend/src/pages/Deployments/ManifestExplorerModal.jsx(.css)`,
+  `frontend/src/pages/Home/OpenAlertsPanel.jsx`, `frontend/src/pages/Deployments/WikiPage.jsx`.
+
+- [x] **Audit « Projet/Workspace comme conteneur transverse » (Lot 48, ligne 29 ci-dessus, close)** :
+  audit complet du schéma relationnel (`backend/src/db/migrations/`, 40 migrations) et des routes
+  associées, en complément de l'audit applicatif déjà fait au Lot 12 (ligne 33/34, `ProjectDetailPage.jsx`).
+  Toutes les ressources qui appartiennent conceptuellement à un seul projet portent bien `project_id`
+  (souvent `NOT NULL REFERENCES projects(id) ON DELETE CASCADE`) : `environments`, `project_members`,
+  `incidents`, `changes`, `maintenance_windows`, `wiki_pages` (+ paliers équipe/organisation),
+  `components`/`component_releases`/`component_dependencies`/`component_bindings`, `adrs`/`adr_revisions`,
+  `project_doc_sites`, `project_activity` (généralisée organisation/équipe au Lot 42),
+  `project_resource_grants`, `project_presence` (Lot 28), `projects.webhook_secret`, et le coffre-fort
+  (`vaultStore.js`, tier `project` avec `projectId`). `platform_requests` a un `project_id` optionnel
+  (rattachement explicite prévu, cohérent avec son usage transverse organisation/projet).
+  **Aucune ressource mal placée trouvée** : les tables restées au niveau organisation/plateforme le
+  sont par conception, pas par oubli — `hosts` (infrastructure physique, partagée entre projets),
+  `feature_flags`/`plugins` (plateforme entière), `policies`/`environment_blueprints`/`service_accounts`/
+  `org_quotas` (gouvernance et modèles réutilisables au niveau organisation, appliqués *aux* projets/
+  composants via `org_id`, jamais dupliqués par projet — `environment_blueprints.id` est référencé par
+  `environments.blueprint_id`, donc bien consommé au niveau projet sans être défini deux fois). Le
+  registre de conteneurs et Grafana (`registry.routes.js`, `grafana.routes.js`) restent scopés
+  plateforme sans `project_id` — déjà documenté et laissé tel quel au Lot 38 (`WorkspaceHealthPanel.jsx`)
+  car aucun `kind` fiable ne permet de les rattacher à un projet sans risquer un faux rapprochement.
+  **Conclusion** : le chantier ouvert depuis longtemps (ligne 29) est en réalité déjà achevé par les
+  sessions précédentes (Lots 12, 28, 34-42 notamment) — le modèle de données confirme ce que l'audit
+  applicatif du Lot 12 avait déjà constaté empiriquement sur `ProjectDetailPage.jsx`. Aucune migration
+  ni changement de code nécessaire pour cette étape ; audit uniquement.
