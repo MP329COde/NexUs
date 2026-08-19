@@ -12,7 +12,7 @@ const DOMAIN_LABELS = {
   infrastructure: 'Infrastructure', network: 'Réseaux', security: 'Sécurité', automation: 'Automatisation',
   monitoring: 'Monitoring', terminal: 'Terminal', identity: 'Connexion & identité', users: 'Utilisateurs',
   settings: 'Paramètres', inventory: 'Inventaire', vault: 'Coffre-fort', kubernetes: 'Kubernetes',
-  hosts: 'Hôtes', backups: 'Sauvegardes', audit: 'Journal d\'audit', proxmox: 'Proxmox'
+  hosts: 'Hôtes', backups: 'Sauvegardes', audit: 'Journal d\'audit', proxmox: 'Proxmox', plugins: 'Plugins'
 };
 const LEVEL_LABELS = { none: 'Aucun', read: 'Lecture', write: 'Écriture', admin: 'Admin' };
 const LEVEL_TONE = { none: 'mut', read: 'ok', write: 'warn', admin: 'crit' };

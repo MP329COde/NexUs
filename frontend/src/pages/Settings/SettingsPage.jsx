@@ -10,6 +10,7 @@ import UsersPanel from './UsersPanel.jsx';
 import GroupsPanel from './GroupsPanel.jsx';
 import InventoryPanel from './InventoryPanel.jsx';
 import PlatformPanel from './PlatformPanel.jsx';
+import PluginsPanel from './PluginsPanel.jsx';
 import EnvironmentBlueprintsPanel from './EnvironmentBlueprintsPanel.jsx';
 import PoliciesPanel from './PoliciesPanel.jsx';
 import IdentityPanel from './IdentityPanel.jsx';
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'groups', label: 'Groupes & permissions', domain: 'users', level: 'admin' },
   { id: 'inventory', label: 'Inventaire', domain: 'inventory', level: 'admin', primaryAdminOnly: true },
   { id: 'platform', label: 'Plateforme', domain: 'settings', level: 'admin' },
+  { id: 'plugins', label: 'Plugins', domain: 'plugins', level: 'read' },
   { id: 'environment-blueprints', label: "Blueprints d'environnement", domain: 'settings', level: 'admin' },
   { id: 'policies', label: 'Policies', domain: 'settings', level: 'admin' },
   { id: 'identity', label: 'Connexion & identité', domain: 'identity', level: 'admin' },
@@ -96,6 +98,7 @@ export default function SettingsPage() {
       {tab === 'groups' && <GroupsPanel />}
       {tab === 'inventory' && <InventoryPanel />}
       {tab === 'platform' && <PlatformPanel data={data} error={error} reload={reload} />}
+      {tab === 'plugins' && <PluginsPanel />}
       {tab === 'environment-blueprints' && <EnvironmentBlueprintsPanel />}
       {tab === 'policies' && <PoliciesPanel />}
       {tab === 'identity' && <IdentityPanel />}

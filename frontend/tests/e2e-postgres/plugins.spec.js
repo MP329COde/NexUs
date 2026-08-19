@@ -124,4 +124,34 @@ test.describe('Plugin Runtime — socle backend (Lot 1)', () => {
     const { items } = await list.json();
     expect(items.some((p) => p.id === 'test-plugin')).toBe(false);
   });
+
+  // Vérifie le vrai flux dans le navigateur (onglet Paramètres → Plugins),
+  // pas seulement l'API — installation via manifest JSON collé, activation,
+  // désinstallation. Utilise un id distinct de TEST_MANIFEST pour ne pas
+  // dépendre de l'ordre avec les tests API ci-dessus.
+  test('Onglet Plugins : installer, activer puis désinstaller depuis le navigateur', async ({ page }) => {
+    await page.goto('/login');
+    await page.locator('.login-field-email').fill('admin@rbac-pg.test');
+    await page.locator('.login-field-password').fill('AdminPassword123!');
+    await page.locator('button[type=submit]').click();
+    await page.waitForURL(/\/$/, { timeout: 10000 });
+
+    await page.goto('/settings?tab=plugins');
+    await page.getByText('Installer un plugin', { exact: true }).click();
+    await page.locator('textarea.input').fill(JSON.stringify({
+      id: 'test-plugin-ui', name: 'Plugin UI Test', version: '1.0.0', apiVersion: '1.0'
+    }));
+    await page.getByRole('button', { name: 'Installer' }).click();
+
+    const row = page.locator('.plugins-row', { has: page.getByText('Plugin UI Test', { exact: true }) });
+    await expect(row).toBeVisible();
+    await expect(row.getByText('Installé', { exact: true })).toBeVisible();
+
+    await row.getByText('Activer', { exact: true }).click();
+    await expect(row.getByText('Actif', { exact: true })).toBeVisible();
+
+    page.once('dialog', (d) => d.accept());
+    await row.locator('.plugins-danger').click();
+    await expect(page.locator('.plugins-row', { has: page.getByText('Plugin UI Test', { exact: true }) })).toHaveCount(0);
+  });
 });
