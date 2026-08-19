@@ -193,6 +193,12 @@ export default function CatalogComponentPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[
+          { label: 'Développement', to: '/deployments' },
+          { label: 'Catalogue logiciel', to: '/deployments/catalog' },
+          ...(component.project_legacy_id ? [{ label: component.project_name, to: `/deployments/projects/${component.project_legacy_id}` }] : []),
+          { label: component.name }
+        ]}
         title={component.name}
         sub={component.description || 'Aucune description'}
         actions={(

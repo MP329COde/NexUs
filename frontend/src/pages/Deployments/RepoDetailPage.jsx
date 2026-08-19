@@ -42,6 +42,11 @@ export default function RepoDetailPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[
+          { label: 'Développement', to: '/deployments' },
+          { label: 'Dépôts Git', to: '/deployments/repos' },
+          { label: repo.name }
+        ]}
         title={repo.name}
         sub={repo.path}
         actions={(

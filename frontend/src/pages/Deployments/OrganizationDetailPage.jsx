@@ -33,6 +33,11 @@ export default function OrganizationDetailPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[
+          { label: 'Développement', to: '/deployments' },
+          { label: 'Organisations', to: '/deployments/organizations' },
+          { label: org.name }
+        ]}
         title={(
           <span className="odp-title-row">
             {org.icon ? (
