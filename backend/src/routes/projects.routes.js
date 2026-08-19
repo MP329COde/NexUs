@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { loadProjectAccess, requireMinRole, resolveProjectRole } from '../middleware/projectAccess.js';
 import * as store from '../store/projectsStore.js';
 import { notifyUser } from '../services/userNotificationService.js';
+import { logProjectActivity, listProjectActivity } from '../services/projectActivityService.js';
 import { findUserByUsername, listUsers } from '../store/usersStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
@@ -927,6 +928,7 @@ router.post('/:id/tasks', loadProjectAccess(), requireMinRole('developer'), asyn
   const { title, priority, assigneeId } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
   const task = store.createTask({ projectId: req.legacyProject.id, title, priority, assigneeId });
+  await logProjectActivity(req.pgProject?.id, req.user.id, 'task.create', { taskId: task.id, title: task.title }).catch(() => {});
   res.status(201).json({ ok: true, task });
 }));
 
@@ -949,6 +951,9 @@ router.put('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'
       message: `${req.user.name || req.user.email} vous a assigné « ${task.title} »`,
       meta: { projectId: req.legacyProject.id, taskId: task.id }
     }).catch(() => {});
+  }
+  if (req.body?.status && req.body.status !== existing.status) {
+    await logProjectActivity(req.pgProject?.id, req.user.id, 'task.status', { taskId: task.id, title: task.title, status: task.status }).catch(() => {});
   }
   res.json({ ok: true, task });
 }));
@@ -1006,6 +1011,7 @@ router.post('/:id/tasks/:taskId/comments', loadProjectAccess(), asyncHandler(asy
       meta: { projectId: req.legacyProject.id, taskId: existing.id, commentId: comment.id }
     }).catch(() => {});
   }
+  await logProjectActivity(req.pgProject?.id, req.user.id, 'task.comment', { taskId: existing.id, title: existing.title }).catch(() => {});
   res.status(201).json({ ok: true, comment });
 }));
 
@@ -1075,6 +1081,7 @@ router.post('/:id/adrs', loadProjectAccess(), requireMinRole('developer'), async
   if (!title || !title.trim()) return res.status(400).json({ ok: false, error: 'title requis' });
   const adr = await orgStore.createAdr(req.pgProject.id, { title: title.trim(), status, content, userId: req.user.id });
   logAudit(req, 'project.adr.create', { projectId: req.legacyProject.id, adrId: adr.id, number: adr.number });
+  await logProjectActivity(req.pgProject.id, req.user.id, 'adr.create', { adrId: adr.id, number: adr.number, title: adr.title }).catch(() => {});
   res.status(201).json({ ok: true, adr });
 }));
 
@@ -1095,7 +1102,15 @@ router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintain
   const { url, repoUrl, branch, lastCommit, lastPublishedAt, status } = req.body || {};
   const site = await orgStore.upsertDocSite(req.pgProject.id, kind, { url, repoUrl, branch, lastCommit, lastPublishedAt, status, userId: req.user.id });
   logAudit(req, 'project.docSite.update', { projectId: req.legacyProject.id, kind, url });
+  await logProjectActivity(req.pgProject.id, req.user.id, 'docSite.update', { kind, url }).catch(() => {});
   res.json({ ok: true, site });
+}));
+
+// Activité d'équipe (todo.md items 28/31) : lecture ouverte à tout membre
+// du projet — même portée que le reste de la fiche projet.
+router.get('/:id/activity', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await listProjectActivity(req.pgProject.id, Number(req.query.limit) || 50) });
 }));
 
 function slugify(name) {
