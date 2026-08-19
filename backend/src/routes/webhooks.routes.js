@@ -8,6 +8,18 @@ import { logAudit } from '../services/auditService.js';
 import { logger } from '../utils/logger.js';
 import { handlePullRequestEvent } from '../services/previewEnvironmentWebhookService.js';
 import { handlePushEvent as handleServiceYamlPush } from '../services/serviceYamlDiscoveryService.js';
+import { notifyUser } from '../services/userNotificationService.js';
+
+// Notifie owner+maintainer du projet (jamais l'auteur du push, non
+// résolvable en compte Nexus depuis un simple nom/e-mail de forge) —
+// même liste de destinataires que pour la création d'incident
+// (routes/projects.routes.js), cohérence de convention.
+async function notifyProjectOwners(project, { type, title, message, meta }) {
+  const members = await orgStore.listMembers(project.id);
+  for (const m of members.filter((x) => ['owner', 'maintainer'].includes(x.role))) {
+    notifyUser(m.user_id, { type, title, message, meta });
+  }
+}
 
 // Points d'entrée publics (pas de requireAuth : GitLab/GitHub ne peuvent pas
 // s'authentifier comme un utilisateur Nexus) mais jamais des portes non
@@ -69,6 +81,17 @@ router.post('/gitlab/:legacyProjectId', asyncHandler(async (req, res) => {
       resourceRef: String(event.object_attributes.id || ''),
       createdBy: 'webhook:gitlab'
     });
+    await notifyProjectOwners(project, {
+      type: 'pipeline.failed', title: 'Pipeline en échec',
+      message: `Pipeline GitLab en échec sur « ${project.name} » (${event.object_attributes.ref || 'branche inconnue'})`,
+      meta: { projectId: project.legacy_id, ref: event.object_attributes.ref }
+    });
+  } else if (event.object_kind === 'pipeline' && event.object_attributes?.status === 'success') {
+    await notifyProjectOwners(project, {
+      type: 'pipeline.success', title: 'Pipeline réussi',
+      message: `Pipeline GitLab réussi sur « ${project.name} » (${event.object_attributes.ref || 'branche inconnue'})`,
+      meta: { projectId: project.legacy_id, ref: event.object_attributes.ref }
+    });
   }
 
   res.json({ ok: true });
@@ -104,13 +127,31 @@ router.post('/github/:legacyProjectId', asyncHandler(async (req, res) => {
       resourceRef: String(event.workflow_run.id || ''),
       createdBy: 'webhook:github'
     });
+    await notifyProjectOwners(project, {
+      type: 'pipeline.failed', title: 'Pipeline en échec',
+      message: `Workflow GitHub Actions en échec sur « ${project.name} » (${event.workflow_run.name || 'workflow inconnu'})`,
+      meta: { projectId: project.legacy_id, webUrl: event.workflow_run.html_url }
+    });
+  } else if (githubEvent === 'workflow_run' && event.action === 'completed' && event.workflow_run?.conclusion === 'success') {
+    await notifyProjectOwners(project, {
+      type: 'pipeline.success', title: 'Pipeline réussi',
+      message: `Workflow GitHub Actions réussi sur « ${project.name} » (${event.workflow_run.name || 'workflow inconnu'})`,
+      meta: { projectId: project.legacy_id, webUrl: event.workflow_run.html_url }
+    });
   }
 
   // Preview Environments (ÉTAPE 10 IDP) — voir previewEnvironmentWebhookService.js
   // pour la logique réelle (provisioning Kubernetes/destruction), testée
   // indépendamment de ce routeur HTTP.
   if (githubEvent === 'pull_request') {
-    await handlePullRequestEvent(project, event.action, event.pull_request, { user: { email: 'webhook:github' }, ip: req.ip });
+    const result = await handlePullRequestEvent(project, event.action, event.pull_request, { user: { email: 'webhook:github' }, ip: req.ip });
+    if (result.action === 'created') {
+      await notifyProjectOwners(project, {
+        type: 'preview.created', title: 'Preview créée',
+        message: `Environnement de preview créé pour la PR #${event.pull_request?.number} sur « ${project.name} »`,
+        meta: { projectId: project.legacy_id, environmentId: result.environmentId, prUrl: event.pull_request?.html_url }
+      });
+    }
   }
 
   // Auto-discovery service.yaml (ÉTAPE 22 IDP) — voir serviceYamlDiscoveryService.js.

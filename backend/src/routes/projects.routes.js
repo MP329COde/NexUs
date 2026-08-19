@@ -758,6 +758,14 @@ router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), 
     projectId: req.pgProject.id, jobId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy: req.user.id
   });
   logAudit(req, 'incident.create', { projectId: req.legacyProject.id, incidentId: incident.id, severity });
+  const owners = (await orgStore.listMembers(req.pgProject.id)).filter((m) => ['owner', 'maintainer'].includes(m.role) && m.user_id !== req.user.id);
+  for (const owner of owners) {
+    notifyUser(owner.user_id, {
+      type: 'incident.create', title: 'Nouvel incident',
+      message: `${req.user.name || req.user.email} a déclaré un incident ${severity} sur « ${req.legacyProject.name || req.pgProject.name} » : ${title}`,
+      meta: { projectId: req.legacyProject.id, incidentId: incident.id, severity }
+    });
+  }
   res.status(201).json({ ok: true, incident });
 }));
 
@@ -788,6 +796,13 @@ router.put('/:id/incidents/:incidentId', loadProjectAccess(), requireMinRole('ma
   }
   const updated = await incidentStore.update(incident.id, { status, assignedTo, resolution, runbookUrl });
   logAudit(req, 'incident.update', { projectId: req.legacyProject.id, incidentId: incident.id, status });
+  if (assignedTo && assignedTo !== incident.assigned_to && assignedTo !== req.user.id) {
+    notifyUser(assignedTo, {
+      type: 'incident.assigned', title: 'Incident assigné',
+      message: `${req.user.name || req.user.email} vous a assigné l'incident « ${incident.title} »`,
+      meta: { projectId: req.legacyProject.id, incidentId: incident.id }
+    });
+  }
   res.json({ ok: true, incident: updated });
 }));
 
