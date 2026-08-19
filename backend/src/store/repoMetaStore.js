@@ -18,7 +18,7 @@ export function setRepoMeta(key, { role, tags }) {
   const idx = all.findIndex((m) => m.key === key);
   const entry = {
     key,
-    role: role || null, // framework | service | library | template | infra | docs
+    role: role || null, // application | framework | service | library | template | infra | docs | storybook | design-system | example
     tags: Array.isArray(tags) ? tags : (idx === -1 ? [] : all[idx].tags),
     updatedAt: new Date().toISOString()
   };
