@@ -56,7 +56,7 @@ export default function AdminOverviewPanel() {
           {problems.map((p) => (
             <div key={p.key} className="aop-item">
               <Icon name="alertTriangle" size={13} className="aop-item-icon" style={{ color: `var(--tone-${p.tier}-dot)` }} />
-              <span className="aop-item-label">{p.label}</span>
+              <span className="aop-item-label" title={p.label}>{p.label}</span>
             </div>
           ))}
         </div>

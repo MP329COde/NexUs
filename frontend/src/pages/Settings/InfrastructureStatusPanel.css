@@ -34,6 +34,10 @@
   flex: 1;
   font-size: 12.5px;
   color: var(--text-faint);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .infra-status-latency {

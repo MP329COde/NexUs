@@ -42,6 +42,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
+  min-width: 0;
 }
 
 .aop-item-icon {
@@ -51,4 +52,8 @@
 .aop-item-label {
   font-size: 12.5px;
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

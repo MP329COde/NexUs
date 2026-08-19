@@ -31,7 +31,7 @@ export default function InfrastructureStatusPanel() {
               <span className="infra-status-icon"><Icon name={DOMAIN_ICON[entry.domain] || 'server'} size={16} /></span>
               <span className="infra-status-label">{entry.label}</span>
               <StatusBadge tone={toneFromStatus(entry)} label={entry.configured ? (entry.ok ? 'Opérationnel' : 'Erreur') : 'Non configuré'} />
-              <span className="infra-status-message">{entry.message}</span>
+              <span className="infra-status-message" title={entry.message}>{entry.message}</span>
               <span className="mono infra-status-latency">{entry.latencyMs} ms</span>
             </Link>
           ))}
