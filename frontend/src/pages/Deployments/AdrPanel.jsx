@@ -17,6 +17,7 @@ export default function AdrPanel({ projectId, canManage }) {
   const notify = useNotify();
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(null);
+  const revisions = useApi(() => (open ? api.get(`/projects/${projectId}/adrs/${open.id}/revisions`) : Promise.resolve(null)), [open?.id]);
   const [form, setForm] = useState({ title: '', status: 'proposed', content: '' });
   const [busy, setBusy] = useState(false);
   const items = adrs.data?.items || [];
@@ -98,6 +99,19 @@ export default function AdrPanel({ projectId, canManage }) {
               )}
             </div>
             <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{open.content || 'Aucun contenu.'}</pre>
+            {(revisions.data?.items || []).length > 0 && (
+              <div>
+                <div className="faint" style={{ marginBottom: 4 }}>Historique des modifications</div>
+                <div className="pd-list-loose">
+                  {revisions.data.items.map((r) => (
+                    <div key={r.id} className="pd-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <div className="faint">{new Date(r.edited_at).toLocaleString('fr-FR')} — {STATUS_LABELS[r.status]}</div>
+                      <div>{r.title}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}
