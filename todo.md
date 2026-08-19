@@ -443,3 +443,27 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
     depuis le début du projet).
   Fichiers touchés pour la correction de régression :
   `frontend/tests/e2e-postgres/incidentComments.spec.js`.
+
+- [x] **Réduction de la sous-nav Développement, 17 → 6 groupes + Outils (Lot 49, début de la feuille de
+  route "Refonte navigation & centre de gravité Projet")** : `DeploymentsLayout.jsx` exposait 17 entrées
+  à plat (Aperçu/Gestion/Code/Livraison/Qualité/Exécution/Sécurité) — l'utilisateur devait connaître
+  l'architecture interne de la plateforme pour savoir où cliquer. `GROUPS` réduit à 6 groupes + Outils
+  (Mon travail, Catalogue, Projets, Code, Livraison, Qualité & sécurité, Outils), **aucune route ni
+  fonctionnalité supprimée** : toutes les 17 destinations restent accessibles aux mêmes URLs
+  (`/deployments/repos`, `/deployments/pipelines`, `/deployments/iac`, etc. — inchangées, donc
+  `searchIndex.js` et `CommandPalette.jsx` n'ont nécessité aucune modification). Les trois groupes les
+  plus fragmentés (Code : dépôts+revues ; Livraison : pipelines+environnements+déploiements ; Qualité
+  & sécurité : IaC+tests+conteneurs+images+secrets+supply chain) sont désormais enveloppés dans un
+  layout à onglets internes (`CodeLayout.jsx`, `DeliveryLayout.jsx`, `QualitySecurityLayout.jsx`,
+  nouveaux, calqués sur le pattern `NavLink`+`Outlet` déjà utilisé par `InfrastructureLayout.jsx`) via
+  des routes parentes **sans préfixe de chemin** (`element` sans `path` dans `App.jsx`) : les enfants
+  gardent leurs chemins existants, donc zéro lien cassé et zéro redirection nécessaire. Catalogue et
+  Projets restent des groupes de sidebar avec plusieurs items directs (Templates/Demandes sous
+  Catalogue, Organisations sous Projets) — leur fusion en un seul espace à onglets et la création d'un
+  espace "Documentation" transverse sont prévues au Lot 50 (dépendent d'une page agrégatrice qui
+  n'existe pas encore). Vérifié : build Vite propre, puis suite `frontend/tests/e2e/` complète
+  (30/30 tests verts dont `smokeNavigation.spec.js` qui charge toutes les pages de la console sans
+  erreur JS) sur environnement fraîchement provisionné. `frontend/src/pages/Deployments/
+  DeploymentsLayout.jsx`, `CodeLayout.jsx` (nouveau), `DeliveryLayout.jsx` (nouveau),
+  `QualitySecurityLayout.jsx` (nouveau), `GroupTabs.css` (nouveau), `frontend/src/App.jsx`. Plan complet
+  des lots suivants (50-58+) dans `/Users/matthew/.claude/plans/voici-la-liste-int-grale-unified-llama.md`.
