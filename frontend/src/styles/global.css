@@ -114,6 +114,8 @@ button { cursor: pointer; }
 .badge-info .dot { background: var(--tone-info-dot); }
 .badge-mut { background: var(--tone-mut-bg); color: var(--tone-mut-fg); border-color: var(--tone-mut-br); }
 .badge-mut .dot { background: var(--tone-mut-dot); }
+.badge-vio { background: var(--tone-vio-bg); color: var(--tone-vio-fg); border-color: var(--tone-vio-br); }
+.badge-vio .dot { background: var(--tone-vio-dot); }
 
 table { width: 100%; border-collapse: collapse; }
 th {
