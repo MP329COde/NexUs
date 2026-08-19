@@ -12,6 +12,7 @@ import ProjectShortcutsPanel from './ProjectShortcutsPanel.jsx';
 import ProjectVaultPanel from './ProjectVaultPanel.jsx';
 import ProjectBoard from './ProjectBoard.jsx';
 import TaskCommentsModal from './TaskCommentsModal.jsx';
+import WorkspaceHealthPanel from './WorkspaceHealthPanel.jsx';
 import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
@@ -284,6 +285,16 @@ export default function ProjectDetailPage() {
 
       <div className="pd-grid-row">
         <DocSitesPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)} />
+      </div>
+
+      <div className="pd-grid-row">
+        <WorkspaceHealthPanel
+          projectId={id}
+          repoKeys={p.repoKeys}
+          environments={environments.data?.items}
+          securityScans={securityScans.data?.items}
+          incidents={incidents.data?.items}
+        />
       </div>
 
       <div className="pd-grid-row">
