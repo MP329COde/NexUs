@@ -1115,6 +1115,19 @@ router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintain
   res.json({ ok: true, site });
 }));
 
+// Fallback local (todo.md Lot 34) : quand aucun repository externe n'est
+// connecté, génère une page de documentation structurée à partir des
+// données réelles du projet, stockée en base et servie par ce backend.
+router.post('/:id/doc-sites/:kind/generate-local', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const { kind } = req.params;
+  if (!['docusaurus', 'storybook'].includes(kind)) return res.status(400).json({ ok: false, error: 'Type inconnu (docusaurus ou storybook)' });
+  const site = await orgStore.generateLocalDocSite(req.pgProject.id, kind, req.user.id);
+  logAudit(req, 'project.docSite.generateLocal', { projectId: req.legacyProject.id, kind });
+  await logProjectActivity(req.pgProject.id, req.user.id, 'docSite.generateLocal', { kind }).catch(() => {});
+  res.json({ ok: true, site });
+}));
+
 // Activité d'équipe (todo.md items 28/31) : lecture ouverte à tout membre
 // du projet — même portée que le reste de la fiche projet.
 router.get('/:id/activity', loadProjectAccess(), asyncHandler(async (req, res) => {

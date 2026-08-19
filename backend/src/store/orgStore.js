@@ -709,6 +709,60 @@ export async function upsertDocSite(projectId, kind, { url, repoUrl, branch, las
   return rows[0];
 }
 
+// Génère localement une page de documentation structurée quand aucun
+// repository externe n'est connecté (todo.md Lot 34) : Docusaurus →
+// synthèse technique du projet (composants, dépendances, ADR) ; Storybook →
+// catalogue des composants d'interface du projet. Uniquement des données
+// réellement présentes en base — jamais de contenu inventé.
+export async function generateLocalDocSite(projectId, kind, userId) {
+  const project = await getProject(projectId);
+  const components = await listComponentsForProject(projectId);
+  const adrs = await listAdrs(projectId);
+  let content;
+  if (kind === 'docusaurus') {
+    const lines = [
+      `# Documentation technique — ${project?.name || projectId}`,
+      '',
+      project?.description ? project.description : '_Aucune description de projet renseignée._',
+      '',
+      '## Composants du catalogue',
+      components.length
+        ? components.map((c) => `- **${c.name}** (${c.kind}${c.lifecycle ? `, ${c.lifecycle}` : ''})${c.description ? ` — ${c.description}` : ''}`).join('\n')
+        : '_Aucun composant enregistré dans le catalogue pour ce projet._',
+      '',
+      '## Décisions d\'architecture (ADR)',
+      adrs.length
+        ? adrs.map((a) => `- ADR-${String(a.number).padStart(3, '0')} — ${a.title} (${a.status})`).join('\n')
+        : '_Aucune ADR enregistrée._',
+      '',
+      '_Généré localement par NexUs faute de repository Docusaurus externe connecté. Connectez un repository pour publier une documentation versionnée réelle._',
+    ];
+    content = lines.join('\n');
+  } else {
+    const uiComponents = components.filter((c) => c.kind === 'frontend' || c.kind === 'ui-library' || c.kind === 'library');
+    const lines = [
+      `# Design System — ${project?.name || projectId}`,
+      '',
+      '## Composants recensés',
+      uiComponents.length
+        ? uiComponents.map((c) => `- **${c.name}**${c.description ? ` — ${c.description}` : ''}${c.repository_url ? ` ([dépôt](${c.repository_url}))` : ''}`).join('\n')
+        : '_Aucun composant frontend/librairie UI enregistré dans le catalogue pour ce projet._',
+      '',
+      '_Généré localement par NexUs faute de repository Storybook externe connecté (aucun build Storybook réel n\'est exécuté). Connectez un repository pour publier un vrai Storybook buildé._',
+    ];
+    content = lines.join('\n');
+  }
+  const { rows } = await query(
+    `INSERT INTO project_doc_sites (project_id, kind, status, local_content, last_published_at, updated_by)
+     VALUES ($1, $2, 'published', $3, now(), $4)
+     ON CONFLICT (project_id, kind) DO UPDATE SET
+       status = 'published', local_content = $3, last_published_at = now(), updated_by = $4, updated_at = now()
+     RETURNING *`,
+    [projectId, kind, content, userId]
+  );
+  return rows[0];
+}
+
 // --- Software Catalog (components) ---------------------------------------
 // Même portée de visibilité que listProjectsForUser : un composant est
 // visible par quiconque a accès à son projet (membre direct ou owner/admin
