@@ -105,6 +105,7 @@ test.describe('Documentation à trois paliers + liens Docusaurus/Storybook', () 
     await page.waitForURL(/\/$/, { timeout: 10000 });
 
     await page.goto(`/deployments/projects/${projectId}`);
+    await page.locator('.pd-tabs .ui-tab', { hasText: 'Documentation' }).click();
     const panel = page.locator('.card', { has: page.getByText('Documentation & Design System', { exact: true }) }).first();
     await panel.scrollIntoViewIfNeeded();
     await expect(panel.getByRole('link', { name: 'Ouvrir' }).first()).toBeVisible();

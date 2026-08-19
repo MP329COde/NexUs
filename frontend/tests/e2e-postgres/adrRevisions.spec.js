@@ -49,6 +49,7 @@ test('modifier une ADR conserve la version précédente dans son historique', as
   await page.waitForURL(/\/$/, { timeout: 10000 });
 
   await page.goto(`/deployments/projects/${project.id}`);
+  await page.locator('.pd-tabs .ui-tab', { hasText: 'Documentation' }).click();
   await page.getByText('Choix initial du cache', { exact: true }).click();
   await expect(page.getByText('Historique des modifications', { exact: true })).toBeVisible();
 

@@ -19,12 +19,22 @@ import ProjectActivityPanel from './ProjectActivityPanel.jsx';
 import EntityCommentsPanel from './EntityCommentsPanel.jsx';
 import IncidentCommentsModal from './IncidentCommentsModal.jsx';
 import ProjectPresenceBar from './ProjectPresenceBar.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
 import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', testing: 'Tests', ready: 'Prêt', done: 'Terminé' };
 const STATUS_ORDER = ['todo', 'in_progress', 'review', 'testing', 'ready', 'done'];
 const PROJECT_STATUS_LABELS = { active: 'Actif', paused: 'En pause', archived: 'Archivé' };
 const PROJECT_STATUS_ORDER = ['active', 'paused', 'archived'];
+const PD_TABS = [
+  { id: 'overview', label: 'Vue générale', icon: 'globe' },
+  { id: 'work', label: 'Travail', icon: 'layers' },
+  { id: 'code', label: 'Code', icon: 'gitBranch' },
+  { id: 'delivery', label: 'Livraison', icon: 'sync' },
+  { id: 'docs', label: 'Documentation', icon: 'box' },
+  { id: 'quality', label: 'Qualité & sécurité', icon: 'shield' },
+  { id: 'settings', label: 'Paramètres', icon: 'lock' }
+];
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -49,6 +59,7 @@ export default function ProjectDetailPage() {
   const [taskTitle, setTaskTitle] = useState('');
   const [boardView, setBoardView] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
+  const [tab, setTab] = useState('overview');
 
   if (project.error) {
     return <div className="card pd-error-state">Projet introuvable ou non accessible.</div>;
@@ -172,6 +183,9 @@ export default function ProjectDetailPage() {
         />
       </div>
 
+      <Tabs tabs={PD_TABS} active={tab} onChange={setTab} className="pd-tabs" />
+
+      {tab === 'work' && (
       <div className="pd-grid-row">
         <Panel
           title="Backlog"
@@ -232,7 +246,9 @@ export default function ProjectDetailPage() {
           onChanged={members.reload}
         />
       </div>
+      )}
 
+      {tab === 'code' && (<>
       <div className="pd-grid-row">
         <Panel title="Dépôts rattachés" span={6} actions={user?.role === 'admin' && <RepoPicker allRepos={repos.data?.items || []} linkedKeys={p.repoKeys} onToggle={toggleRepo} />}>
           {linkedRepos.length === 0 ? (
@@ -269,7 +285,9 @@ export default function ProjectDetailPage() {
       <div className="pd-grid-row">
         <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} projectId={id} onChanged={workspace.reload} />
       </div>
+      </>)}
 
+      {tab === 'delivery' && (<>
       <div className="pd-grid-row">
         <EnvironmentsPanel
           environments={environments.data?.items || []}
@@ -282,35 +300,16 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="pd-grid-row">
-        <IncidentsPanel
-          incidents={incidents.data?.items || []}
+        <JobsPanel
+          jobs={jobs.data?.items || []}
           projectId={id}
           role={projectRole}
-          onChanged={incidents.reload}
-          userName={userName}
+          onChanged={jobs.reload}
         />
       </div>
+      </>)}
 
-      <div className="pd-grid-row">
-        <DocumentationPanel orgId={p.orgId} projectId={p.relationalProjectId} />
-      </div>
-
-      <div className="pd-grid-row">
-        <DocSitesPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)} />
-      </div>
-
-      <div className="pd-grid-row">
-        <AdrPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer', 'developer'].includes(projectRole)} />
-      </div>
-
-      <div className="pd-grid-row">
-        <ProjectActivityPanel projectId={id} userName={userName} />
-      </div>
-
-      <div className="pd-grid-row">
-        <EntityCommentsPanel endpoint={`/projects/${id}/comments`} userName={userName} />
-      </div>
-
+      {tab === 'overview' && (<>
       <div className="pd-grid-row">
         <WorkspaceHealthPanel
           projectId={id}
@@ -323,21 +322,32 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="pd-grid-row">
+        <ProjectActivityPanel projectId={id} userName={userName} />
+      </div>
+      </>)}
+
+      {tab === 'docs' && (<>
+      <div className="pd-grid-row">
+        <DocumentationPanel orgId={p.orgId} projectId={p.relationalProjectId} />
+      </div>
+
+      <div className="pd-grid-row">
+        <DocSitesPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)} />
+      </div>
+
+      <div className="pd-grid-row">
+        <AdrPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer', 'developer'].includes(projectRole)} />
+      </div>
+      </>)}
+
+      {tab === 'quality' && (<>
+      <div className="pd-grid-row">
         <ChangesPanel
           changes={changes.data?.items || []}
           environments={environments.data?.items || []}
           projectId={id}
           role={projectRole}
           onChanged={changes.reload}
-        />
-      </div>
-
-      <div className="pd-grid-row">
-        <JobsPanel
-          jobs={jobs.data?.items || []}
-          projectId={id}
-          role={projectRole}
-          onChanged={jobs.reload}
         />
       </div>
 
@@ -349,6 +359,22 @@ export default function ProjectDetailPage() {
           role={projectRole}
           onChanged={securityScans.reload}
         />
+      </div>
+      </>)}
+
+      {tab === 'settings' && (<>
+      <div className="pd-grid-row">
+        <IncidentsPanel
+          incidents={incidents.data?.items || []}
+          projectId={id}
+          role={projectRole}
+          onChanged={incidents.reload}
+          userName={userName}
+        />
+      </div>
+
+      <div className="pd-grid-row">
+        <EntityCommentsPanel endpoint={`/projects/${id}/comments`} userName={userName} />
       </div>
 
       <div className="pd-grid-row">
@@ -378,6 +404,7 @@ export default function ProjectDetailPage() {
       )}
 
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
+      </>)}
 
       {commentsFor && (
         <TaskCommentsModal projectId={id} task={commentsFor} userName={userName} onClose={() => setCommentsFor(null)} onTaskUpdated={() => tasks.reload()} />

@@ -42,6 +42,7 @@ test('lier une tâche à une branche depuis la fiche projet, affichée sur le ba
   await page.waitForURL(/\/$/, { timeout: 10000 });
 
   await page.goto(`/deployments/projects/${project.id}`);
+  await page.locator('.pd-tabs .ui-tab', { hasText: 'Travail' }).click();
   await page.locator('.pd-task-row', { hasText: 'Corriger le bug de login' }).locator('.pd-task-remove').first().click();
   await page.locator('input[placeholder="branche (ex. feature/ma-tache)"]').fill('fix/login-bug');
   await page.getByRole('button', { name: 'Enregistrer le lien' }).click();

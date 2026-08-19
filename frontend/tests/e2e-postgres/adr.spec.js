@@ -52,6 +52,7 @@ test('deux ADR consécutives sont numérotées ADR-001 puis ADR-002, et le statu
   await page.waitForURL(/\/$/, { timeout: 10000 });
 
   await page.goto(`/deployments/projects/${project.id}`);
+  await page.locator('.pd-tabs .ui-tab', { hasText: 'Documentation' }).click();
   await expect(page.getByText('ADR-001', { exact: true })).toBeVisible();
   await expect(page.getByText('ADR-002', { exact: true })).toBeVisible();
   await expect(page.getByText('Acceptée', { exact: true })).toBeVisible();

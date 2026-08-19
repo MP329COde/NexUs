@@ -42,6 +42,7 @@ test('commenter un incident depuis la fiche projet, journalisé dans l\'activit�
   await page.waitForURL(/\/$/, { timeout: 10000 });
 
   await page.goto(`/deployments/projects/${project.id}`);
+  await page.locator('.pd-tabs .ui-tab', { hasText: 'Paramètres' }).click();
   await page.locator('.pd-row', { hasText: 'API en erreur 500' }).getByText('Commentaires', { exact: true }).click();
   await expect(page.locator('.modal-title', { hasText: 'API en erreur 500' })).toBeVisible();
 

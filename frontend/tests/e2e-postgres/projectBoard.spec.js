@@ -100,6 +100,7 @@ test.describe('Project Board + commentaires/mentions', () => {
     await page.waitForURL(/\/$/, { timeout: 10000 });
 
     await page.goto(`/deployments/projects/${projectId}`);
+    await page.locator('.pd-tabs .ui-tab', { hasText: 'Travail' }).click();
     await page.getByText('Tableau', { exact: true }).click();
 
     await expect(page.locator('.board-column-head', { hasText: 'Backlog' })).toBeVisible();

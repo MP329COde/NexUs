@@ -205,6 +205,7 @@ test.describe('RBAC relationnel et failles d\'autorisation corrigées', () => {
     await page.waitForURL(/\/$/, { timeout: 10000 });
 
     await page.goto(`/deployments/projects/${projectId}`);
+    await page.locator('.pd-tabs .ui-tab', { hasText: 'Documentation' }).click();
     const docPanel = page.locator('.card', { has: page.getByText('Documentation', { exact: true }) }).first();
     await docPanel.scrollIntoViewIfNeeded();
     await expect(docPanel.getByText('Runbook RBAC Project')).toBeVisible();
