@@ -10,9 +10,11 @@ const STEP_LABEL = {
   generate: 'Génération des fichiers',
   create_repo: 'Création du dépôt',
   push_files: 'Envoi des fichiers',
-  register_catalog: 'Enregistrement dans le catalogue'
+  register_catalog: 'Enregistrement dans le catalogue',
+  generate_docs: 'Documentation (Docusaurus)',
+  create_environment: 'Environnement de preview'
 };
-const STEP_ORDER = ['validate', 'generate', 'create_repo', 'push_files', 'register_catalog'];
+const STEP_ORDER = ['validate', 'generate', 'create_repo', 'push_files', 'register_catalog', 'generate_docs', 'create_environment'];
 
 function stepIcon(status) {
   if (status === 'done') return { name: 'check', color: 'var(--ok, #10b981)' };
@@ -33,6 +35,8 @@ export default function ScaffolderModal({ template, onClose }) {
   const [description, setDescription] = useState('');
   const [repositoryProvider, setRepositoryProvider] = useState('none');
   const [ownerTeamId, setOwnerTeamId] = useState('');
+  const [withDocs, setWithDocs] = useState(false);
+  const [withEnvironment, setWithEnvironment] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [job, setJob] = useState(null);
@@ -64,7 +68,7 @@ export default function ScaffolderModal({ template, onClose }) {
     setError('');
     try {
       const res = await api.post('/catalog/scaffold', {
-        legacyProjectId, templateId: template.id, name, description, ownerTeamId: ownerTeamId || null, repositoryProvider
+        legacyProjectId, templateId: template.id, name, description, ownerTeamId: ownerTeamId || null, repositoryProvider, withDocs, withEnvironment
       });
       setJob(res.job);
       pollJob(res.job.id);
@@ -125,6 +129,17 @@ export default function ScaffolderModal({ template, onClose }) {
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
               <input type="radio" name="provider" checked={repositoryProvider === 'github'} onChange={() => setRepositoryProvider('github')} />
               GitHub
+            </label>
+          </div>
+          <label className="projects-form-label">Aussi générer</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <input type="checkbox" checked={withDocs} onChange={(e) => setWithDocs(e.target.checked)} />
+              Documentation (page Docusaurus générée localement à partir du catalogue/ADR du projet)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <input type="checkbox" checked={withEnvironment} onChange={(e) => setWithEnvironment(e.target.checked)} />
+              Environnement de preview (déclaratif — sélectionnez un blueprint depuis la fiche projet pour un provisioning Kubernetes réel)
             </label>
           </div>
           {error && <p style={{ color: 'var(--danger, #ef4444)', marginBottom: 8, fontSize: 13 }}>{error}</p>}

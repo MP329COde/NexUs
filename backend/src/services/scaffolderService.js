@@ -20,7 +20,7 @@ const PROVIDERS = ['none', 'github'];
 // case à cocher qui échouerait silencieusement, l'API les refuse
 // explicitement (voir validation ci-dessous) — cohérent avec la consigne de
 // ne jamais simuler une réussite pour une intégration non branchée.
-export async function scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log, isCancelled }) {
+export async function scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, withDocs, withEnvironment, userId, log, isCancelled }) {
   // Attend chaque écriture de log avant de continuer : sans ce await, les
   // appels à jobService.appendJobStep() (une requête UPDATE chacun) partent
   // en parallèle et se terminent dans un ordre non déterministe côté base —
@@ -90,7 +90,45 @@ export async function scaffoldService({ templateId, name, description, projectId
   });
   await emit('register_catalog', 'done', { componentId: component.id });
 
-  return { component, repository, files: Object.keys(files) };
+  // Documentation (chantier "provisioning en un workflow", todo.md) : pas de
+  // repository Docusaurus/Storybook externe à ce stade (aucune plateforme
+  // GitHub dédiée branchée, voir Étape 19/20 du todo.md), donc génération
+  // locale à partir des données réelles déjà enregistrées ci-dessus — jamais
+  // de contenu inventé, même fonction que le bouton manuel "Générer" de
+  // DocSitesPanel.jsx (routes/projects.routes.js: POST .../doc-sites/:kind/generate-local).
+  let docSite = null;
+  if (withDocs) {
+    await emit('generate_docs', 'running');
+    try {
+      docSite = await orgStore.generateLocalDocSite(projectId, 'docusaurus', userId);
+      await emit('generate_docs', 'done', { kind: 'docusaurus' });
+    } catch (err) {
+      await emit('generate_docs', 'failed', { error: err.message });
+    }
+  } else {
+    await emit('generate_docs', 'skipped');
+  }
+
+  // Environnement de preview (même chantier) : créé sans blueprint —
+  // reste purement déclaratif (pas de provisioning Kubernetes réel), comme
+  // n'importe quel environnement créé sans blueprint depuis la fiche projet
+  // (routes/projects.routes.js POST .../environments). Choisir un blueprint
+  // précis pour un provisioning réel resterait un geste explicite depuis la
+  // fiche projet, pas une valeur devinée ici.
+  let environment = null;
+  if (withEnvironment) {
+    await emit('create_environment', 'running');
+    try {
+      environment = await orgStore.createEnvironment(projectId, { name: 'preview', kind: 'preview', isProduction: false });
+      await emit('create_environment', 'done', { environmentId: environment.id });
+    } catch (err) {
+      await emit('create_environment', 'failed', { error: err.message });
+    }
+  } else {
+    await emit('create_environment', 'skipped');
+  }
+
+  return { component, repository, files: Object.keys(files), docSite, environment };
 }
 
 export { ScaffolderError };

@@ -375,7 +375,7 @@ router.get('/templates', asyncHandler(async (req, res) => {
 // le job est rattaché au projet relationnel cible comme n'importe quel
 // autre job de projet.
 router.post('/scaffold', asyncHandler(async (req, res) => {
-  const { templateId, legacyProjectId, projectId: rawProjectId, name, description, ownerTeamId, repositoryProvider } = req.body || {};
+  const { templateId, legacyProjectId, projectId: rawProjectId, name, description, ownerTeamId, repositoryProvider, withDocs, withEnvironment } = req.body || {};
   let projectId = rawProjectId;
   if (!projectId && legacyProjectId) {
     const pgProject = await orgStore.getProjectByLegacyId(legacyProjectId);
@@ -392,7 +392,7 @@ router.post('/scaffold', asyncHandler(async (req, res) => {
     { type: 'catalog.scaffold', projectId, userId: req.user.id, payload: { templateId, name, repositoryProvider: repositoryProvider || 'none' } },
     async (createdJob, { isCancelled }) => {
       const log = (step, status, detail) => jobService.appendJobStep(createdJob.id, step, status, detail);
-      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, log, isCancelled });
+      const result = await scaffoldService({ templateId, name, description, projectId, ownerTeamId, repositoryProvider, withDocs: Boolean(withDocs), withEnvironment: Boolean(withEnvironment), userId: req.user.id, log, isCancelled });
       logAudit(req, 'catalog.scaffold', { componentId: result.component.id, projectId, templateId, name });
       return result;
     }
