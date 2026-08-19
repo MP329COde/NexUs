@@ -1,0 +1,51 @@
+.ff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ff-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.ff-row-main {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ff-row-key {
+  font-weight: 600;
+}
+
+.ff-row-delete {
+  cursor: pointer;
+}
+
+.ff-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ff-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.ff-form-actions {
+  display: flex;
+  gap: 8px;
+}
