@@ -24,6 +24,7 @@ import HostsPage from './pages/Infrastructure/HostsPage.jsx';
 import MonitoringPage from './pages/Monitoring/MonitoringPage.jsx';
 import DeploymentsLayout from './pages/Deployments/DeploymentsLayout.jsx';
 import ToolsAccessPage from './pages/Deployments/ToolsAccessPage.jsx';
+import MyWorkPage from './pages/Deployments/MyWorkPage.jsx';
 import ProjectsPage from './pages/Deployments/ProjectsPage.jsx';
 import CatalogPage from './pages/Deployments/CatalogPage.jsx';
 import CatalogComponentPage from './pages/Deployments/CatalogComponentPage.jsx';
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
             handle: { title: 'Développement' },
             children: [
               { index: true, element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
+              { path: 'my-work', element: <MyWorkPage />, handle: { title: 'Mon travail' } },
               { path: 'catalog', element: <CatalogPage />, handle: { title: 'Catalogue logiciel' } },
               { path: 'catalog/:id', element: <CatalogComponentPage />, handle: { title: 'Composant' } },
               { path: 'templates', element: <TemplatesPage />, handle: { title: 'Templates' } },
