@@ -78,6 +78,20 @@ export const INTEGRATION_FORMS = {
       { key: 'token', label: 'Token d\'accès personnel (scope repo + workflow)', type: 'password', secret: true }
     ]
   },
+  githubPlatform: {
+    label: 'GitHub (compte plateforme)',
+    hint: "Compte ou organisation GitHub dédié au provisioning automatisé de dépôts par Nexus (chantiers #40/#49) — distinct de l'intégration GitHub ci-dessus, qui lit votre propre compte personnel. Ce compte/organisation est créé et géré par vous, en dehors de Nexus : Nexus se contente ici de recevoir ses identifiants une fois prêts.",
+    guide: [
+      "Créez (ou désignez) un compte ou une organisation GitHub dédié à la plateforme — jamais votre compte GitHub personnel.",
+      "Générez un token (fine-grained de préférence, scopé à cette organisation) avec au minimum : Contents (lecture/écriture, pour créer dépôts/branches/push), Pull requests (écriture), Webhooks (écriture), Actions (lecture, pour lire l'état des workflows), Pages (écriture, pour publier la documentation/Storybook).",
+      "Copiez-le immédiatement : GitHub ne l'affichera plus jamais ensuite.",
+      "Cette intégration ne fait, pour l'instant, que vérifier la connexion à l'organisation — aucun provisioning automatique de dépôt n'est encore branché dessus."
+    ],
+    fields: [
+      { key: 'organization', label: 'Organisation GitHub', placeholder: 'mon-organisation', hint: "Nom exact de l'organisation (ou du compte) tel qu'il apparaît dans l'URL github.com/<organisation>." },
+      { key: 'token', label: 'Token d\'accès (permissions minimales ci-dessus)', type: 'password', secret: true }
+    ]
+  },
   gitea: {
     label: 'Gitea',
     hint: 'Dépôts et pull requests (lecture + approbation). Auto-hébergé, alternative légère à GitLab/GitHub.',
@@ -237,4 +251,4 @@ export const INTEGRATION_FORMS = {
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
