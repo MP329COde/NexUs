@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../components/ui/Modal.jsx';
-import Icon from '../../components/ui/Icon.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
+import LoadingState from '../../components/ui/LoadingState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import './PodDetailDialog.css';
@@ -20,17 +21,7 @@ export default function PodDetailDialog({ pod, initialTab = 'describe', onClose 
 
   return (
     <Modal title={pod.name} sub={`${pod.namespace} · détail du pod`} onClose={onClose} width={640}>
-      <div className="pdd-tabs">
-        {TABS.map((t) => (
-          <div
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`pdd-tab${tab === t.id ? ' pdd-tab-active' : ''}`}
-          >
-            <Icon name={t.icon} size={13} />{t.label}
-          </div>
-        ))}
-      </div>
+      <Tabs tabs={TABS} active={tab} onChange={setTab} className="pdd-tabs" />
       {tab === 'describe' && <DescribeTab pod={pod} />}
       {tab === 'events' && <EventsTab pod={pod} />}
       {tab === 'metrics' && <MetricsTab pod={pod} />}
@@ -40,8 +31,8 @@ export default function PodDetailDialog({ pod, initialTab = 'describe', onClose 
 
 function DescribeTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/pods/${pod.namespace}/${pod.name}/describe`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
-  if (error) return <div className="pdd-error">{error}</div>;
+  if (loading) return <LoadingState className="pdd-loading" />;
+  if (error) return <div className="pdd-error">{error.message}</div>;
   const p = data?.pod;
   if (!p) return null;
   return (
@@ -87,8 +78,8 @@ function DescribeTab({ pod }) {
 
 function EventsTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/events?namespace=${pod.namespace}&involvedObject=${pod.name}`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
-  if (error) return <div className="pdd-error">{error}</div>;
+  if (loading) return <LoadingState className="pdd-loading" />;
+  if (error) return <div className="pdd-error">{error.message}</div>;
   const items = data?.items || [];
   if (items.length === 0) return <div className="faint pdd-empty-events">Aucun événement récent pour ce pod</div>;
   return (
@@ -108,12 +99,12 @@ function EventsTab({ pod }) {
 
 function MetricsTab({ pod }) {
   const { data, loading, error } = useApi(() => api.get(`/kubernetes/pods/${pod.namespace}/${pod.name}/metrics`), [pod.namespace, pod.name]);
-  if (loading) return <div className="faint pdd-loading">Chargement…</div>;
+  if (loading) return <LoadingState className="pdd-loading" />;
   if (error) {
     return (
       <div className="faint pdd-metrics-error">
         Métriques non disponibles — metrics-server n'est probablement pas installé sur ce cluster.
-        <div className="mono pdd-metrics-error-detail">{error}</div>
+        <div className="mono pdd-metrics-error-detail">{error.message}</div>
       </div>
     );
   }

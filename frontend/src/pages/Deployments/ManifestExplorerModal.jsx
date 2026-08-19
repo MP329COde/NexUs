@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
+import LoadingState from '../../components/ui/LoadingState.jsx';
 import YamlView from '../../components/ui/YamlView.jsx';
 import DiffView from '../../components/ui/DiffView.jsx';
 import { useApi } from '../../hooks/useApi.js';
@@ -61,7 +63,7 @@ export default function ManifestExplorerModal({ repo, onClose }) {
             )}
             <span className="mono faint mem-tree-path">/{path}</span>
           </div>
-          {tree.loading && <div className="faint mem-tree-loading">Chargement…</div>}
+          {tree.loading && <LoadingState className="mem-tree-loading" />}
           {tree.error && <div className="mem-tree-error">{tree.error}</div>}
           {dirs.map((d) => (
             <div key={d.path} onClick={() => openFile(d)} className="mem-tree-item">
@@ -84,15 +86,13 @@ export default function ManifestExplorerModal({ repo, onClose }) {
             <div className="faint mem-content-empty">Sélectionnez un fichier à gauche</div>
           ) : (
             <>
-              <div className="mem-tabs">
-                {TABS.map((t) => (
-                  <div key={t.id} onClick={() => setTab(t.id)} className={`mem-tab${tab === t.id ? ' mem-tab-active' : ''}`}>
-                    {t.label}
-                  </div>
-                ))}
-                <div className="mem-tabs-spacer" />
-                {changed && <span className="badge badge-warn mem-changed-badge">Modifié</span>}
-              </div>
+              <Tabs
+                tabs={TABS}
+                active={tab}
+                onChange={setTab}
+                className="mem-tabs"
+                right={changed && <span className="badge badge-warn mem-changed-badge">Modifié</span>}
+              />
 
               {tab === 'edit' && (
                 <textarea

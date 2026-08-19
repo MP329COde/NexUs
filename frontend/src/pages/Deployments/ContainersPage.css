@@ -1,26 +1,5 @@
 .cnp-tabs {
-  display: flex;
-  gap: 6px;
   margin-bottom: 16px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.cnp-tab {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-
-.cnp-tab-active {
-  font-weight: 600;
-  color: var(--primary);
-  border-bottom: 2px solid var(--primary);
 }
 
 .cnp-kpi-grid {

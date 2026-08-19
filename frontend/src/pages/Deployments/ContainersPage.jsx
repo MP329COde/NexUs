@@ -3,6 +3,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
 import DemoNote from '../../components/ui/DemoNote.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
@@ -10,6 +11,11 @@ import PodLogsDialog from '../Kubernetes/PodLogsDialog.jsx';
 import './ContainersPage.css';
 
 const PHASE_TONE = { Running: 'ok', Succeeded: 'ok', Pending: 'warn', Failed: 'crit', Unknown: 'mut' };
+
+const CNP_TABS = [
+  { id: 'k8s', label: 'Kubernetes', icon: 'k8s' },
+  { id: 'docker', label: 'Docker', icon: 'cube' }
+];
 
 // Deux sources réelles distinctes : Kubernetes (pods, via l'intégration déjà
 // configurée) et Docker (aucune intégration dans la console aujourd'hui —
@@ -26,17 +32,7 @@ export default function ContainersPage() {
     <>
       <PageHeader title="Conteneurs" sub="Conteneurs en exécution sur Kubernetes et sur les hôtes Docker déclarés." />
 
-      <div className="cnp-tabs">
-        {[{ id: 'k8s', label: 'Kubernetes', icon: 'k8s' }, { id: 'docker', label: 'Docker', icon: 'cube' }].map((t) => (
-          <div
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`cnp-tab${tab === t.id ? ' cnp-tab-active' : ''}`}
-          >
-            <Icon name={t.icon} size={13} />{t.label}
-          </div>
-        ))}
-      </div>
+      <Tabs tabs={CNP_TABS} active={tab} onChange={setTab} className="cnp-tabs" />
 
       {tab === 'k8s' ? (
         <>

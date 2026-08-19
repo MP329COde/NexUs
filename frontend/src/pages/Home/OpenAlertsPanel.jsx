@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Panel from '../../components/ui/Panel.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import LoadingState from '../../components/ui/LoadingState.jsx';
 import { api } from '../../lib/apiClient.js';
 import './OpenAlertsPanel.css';
 
@@ -39,7 +40,7 @@ export default function OpenAlertsPanel() {
   if (!alerts) {
     return (
       <Panel title="Alertes ouvertes" sub="Triées par sévérité" span={6}>
-        <div className="oap-loading">Chargement…</div>
+        <LoadingState className="oap-loading" />
       </Panel>
     );
   }

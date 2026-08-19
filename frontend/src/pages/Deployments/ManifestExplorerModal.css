@@ -78,30 +78,7 @@
 }
 
 .mem-tabs {
-  display: flex;
-  gap: 6px;
   margin-bottom: 8px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.mem-tab {
-  padding: 6px 4px;
-  margin-right: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-
-.mem-tab-active {
-  font-weight: 600;
-  color: var(--primary);
-  border-bottom: 2px solid var(--primary);
-}
-
-.mem-tabs-spacer {
-  flex: 1;
 }
 
 .mem-changed-badge {

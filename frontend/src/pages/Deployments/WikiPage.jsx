@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
+import LoadingState from '../../components/ui/LoadingState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
@@ -202,7 +203,7 @@ function WikiPageDetail({ id, onDeleted, onHistory, onSaved }) {
     }
   }
 
-  if (loading) return <div className="card faint wiki-detail-loading">Chargement…</div>;
+  if (loading) return <div className="card"><LoadingState className="wiki-detail-loading" /></div>;
   if (error) return <div className="card wiki-detail-error">{error}</div>;
   const page = data?.page;
   if (!page) return null;
@@ -259,7 +260,7 @@ function HistoryModal({ pageId, onClose }) {
   const items = data?.items || [];
   return (
     <Modal title="Historique des modifications" onClose={onClose} width={480}>
-      {loading && <div className="faint wiki-history-loading">Chargement…</div>}
+      {loading && <LoadingState className="wiki-history-loading" />}
       {items.length === 0 && !loading && <div className="faint wiki-history-empty">Aucune révision précédente — cette page n'a jamais été modifiée depuis sa création.</div>}
       <div className="wiki-history-list">
         {items.map((r) => (
