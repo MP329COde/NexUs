@@ -12,11 +12,19 @@ import ManifestExplorerModal from './ManifestExplorerModal.jsx';
 import RepoStructureModal from './RepoStructureModal.jsx';
 import './GitReposPage.css';
 
+// Repository Purpose (todo.md item 43) : chaque dépôt géré indique
+// clairement à quoi il sert — "framework"/"service" existaient déjà,
+// complété ici avec les catégories manquantes de la liste demandée
+// (Application, Storybook, Design System, Example).
 const ROLE_LABELS = {
-  framework: 'Framework de base', service: 'Service applicatif', library: 'Bibliothèque',
-  template: 'Template de démarrage', infra: 'Infrastructure as Code', docs: 'Documentation'
+  application: 'Application', framework: 'Framework de base', service: 'Service applicatif', library: 'Bibliothèque',
+  template: 'Template de démarrage', infra: 'Infrastructure as Code', docs: 'Documentation',
+  storybook: 'Storybook', 'design-system': 'Design System', example: 'Exemple'
 };
-const ROLE_ICON = { framework: 'layers', service: 'server', library: 'box', template: 'folder', infra: 'inf', docs: 'book' };
+const ROLE_ICON = {
+  application: 'box', framework: 'layers', service: 'server', library: 'box', template: 'folder', infra: 'inf', docs: 'book',
+  storybook: 'cube', 'design-system': 'layers', example: 'terminal'
+};
 const PROVIDER_ICON = { gitlab: 'gitlab', github: 'github' };
 const VISIBILITY_TONE = { public: 'ok', internal: 'info', private: 'mut' };
 const VISIBILITY_LABEL = { public: 'Public', internal: 'Interne', private: 'Privé' };
