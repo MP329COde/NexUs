@@ -8,6 +8,8 @@ import './MyWorkPage.css';
 
 const TASK_STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', testing: 'Tests', ready: 'Prêt', done: 'Terminé' };
 const SEVERITY_TONE = { critical: 'crit', high: 'crit', medium: 'warn', low: 'mut' };
+const PROVISIONING_TONE = { provisioned: 'ok', pending: 'warn', failed: 'crit', skipped: 'mut' };
+const PROVISIONING_LABELS = { provisioned: 'Provisionné', pending: 'En cours', failed: 'Échec', skipped: 'Non provisionné' };
 
 // Page centrale "Mon travail" : regroupe ce qui concerne directement
 // l'utilisateur connecté (tâches assignées, revues à effectuer, incidents
@@ -106,14 +108,22 @@ export default function MyWorkPage() {
             <div className="faint">Aucun environnement de preview sur vos projets.</div>
           ) : (
             <div className="mywork-list">
-              {myEnvironments.map((e) => (
-                <Link key={e.id} to={`/deployments/projects/${e.projectId}`} className="mywork-row">
-                  <span className="mywork-row-title">{e.name}</span>
-                  {e.source_branch && <span className="faint mono">{e.source_branch}</span>}
-                  <span className="faint">{e.projectName}</span>
-                  {e.expires_at && <span className="faint">expire le {new Date(e.expires_at).toLocaleDateString('fr-FR')}</span>}
-                </Link>
-              ))}
+              {myEnvironments.map((e) => {
+                const linkedTask = myTasks.find((t) => t.branch && e.source_branch && t.branch === e.source_branch);
+                return (
+                  <Link key={e.id} to={`/deployments/projects/${e.projectId}`} className="mywork-row">
+                    <span className={`badge badge-${PROVISIONING_TONE[e.provisioning_status] || 'mut'}`}>{PROVISIONING_LABELS[e.provisioning_status] || e.provisioning_status}</span>
+                    <span className="mywork-row-title">{e.name}</span>
+                    <span className="faint">{e.projectName}</span>
+                    {e.source_branch && <span className="faint mono">{e.source_branch}</span>}
+                    {e.source_commit && <span className="faint mono">{e.source_commit.slice(0, 7)}</span>}
+                    {e.provisioned_namespace && <span className="faint mono">{e.provisioned_namespace}</span>}
+                    {e.source_pr_url && <a href={e.source_pr_url} target="_blank" rel="noreferrer" className="badge badge-vio" onClick={(ev) => ev.stopPropagation()}>PR</a>}
+                    {linkedTask && <span className="badge badge-mut" title={linkedTask.title}>Tâche liée</span>}
+                    {e.expires_at && <span className="faint">expire le {new Date(e.expires_at).toLocaleDateString('fr-FR')}</span>}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </Panel>
