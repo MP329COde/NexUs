@@ -316,3 +316,130 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
   sessions précédentes (Lots 12, 28, 34-42 notamment) — le modèle de données confirme ce que l'audit
   applicatif du Lot 12 avait déjà constaté empiriquement sur `ProjectDetailPage.jsx`. Aucune migration
   ni changement de code nécessaire pour cette étape ; audit uniquement.
+
+- [x] **Commentaires génériques débloqués (Lot 49, todo.md ligne ~118)** : le
+  blocage documenté au Lot 35 (« ajouter des commentaires sur PR/projets/
+  documents/déploiements demanderait au minimum une nouvelle table
+  générique... un vrai chantier de modélisation ») est levé, sans le
+  contourner : `backend/src/db/migrations/0041_entity_comments.sql` ajoute
+  une table polymorphe unique `entity_comments (entity_type, entity_id,
+  author_id, body, created_at)` plutôt que 4 tables séparées, réutilisable
+  pour n'importe quelle ressource future sans nouvelle migration.
+  `backend/src/store/entityCommentsStore.js` (addComment/listComments,
+  même forme que `incidentStore.js`). `extractMentionedUserIds` (jusqu'ici
+  définie en local dans `projects.routes.js` pour les commentaires de
+  tâche) extraite dans `backend/src/services/mentionService.js` pour être
+  réutilisée sans duplication. Branché sur **deux ressources** (sur les
+  quatre citées au Lot 35), choisies comme les plus simples à intégrer sans
+  casser l'existant, conformément à la consigne :
+  - **Projets** : `GET`/`POST /projects/:id/comments` (`backend/src/routes/
+    projects.routes.js`, réservé aux projets migrés vers le socle
+    relationnel — `req.pgProject`, comme les commentaires d'incident déjà
+    en place sur la même page), notifie les mentions (`project.mention`).
+  - **Documents wiki** : `GET`/`POST /wiki/:id/comments` (`backend/src/
+    routes/wiki.routes.js`, ouvert à tout membre de l'organisation, même
+    politique que la lecture/édition de la page), notifie les mentions
+    (`wiki.mention`).
+  PR et déploiements restent non traités (aucune ressource "PR" ni
+  "déploiement" n'a de fiche dédiée avec un id stable côté NexUs — les PR
+  sont des objets de forge externe lus en direct via API GitLab/GitHub/
+  Gitea, pas des lignes en base ; les déploiements sont des exécutions de
+  pipeline, pas une entité qu'on commenterait dans la durée) — la table
+  `entity_comments` les supporterait sans nouvelle migration si un id
+  stable apparaît un jour pour l'un des deux.
+  Frontend : `frontend/src/pages/Deployments/EntityCommentsPanel.jsx`
+  (nouveau), calque de `TaskCommentsModal.jsx` mais en panneau (`Panel`)
+  plutôt qu'en modale, avec un prop `endpoint` générique — monté sur
+  `ProjectDetailPage.jsx` (nouveau panneau « Commentaires » sous
+  l'Activité d'équipe) et sur `WikiPage.jsx` (`WikiPageDetail`, sous le
+  contenu de la page ; pas de liste de membres disponible côté wiki pour
+  résoudre un id en nom affiché comme le fait `OrganizationDetailPage.jsx`
+  — résolution limitée à « Vous » vs l'id brut, honnête plutôt qu'un nom
+  inventé).
+  **Vérifié réellement de bout en bout via Playwright** (Postgres
+  `nexus-dev-postgres`, backend/frontend relancés sur les ports standards
+  4000/5173) : commentaire posté sur le projet réel « Catalog Test Proj »
+  mentionnant `@alice`, commentaire posté sur une page wiki réelle créée
+  pour le test (« Page Test Comments Lot 49 », organisation par défaut)
+  mentionnant `@alice` — dans les deux cas, aucune erreur console, le
+  commentaire apparaît immédiatement dans le panneau, et une vraie ligne
+  `user_notifications` a été vérifiée en base après coup (`project.mention`
+  et `wiki.mention`, message correct, destinataire Alice). Note : la
+  première tentative a été faite sur `api-gateway`, qui s'est révélé ne pas
+  être migré vers le socle relationnel (`req.pgProject` null → 409 honnête
+  à la création, pas une 500) — bascule sur `Catalog Test Proj` (relationnel
+  confirmé, déjà utilisé à ce titre lors de lots précédents) pour la
+  vérification réelle.
+  `backend/src/db/migrations/0041_entity_comments.sql`,
+  `backend/src/services/mentionService.js`,
+  `backend/src/store/entityCommentsStore.js`,
+  `backend/src/routes/projects.routes.js`, `backend/src/routes/wiki.routes.js`,
+  `frontend/src/pages/Deployments/EntityCommentsPanel.jsx`,
+  `frontend/src/pages/Deployments/ProjectDetailPage.jsx`,
+  `frontend/src/pages/Deployments/WikiPage.jsx`.
+
+- [x] **Passage qualité global (Lot 49)** :
+  - **Tests backend** (`cd backend && npm test`, base directement sur
+    `node --test`, `DATABASE_URL=` vide donc store JSON en mémoire) :
+    **123/126 passent, 0 échec, 3 ignorés** — inchangé avant/après ce lot
+    (relancé deux fois, une fois avant tout changement et une fois après,
+    même résultat).
+  - **Tests E2E Postgres** (`frontend/tests/e2e-postgres/`, 26 fichiers,
+    64 tests, base jetable dédiée `nexus_e2e` sur `nexus-dev-postgres`
+    recréée avant chaque run) :
+    - Premier run (avant correctif) : **1 régression réelle trouvée**,
+      causée par ce lot lui-même — `incidentComments.spec.js` cherchait un
+      bouton « Envoyer » non scopé à la modale d'incident, devenu ambigu
+      dès l'ajout du bouton « Envoyer » du nouveau panneau
+      `EntityCommentsPanel.jsx` sur la même page (fiche projet). Corrigée
+      en scopant le sélecteur à `.modal-card` (voir commit Lot 49).
+    - Après correctif, plusieurs runs (avec et sans `--workers=1`, bases
+      fraîches à chaque fois) montrent **3 échecs supplémentaires,
+      reproductibles mais non liés à ce lot** : `myWork.spec.js` (3
+      éléments `.mywork-row "Tâche assignée à moi"` trouvés au lieu d'1),
+      `rbac.spec.js` (création d'Alice en échec, e-mail déjà utilisé) et
+      `toolsRegistry.spec.js` (« SonarQube Lab » en double). Les trois
+      fichiers concernés utilisent un compte admin/organisation **partagé
+      entre fichiers de test** par convention (`admin@rbac-pg.test`, setup
+      idempotent — voir commentaire dans `rbac.spec.js`), et les données
+      dupliquées correspondent exactement à des exécutions multiples du
+      même `beforeAll`. **Cause identifiée avec un niveau de confiance
+      raisonnable, pas certaine** : plusieurs autres agents tournaient en
+      parallèle sur ce même dépôt pendant cette session (processus
+      `npx playwright test tests/e2e/smokeNavigation.spec.js` observé actif
+      pendant l'investigation, fichiers non commités d'un autre agent —
+      `App.jsx`, `DeploymentsLayout.jsx`, `CodeLayout.jsx` — constatés dans
+      l'arbre de travail partagé), et `playwright.postgres.config.js` fixe
+      des ports non paramétrables (backend `4056`, frontend `5198`) sans
+      isolation entre invocations concurrentes — le même scénario de
+      contamination inter-agents que celui déjà documenté au Lot 45 pour le
+      navigateur Playwright partagé, mais ici pour les ports du serveur de
+      test. Aucun des trois fichiers en échec ne touche `entity_comments`,
+      `projects.routes.js` (hors la zone déjà testée par
+      `incidentComments.spec.js`, verte) ni `wiki.routes.js` — cohérent
+      avec une contamination externe plutôt qu'une régression de ce lot.
+      **Non corrigé dans ce lot** : corriger l'isolation des ports/comptes
+      de test serait un chantier à part (paramétrer les ports par variable
+      d'environnement, ou un compte par fichier plutôt que partagé) et
+      risquerait de masquer une vraie régression si la cause réelle était
+      différente — signalé pour une session où aucun autre agent ne tourne
+      en parallèle sur ce dépôt (comme le Lot 47 l'a fait avec succès après
+      le blocage du Lot 45).
+    - **61/64 verts sur le dernier run** (52 passants + les 12 déjà
+      comptés dans les groupes qui ne re-déclenchent pas d'échec — le
+      détail exact : 3 échecs déterministes ci-dessus, 61 passent).
+  - **Lint** : aucun script `lint` défini dans `backend/package.json` ni
+    `frontend/package.json`, et `npx eslint` échoue faute de
+    `eslint.config.js` (projet en ESLint 10 sans config migrée) — non
+    exécutable tel quel, non corrigé (créer une config ESLint serait un
+    nouveau chantier d'outillage, hors périmètre de ce lot qui vise à
+    *exécuter* un lint existant, pas en installer un).
+  - **Démarrage backend propre** : `node src/index.js` relancé sur une base
+    `nexus_e2e` fraîchement créée (0 table) applique les **41 migrations**
+    dans l'ordre sans aucune erreur (vérifié dans les logs du run E2E),
+    et sur la base de dev existante (`nexus`, déjà à jour) démarre sans
+    erreur ni avertissement suspect au-delà de l'avertissement habituel et
+    déjà connu sur `NEXUS_MASTER_KEY` (documenté comme acceptable en dev
+    depuis le début du projet).
+  Fichiers touchés pour la correction de régression :
+  `frontend/tests/e2e-postgres/incidentComments.spec.js`.
