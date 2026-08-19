@@ -10,7 +10,10 @@ const COLLAPSE_KEY = 'nexus-dev-nav-collapsed';
 const GROUPS = [
   {
     label: 'Aperçu',
-    items: [{ to: '/deployments', label: 'Accès aux outils', icon: 'globe', end: true }]
+    items: [
+      { to: '/deployments/my-work', label: 'Mon travail', icon: 'users' },
+      { to: '/deployments', label: 'Accès aux outils', icon: 'globe', end: true }
+    ]
   },
   {
     label: 'Gestion',

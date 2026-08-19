@@ -115,6 +115,21 @@ function roleAtLeastForDecide(role) {
   return role === 'maintainer' || role === 'owner';
 }
 
+// "Mon travail" (page frontend éponyme) : mes tâches, tous projets
+// confondus, avec le nom du projet pour affichage/navigation directe.
+// Filtre par appartenance projet (comme /mine/overview) pour ne jamais
+// exposer une tâche d'un projet dont l'utilisateur a été retiré depuis.
+router.get('/mine/tasks', asyncHandler(async (req, res) => {
+  const myProjects = await listMyProjects(req.user);
+  const myProjectIds = new Set(myProjects.map((p) => p.id));
+  const tasks = store.listTasksAssignedTo(req.user.id).filter((t) => myProjectIds.has(t.projectId));
+  const projectName = (id) => myProjects.find((p) => p.id === id)?.name || id;
+  res.json({
+    ok: true,
+    items: tasks.map((t) => ({ ...t, projectName: projectName(t.projectId) }))
+  });
+}));
+
 const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$|^$/u;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 

@@ -105,6 +105,15 @@ export function findTask(id) {
   return (readStore('tasks') || []).find((t) => t.id === id);
 }
 
+// Toutes les tâches assignées à un utilisateur, tous projets confondus —
+// pour la page "Mon travail" (routes/projects.routes.js GET /mine/tasks).
+// L'appelant doit encore filtrer aux seuls projets accessibles à
+// l'utilisateur (listMyProjects) avant d'exposer le résultat : cette
+// fonction ne fait aucune vérification d'accès elle-même.
+export function listTasksAssignedTo(userId) {
+  return (readStore('tasks') || []).filter((t) => t.assigneeId === userId);
+}
+
 export function createTask({ projectId, title, priority, assigneeId }) {
   const tasks = readStore('tasks') || [];
   const task = {
