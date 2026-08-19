@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { createBackup, listBackups, getBackupPath, deleteBackup, importBackup, restoreBackup } from '../services/backupService.js';
 import { pushBackup, pullAndList, importFromRepo } from '../services/gitBackupService.js';
+import { startRecoveryTest, listRecoveryTests, getRecoveryTest, stopRecoveryTest } from '../services/recoveryTestService.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
@@ -83,5 +84,32 @@ router.delete('/:file', (req, res) => {
   logAudit(req, 'backup.delete', { file: req.params.file });
   res.json({ ok: true });
 });
+
+// Recovery Test : restauration à blanc dans un process isolé (voir
+// recoveryTestService.js), jamais une modification de la base active — pas
+// de ré-authentification par mot de passe requise ici, contrairement à
+// POST /:file/restore, puisqu'aucune action destructrice n'est possible.
+router.get('/recovery-tests', (req, res) => {
+  res.json({ ok: true, items: listRecoveryTests() });
+});
+
+router.post('/:file/recovery-test', asyncHandler(async (req, res) => {
+  const test = await startRecoveryTest(req.params.file);
+  logAudit(req, 'backup.recovery_test.start', { file: req.params.file, testId: test.id });
+  res.status(201).json({ ok: true, test });
+}));
+
+router.get('/recovery-tests/:id', (req, res) => {
+  const test = getRecoveryTest(req.params.id);
+  if (!test) return res.status(404).json({ ok: false, error: 'Test introuvable (déjà détruit ?)' });
+  res.json({ ok: true, test });
+});
+
+router.delete('/recovery-tests/:id', asyncHandler(async (req, res) => {
+  const destroyed = await stopRecoveryTest(req.params.id);
+  if (!destroyed) return res.status(404).json({ ok: false, error: 'Test introuvable (déjà détruit ?)' });
+  logAudit(req, 'backup.recovery_test.stop', { testId: req.params.id });
+  res.json({ ok: true });
+}));
 
 export default router;

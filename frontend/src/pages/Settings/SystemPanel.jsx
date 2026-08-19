@@ -6,6 +6,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import RestoreBackupDialog from './RestoreBackupDialog.jsx';
+import RecoveryTestPanel from './RecoveryTestPanel.jsx';
 import './SystemPanel.css';
 
 function formatSize(bytes) {
@@ -32,6 +33,7 @@ export default function SystemPanel() {
   const [importing, setImporting] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitRemoteItems, setGitRemoteItems] = useState(null);
+  const [testingFile, setTestingFile] = useState(null);
   const fileInputRef = useRef(null);
   const notify = useNotify();
 
@@ -61,6 +63,22 @@ export default function SystemPanel() {
     if (!confirm(`Supprimer la sauvegarde ${file} ?`)) return;
     await api.del(`/backups/${file}`);
     backups.reload();
+  }
+
+  async function testRestore(file) {
+    setTestingFile(file);
+    try {
+      const { test } = await api.post(`/backups/${file}/recovery-test`, {});
+      if (test.status === 'running') {
+        notify(`Restauration validée sur un process isolé (port ${test.port})`, { type: 'ok' });
+      } else {
+        notify(test.error || 'Le test de restauration a échoué', { type: 'crit' });
+      }
+    } catch (err) {
+      notify(err.message, { type: 'crit', title: 'Recovery test échoué' });
+    } finally {
+      setTestingFile(null);
+    }
   }
 
   async function onFileSelected(e) {
@@ -181,6 +199,9 @@ export default function SystemPanel() {
               <td>
                 <div className="system-row-actions">
                   <a className="btn-outline system-download-btn" href={`/api/backups/${b.file}/download`} target="_blank" rel="noreferrer">Télécharger</a>
+                  <span className="btn-outline system-action-btn" onClick={() => testRestore(b.file)}>
+                    {testingFile === b.file ? 'Test…' : 'Tester la restauration'}
+                  </span>
                   <span className="btn-outline system-action-btn" onClick={() => setRestoreTarget(b.file)}>Restaurer</span>
                   <span className="btn-outline system-action-btn system-action-btn-danger" onClick={() => removeBackup(b.file)}>Suppr.</span>
                 </div>
@@ -189,6 +210,8 @@ export default function SystemPanel() {
           )}
         />
       </Panel>
+
+      <RecoveryTestPanel />
 
       <Panel
         title="Sauvegarde Git"
