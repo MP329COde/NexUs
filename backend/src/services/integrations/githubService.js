@@ -69,6 +69,8 @@ export async function listWorkflowRuns(owner, repo) {
     conclusion: r.conclusion,
     branch: r.head_branch,
     sha: r.head_sha?.slice(0, 8),
+    author: r.actor?.login || r.triggering_actor?.login || null,
+    pullRequestNumber: r.pull_requests?.[0]?.number || null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     webUrl: r.html_url

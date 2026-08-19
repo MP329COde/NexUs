@@ -17,6 +17,28 @@ const STATUS_TONE = { success: 'ok', failed: 'crit', running: 'info', cancelled:
 const STATUS_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cours', cancelled: 'Annulé', other: '—' };
 const PROVIDER_ICON = { gitlab: 'gitlab', github: 'github' };
 
+// Étiquette une étape/job par son nom réel (jamais une donnée inventée : si
+// aucun mot-clé connu ne correspond, le nom brut du job reste affiché tel
+// quel). Aligné sur les jobs générés par services/ciWorkflowService.js
+// (Semgrep/Trivy/GitGuardian/Docker/SBOM) pour rendre la timeline du plan
+// lisible quand ces jobs existent réellement dans le workflow du dépôt.
+const STAGE_KEYWORDS = [
+  { match: /semgrep|sast/i, label: 'SAST' },
+  { match: /gitguardian|secret/i, label: 'Secret Scan' },
+  { match: /trivy/i, label: 'Trivy' },
+  { match: /sbom/i, label: 'SBOM' },
+  { match: /sca|dependenc/i, label: 'SCA' },
+  { match: /docker|image/i, label: 'Docker' },
+  { match: /lint/i, label: 'Lint' },
+  { match: /test/i, label: 'Tests' },
+  { match: /build/i, label: 'Build' },
+  { match: /deploy|staging|production|preview/i, label: 'Déploiement' }
+];
+function stageLabelFor(name) {
+  const hit = STAGE_KEYWORDS.find((k) => k.match.test(name || ''));
+  return hit ? hit.label : null;
+}
+
 function formatDuration(seconds) {
   if (seconds === null || seconds === undefined) return '—';
   const m = Math.floor(seconds / 60);
@@ -130,7 +152,7 @@ export default function PipelinesPage() {
             <table className="pipelines-table">
               <thead>
                 <tr>
-                  {['Dépôt', 'Branche', 'Fournisseur', 'État', 'Durée', 'Déclenché', ''].map((c) => (
+                  {['Dépôt', 'Branche', 'Commit', 'Auteur', 'Fournisseur', 'État', 'Durée', 'Déclenché', ''].map((c) => (
                     <th key={c} className="pipelines-table-head">{c}</th>
                   ))}
                 </tr>
@@ -140,6 +162,8 @@ export default function PipelinesPage() {
                   <tr key={r.id} className="pipelines-table-row">
                     <td className="pipelines-table-cell pipelines-cell-repo">{r.repo}</td>
                     <td className="pipelines-table-cell mono muted">{r.branch || '—'}</td>
+                    <td className="pipelines-table-cell mono muted">{r.sha || '—'}{r.pullRequestNumber ? <span className="faint"> · #{r.pullRequestNumber}</span> : ''}</td>
+                    <td className="pipelines-table-cell muted">{r.author || 'non disponible'}</td>
                     <td className="pipelines-table-cell">
                       <span className="pipelines-provider">
                         <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={12} className="pipelines-provider-icon" />{r.provider}
@@ -158,7 +182,7 @@ export default function PipelinesPage() {
                     <td className="pipelines-table-cell pipelines-cell-date">{new Date(r.createdAt).toLocaleString('fr-FR')}</td>
                     <td className="pipelines-table-cell">
                       <div className="pipelines-row-actions">
-                        {r.provider === 'github' && (
+                        {r.jobsSupported && (
                           <span className="btn-outline pipelines-action-btn" onClick={() => setJobsFor(r)}>
                             <Icon name="layers" size={11} />Jobs
                           </span>
@@ -213,8 +237,9 @@ function JobsModal({ run, onClose }) {
                 <span className="dot" />{j.status === 'in_progress' ? 'En cours' : (j.conclusion || j.status)}
               </span>
               <a href={j.webUrl} target="_blank" rel="noreferrer" className="pipelines-job-name">{j.name}</a>
+              {stageLabelFor(j.name) && <span className="badge badge-vio">{stageLabelFor(j.name)}</span>}
             </div>
-            {j.steps.length > 0 && (
+            {(j.steps || []).length > 0 && (
               <div className="pipelines-job-steps">
                 {j.steps.map((s) => (
                   <div key={s.number} className="pipelines-job-step">

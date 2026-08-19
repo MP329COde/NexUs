@@ -12,8 +12,9 @@ export function normalizePipelineRun(provider, run, repoName, a, b) {
     const status = GITLAB_STATUS[run.status] || 'other';
     return {
       id: `gitlab:${projectId}:${run.id}`, provider: 'gitlab', repo: repoName, branch: run.ref,
+      sha: run.sha || null, author: run.author || null, pullRequestNumber: null,
       status, durationSeconds, createdAt: run.createdAt, webUrl: run.webUrl, trigger: 'push',
-      retryable: ['failed', 'cancelled'].includes(status)
+      retryable: ['failed', 'cancelled'].includes(status), jobsSupported: true
     };
   }
   if (provider === 'github') {
@@ -26,8 +27,9 @@ export function normalizePipelineRun(provider, run, repoName, a, b) {
       ? Math.max(0, Math.round((new Date(run.updatedAt) - new Date(run.createdAt)) / 1000)) : null;
     return {
       id: `github:${owner}/${repo}:${run.id}`, provider: 'github', repo: repoName, branch: run.branch,
+      sha: run.sha || null, author: run.author || null, pullRequestNumber: run.pullRequestNumber || null,
       status, durationSeconds, createdAt: run.createdAt, webUrl: run.webUrl, trigger: 'push',
-      retryable: status === 'failed'
+      retryable: status === 'failed', jobsSupported: true
     };
   }
   throw new Error(`Fournisseur de pipeline inconnu : ${provider}`);

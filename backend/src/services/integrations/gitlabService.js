@@ -35,7 +35,28 @@ export async function listPipelines(projectId) {
   const c = client();
   if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/pipelines`, params: { per_page: 20 } }, 'GitLab');
-  return data.map((p) => ({ id: p.id, ref: p.ref, status: p.status, sha: p.sha?.slice(0, 8), createdAt: p.created_at, updatedAt: p.updated_at, duration: p.duration ?? null, webUrl: p.web_url }));
+  return data.map((p) => ({ id: p.id, ref: p.ref, status: p.status, sha: p.sha?.slice(0, 8), author: p.user?.username || null, createdAt: p.created_at, updatedAt: p.updated_at, duration: p.duration ?? null, webUrl: p.web_url }));
+}
+
+// Détail par job d'un pipeline — équivalent GitLab de
+// githubService.listWorkflowRunJobs(). L'API GitLab n'expose pas de niveau
+// "step" séparé du job (contrairement à GitHub Actions) : un job GitLab EST
+// déjà l'unité la plus fine, ses logs bruts restent sur la page GitLab
+// native (webUrl), pas de viewer de logs dupliqué ici.
+export async function listPipelineJobs(projectId, pipelineId) {
+  const c = client();
+  if (!c) throw new IntegrationError('GitLab non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: `/projects/${projectId}/pipelines/${pipelineId}/jobs`, params: { per_page: 50 } }, 'GitLab');
+  return data.map((j) => ({
+    id: j.id,
+    name: j.name,
+    stage: j.stage,
+    status: j.status,
+    startedAt: j.started_at,
+    completedAt: j.finished_at,
+    webUrl: j.web_url,
+    steps: []
+  }));
 }
 
 export async function listBranches(projectId) {

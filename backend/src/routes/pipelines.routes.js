@@ -65,18 +65,26 @@ router.post('/runs/:id/retry', requireRole('admin'), asyncHandler(async (req, re
   res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
 }));
 
-// Détail jobs/étapes d'une exécution — GitHub Actions uniquement (GitLab
-// expose déjà ce niveau de détail directement dans son interface, moins
-// pertinent à dupliquer ici vu l'absence d'API équivalente simple).
+// Détail jobs/étapes d'une exécution — GitHub Actions (jobs + steps) et
+// GitLab CI (jobs, sans notion de step séparée : voir
+// gitlabService.listPipelineJobs). Gitea n'a pas d'intégration CI dans
+// giteaService.js (périmètre lecture + approbation PR uniquement).
 router.get('/runs/:id/jobs', asyncHandler(async (req, res) => {
   const key = decodeURIComponent(req.params.id);
   const [provider, ...rest] = key.split(':');
-  if (provider !== 'github') return res.status(400).json({ ok: false, error: 'Détail des jobs disponible pour GitHub Actions uniquement' });
-  const repoFull = rest.slice(0, -1).join(':');
-  const runId = rest[rest.length - 1];
-  const [owner, repo] = repoFull.split('/');
-  const jobs = await github.listWorkflowRunJobs(owner, repo, runId);
-  res.json({ ok: true, items: jobs });
+  if (provider === 'gitlab') {
+    const [projectId, pipelineId] = rest;
+    const jobs = await gitlab.listPipelineJobs(projectId, pipelineId);
+    return res.json({ ok: true, items: jobs });
+  }
+  if (provider === 'github') {
+    const repoFull = rest.slice(0, -1).join(':');
+    const runId = rest[rest.length - 1];
+    const [owner, repo] = repoFull.split('/');
+    const jobs = await github.listWorkflowRunJobs(owner, repo, runId);
+    return res.json({ ok: true, items: jobs });
+  }
+  res.status(400).json({ ok: false, error: 'Détail des jobs disponible pour GitLab CI et GitHub Actions uniquement' });
 }));
 
 export default router;
