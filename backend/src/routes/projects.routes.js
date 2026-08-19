@@ -5,6 +5,7 @@ import { loadProjectAccess, requireMinRole, resolveProjectRole } from '../middle
 import * as store from '../store/projectsStore.js';
 import { notifyUser } from '../services/userNotificationService.js';
 import { logProjectActivity, listProjectActivity } from '../services/projectActivityService.js';
+import * as presence from '../services/projectPresenceService.js';
 import { findUserByUsername, listUsers } from '../store/usersStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
@@ -1119,6 +1120,19 @@ router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintain
 router.get('/:id/activity', loadProjectAccess(), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
   res.json({ ok: true, items: await listProjectActivity(req.pgProject.id, Number(req.query.limit) || 50) });
+}));
+
+// Présence (todo.md item 3) : ping léger + lecture, réservés aux membres
+// du projet comme le reste de la fiche (loadProjectAccess()).
+router.post('/:id/presence', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true });
+  await presence.ping(req.pgProject.id, req.user.id);
+  res.json({ ok: true });
+}));
+
+router.get('/:id/presence', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await presence.listPresence(req.pgProject.id) });
 }));
 
 function slugify(name) {

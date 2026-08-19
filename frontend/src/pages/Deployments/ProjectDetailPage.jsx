@@ -16,6 +16,7 @@ import WorkspaceHealthPanel from './WorkspaceHealthPanel.jsx';
 import AdrPanel from './AdrPanel.jsx';
 import ProjectActivityPanel from './ProjectActivityPanel.jsx';
 import IncidentCommentsModal from './IncidentCommentsModal.jsx';
+import ProjectPresenceBar from './ProjectPresenceBar.jsx';
 import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
@@ -158,6 +159,8 @@ export default function ProjectDetailPage() {
           </div>
         )}
       />
+
+      <ProjectPresenceBar projectId={id} userName={userName} />
 
       <div className="pd-grid-row">
         <DescriptionTagsPanel
