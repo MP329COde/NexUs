@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
 import Modal from '../../components/ui/Modal.jsx';
@@ -106,7 +107,10 @@ export default function GitReposPage() {
               <tbody>
                 {filtered.map((r) => (
                   <tr key={r.key} className="repos-table-row">
-                    <td className="repos-table-cell repos-cell-name">{r.name}<div className="faint mono repos-cell-path">{r.path}</div></td>
+                    <td className="repos-table-cell repos-cell-name">
+                      <Link to={`/deployments/repos/${encodeURIComponent(r.key)}`}>{r.name}</Link>
+                      <div className="faint mono repos-cell-path">{r.path}</div>
+                    </td>
                     <td className="repos-table-cell">
                       <span className="repos-provider">
                         <Icon name={PROVIDER_ICON[r.provider] || 'gitBranch'} size={13} className="repos-provider-icon" />{r.provider}

@@ -35,6 +35,7 @@ import OrganizationDetailPage from './pages/Deployments/OrganizationDetailPage.j
 import WikiPage from './pages/Deployments/WikiPage.jsx';
 import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
 import GitReposPage from './pages/Deployments/GitReposPage.jsx';
+import RepoDetailPage from './pages/Deployments/RepoDetailPage.jsx';
 import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
 import PipelinesPage from './pages/Deployments/PipelinesPage.jsx';
 import EnvironmentsPage from './pages/Deployments/EnvironmentsPage.jsx';
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
               { path: 'organizations/:id/wiki', element: <WikiPage />, handle: { title: "Wiki d'équipe" } },
               { path: 'projects/:id', element: <ProjectDetailPage />, handle: { title: 'Projet' } },
               { path: 'repos', element: <GitReposPage />, handle: { title: 'Dépôts Git' } },
+              { path: 'repos/:key', element: <RepoDetailPage />, handle: { title: 'Dépôt' } },
               { path: 'reviews', element: <CodeReviewsPage />, handle: { title: 'Revue de code' } },
               { path: 'pipelines', element: <PipelinesPage />, handle: { title: 'Pipelines CI/CD' } },
               { path: 'environments', element: <EnvironmentsPage />, handle: { title: 'Environnements' } },
