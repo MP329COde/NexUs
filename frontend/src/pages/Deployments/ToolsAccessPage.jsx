@@ -46,18 +46,21 @@ export default function ToolsAccessPage() {
   const integrations = overview?.integrations || [];
   const shortcutItems = shortcuts.data?.items || [];
 
-  const cards = [
-    ...integrations.map((e) => ({
-      key: `int-${e.key}`, label: e.label, category: CATEGORY_BY_KEY[e.key] || 'Exécution',
-      configured: e.configured, ok: e.ok, url: e.baseUrl || null, kind: 'integration', icon: TOOL_ICON[e.key] || 'terminal'
-    })),
-    ...shortcutItems.map((s) => ({ key: `sc-${s.id}`, id: s.id, label: s.label, category: s.category, configured: true, ok: true, url: s.url, kind: 'shortcut', opens: s.opens, icon: 'terminal' }))
-  ];
+  // Trois catégories distinctes plutôt qu'une liste mélangée (todo.md item
+  // 22 : "Elle mélange actuellement intégrations connectées et raccourcis
+  // externes") — Intégré : statut/santé réels via /status/overview. Externe :
+  // raccourci manuel ajouté par un utilisateur, jamais de statut de santé
+  // (aucune vérification effectuée sur une URL arbitraire).
+  const integratedCards = integrations.map((e) => ({
+    key: `int-${e.key}`, label: e.label, category: CATEGORY_BY_KEY[e.key] || 'Exécution',
+    configured: e.configured, ok: e.ok, url: e.baseUrl || null, kind: 'integration', icon: TOOL_ICON[e.key] || 'terminal'
+  }));
+  const externalCards = shortcutItems.map((s) => ({ key: `sc-${s.id}`, id: s.id, label: s.label, category: s.category, configured: true, ok: true, url: s.url, kind: 'shortcut', opens: s.opens, icon: 'terminal' }));
+  const cards = [...integratedCards, ...externalCards];
 
-  const connectedCount = cards.filter((c) => c.configured && c.ok).length;
-  const openedToday = shortcutItems.filter((s) => s.lastOpenedAt && isToday(s.lastOpenedAt)).length
-    + integrations.filter(() => false).length; // les intégrations n'ont pas de suivi de clic (lien direct vers baseUrl)
-  const notConfigured = cards.filter((c) => !c.configured).length;
+  const connectedCount = integratedCards.filter((c) => c.configured && c.ok).length;
+  const openedToday = shortcutItems.filter((s) => s.lastOpenedAt && isToday(s.lastOpenedAt)).length;
+  const notConfigured = integratedCards.filter((c) => !c.configured).length;
 
   async function openCard(card) {
     if (card.kind === 'shortcut') api.post(`/shortcuts/${card.id}/open`, {}).catch(() => {});
@@ -98,7 +101,7 @@ export default function ToolsAccessPage() {
       />
 
       <div className="tools-kpi-grid">
-        <KpiCard label="Outils connectés" value={connectedCount} unit={`/ ${cards.length}`} tint="#3B82F6" />
+        <KpiCard label="Outils intégrés connectés" value={connectedCount} unit={`/ ${integratedCards.length}`} tint="#3B82F6" />
         <KpiCard label="Ouverts aujourd'hui" value={openedToday} tint="#8B5CF6" note="raccourcis suivis" />
         <KpiCard label="Raccourcis personnalisés" value={shortcutItems.length} tint="#F59E0B" />
         <KpiCard label="Non configurés" value={notConfigured} tint={notConfigured > 0 ? '#F43F5E' : '#10B981'} />
@@ -129,9 +132,10 @@ export default function ToolsAccessPage() {
         </Modal>
       )}
 
+      <h2 className="tools-section-title">Outils intégrés</h2>
       <div className="tools-category-grid">
         {CATEGORY_ORDER.map((cat) => {
-          const items = cards.filter((c) => c.category === cat);
+          const items = integratedCards.filter((c) => c.category === cat);
           return (
             <Panel
               key={cat}
@@ -174,6 +178,32 @@ export default function ToolsAccessPage() {
           );
         })}
       </div>
+
+      <h2 className="tools-section-title">Outils externes (raccourcis manuels)</h2>
+      <Panel sub="Liens ajoutés manuellement vers des outils non intégrés — aucun statut de santé vérifié" span={12}>
+        {externalCards.length === 0 ? (
+          <div className="tools-category-empty">Aucun raccourci externe ajouté.</div>
+        ) : (
+          <div className="tools-card-grid">
+            {externalCards.map((c) => (
+              <div key={c.key} onClick={() => openCard(c)} className="tools-card tools-card-clickable">
+                <span className="tools-card-icon" style={{ background: 'var(--tone-ok-soft, var(--primary-soft))', color: 'var(--tone-ok-fg)' }}>
+                  <Icon name={c.icon} size={15} />
+                </span>
+                <div className="tools-card-body">
+                  <div className="tools-card-label">{c.label}</div>
+                  <div className="mono tools-card-url">{c.url.replace(/^https?:\/\//, '')}</div>
+                  <span className="badge badge-mut" style={{ marginTop: 4 }}>{c.category}</span>
+                </div>
+                <Icon name="externalLink" size={13} className="tools-card-external-icon" />
+                <span onClick={(e) => { e.stopPropagation(); removeShortcut(c.id); }} title="Retirer" className="tools-card-remove">
+                  <Icon name="x" size={12} />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       <Panel title="État des intégrations de la chaîne" sub="Statut en direct" span={12}>
         <div className="tools-table-wrap">

@@ -158,3 +158,12 @@
 .tools-table-cell-message {
   color: var(--text-faint);
 }
+
+.tools-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 20px 0 10px;
+}
