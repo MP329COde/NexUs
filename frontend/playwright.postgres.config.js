@@ -36,7 +36,12 @@ export default defineConfig({
         FRONTEND_ORIGIN: 'http://localhost:5198',
         JWT_SECRET: 'e2e-pg-test-secret',
         ADMIN_EMAIL: '',
-        ADMIN_PASSWORD: ''
+        ADMIN_PASSWORD: '',
+        // Un seul backend jetable partagé par toute la suite (dizaines de
+        // fichiers *.spec.js, chacun avec son propre setup/login) — le
+        // plafond de production (30/min) déclenche des 429 qui ne reflètent
+        // aucune attaque, seulement le volume de la suite elle-même.
+        STRICT_RATE_LIMIT_MAX: '500'
       },
       url: 'http://localhost:4056/api/status/health',
       reuseExistingServer: false,

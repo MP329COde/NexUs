@@ -44,7 +44,7 @@ export default function CatalogComponentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const { data, error, loading } = useApi(() => api.get(`/catalog/components/${id}`), [id]);
+  const { data, error, loading, reload } = useApi(() => api.get(`/catalog/components/${id}`), [id]);
   const [deleting, setDeleting] = useState(false);
   const deps = useApi(() => api.get(`/catalog/components/${id}/dependencies`), [id]);
   const policyCheck = useApi(() => api.get(`/catalog/components/${id}/policy-check`), [id]);
@@ -64,6 +64,9 @@ export default function CatalogComponentPage() {
   const [addingRelease, setAddingRelease] = useState(false);
   const [releaseForm, setReleaseForm] = useState({ version: '', notes: '', commitSha: '', prUrl: '', pipelineUrl: '', deploymentUrl: '' });
   const [releaseBusy, setReleaseBusy] = useState(false);
+  const [addingLink, setAddingLink] = useState(false);
+  const [linkForm, setLinkForm] = useState({ label: '', url: '' });
+  const [linkBusy, setLinkBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -101,6 +104,33 @@ export default function CatalogComponentPage() {
       notify(err.message, { type: 'crit' });
     } finally {
       setBindingBusy(false);
+    }
+  }
+
+  async function addLink(e) {
+    e.preventDefault();
+    setLinkBusy(true);
+    try {
+      const links = [...(component.links || []), { label: linkForm.label, url: linkForm.url }];
+      await api.put(`/catalog/components/${id}`, { links });
+      notify('Lien ajouté', { type: 'ok' });
+      setLinkForm({ label: '', url: '' });
+      setAddingLink(false);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
+  async function removeLink(index) {
+    try {
+      const links = (component.links || []).filter((_, i) => i !== index);
+      await api.put(`/catalog/components/${id}`, { links });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
     }
   }
 
@@ -267,6 +297,43 @@ export default function CatalogComponentPage() {
               <a href={component.repository_url} target="_blank" rel="noreferrer">{component.repository_url}</a>
             ) : <span>—</span>}
           </div>
+        </div>
+
+        <div className="card catalog-detail-card">
+          <div className="catalog-deps-header">
+            <span className="faint">Liens (documentation API, dashboard, runbook…)</span>
+            {canManage && !addingLink && (
+              <span className="btn-outline catalog-deps-add-btn" onClick={() => setAddingLink(true)}>
+                <Icon name="plus" size={12} />Ajouter
+              </span>
+            )}
+          </div>
+
+          {addingLink && (
+            <form onSubmit={addLink} className="catalog-deps-form">
+              <input className="input" required placeholder="Libellé (ex. Documentation API)" value={linkForm.label} onChange={(e) => setLinkForm((f) => ({ ...f, label: e.target.value }))} />
+              <input className="input" required type="url" placeholder="https://…" value={linkForm.url} onChange={(e) => setLinkForm((f) => ({ ...f, url: e.target.value }))} />
+              <div className="projects-form-actions">
+                <span className="btn-outline" onClick={() => setAddingLink(false)}>Annuler</span>
+                <button className="btn" type="submit" disabled={linkBusy}>Ajouter</button>
+              </div>
+            </form>
+          )}
+
+          {(component.links || []).length === 0 ? (
+            <p className="faint catalog-deps-empty">Aucun lien déclaré.</p>
+          ) : (
+            (component.links || []).map((l, i) => (
+              <div key={`${l.label}-${i}`} className="catalog-deps-row">
+                <a href={l.url} target="_blank" rel="noreferrer" className="catalog-deps-link">{l.label}</a>
+                {canManage && (
+                  <span className="btn-outline catalog-deps-remove-btn" onClick={() => removeLink(i)}>
+                    <Icon name="trash" size={11} />
+                  </span>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         {component.scorecard && (
