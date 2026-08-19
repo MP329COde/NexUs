@@ -249,7 +249,7 @@ export default function KubernetesPage() {
               <tr key={`${p.namespace}/${p.name}`}>
                 <td className="k8s-cell-name">{p.name}</td>
                 <td className="mono muted">{p.namespace}</td>
-                <td><span className={`badge badge-${p.phase === 'Running' ? 'ok' : p.phase === 'Pending' ? 'warn' : 'crit'}`}><span className="dot" />{p.phase}</span></td>
+                <td><span className={`badge badge-${p.phase === 'Running' || p.phase === 'Succeeded' ? 'ok' : p.phase === 'Pending' ? 'warn' : 'crit'}`}><span className="dot" />{p.phase}</span></td>
                 <td className="mono">{p.restarts}</td>
                 <td className="mono faint">{p.node}</td>
                 <td>
