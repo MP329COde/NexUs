@@ -108,7 +108,7 @@ test.describe('Project Board + commentaires/mentions', () => {
     await expect(card).toBeVisible();
 
     await card.locator('.board-card-comments').click();
-    await expect(page.getByText(`Commentaires — Tâche du tableau`, { exact: false })).toBeVisible();
+    await expect(page.locator('.modal-title', { hasText: 'Tâche du tableau' })).toBeVisible();
     await expect(page.getByText(`@${aliceUsername}`, { exact: false })).toBeVisible();
   });
 });

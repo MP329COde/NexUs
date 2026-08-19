@@ -123,6 +123,13 @@ export function createTask({ projectId, title, priority, assigneeId }) {
     status: 'todo', // todo | in_progress | review | done
     priority: priority || 'normal', // low | normal | high
     assigneeId: assigneeId || null,
+    // Task → Code (todo.md items 25/48/50) : liens déclarés manuellement
+    // vers la branche/PR qui réalise cette tâche — aucune détection
+    // automatique (nécessiterait de parser les messages de commit d'une
+    // forge configurée), enregistrement honnête comme les liens
+    // Docusaurus/Storybook (Lot 6).
+    branch: '',
+    prUrl: '',
     createdAt: new Date().toISOString()
   };
   tasks.push(task);

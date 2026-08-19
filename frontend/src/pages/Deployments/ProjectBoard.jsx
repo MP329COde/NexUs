@@ -48,6 +48,7 @@ export default function ProjectBoard({ tasks, userName, onStatusChange, onOpenCo
                 onDragEnd={() => setDragId(null)}
               >
                 <div className="board-card-title">{t.title}</div>
+                {t.branch && <div className="faint mono" style={{ fontSize: 11, marginBottom: 6 }}>{t.branch}</div>}
                 <div className="board-card-foot">
                   {t.assigneeId ? <span className="badge badge-vio">{userName(t.assigneeId)}</span> : <span className="faint">Non assignée</span>}
                   <span className="board-card-comments" onClick={() => onOpenComments(t)} title="Commentaires">

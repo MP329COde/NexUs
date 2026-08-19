@@ -4,14 +4,20 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 
-// Commentaires sur une tâche, avec mentions @nom-utilisateur — le backend
-// (POST /projects/:id/tasks/:taskId/comments) notifie chaque utilisateur
-// mentionné et l'assigné de la tâche (voir routes/projects.routes.js).
-export default function TaskCommentsModal({ projectId, task, userName, onClose }) {
+// Commentaires + lien Task → Code (branche/PR) sur une tâche. Les
+// commentaires notifient les mentions @nom-utilisateur et l'assigné (voir
+// POST /projects/:id/tasks/:taskId/comments) ; le lien Task → Code est
+// enregistré manuellement (todo.md items 25/48/50 — aucune détection
+// automatique de branche sans forge configurée) via le même PUT que le
+// changement de statut.
+export default function TaskCommentsModal({ projectId, task, userName, onClose, onTaskUpdated }) {
   const comments = useApi(() => api.get(`/projects/${projectId}/tasks/${task.id}/comments`), [projectId, task.id]);
   const notify = useNotify();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [branch, setBranch] = useState(task.branch || '');
+  const [prUrl, setPrUrl] = useState(task.prUrl || '');
+  const [linkBusy, setLinkBusy] = useState(false);
   const items = comments.data?.items || [];
 
   async function submit(e) {
@@ -29,9 +35,34 @@ export default function TaskCommentsModal({ projectId, task, userName, onClose }
     }
   }
 
+  async function saveLink(e) {
+    e.preventDefault();
+    setLinkBusy(true);
+    try {
+      const updated = await api.put(`/projects/${projectId}/tasks/${task.id}`, { branch, prUrl });
+      notify('Lien code enregistré', { type: 'ok' });
+      onTaskUpdated?.(updated.task);
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
   return (
-    <Modal title={`Commentaires — ${task.title}`} onClose={onClose} width={480}>
+    <Modal title={`${task.title}`} onClose={onClose} width={480}>
       <div className="pd-list-loose">
+        <form onSubmit={saveLink} className="pd-list-loose" style={{ paddingBottom: 10, borderBottom: '1px solid var(--border-soft)' }}>
+          <div className="faint">Task → Code</div>
+          <input className="input mono" placeholder="branche (ex. feature/ma-tache)" value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <input className="input" placeholder="URL de la pull request" value={prUrl} onChange={(e) => setPrUrl(e.target.value)} />
+          <div className="pd-form-row">
+            <button className="btn" type="submit" disabled={linkBusy}>Enregistrer le lien</button>
+            {prUrl && <a href={prUrl} target="_blank" rel="noreferrer" className="btn-outline">Ouvrir la PR</a>}
+          </div>
+        </form>
+
+        <div className="faint">Commentaires</div>
         {items.length === 0 ? (
           <div className="pd-empty">Aucun commentaire.</div>
         ) : (
