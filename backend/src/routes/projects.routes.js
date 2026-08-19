@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { loadProjectAccess, requireMinRole, resolveProjectRole } from '../middleware/projectAccess.js';
 import * as store from '../store/projectsStore.js';
+import { notifyUser } from '../services/userNotificationService.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
 import * as orgStore from '../store/orgStore.js';
@@ -912,6 +913,16 @@ router.put('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('developer'
   const existing = store.findTask(req.params.taskId);
   if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   const task = store.updateTask(req.params.taskId, req.body || {});
+  // Notifie le nouvel assigné (jamais soi-même — pas de notification pour
+  // s'être assigné sa propre tâche, cf. bouton "S'assigner" côté frontend).
+  const newAssignee = req.body?.assigneeId;
+  if (newAssignee && newAssignee !== existing.assigneeId && newAssignee !== req.user.id) {
+    notifyUser(newAssignee, {
+      type: 'task.assigned', title: 'Tâche assignée',
+      message: `${req.user.name || req.user.email} vous a assigné « ${task.title} »`,
+      meta: { projectId: req.legacyProject.id, taskId: task.id }
+    }).catch(() => {});
+  }
   res.json({ ok: true, task });
 }));
 
