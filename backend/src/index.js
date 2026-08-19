@@ -71,7 +71,7 @@ app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/sta
 // le polling dashboard (hosts, kubernetes, proxmox...) dans un seul budget de
 // 30 req/min, épuisé avant même d'ouvrir Paramètres → Plateforme/Identité —
 // c'est précisément ce qui provoquait des 429 sur ces deux pages.
-const makeStrictLimiter = () => rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
+const makeStrictLimiter = () => rateLimit({ windowMs: 60_000, max: env.strictRateLimitMax, standardHeaders: true, legacyHeaders: false });
 app.use('/api/auth/login', makeStrictLimiter());
 app.use('/api/auth/webauthn', makeStrictLimiter());
 app.use('/api/auth/password', makeStrictLimiter());
