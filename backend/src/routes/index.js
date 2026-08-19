@@ -65,6 +65,7 @@ import shortcutsRoutes from './shortcuts.routes.js';
 import terminalRoutes from './terminal.routes.js';
 import wikiRoutes from './wiki.routes.js';
 import pluginsRoutes from './plugins.routes.js';
+import repositoryProvisioningRoutes from './repositoryProvisioning.routes.js';
 
 const router = Router();
 
@@ -134,5 +135,6 @@ router.use('/shortcuts', shortcutsRoutes);
 router.use('/terminal', terminalRoutes);
 router.use('/wiki', wikiRoutes);
 router.use('/plugins', pluginsRoutes);
+router.use('/repository-provisioning', repositoryProvisioningRoutes);
 
 export default router;
