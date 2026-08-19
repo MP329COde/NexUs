@@ -535,6 +535,63 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
   `/security` et `/storage` sans erreur JS). `frontend/src/pages/Security/SecurityPage.jsx`,
   `frontend/src/pages/Storage/StoragePage.jsx`.
 
+- [x] **Paramètres réorganisés en catégories + Intégrations catégorisées (Lot 52, 2e moitié, clôt le
+  Lot 52)** : `SettingsPage.jsx` affichait ses 13 onglets à plat (gouvernance, plateforme, identité,
+  intégrations, système... mélangés sans logique visuelle) et `IntegrationPanel.jsx` affichait ses 17
+  intégrations en grille plate sans catégorie. **Aucun id/route/permission changé** — uniquement un
+  regroupement visuel, pour ne casser ni les liens externes (`Link to="/settings?tab=system"` depuis
+  `StoragePage.jsx`) ni le comportement de repli `?tab=` déjà en place. Onglets regroupés via une
+  nouvelle constante `TAB_CATEGORIES` (Général, Identité & accès, Intégrations, Plateforme, Policies &
+  audit, Système) rendue au-dessus de la barre d'onglets existante, avec un filet de sécurité
+  (`uncategorized`) qui garde visible tout onglet qu'on oublierait un jour de rattacher à une catégorie
+  plutôt que de le faire disparaître silencieusement. Intégrations regroupées via une nouvelle constante
+  `INTEGRATION_CATEGORIES` dans `integrationForms.js` (Source Control, Runtime, Observability,
+  Networking, Plateforme), rendues avec `FragmentWithLabel` — un simple Fragment plutôt qu'un `<div>`
+  wrapper, pour ne pas casser la mise en colonnes de `.settings-integrations-grid` (un wrapper autour
+  d'un groupe de cartes en aurait fait un seul item de grille au lieu de plusieurs). Vérifié : build
+  Vite propre, suite `frontend/tests/e2e/` (30/30) et suite Postgres complète sur base fraîchement
+  migrée (64/64, y compris les tests qui dépendent de `?tab=` : `featureFlags.spec.js`,
+  `plugins.spec.js`, `docsTiers.spec.js`). `frontend/src/pages/Settings/SettingsPage.jsx`,
+  `SettingsPage.css`, `frontend/src/config/integrationForms.js`. **Clôt le Lot 52** (les deux moitiés,
+  Sécurité/Stockage et Paramètres/Intégrations, sont maintenant livrées).
+
+- [ ] **Observabilité par projet/service (Lot 55-nav — renumérotée, collision avec un « Lot 53 » ajouté
+  entretemps par une autre session sur ce même fichier ; feuille de route "refonte navigation", pas de
+  lien avec l'autre Lot 53) — audit, aucun panel ajouté** : le plan demandait un
+  panel "Observabilité" (Metrics/Logs/Alerts/Dashboards/SLO) dans l'onglet Vue générale de la fiche
+  projet. Audit avant tout code (comme pour les autres refus documentés du fichier) : `grafana.routes.js`
+  n'expose que 3 routes globales (`/status`, `/dashboards`, `/alerts`), `grafanaService.js` interroge
+  Grafana sans aucune jointure `project_id` — **confirmé aucun lien projet→Grafana n'existe en base**,
+  ni sur `components` (kind='service' du Software Catalog, la seule table candidate) ni ailleurs.
+  `WorkspaceHealthPanel.jsx` (Lot 38) a déjà traité exactement ce manque pour ses checks Registry/
+  Monitoring, avec la même conclusion : "non configuré" plutôt qu'un rapprochement deviné sur un nom.
+  Ajouter un nouveau panel "Observabilité" reviendrait donc à dupliquer ces deux mêmes lignes
+  "Non configuré" sans rien afficher de plus — de la duplication sans valeur, pas une fonctionnalité.
+  Le mécanisme réel déjà disponible pour ce besoin est `ProjectShortcutsPanel.jsx` : un mainteneur peut
+  déjà déclarer manuellement un lien "Grafana" (catégorie texte libre + URL) sur la fiche projet, ce qui
+  couvre le cas d'usage sans inventer de correspondance automatique. **Reste à faire dans une session
+  dédiée si un vrai lien structuré est souhaité** : ajouter une colonne (`grafana_folder` ou
+  `dashboard_uid`) sur `components`, migration + endpoint de filtrage `/grafana/dashboards?folder=`,
+  avant que le panel Observabilité ait un sens réel à construire. HAProxy (création frontend,
+  diff/validation/rollback) déjà couvert au Lot 43. **Certificats vérifiés, pas unifiés** :
+  `CertificatesPage.jsx` (`/network/certificates`) n'affiche aujourd'hui que Cert-Manager (`EmptyState`
+  "Cert-Manager n'est pas disponible" si Kubernetes non configuré) ; Let's Encrypt/OVH n'apparaissent
+  que dans `NetworkPage.jsx` (topologie) et `backend/src/routes/dns.routes.js`, sans vue unifiée
+  domaine/issuer/expiration/service — **reste un vrai chantier, non fait dans ce lot** (périmètre
+  différent de l'observabilité, mieux traité isolément). Aucun fichier modifié.
+
+- [ ] **Traces OpenTelemetry (Lot 56-nav — renumérotée pour la même raison que ci-dessus) — confirmé
+  absent, non codé** : `grep` insensible à la casse sur
+  `opentelemetry|jaeger|tempo|otel` dans tout `backend/src` et `frontend/src` ne remonte que des faux
+  positifs (`temporairement`, `template`, aucune vraie occurrence d'intégration). Conforme à la
+  décision déjà actée dans le plan de cette feuille de route : ne pas construire de backend de traces
+  tant qu'aucun collecteur Tempo/Jaeger réel n'est disponible dans cet environnement — un onglet
+  "Traces" qui afficherait indéfiniment "Non configuré" sans qu'aucune intégration ne puisse jamais le
+  faire passer au vert serait une fonctionnalité morte plutôt qu'un état vide honnête. Reste à faire
+  quand un collecteur OTel réel sera accessible : ajouter `otel` à `INTEGRATION_CATEGORIES.Observability`
+  (`frontend/src/config/integrationForms.js`, Lot 52) et un onglet Traces dans l'Observabilité par
+  projet une fois celle-ci débloquée (Lot 55-nav ci-dessus). Aucun fichier modifié.
+
 - [x] **Commentaires génériques étendus aux déploiements (Lot 53)** : la table `entity_comments`
   (migration 0041, Lot 49) couvrait déjà `project` et `wiki_page` — étendue à `deployment`, seul autre
   type de ressource avec un ID stable côté NexUs (les PR n'en ont pas, cf. todo.md ligne ~118, laissées
@@ -565,3 +622,100 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
   projet)"` sur le même `POST`, cohérent avec la règle ci-dessus. Toutes les données de test (lien de
   déploiement, commentaire, notification, deux comptes) nettoyées après vérification. `backend/src/
   routes/deployments.routes.js`, `frontend/src/pages/Deployments/ReleasesPage.jsx`.
+
+- [x] **Recovery Test — restauration isolée d'une sauvegarde (Lot 57-nav, feuille de route "refonte
+  navigation")** : `RestoreBackupDialog.jsx`/`backupService.restoreBackup()` ne permettent qu'une
+  restauration réelle et destructive (écrase `nexus.db` du process actif). Nouveau mécanisme
+  `backend/src/services/recoveryTestService.js` : copie le fichier `.db` d'une sauvegarde dans un
+  dossier temporaire (`fs.mkdtempSync`), puis **démarre un second process backend complet**
+  (`spawn(process.execPath, ['src/index.js'], { env: { PORT: <port éphémère 21000-25999>,
+  NEXUS_DATA_DIR: <dossier temporaire>, DATABASE_URL: '' } })`) — `NEXUS_DATA_DIR` existait déjà dans
+  `config/paths.js` précisément pour l'isolation (utilisé jusqu'ici par les tests automatisés), donc
+  aucune nouvelle primitive d'isolation à inventer. Le process de test tourne volontairement en mode
+  legacy (`DATABASE_URL` vidé) : le socle relationnel Postgres est partagé par toute la plateforme et
+  n'est jamais touché par un test de restauration, qui ne porte que sur la copie SQLite isolée —
+  limite documentée dans le service plutôt que masquée. Validation automatique et honnête : le service
+  attend que `/api/status/health` (sonde publique existante) réponde, puis interroge
+  `/api/setup/status` — `needsSetup: false` prouve qu'un admin existe réellement dans la base restaurée,
+  sans jamais afficher un statut "OK" inventé côté frontend. Auto-destruction après 15 min
+  (`setTimeout` + `child.kill()` + suppression du dossier temporaire) pour ne jamais laisser de process
+  orphelin si l'admin oublie de le détruire ; filet `process.on('exit', ...)` si le process principal
+  s'arrête. Routes admin-only (même garde `requirePermission('backups','admin')` que le reste de
+  `backups.routes.js`) : `POST /:file/recovery-test`, `GET /recovery-tests`, `GET /recovery-tests/:id`,
+  `DELETE /recovery-tests/:id` — **pas de ré-authentification par mot de passe requise ici**,
+  contrairement à `POST /:file/restore`, puisqu'aucune action destructrice n'est possible (nouveau
+  process isolé, jamais la base active). UI : bouton "Tester la restauration" par ligne de sauvegarde
+  dans `SystemPanel.jsx`, nouveau `RecoveryTestPanel.jsx` (liste les tests actifs avec statut/port/
+  expiration, lien direct vers l'API du process de test, bouton Détruire), polling 5s. **Vérifié
+  réellement de bout en bout** (pas seulement une vérification syntaxique) : script manuel exécutant le
+  vrai service contre un vrai `nexus.db` de test — création d'un admin bootstrap, `createBackup()` réel,
+  `startRecoveryTest()` réel, confirmation `status: 'running'`, `needsSetup: false` en interrogeant le
+  vrai process enfant sur son port éphémère réel, puis `stopRecoveryTest()` et confirmation que le port
+  ne répond plus (process bien tué, pas seulement marqué comme tel). Suite de tests backend Node natifs
+  (123/123 passent, 3 skipped préexistants) et suite `frontend/tests/e2e/` (30/30) toujours vertes après
+  l'ajout. `backend/src/services/recoveryTestService.js` (nouveau), `backend/src/routes/backups.routes.js`,
+  `frontend/src/pages/Settings/RecoveryTestPanel.jsx` (nouveau), `frontend/src/pages/Settings/
+  SystemPanel.jsx`.
+
+- [x] **Provisioning en un workflow — Documentation + Environnement (Lot 58-nav, feuille de route
+  "refonte navigation")** : `scaffolderService.js` créait déjà projet+composant+dépôt Git+fichiers
+  (Dockerfile et `.github/workflows/ci.yml` **déjà générés par les templates existants**,
+  `scaffolderTemplates.js` — confirmé, contrairement à ce que laissait supposer le libellé du Lot 36 :
+  la CI n'était pas manquante, juste non documentée comme telle). Deux étapes réelles ajoutées, toutes
+  deux optionnelles (cases à cocher, pas de comportement caché) : **`generate_docs`** appelle
+  `orgStore.generateLocalDocSite(projectId, 'docusaurus', userId)` — la même fonction que le bouton
+  manuel "Générer" de `DocSitesPanel.jsx`, contenu réel dérivé du catalogue/ADR du projet, jamais
+  inventé ; **`create_environment`** appelle `orgStore.createEnvironment(projectId, {name:'preview',
+  kind:'preview'})` — environnement réel enregistré, **délibérément sans blueprint** donc sans
+  provisioning Kubernetes automatique (choisir un blueprint reste un geste explicite depuis la fiche
+  projet, pas une valeur devinée dans un formulaire de scaffolding). **Registry non chaîné** : confirmé
+  par audit que `registry.routes.js` n'a aucune notion de `project_id` (vue globale/admin du registre
+  Docker privé) — même limite structurelle déjà documentée pour Monitoring au Lot 38, non résolue ici
+  (chantier de modélisation séparé). Vérifié réellement de bout en bout (pas seulement les tests
+  existants) : backend isolé lancé sur le port `4097` avec sa propre base Postgres jetable et son propre
+  `NEXUS_DATA_DIR`, création d'une vraie organisation + projet via l'API authentifiée, appel réel
+  `POST /catalog/scaffold` avec `withDocs`/`withEnvironment` à `true` — job `succeeded`, les 7 étapes
+  attendues dans l'ordre (`validate`→`generate`→`create_repo` skipped→`push_files` skipped→
+  `register_catalog`→`generate_docs`→`create_environment`), `docSite.local_content` contenant bien le
+  nom réel du composant créé, `environment.kind: 'preview'` avec `provisioning_status: 'skipped'` (honnête,
+  aucun blueprint fourni). Suite Postgres complète (64/64, y compris `ultimate.spec.js` qui exerce déjà
+  le scaffolder sans ces nouveaux flags — non affecté, les deux étapes restent `skipped` par défaut) et
+  suite `frontend/tests/e2e/` (30/30) toujours vertes. `backend/src/services/scaffolderService.js`,
+  `backend/src/routes/catalog.routes.js`, `frontend/src/pages/Deployments/ScaffolderModal.jsx`.
+
+- [x] **Durcissement sécurité de plateforme — complexité mot de passe + restriction CIDR (Lot 59-nav,
+  feuille de route "refonte navigation", partiel)** : audit avant tout code confirme que verrouillage de
+  compte après échecs, auto-ban IP, TTL de session configurable, longueur minimale de mot de passe et
+  révocation globale par `tokenVersion` **existaient déjà** (non refaits). Deux règles manquantes
+  ajoutées, toutes deux désactivées par défaut (comportement historique inchangé tant qu'un admin ne les
+  active pas explicitement) :
+  - **Complexité de mot de passe** (`identityStore.getPasswordComplexity()` : majuscule/chiffre/symbole,
+    3 booléens indépendants) — nouveau point d'entrée unique `identityStore.passwordPolicyError()`
+    combinant longueur + complexité, remplaçant la logique dupliquée dans les 3 routes qui valident un
+    mot de passe de **compte** (`auth.routes.js` changement + onboarding, `users.routes.js` création).
+    Le mot de passe de **coffre-fort projet** (`projects.routes.js` vault-password) reste
+    volontairement hors de cette politique — classe de secret différente.
+  - **Restriction CIDR de connexion** (`identityStore.getLoginCidrAllowlist()`, vide = aucune
+    restriction) — nouvel utilitaire `backend/src/utils/cidr.js` (matching IPv4 pur, sans dépendance),
+    vérifiée en tout premier dans `POST /auth/login` (avant toute recherche de compte, pour qu'une
+    tentative hors plage n'entame jamais un compteur de verrouillage ni ne révèle l'existence d'un
+    compte). **Garde-fou dans `PUT /identity`** : refuse d'enregistrer une liste non vide si l'adresse
+    de l'admin qui l'enregistre n'y correspond pas elle-même — sinon aucun moyen de la retirer sans
+    accès direct au fichier de données. UI : nouveaux champs dans `IdentityPanel.jsx` (3 cases à cocher
+    + zone de texte une plage par ligne). **MFA/TOTP et liste+révocation individuelle des sessions
+    actives volontairement NON codés dans ce lot** : confirmé absents (aucune dépendance TOTP, aucune
+    table de sessions — le JWT est stateless, seule une révocation globale existe) ; les deux touchent
+    au cœur du flux de connexion et à l'architecture de session (une vraie table `sessions` référencée
+    par chaque JWT serait nécessaire pour la révocation individuelle) — portée trop sensible et trop
+    large pour être ajoutée sans confirmation explicite préalable, cohérent avec la réserve déjà actée
+    dans le plan de cette feuille de route. Rotation de token automatique/refresh token également non
+    codée (même raison). **Vérifié réellement de bout en bout** (backend isolé, port `4098`, propre
+    `NEXUS_DATA_DIR`) : complexité activée → création d'utilisateur avec mot de passe faible refusée
+    (message exact sur la règle manquante), avec mot de passe fort acceptée ; CIDR `10.0.0.0/24` refusé
+    par le garde-fou (adresse de l'admin non incluse) ; CIDR `127.0.0.1/32` accepté ; login normal
+    depuis `127.0.0.1` réussi ; login avec `X-Forwarded-For: 203.0.113.9` usurpé refusé en `403` ;
+    désactivation (liste vide) réussie sans garde-fou. Suite de tests backend Node natifs (123/123) et
+    `frontend/tests/e2e/` (30/30) toujours vertes après l'ajout. `backend/src/utils/cidr.js` (nouveau),
+    `backend/src/store/identityStore.js`, `backend/src/routes/identity.routes.js`,
+    `backend/src/routes/auth.routes.js`, `backend/src/routes/users.routes.js`,
+    `frontend/src/pages/Settings/IdentityPanel.jsx`.
