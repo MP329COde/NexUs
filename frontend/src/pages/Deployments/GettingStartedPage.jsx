@@ -18,6 +18,7 @@ export default function GettingStartedPage() {
   const vault = useApi(() => api.get(`/projects/${id}/vault`), [id]);
   const environments = useApi(() => api.get(`/projects/${id}/environments`), [id]);
   const docSites = useApi(() => api.get(`/projects/${id}/doc-sites`), [id]);
+  const workspace = useApi(() => api.get(`/projects/${id}/workspace`), [id]);
 
   const p = project.data?.project;
   if (!p) return <div className="faint">Chargement…</div>;
@@ -26,6 +27,9 @@ export default function GettingStartedPage() {
   const vaultEntries = vault.data?.items || [];
   const envs = environments.data?.items || [];
   const sites = docSites.data?.items || [];
+  const workspaceRepos = workspace.data?.repos || [];
+  const lastPipeline = workspaceRepos.flatMap((r) => r.pipelines || [])[0];
+  const previewEnvs = envs.filter((e) => e.kind === 'preview');
 
   return (
     <>
@@ -103,7 +107,40 @@ export default function GettingStartedPage() {
       </div>
 
       <div className="pd-grid-row">
-        <Panel title="5. Lancer une tâche" span={12}>
+        <Panel title="5. CI & Previews" sub="Dernier run détecté sur les dépôts rattachés" span={6}>
+          {lastPipeline ? (
+            <div className="pd-row">
+              <span className="pd-row-title">{lastPipeline.status || 'inconnu'}</span>
+              {lastPipeline.webUrl && <a href={lastPipeline.webUrl} target="_blank" rel="noreferrer" className="faint">Voir le run</a>}
+            </div>
+          ) : (
+            <div className="pd-empty">Aucun pipeline détecté sur les dépôts rattachés.</div>
+          )}
+          {previewEnvs.length === 0 ? (
+            <div className="pd-empty">Aucun environnement de preview actif.</div>
+          ) : (
+            <div className="pd-list-loose">
+              {previewEnvs.map((e) => (
+                <div key={e.id} className="pd-row">
+                  <span className="pd-row-title">{e.name}</span>
+                  {e.url && <a href={e.url} target="_blank" rel="noreferrer" className="faint">Ouvrir</a>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="6. Tests" sub="Aucune source réelle par projet" span={6}>
+          <div className="pd-empty">
+            NexUs ne stocke pas de commande de test par projet (dépendrait de la stack du dépôt) — se
+            référer au README du dépôt cloné ci-dessus ou au workflow CI listé dans l'onglet Pipelines
+            de ce projet.
+          </div>
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="7. Lancer une tâche" span={12}>
           <div className="pd-empty">
             Créer une branche → coder → tester → commit → pull request → revue → CI → preview → staging → approbation → production.
             Voir <Link to={`/deployments/projects/${id}`}>le backlog du projet</Link> pour prendre une tâche.
