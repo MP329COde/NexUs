@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import ProjectActivityPanel from './ProjectActivityPanel.jsx';
 import './TeamWorkspacePage.css';
 
 const ROLE_LABELS = { lead: 'Lead', member: 'Membre' };
@@ -111,6 +112,10 @@ export default function TeamWorkspacePage() {
             </div>
           )}
         </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <ProjectActivityPanel endpoint={`/teams/${teamId}/activity`} userName={userName} />
       </div>
     </>
   );

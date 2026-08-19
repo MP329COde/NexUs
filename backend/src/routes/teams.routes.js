@@ -4,6 +4,7 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
+import { logActivity, listActivity } from '../services/projectActivityService.js';
 
 // Équipes : regroupement d'utilisateurs à l'échelle d'une organisation,
 // distinct des projets (voir store/orgStore.js). Accès en lecture réservé
@@ -48,6 +49,7 @@ router.post('/org/:orgId', asyncHandler(async (req, res) => {
   if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ ok: false, error: "Identifiant invalide (lettres minuscules, chiffres, tirets)" });
   const team = await orgStore.createTeam({ orgId: req.params.orgId, name, slug, ownerUserId: req.user.id });
   logAudit(req, 'team.create', { orgId: req.params.orgId, teamId: team.id, name });
+  await logActivity('organization', req.params.orgId, req.user.id, 'team.create', { teamId: team.id, name }).catch(() => {});
   res.status(201).json({ ok: true, team });
 }));
 
@@ -72,8 +74,11 @@ router.put('/:id/members/:userId', asyncHandler(async (req, res) => {
   if (ctx.teamRole !== 'lead') return res.status(403).json({ ok: false, error: "Réservé au lead de l'équipe (ou owner/admin de l'organisation)" });
   const { role } = req.body || {};
   if (!['lead', 'member'].includes(role)) return res.status(400).json({ ok: false, error: 'Rôle invalide' });
+  const wasMember = Boolean(await orgStore.getTeamRole(ctx.team.id, req.params.userId));
   const member = await orgStore.addTeamMember(ctx.team.id, req.params.userId, role);
-  logAudit(req, 'team.member.role', { teamId: ctx.team.id, userId: req.params.userId, role });
+  const action = wasMember ? 'team.member.role' : 'team.member.add';
+  logAudit(req, action, { teamId: ctx.team.id, userId: req.params.userId, role });
+  await logActivity('team', ctx.team.id, req.user.id, action, { userId: req.params.userId, role }).catch(() => {});
   res.json({ ok: true, member });
 }));
 
@@ -83,6 +88,7 @@ router.delete('/:id/members/:userId', asyncHandler(async (req, res) => {
   if (ctx.teamRole !== 'lead') return res.status(403).json({ ok: false, error: "Réservé au lead de l'équipe (ou owner/admin de l'organisation)" });
   await orgStore.removeTeamMember(ctx.team.id, req.params.userId);
   logAudit(req, 'team.member.remove', { teamId: ctx.team.id, userId: req.params.userId });
+  await logActivity('team', ctx.team.id, req.user.id, 'team.member.remove', { userId: req.params.userId }).catch(() => {});
   res.json({ ok: true });
 }));
 
@@ -95,6 +101,14 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   await orgStore.deleteTeam(ctx.team.id);
   logAudit(req, 'team.delete', { teamId: ctx.team.id });
   res.json({ ok: true });
+}));
+
+// Activité d'équipe (généralisation todo.md #31/#32, Lot 42) — même pattern
+// que /projects/:id/activity et /organizations/:id/activity.
+router.get('/:id/activity', asyncHandler(async (req, res) => {
+  const ctx = await loadTeamWithRole(req, res);
+  if (!ctx) return;
+  res.json({ ok: true, items: await listActivity('team', ctx.team.id, Number(req.query.limit) || 50) });
 }));
 
 export default router;

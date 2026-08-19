@@ -5,6 +5,7 @@ import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
 import { getOrgQuota, setOrgQuota, computeOrgUsage } from '../services/quotaService.js';
+import { logActivity, listActivity } from '../services/projectActivityService.js';
 
 const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$|^$/u;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -98,6 +99,7 @@ router.post('/:id/members', asyncHandler(async (req, res) => {
   if (!['owner', 'admin', 'member'].includes(newRole)) return res.status(400).json({ ok: false, error: 'Rôle invalide' });
   const member = await orgStore.addOrgMember(req.params.id, userId, newRole);
   logAudit(req, 'organization.member.add', { orgId: req.params.id, userId, role: newRole });
+  await logActivity('organization', req.params.id, req.user.id, 'organization.member.add', { userId, role: newRole }).catch(() => {});
   res.status(201).json({ ok: true, member });
 }));
 
@@ -127,6 +129,7 @@ router.delete('/:id/members/:userId', asyncHandler(async (req, res) => {
   const removed = await orgStore.removeOrgMember(req.params.id, req.params.userId);
   if (!removed) return res.status(404).json({ ok: false, error: 'Membre introuvable' });
   logAudit(req, 'organization.member.remove', { orgId: req.params.id, userId: req.params.userId });
+  await logActivity('organization', req.params.id, req.user.id, 'organization.member.remove', { userId: req.params.userId }).catch(() => {});
   res.json({ ok: true });
 }));
 
@@ -158,6 +161,14 @@ router.put('/:id/quota', asyncHandler(async (req, res) => {
   const quota = await setOrgQuota(req.params.id, { maxEnvironments, maxCpuMillicores, maxMemoryBytes, updatedBy: req.user.id });
   logAudit(req, 'organization.quota.update', { orgId: req.params.id, maxEnvironments, maxCpuMillicores, maxMemoryBytes });
   res.json({ ok: true, quota });
+}));
+
+// Activité d'organisation (généralisation todo.md #31/#32, Lot 42) —
+// même pattern que /projects/:id/activity, lecture ouverte à tout membre.
+router.get('/:id/activity', asyncHandler(async (req, res) => {
+  const role = await orgStore.getOrgRole(req.params.id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Organisation introuvable' });
+  res.json({ ok: true, items: await listActivity('organization', req.params.id, Number(req.query.limit) || 50) });
 }));
 
 export default router;

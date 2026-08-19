@@ -75,3 +75,38 @@
 .odp-loading {
   padding: 24px;
 }
+
+.pd-grid-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pd-list-loose {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.pd-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-empty {
+  color: var(--text-faint);
+  padding: 8px 0;
+}

@@ -8,6 +8,7 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import OrgMembersModal from './OrgMembersModal.jsx';
 import TeamsModal from './TeamsModal.jsx';
+import ProjectActivityPanel from './ProjectActivityPanel.jsx';
 import './OrganizationDetailPage.css';
 
 const ROLE_LABEL = { owner: 'Propriétaire', admin: 'Admin', member: 'Membre' };
@@ -21,8 +22,13 @@ export default function OrganizationDetailPage() {
   const { user } = useAuth();
   const { data, error } = useApi(() => api.get(`/organizations/${id}`), [id]);
   const projects = useApi(() => api.get(`/organizations/${id}/projects`), [id]);
+  const allUsers = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingTeams, setManagingTeams] = useState(false);
+
+  function userName(uid) {
+    return (allUsers.data?.items || []).find((u) => u.id === uid)?.name || uid;
+  }
 
   const org = data?.organization;
   const canManage = user?.role === 'admin' || org?.my_role === 'owner' || org?.my_role === 'admin';
@@ -93,6 +99,10 @@ export default function OrganizationDetailPage() {
       </Panel>
 
       <div className="faint odp-role-note">Votre rôle dans cette organisation : {ROLE_LABEL[org.my_role] || 'aucun (accès administrateur plateforme)'}</div>
+
+      <div className="pd-grid-row">
+        <ProjectActivityPanel endpoint={`/organizations/${id}/activity`} userName={userName} />
+      </div>
 
       {managingMembers && (
         <OrgMembersModal
