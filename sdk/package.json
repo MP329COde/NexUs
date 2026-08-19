@@ -1,0 +1,20 @@
+{
+  "name": "@nexus/plugin-sdk",
+  "version": "0.1.0",
+  "description": "SDK TypeScript pour développer des plugins NexUs — types du manifest, catalogue des permissions/événements/hooks du cœur, validation locale.",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
