@@ -37,6 +37,7 @@ import ProjectDetailPage from './pages/Deployments/ProjectDetailPage.jsx';
 import GitReposPage from './pages/Deployments/GitReposPage.jsx';
 import RepoDetailPage from './pages/Deployments/RepoDetailPage.jsx';
 import TeamWorkspacePage from './pages/Deployments/TeamWorkspacePage.jsx';
+import GettingStartedPage from './pages/Deployments/GettingStartedPage.jsx';
 import CodeReviewsPage from './pages/Deployments/CodeReviewsPage.jsx';
 import PipelinesPage from './pages/Deployments/PipelinesPage.jsx';
 import EnvironmentsPage from './pages/Deployments/EnvironmentsPage.jsx';
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([
               { path: 'organizations/:id/wiki', element: <WikiPage />, handle: { title: "Wiki d'équipe" } },
               { path: 'teams/:teamId', element: <TeamWorkspacePage />, handle: { title: 'Équipe' } },
               { path: 'projects/:id', element: <ProjectDetailPage />, handle: { title: 'Projet' } },
+              { path: 'projects/:id/getting-started', element: <GettingStartedPage />, handle: { title: 'Commencer à développer' } },
               { path: 'repos', element: <GitReposPage />, handle: { title: 'Dépôts Git' } },
               { path: 'repos/:key', element: <RepoDetailPage />, handle: { title: 'Dépôt' } },
               { path: 'reviews', element: <CodeReviewsPage />, handle: { title: 'Revue de code' } },

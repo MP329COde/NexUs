@@ -151,6 +151,7 @@ export default function ProjectDetailPage() {
                 <Icon name="trash" size={13} />
               </span>
             )}
+            <Link to={`/deployments/projects/${id}/getting-started`} className="btn-outline pd-back-link">Commencer à développer</Link>
             <Link to="/deployments/projects" className="btn-outline pd-back-link">← Tous les projets</Link>
           </div>
         )}
