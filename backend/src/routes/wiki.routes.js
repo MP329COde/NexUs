@@ -26,6 +26,20 @@ async function requireOrgMember(req, res, orgId) {
   return role;
 }
 
+// Une page d'équipe reste lisible/éditable par toute l'organisation (même
+// politique ouverte que le reste du wiki, cf. commentaire sur POST / plus
+// bas) — cette vérification n'exclut donc personne, elle confirme
+// seulement que teamId existe réellement dans l'organisation visée, pour ne
+// jamais laisser une page pointer vers une équipe d'une autre organisation.
+async function requireTeamInOrg(res, teamId, orgId) {
+  const team = await orgStore.getTeam(teamId);
+  if (!team || team.org_id !== orgId) {
+    res.status(404).json({ ok: false, error: 'Équipe introuvable' });
+    return false;
+  }
+  return true;
+}
+
 function slugify(title) {
   return title.toLowerCase().trim()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -33,11 +47,12 @@ function slugify(title) {
 }
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { orgId, projectId, q } = req.query;
+  const { orgId, projectId, teamId, q } = req.query;
   if (!orgId) return res.status(400).json({ ok: false, error: 'orgId requis' });
   const role = await requireOrgMember(req, res, orgId);
   if (role === null && !isPlatformAdmin(req.user)) return;
-  const items = q ? await orgStore.searchWikiPages(orgId, q) : await orgStore.listWikiPages(orgId, projectId || null);
+  if (teamId && !(await requireTeamInOrg(res, teamId, orgId))) return;
+  const items = q ? await orgStore.searchWikiPages(orgId, q) : await orgStore.listWikiPages(orgId, { projectId: projectId || null, teamId: teamId || null });
   res.json({ ok: true, items });
 }));
 
@@ -71,11 +86,13 @@ router.get('/:id/revisions/:revisionId', asyncHandler(async (req, res) => {
 // wiki d'équipe fonctionne collaborativement, pas sous permission fine par
 // page (contrairement au coffre-fort ou aux changements contrôlés).
 router.post('/', asyncHandler(async (req, res) => {
-  const { orgId, projectId, title, content } = req.body || {};
+  const { orgId, projectId, teamId, title, content } = req.body || {};
   if (!orgId || !title) return res.status(400).json({ ok: false, error: 'orgId et title requis' });
+  if (projectId && teamId) return res.status(400).json({ ok: false, error: "Une page ne peut être rattachée qu'à un seul palier : projet OU équipe, jamais les deux" });
   const role = await requireOrgMember(req, res, orgId);
   if (role === null && !isPlatformAdmin(req.user)) return;
-  const page = await orgStore.createWikiPage({ orgId, projectId: projectId || null, slug: slugify(title), title, content, userId: req.user.id });
+  if (teamId && !(await requireTeamInOrg(res, teamId, orgId))) return;
+  const page = await orgStore.createWikiPage({ orgId, projectId: projectId || null, teamId: teamId || null, slug: slugify(title), title, content, userId: req.user.id });
   logAudit(req, 'wiki.page.create', { pageId: page.id, orgId, title });
   res.status(201).json({ ok: true, page });
 }));

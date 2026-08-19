@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
@@ -70,6 +71,9 @@ export default function TeamMembersModal({ team, onClose }) {
 
   return (
     <Modal title={`Membres — ${team.name}`} onClose={onClose} width={460}>
+      <Link to={`/deployments/organizations/${team.org_id}/wiki?teamId=${team.id}`} className="btn-outline" style={{ marginBottom: 12, display: 'inline-flex' }}>
+        <Icon name="book" size={13} /> Documentation d'équipe
+      </Link>
       <div className="omm-list">
         {members.length === 0 ? (
           <div className="faint">Aucun membre</div>

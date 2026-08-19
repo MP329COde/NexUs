@@ -254,6 +254,10 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="pd-grid-row">
+        <DocSitesPanel projectId={id} canManage={user?.role === 'admin' || ['owner', 'maintainer'].includes(projectRole)} />
+      </div>
+
+      <div className="pd-grid-row">
         <ChangesPanel
           changes={changes.data?.items || []}
           environments={environments.data?.items || []}
@@ -434,6 +438,84 @@ function DocumentationPanel({ orgId, projectId }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+const DOC_SITE_LABELS = { docusaurus: 'Documentation technique (Docusaurus)', storybook: 'Design System (Storybook)' };
+
+// Liens vers la documentation Docusaurus et le Storybook du projet —
+// repositories externes gérés par la plateforme dans la cible produit,
+// mais dont la création automatisée nécessite un compte GitHub de
+// plateforme non fourni ici (voir backend/src/routes/projects.routes.js
+// GET/PUT /:id/doc-sites) : ce panneau enregistre et affiche les liens
+// saisis manuellement, en attendant la génération automatique.
+function DocSitesPanel({ projectId, canManage }) {
+  const notify = useNotify();
+  const sites = useApi(() => api.get(`/projects/${projectId}/doc-sites`), [projectId]);
+  const [editing, setEditing] = useState(null);
+  const items = sites.data?.items || [];
+  const siteFor = (kind) => items.find((s) => s.kind === kind);
+
+  async function save(kind, url, repoUrl) {
+    try {
+      await api.put(`/projects/${projectId}/doc-sites/${kind}`, { url: url || null, repoUrl: repoUrl || null });
+      notify('Lien enregistré', { type: 'ok' });
+      setEditing(null);
+      sites.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
+  return (
+    <Panel title="Design System & Documentation technique" sub="Docusaurus et Storybook — repositories externes gérés par la plateforme" span={12}>
+      <div className="pd-list-loose" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {['docusaurus', 'storybook'].map((kind) => {
+          const site = siteFor(kind);
+          const isEditing = editing === kind;
+          return (
+            <div key={kind} className="card" style={{ padding: 12 }}>
+              <div className="pd-row-title" style={{ marginBottom: 8 }}>{DOC_SITE_LABELS[kind]}</div>
+              {isEditing ? (
+                <DocSiteEditForm site={site} onCancel={() => setEditing(null)} onSave={(url, repoUrl) => save(kind, url, repoUrl)} />
+              ) : (
+                <>
+                  {site?.url || site?.repo_url ? (
+                    <div className="pd-list-loose">
+                      {site.url && <a className="btn-outline" href={site.url} target="_blank" rel="noreferrer">Ouvrir la documentation</a>}
+                      {site.repo_url && <a className="btn-outline" href={site.repo_url} target="_blank" rel="noreferrer">Voir le repository</a>}
+                      {site.updated_at && <div className="faint">Dernière mise à jour : {new Date(site.updated_at).toLocaleDateString('fr-FR')}</div>}
+                    </div>
+                  ) : (
+                    <div className="pd-empty">Aucun lien enregistré.</div>
+                  )}
+                  {canManage && (
+                    <span className="btn-outline pd-action-btn" style={{ marginTop: 8, display: 'inline-block' }} onClick={() => setEditing(kind)}>
+                      {site?.url || site?.repo_url ? 'Modifier' : 'Enregistrer un lien'}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function DocSiteEditForm({ site, onCancel, onSave }) {
+  const [url, setUrl] = useState(site?.url || '');
+  const [repoUrl, setRepoUrl] = useState(site?.repo_url || '');
+  return (
+    <div className="pd-list-loose">
+      <input className="input" placeholder="URL du site publié" value={url} onChange={(e) => setUrl(e.target.value)} />
+      <input className="input" placeholder="URL du repository" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
+      <div className="pd-form-row">
+        <button className="btn" onClick={() => onSave(url, repoUrl)}>Enregistrer</button>
+        <span className="btn-outline pd-action-btn" onClick={onCancel}>Annuler</span>
+      </div>
+    </div>
   );
 }
 
