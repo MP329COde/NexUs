@@ -200,6 +200,7 @@ export default function ProjectDetailPage() {
                     {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                   </select>
                   <span className="pd-task-title">{t.title}</span>
+                  {t.branch && <span className="faint mono">{t.branch}</span>}
                   {t.assigneeId ? (
                     <span className="badge badge-vio" style={{ cursor: 'pointer' }} onClick={() => assignTask(t, null)} title="Se désassigner">{userName(t.assigneeId)}</span>
                   ) : (
@@ -361,7 +362,7 @@ export default function ProjectDetailPage() {
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
 
       {commentsFor && (
-        <TaskCommentsModal projectId={id} task={commentsFor} userName={userName} onClose={() => setCommentsFor(null)} />
+        <TaskCommentsModal projectId={id} task={commentsFor} userName={userName} onClose={() => setCommentsFor(null)} onTaskUpdated={() => tasks.reload()} />
       )}
     </>
   );
