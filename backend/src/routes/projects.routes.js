@@ -6,7 +6,8 @@ import * as store from '../store/projectsStore.js';
 import { notifyUser } from '../services/userNotificationService.js';
 import { logProjectActivity, listProjectActivity } from '../services/projectActivityService.js';
 import * as presence from '../services/projectPresenceService.js';
-import { findUserByUsername, listUsers } from '../store/usersStore.js';
+import { extractMentionedUserIds } from '../services/mentionService.js';
+import * as entityCommentsStore from '../store/entityCommentsStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
 import * as orgStore from '../store/orgStore.js';
@@ -816,6 +817,31 @@ router.post('/:id/incidents/:incidentId/comments', loadProjectAccess(), requireM
   res.status(201).json({ ok: true, comment });
 }));
 
+// Commentaires génériques sur le projet lui-même (entity_comments,
+// migration 0041, todo.md ligne ~118) — même politique de mentions que les
+// commentaires de tâche/incident (extractMentionedUserIds → notifyUser).
+router.get('/:id/comments', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.json({ ok: true, items: [] });
+  res.json({ ok: true, items: await entityCommentsStore.listComments('project', req.pgProject.id) });
+}));
+
+router.post('/:id/comments', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
+  const { body } = req.body || {};
+  if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
+  const comment = await entityCommentsStore.addComment('project', req.pgProject.id, req.user.id, body.trim());
+  await logProjectActivity(req.pgProject.id, req.user.id, 'project.comment', {}).catch(() => {});
+  for (const mentionedId of extractMentionedUserIds(body)) {
+    if (mentionedId === req.user.id) continue;
+    notifyUser(mentionedId, {
+      type: 'project.mention', title: 'Mention dans un commentaire',
+      message: `${req.user.name || req.user.email} vous a mentionné sur le projet « ${req.pgProject.name} »`,
+      meta: { projectId: req.legacyProject.id, commentId: comment.id }
+    }).catch(() => {});
+  }
+  res.status(201).json({ ok: true, comment });
+}));
+
 // --- Changements contrôlés : une modification planifiée, avec description,
 // impact attendu, auteur, validation éventuelle et état d'exécution — voir
 // store/changeStore.js. Distinct d'un incident (qui documente un problème
@@ -982,23 +1008,8 @@ router.delete('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('develop
   res.json({ ok: true });
 }));
 
-// Résout @handle en id réel, pour notifier une mention dans un commentaire.
-// `username` est optionnel (souvent absent, cf. usersStore.js createUser) :
-// repli sur la partie locale de l'e-mail (avant @), qui existe toujours et
-// reste le handle affiché par défaut dans l'UI (ex. "alex.lambert" pour
-// alex.lambert@exemple.com). Un handle inconnu est simplement ignoré —
-// jamais d'erreur pour une faute de frappe dans une mention.
-function extractMentionedUserIds(text) {
-  const handles = [...text.matchAll(/@([a-z0-9._-]+)/gi)].map((m) => m[1].toLowerCase());
-  const ids = new Set();
-  for (const handle of handles) {
-    const byUsername = findUserByUsername(handle);
-    const byEmailPrefix = byUsername ? null : listUsers().find((u) => u.email.split('@')[0].toLowerCase() === handle);
-    const match = byUsername || byEmailPrefix;
-    if (match) ids.add(match.id);
-  }
-  return [...ids];
-}
+// extractMentionedUserIds déplacée dans services/mentionService.js (Lot 49)
+// pour être réutilisée par les commentaires génériques (entity_comments).
 
 router.get('/:id/tasks/:taskId/comments', loadProjectAccess(), asyncHandler(async (req, res) => {
   const existing = store.findTask(req.params.taskId);

@@ -45,9 +45,10 @@ test('commenter un incident depuis la fiche projet, journalisé dans l\'activit�
   await page.locator('.pd-row', { hasText: 'API en erreur 500' }).getByText('Commentaires', { exact: true }).click();
   await expect(page.locator('.modal-title', { hasText: 'API en erreur 500' })).toBeVisible();
 
-  await page.locator('input[placeholder="Écrire un commentaire…"]').fill('Investigation en cours, cause identifiée.');
-  await page.getByRole('button', { name: 'Envoyer' }).click();
-  await expect(page.getByText('Investigation en cours, cause identifiée.', { exact: true })).toBeVisible();
+  const modal = page.locator('.modal-card', { hasText: 'API en erreur 500' });
+  await modal.locator('input[placeholder="Écrire un commentaire…"]').fill('Investigation en cours, cause identifiée.');
+  await modal.getByRole('button', { name: 'Envoyer' }).click();
+  await expect(modal.getByText('Investigation en cours, cause identifiée.', { exact: true })).toBeVisible();
 
   await page.keyboard.press('Escape');
   // Le panneau Activité d'équipe charge une fois au montage (pas

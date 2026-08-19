@@ -4,6 +4,9 @@ import { requireAuth, isPlatformAdmin } from '../middleware/auth.js';
 import { pool } from '../db/pool.js';
 import * as orgStore from '../store/orgStore.js';
 import { logAudit } from '../services/auditService.js';
+import * as entityCommentsStore from '../store/entityCommentsStore.js';
+import { extractMentionedUserIds } from '../services/mentionService.js';
+import { notifyUser } from '../services/userNotificationService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -123,6 +126,37 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   await orgStore.deleteWikiPage(req.params.id);
   logAudit(req, 'wiki.page.delete', { pageId: req.params.id, orgId: existing.org_id, title: existing.title });
   res.json({ ok: true });
+}));
+
+// Commentaires génériques sur une page wiki (entity_comments, migration
+// 0041, todo.md ligne ~118) — mêmes mentions @utilisateur que les
+// commentaires de tâche/incident, ouverts à tout membre de l'organisation
+// (même politique que la lecture/édition de la page elle-même).
+router.get('/:id/comments', asyncHandler(async (req, res) => {
+  const page = await orgStore.getWikiPage(req.params.id);
+  if (!page) return res.status(404).json({ ok: false, error: 'Page introuvable' });
+  const role = await requireOrgMember(req, res, page.org_id);
+  if (role === null && !isPlatformAdmin(req.user)) return;
+  res.json({ ok: true, items: await entityCommentsStore.listComments('wiki_page', page.id) });
+}));
+
+router.post('/:id/comments', asyncHandler(async (req, res) => {
+  const page = await orgStore.getWikiPage(req.params.id);
+  if (!page) return res.status(404).json({ ok: false, error: 'Page introuvable' });
+  const role = await requireOrgMember(req, res, page.org_id);
+  if (role === null && !isPlatformAdmin(req.user)) return;
+  const { body } = req.body || {};
+  if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
+  const comment = await entityCommentsStore.addComment('wiki_page', page.id, req.user.id, body.trim());
+  for (const mentionedId of extractMentionedUserIds(body)) {
+    if (mentionedId === req.user.id) continue;
+    notifyUser(mentionedId, {
+      type: 'wiki.mention', title: 'Mention dans un commentaire',
+      message: `${req.user.name || req.user.email} vous a mentionné sur la page « ${page.title} »`,
+      meta: { pageId: page.id, orgId: page.org_id, commentId: comment.id }
+    }).catch(() => {});
+  }
+  res.status(201).json({ ok: true, comment });
 }));
 
 export default router;

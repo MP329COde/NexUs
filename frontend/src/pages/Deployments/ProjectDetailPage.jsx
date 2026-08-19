@@ -16,6 +16,7 @@ import WorkspaceHealthPanel from './WorkspaceHealthPanel.jsx';
 import AdrPanel from './AdrPanel.jsx';
 import DocSitesPanel from './DocSitesPanel.jsx';
 import ProjectActivityPanel from './ProjectActivityPanel.jsx';
+import EntityCommentsPanel from './EntityCommentsPanel.jsx';
 import IncidentCommentsModal from './IncidentCommentsModal.jsx';
 import ProjectPresenceBar from './ProjectPresenceBar.jsx';
 import './ProjectDetailPage.css';
@@ -304,6 +305,10 @@ export default function ProjectDetailPage() {
 
       <div className="pd-grid-row">
         <ProjectActivityPanel projectId={id} userName={userName} />
+      </div>
+
+      <div className="pd-grid-row">
+        <EntityCommentsPanel endpoint={`/projects/${id}/comments`} userName={userName} />
       </div>
 
       <div className="pd-grid-row">

@@ -8,6 +8,8 @@ import LoadingState from '../../components/ui/LoadingState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import EntityCommentsPanel from './EntityCommentsPanel.jsx';
 import './WikiPage.css';
 
 // Wiki d'équipe : pages de texte éditables par tout membre de l'organisation,
@@ -179,6 +181,11 @@ function CreatePageModal({ onCreate, onClose }) {
 function WikiPageDetail({ id, onDeleted, onHistory, onSaved }) {
   const { data, loading, error, reload } = useApi(() => api.get(`/wiki/${id}`), [id]);
   const notify = useNotify();
+  const { user } = useAuth();
+  // Pas de liste de membres disponible ici (contrairement à
+  // OrganizationDetailPage.jsx, réservée admin) — se limite à distinguer
+  // "Vous" du reste, sans inventer un nom pour un id non résolu.
+  function userName(uid) { return uid === user?.id ? 'Vous' : uid; }
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -251,6 +258,7 @@ function WikiPageDetail({ id, onDeleted, onHistory, onSaved }) {
           {page.content || <span className="faint">Page vide — cliquez sur « Modifier » pour rédiger du contenu.</span>}
         </div>
       )}
+      <EntityCommentsPanel endpoint={`/wiki/${id}/comments`} userName={userName} />
     </div>
   );
 }
