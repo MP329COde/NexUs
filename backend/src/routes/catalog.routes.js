@@ -95,6 +95,34 @@ router.put('/components/:id', asyncHandler(async (req, res) => {
   res.json({ ok: true, component });
 }));
 
+// Changelog / Releases (todo.md item 37) : mêmes règles d'accès que le
+// composant lui-même — lecture ouverte à quiconque le voit déjà,
+// écriture réservée maintainer+ sur le projet du composant.
+router.get('/components/:id/releases', asyncHandler(async (req, res) => {
+  const existing = await orgStore.getComponent(req.params.id);
+  if (!existing) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  res.json({ ok: true, items: await orgStore.listComponentReleases(req.params.id) });
+}));
+
+router.post('/components/:id/releases', asyncHandler(async (req, res) => {
+  const existing = await orgStore.getComponent(req.params.id);
+  if (!existing) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(existing.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const { version, notes, commitSha, prUrl, pipelineUrl, deploymentUrl } = req.body || {};
+  if (!version || !version.trim()) return res.status(400).json({ ok: false, error: 'version requise' });
+  try {
+    const release = await orgStore.createComponentRelease(req.params.id, { version: version.trim(), notes, commitSha, prUrl, pipelineUrl, deploymentUrl, userId: req.user.id });
+    logAudit(req, 'catalog.component.release', { componentId: existing.id, version: release.version });
+    res.status(201).json({ ok: true, release });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ ok: false, error: 'Cette version existe déjà pour ce composant' });
+    throw err;
+  }
+}));
+
 // Dependency Graph (ÉTAPE 14 IDP) : dépendances directes déclarées entre
 // composants — voir db/migrations/0015_component_dependencies.sql et
 // orgStore.js. Lecture ouverte à quiconque voit déjà le composant (même
