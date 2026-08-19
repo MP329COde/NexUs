@@ -310,6 +310,7 @@ export default function ProjectDetailPage() {
         <WorkspaceHealthPanel
           projectId={id}
           repoKeys={p.repoKeys}
+          repos={workspace.data?.repos}
           environments={environments.data?.items}
           securityScans={securityScans.data?.items}
           incidents={incidents.data?.items}
