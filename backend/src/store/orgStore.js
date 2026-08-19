@@ -818,13 +818,38 @@ export async function createAdr(projectId, { title, status, content, userId }) {
   }
 }
 
+// Écrit l'état courant dans adr_revisions avant de l'écraser (même
+// principe que updateWikiPage) — todo.md item 11, "historique des
+// modifications" : la décision précédente reste consultable, jamais
+// perdue silencieusement.
 export async function updateAdr(id, { title, status, content, userId }) {
-  const { rows } = await query(
-    `UPDATE adrs SET title = COALESCE($2, title), status = COALESCE($3, status), content = COALESCE($4, content), updated_by = $5, updated_at = now()
-     WHERE id = $1 RETURNING *`,
-    [id, title || null, status || null, content ?? null, userId]
-  );
-  return rows[0] || null;
+  const client = await (await import('../db/pool.js')).requirePool().connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: current } = await client.query('SELECT * FROM adrs WHERE id = $1 FOR UPDATE', [id]);
+    if (!current[0]) { await client.query('ROLLBACK'); return null; }
+    await client.query(
+      'INSERT INTO adr_revisions (adr_id, title, status, content, edited_by) VALUES ($1, $2, $3, $4, $5)',
+      [id, current[0].title, current[0].status, current[0].content, userId]
+    );
+    const { rows } = await client.query(
+      `UPDATE adrs SET title = COALESCE($2, title), status = COALESCE($3, status), content = COALESCE($4, content), updated_by = $5, updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [id, title || null, status || null, content ?? null, userId]
+    );
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listAdrRevisions(adrId) {
+  const { rows } = await query('SELECT * FROM adr_revisions WHERE adr_id = $1 ORDER BY edited_at DESC', [adrId]);
+  return rows;
 }
 
 // --- Changelog / Releases par composant (voir 0033_component_releases.sql) ---

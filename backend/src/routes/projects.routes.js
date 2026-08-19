@@ -1096,6 +1096,13 @@ router.put('/:id/adrs/:adrId', loadProjectAccess(), requireMinRole('developer'),
   res.json({ ok: true, adr });
 }));
 
+router.get('/:id/adrs/:adrId/revisions', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [] });
+  const existing = await orgStore.getAdr(req.params.adrId);
+  if (!existing || existing.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'ADR introuvable' });
+  res.json({ ok: true, items: await orgStore.listAdrRevisions(req.params.adrId) });
+}));
+
 router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
   const { kind } = req.params;
