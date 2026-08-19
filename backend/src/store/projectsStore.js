@@ -144,9 +144,26 @@ export function updateTask(id, payload) {
   return tasks[idx];
 }
 
+// Commentaires sur une tâche — stockés à part (comme les révisions wiki)
+// plutôt que dans le tableau `tasks` lui-même, pour ne jamais réécrire tout
+// l'historique des commentaires à chaque mise à jour de statut de la tâche.
+export function listTaskComments(taskId) {
+  return (readStore('taskComments') || []).filter((c) => c.taskId === taskId);
+}
+
+export function addTaskComment({ taskId, userId, text }) {
+  const comments = readStore('taskComments') || [];
+  const comment = { id: uuid(), taskId, userId, text, createdAt: new Date().toISOString() };
+  comments.push(comment);
+  writeStore('taskComments', comments);
+  return comment;
+}
+
 export function deleteTask(id) {
   const tasks = readStore('tasks') || [];
   const next = tasks.filter((t) => t.id !== id);
   writeStore('tasks', next);
+  const comments = readStore('taskComments') || [];
+  writeStore('taskComments', comments.filter((c) => c.taskId !== id));
   return next.length !== tasks.length;
 }

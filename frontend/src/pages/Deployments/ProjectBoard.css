@@ -1,0 +1,71 @@
+.board-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.board-column {
+  background: var(--surface-2, transparent);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 120px;
+  transition: border-color 0.15s;
+}
+
+.board-column-over {
+  border-color: var(--accent, #6366f1);
+}
+
+.board-column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  padding: 4px 4px 8px;
+}
+
+.board-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.board-card {
+  background: var(--card-bg, var(--surface-1));
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: grab;
+}
+
+.board-card:active {
+  cursor: grabbing;
+}
+
+.board-card-title {
+  font-size: 0.9em;
+  margin-bottom: 6px;
+}
+
+.board-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.board-card-comments {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.board-card-comments:hover {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .board-columns {
+    grid-template-columns: 1fr;
+  }
+}
