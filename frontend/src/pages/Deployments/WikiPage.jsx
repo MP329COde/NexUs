@@ -24,11 +24,26 @@ export default function WikiPage() {
   // pages") pour ne pas enfermer l'utilisateur dans ce filtre.
   const [searchParams, setSearchParams] = useSearchParams();
   const projectIdFilter = searchParams.get('projectId') || '';
+  // Palier "équipe" (voir TeamMembersModal.jsx, bouton "Documentation
+  // d'équipe") : même principe que projectIdFilter, mutuellement exclusif —
+  // l'URL ne porte jamais les deux à la fois (voir clearFilter ci-dessous).
+  const teamIdFilter = searchParams.get('teamId') || '';
   const { data: orgsData } = useApi(() => api.get('/organizations'), []);
   const organizations = orgsData?.items || [];
   const [orgId, setOrgId] = useState(routeOrgId || '');
   const currentOrg = organizations.find((o) => o.id === orgId);
+  const teams = useApi(() => (teamIdFilter && orgId ? api.get(`/teams/org/${orgId}`) : Promise.resolve(null)), [teamIdFilter, orgId]);
+  const currentTeam = (teams.data?.items || []).find((t) => t.id === teamIdFilter);
   const notify = useNotify();
+
+  function clearFilter() {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('projectId');
+      next.delete('teamId');
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (routeOrgId) { setOrgId(routeOrgId); return; }
@@ -36,7 +51,7 @@ export default function WikiPage() {
   }, [organizations, orgId, routeOrgId]);
 
   const [q, setQ] = useState('');
-  const pages = useApi(() => (orgId ? api.get(`/wiki?orgId=${orgId}${projectIdFilter ? `&projectId=${projectIdFilter}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`) : Promise.resolve({ items: [] })), [orgId, q, projectIdFilter]);
+  const pages = useApi(() => (orgId ? api.get(`/wiki?orgId=${orgId}${projectIdFilter ? `&projectId=${projectIdFilter}` : ''}${teamIdFilter ? `&teamId=${teamIdFilter}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`) : Promise.resolve({ items: [] })), [orgId, q, projectIdFilter, teamIdFilter]);
   const items = pages.data?.items || [];
 
   const [selectedId, setSelectedId] = useState(null);
@@ -47,7 +62,7 @@ export default function WikiPage() {
 
   async function createPage(title) {
     try {
-      const res = await api.post('/wiki', { orgId, projectId: projectIdFilter || null, title, content: '' });
+      const res = await api.post('/wiki', { orgId, projectId: projectIdFilter || null, teamId: teamIdFilter || null, title, content: '' });
       notify('Page créée', { type: 'ok' });
       setCreating(false);
       pages.reload();
@@ -71,8 +86,8 @@ export default function WikiPage() {
   return (
     <>
       <PageHeader
-        title="Wiki d'équipe"
-        sub={routeOrgId ? `Organisation : ${currentOrg?.icon ? `${currentOrg.icon} ` : ''}${currentOrg?.name || '…'}` : 'Base de connaissance partagée par organisation : procédures, décisions techniques, onboarding.'}
+        title={teamIdFilter ? `Documentation d'équipe${currentTeam ? ` — ${currentTeam.name}` : ''}` : projectIdFilter ? 'Documentation de projet' : 'Documentation générale'}
+        sub={routeOrgId ? `Organisation : ${currentOrg?.icon ? `${currentOrg.icon} ` : ''}${currentOrg?.name || '…'} — trois paliers : organisation, équipe, projet` : 'Base de connaissance partagée par organisation, équipe ou projet : procédures, décisions techniques, onboarding.'}
         actions={routeOrgId ? (
           <Link to={`/deployments/organizations/${routeOrgId}`} className="btn-outline wiki-org-select">← Retour à l'organisation</Link>
         ) : (
@@ -97,14 +112,11 @@ export default function WikiPage() {
             <div className="wiki-search-wrap">
               <input className="input wiki-search-input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            {projectIdFilter && (
+            {(projectIdFilter || teamIdFilter) && (
               <div className="wiki-project-filter">
-                Filtré sur ce projet
-                <span
-                  className="wiki-project-filter-clear"
-                  onClick={() => setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete('projectId'); return next; })}
-                >
-                  Toutes les pages
+                {projectIdFilter ? 'Documentation de projet' : `Documentation d'équipe${currentTeam ? ` — ${currentTeam.name}` : ''}`}
+                <span className="wiki-project-filter-clear" onClick={clearFilter}>
+                  Documentation générale
                 </span>
               </div>
             )}

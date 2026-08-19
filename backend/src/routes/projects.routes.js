@@ -966,6 +966,26 @@ router.post('/:id/vault', loadProjectAccess(), requireMinRole('developer'), asyn
   res.status(201).json({ ok: true, entry });
 }));
 
+// --- Documentation (Docusaurus) / Design System (Storybook) ---
+// Enregistrement manuel des liens tant que la création automatisée de
+// repository (compte GitHub de plateforme) n'est pas branchée — voir
+// 0031_project_doc_sites.sql. Nécessite le socle relationnel (les liens
+// sont rattachés au projet relationnel, pas au projet legacy JSON).
+router.get('/:id/doc-sites', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
+  res.json({ ok: true, items: await orgStore.listDocSites(req.pgProject.id), migrated: true });
+}));
+
+router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const { kind } = req.params;
+  if (!['docusaurus', 'storybook'].includes(kind)) return res.status(400).json({ ok: false, error: 'Type inconnu (docusaurus ou storybook)' });
+  const { url, repoUrl, branch, lastCommit, lastPublishedAt, status } = req.body || {};
+  const site = await orgStore.upsertDocSite(req.pgProject.id, kind, { url, repoUrl, branch, lastCommit, lastPublishedAt, status, userId: req.user.id });
+  logAudit(req, 'project.docSite.update', { projectId: req.legacyProject.id, kind, url });
+  res.json({ ok: true, site });
+}));
+
 function slugify(name) {
   return String(name).toLowerCase().trim()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')

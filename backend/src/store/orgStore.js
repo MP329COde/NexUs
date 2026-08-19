@@ -594,10 +594,19 @@ export async function deleteTeam(id) {
 // --- Wiki d'équipe (voir db/migrations/0012_wiki.sql pour le pourquoi :
 // contenu réellement stocké, contrairement au lien runbook des incidents).
 
-export async function listWikiPages(orgId, projectId) {
-  const { rows } = projectId
-    ? await query('SELECT * FROM wiki_pages WHERE org_id = $1 AND project_id = $2 ORDER BY title', [orgId, projectId])
-    : await query('SELECT * FROM wiki_pages WHERE org_id = $1 ORDER BY title', [orgId]);
+// Trois portées mutuellement exclusives (voir 0030_wiki_team_tier.sql) :
+// { projectId } → pages du projet, { teamId } → pages de l'équipe, aucun des
+// deux → pages générales de l'organisation (jamais un mélange des trois).
+export async function listWikiPages(orgId, { projectId, teamId } = {}) {
+  if (projectId) {
+    const { rows } = await query('SELECT * FROM wiki_pages WHERE org_id = $1 AND project_id = $2 ORDER BY title', [orgId, projectId]);
+    return rows;
+  }
+  if (teamId) {
+    const { rows } = await query('SELECT * FROM wiki_pages WHERE org_id = $1 AND team_id = $2 ORDER BY title', [orgId, teamId]);
+    return rows;
+  }
+  const { rows } = await query('SELECT * FROM wiki_pages WHERE org_id = $1 AND project_id IS NULL AND team_id IS NULL ORDER BY title', [orgId]);
   return rows;
 }
 
@@ -614,11 +623,11 @@ export async function getWikiPage(id) {
   return rows[0] || null;
 }
 
-export async function createWikiPage({ orgId, projectId, slug, title, content, userId }) {
+export async function createWikiPage({ orgId, projectId, teamId, slug, title, content, userId }) {
   const { rows } = await query(
-    `INSERT INTO wiki_pages (org_id, project_id, slug, title, content, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
-    [orgId, projectId || null, slug, title, content || '', userId]
+    `INSERT INTO wiki_pages (org_id, project_id, team_id, slug, title, content, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *`,
+    [orgId, projectId || null, teamId || null, slug, title, content || '', userId]
   );
   return rows[0];
 }
@@ -665,6 +674,27 @@ export async function listWikiRevisions(pageId) {
 export async function getWikiRevision(id) {
   const { rows } = await query('SELECT * FROM wiki_page_revisions WHERE id = $1', [id]);
   return rows[0] || null;
+}
+
+// --- Liens Documentation (Docusaurus) / Design System (Storybook) --------
+// Voir 0031_project_doc_sites.sql : enregistrement manuel des URLs tant que
+// la création automatisée de repository (compte GitHub de plateforme) n'est
+// pas branchée.
+export async function listDocSites(projectId) {
+  const { rows } = await query('SELECT * FROM project_doc_sites WHERE project_id = $1', [projectId]);
+  return rows;
+}
+
+export async function upsertDocSite(projectId, kind, { url, repoUrl, branch, lastCommit, lastPublishedAt, status, userId }) {
+  const { rows } = await query(
+    `INSERT INTO project_doc_sites (project_id, kind, url, repo_url, branch, last_commit, last_published_at, status, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (project_id, kind) DO UPDATE SET
+       url = $3, repo_url = $4, branch = $5, last_commit = $6, last_published_at = $7, status = $8, updated_by = $9, updated_at = now()
+     RETURNING *`,
+    [projectId, kind, url || null, repoUrl || null, branch || null, lastCommit || null, lastPublishedAt || null, status || 'unknown', userId]
+  );
+  return rows[0];
 }
 
 // --- Software Catalog (components) ---------------------------------------
