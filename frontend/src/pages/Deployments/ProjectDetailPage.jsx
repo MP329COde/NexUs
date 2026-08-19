@@ -19,8 +19,8 @@ import IncidentCommentsModal from './IncidentCommentsModal.jsx';
 import ProjectPresenceBar from './ProjectPresenceBar.jsx';
 import './ProjectDetailPage.css';
 
-const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
-const STATUS_ORDER = ['todo', 'in_progress', 'review', 'done'];
+const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', testing: 'Tests', ready: 'Prêt', done: 'Terminé' };
+const STATUS_ORDER = ['todo', 'in_progress', 'review', 'testing', 'ready', 'done'];
 const PROJECT_STATUS_LABELS = { active: 'Actif', paused: 'En pause', archived: 'Archivé' };
 const PROJECT_STATUS_ORDER = ['active', 'paused', 'archived'];
 
@@ -206,6 +206,7 @@ export default function ProjectDetailPage() {
                   </select>
                   <span className="pd-task-title">{t.title}</span>
                   {t.branch && <span className="faint mono">{t.branch}</span>}
+                  {t.prUrl && <a href={t.prUrl} target="_blank" rel="noreferrer" className="btn-outline pd-action-btn" title="Ouvrir la PR/MR liée">PR</a>}
                   {t.assigneeId ? (
                     <span className="badge badge-vio" style={{ cursor: 'pointer' }} onClick={() => assignTask(t, null)} title="Se désassigner">{userName(t.assigneeId)}</span>
                   ) : (

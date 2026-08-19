@@ -6,6 +6,8 @@ const COLUMNS = [
   { status: 'todo', label: 'Backlog' },
   { status: 'in_progress', label: 'En cours' },
   { status: 'review', label: 'En revue' },
+  { status: 'testing', label: 'Tests' },
+  { status: 'ready', label: 'Prêt' },
   { status: 'done', label: 'Terminé' }
 ];
 
@@ -51,6 +53,11 @@ export default function ProjectBoard({ tasks, userName, onStatusChange, onOpenCo
                 {t.branch && <div className="faint mono" style={{ fontSize: 11, marginBottom: 6 }}>{t.branch}</div>}
                 <div className="board-card-foot">
                   {t.assigneeId ? <span className="badge badge-vio">{userName(t.assigneeId)}</span> : <span className="faint">Non assignée</span>}
+                  {t.prUrl && (
+                    <a href={t.prUrl} target="_blank" rel="noreferrer" title="Ouvrir la PR/MR liée" onClick={(e) => e.stopPropagation()}>
+                      <Icon name="gitBranch" size={12} />
+                    </a>
+                  )}
                   <span className="board-card-comments" onClick={() => onOpenComments(t)} title="Commentaires">
                     <Icon name="edit" size={12} />
                   </span>

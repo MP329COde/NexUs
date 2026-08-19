@@ -6,7 +6,7 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import './MyWorkPage.css';
 
-const TASK_STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
+const TASK_STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', testing: 'Tests', ready: 'Prêt', done: 'Terminé' };
 const SEVERITY_TONE = { critical: 'crit', high: 'crit', medium: 'warn', low: 'mut' };
 
 // Page centrale "Mon travail" : regroupe ce qui concerne directement
