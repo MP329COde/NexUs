@@ -136,7 +136,7 @@ const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { name, description, tags, memberIds, repoKeys, icon, color } = req.body || {};
+  const { name, description, tags, memberIds, repoKeys, icon, color, organizationId } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
   if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
   if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
@@ -148,8 +148,16 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   if (pool) {
     try {
       const orgs = await orgStore.listOrganizationsForUser(req.user.id);
-      let org = orgs[0];
-      if (!org) org = await orgStore.createOrganization({ name: 'Organisation par défaut', slug: 'default', ownerUserId: req.user.id });
+      // Bug corrigé : organizationId envoyé par le client était jusqu'ici
+      // silencieusement ignoré — le projet finissait toujours rattaché à
+      // la première organisation de l'utilisateur (orgs[0]), jamais celle
+      // demandée, dès qu'un compte appartenait à plusieurs organisations.
+      let org = organizationId ? orgs.find((o) => o.id === organizationId) : orgs[0];
+      // organizationId invalide/inaccessible : repli sur le comportement
+      // précédent (première organisation, ou "Organisation par défaut")
+      // plutôt qu'un échec — le projet legacy ci-dessus est déjà créé, une
+      // erreur ici laisserait un projet legacy sans réponse cohérente.
+      if (!org) org = orgs[0] || await orgStore.createOrganization({ name: 'Organisation par défaut', slug: 'default', ownerUserId: req.user.id });
       const pgProject = await orgStore.createProject({
         orgId: org.id, name, slug: slugify(name), description, tags, repoKeys,
         ownerUserId: req.user.id, legacyId: project.id
@@ -1035,6 +1043,31 @@ router.post('/:id/vault', loadProjectAccess(), requireMinRole('developer'), asyn
 router.get('/:id/doc-sites', loadProjectAccess(), asyncHandler(async (req, res) => {
   if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
   res.json({ ok: true, items: await orgStore.listDocSites(req.pgProject.id), migrated: true });
+}));
+
+// --- ADR (Architecture Decision Records) ---
+router.get('/:id/adrs', loadProjectAccess(), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.json({ ok: true, items: [], migrated: false });
+  res.json({ ok: true, items: await orgStore.listAdrs(req.pgProject.id), migrated: true });
+}));
+
+router.post('/:id/adrs', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const { title, status, content } = req.body || {};
+  if (!title || !title.trim()) return res.status(400).json({ ok: false, error: 'title requis' });
+  const adr = await orgStore.createAdr(req.pgProject.id, { title: title.trim(), status, content, userId: req.user.id });
+  logAudit(req, 'project.adr.create', { projectId: req.legacyProject.id, adrId: adr.id, number: adr.number });
+  res.status(201).json({ ok: true, adr });
+}));
+
+router.put('/:id/adrs/:adrId', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
+  if (!pool || !req.pgProject) return res.status(409).json({ ok: false, error: 'Projet non migré vers le socle relationnel' });
+  const existing = await orgStore.getAdr(req.params.adrId);
+  if (!existing || existing.project_id !== req.pgProject.id) return res.status(404).json({ ok: false, error: 'ADR introuvable' });
+  const { title, status, content } = req.body || {};
+  const adr = await orgStore.updateAdr(req.params.adrId, { title, status, content, userId: req.user.id });
+  logAudit(req, 'project.adr.update', { projectId: req.legacyProject.id, adrId: adr.id });
+  res.json({ ok: true, adr });
 }));
 
 router.put('/:id/doc-sites/:kind', loadProjectAccess(), requireMinRole('maintainer'), asyncHandler(async (req, res) => {
