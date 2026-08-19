@@ -169,6 +169,52 @@ router.get('/:key/structure', asyncHandler(async (req, res) => {
   });
 }));
 
+// --- Branches / commits / sécurité : complète la vue "Repository Workspace"
+// avec les méthodes déjà écrites dans les services d'intégration mais pas
+// encore exposées côté API (listBranches/listCommits existent aussi pour
+// Gitea — lecture seule, cohérent avec son périmètre volontairement limité).
+router.get('/:key/branches', asyncHandler(async (req, res) => {
+  const { provider, id } = parseKey(req.params.key);
+  if (provider === 'gitlab') return res.json({ ok: true, items: await gitlab.listBranches(id) });
+  if (provider === 'github') {
+    const [owner, repo] = id.split('/');
+    return res.json({ ok: true, items: await github.listBranches(owner, repo) });
+  }
+  if (provider === 'gitea') {
+    const [owner, repo] = id.split('/');
+    return res.json({ ok: true, items: await gitea.listBranches(owner, repo) });
+  }
+  res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+router.get('/:key/commits', asyncHandler(async (req, res) => {
+  const { provider, id } = parseKey(req.params.key);
+  const ref = req.query.ref || undefined;
+  if (provider === 'gitlab') return res.json({ ok: true, items: await gitlab.listCommits(id, ref) });
+  if (provider === 'github') {
+    const [owner, repo] = id.split('/');
+    return res.json({ ok: true, items: await github.listCommits(owner, repo, ref) });
+  }
+  if (provider === 'gitea') {
+    const [owner, repo] = id.split('/');
+    return res.json({ ok: true, items: await gitea.listCommits(owner, repo, ref) });
+  }
+  res.status(400).json({ ok: false, error: 'Fournisseur inconnu' });
+}));
+
+// Alertes de sécurité : seul GitHub (Dependabot) est câblé côté service —
+// GitLab/Gitea répondent honnêtement "non supporté" plutôt qu'une liste
+// vide ambiguë (voir githubService.listDependencyAlerts, déjà écrite mais
+// jusqu'ici inutilisée par aucune route).
+router.get('/:key/security', asyncHandler(async (req, res) => {
+  const { provider, id } = parseKey(req.params.key);
+  if (provider === 'github') {
+    const [owner, repo] = id.split('/');
+    return res.json({ ok: true, supported: true, items: await github.listDependencyAlerts(owner, repo) });
+  }
+  res.json({ ok: true, supported: false, items: [] });
+}));
+
 router.get('/:key/file', asyncHandler(async (req, res) => {
   const { provider, id } = parseKey(req.params.key);
   const path = req.query.path;

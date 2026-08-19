@@ -34,6 +34,9 @@ export default function RepoDetailPage() {
   // "owner/repo") avant de le donner à useParams — le réencoder ici est donc
   // nécessaire pour reconstruire une URL d'API valide vers ce même segment.
   const structure = useApi(() => api.get(`/repos/${encodeURIComponent(key)}/structure`), [key]);
+  const branches = useApi(() => api.get(`/repos/${encodeURIComponent(key)}/branches`), [key]);
+  const commits = useApi(() => api.get(`/repos/${encodeURIComponent(key)}/commits`), [key]);
+  const security = useApi(() => api.get(`/repos/${encodeURIComponent(key)}/security`), [key]);
 
   const repo = (repos.data?.items || []).find((r) => r.key === key);
   if (repos.data && !repo) {
@@ -79,6 +82,67 @@ export default function RepoDetailPage() {
             <div className="repo-detail-stack">
               <span className="faint">Stack détectée : </span>
               {structure.data.structure.stack.length === 0 ? <span className="faint">non détectée</span> : structure.data.structure.stack.map((s) => <span key={s} className="badge badge-mut">{s}</span>)}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="Branches" sub={`${(branches.data?.items || []).length} branche(s)`} span={6}>
+          {!branches.data ? (
+            <div className="faint">Chargement…</div>
+          ) : (branches.data.items || []).length === 0 ? (
+            <div className="faint">Aucune branche trouvée.</div>
+          ) : (
+            <div className="repo-detail-list">
+              {branches.data.items.slice(0, 15).map((b) => (
+                <div key={b.name} className="repo-detail-row">
+                  <span className="mono repo-detail-row-title">{b.name}</span>
+                  {b.default && <span className="badge badge-info">défaut</span>}
+                  {b.protected && <span className="badge badge-warn">protégée</span>}
+                  <span className="faint mono">{b.commitSha || '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Commits" sub={`${(commits.data?.items || []).length} récent(s) sur la branche par défaut`} span={6}>
+          {!commits.data ? (
+            <div className="faint">Chargement…</div>
+          ) : (commits.data.items || []).length === 0 ? (
+            <div className="faint">Aucun commit trouvé.</div>
+          ) : (
+            <div className="repo-detail-list">
+              {commits.data.items.slice(0, 15).map((c) => (
+                <a key={c.sha} href={c.webUrl} target="_blank" rel="noreferrer" className="repo-detail-row">
+                  <span className="mono repo-detail-row-title">{c.sha}</span>
+                  <span className="faint">{c.message}</span>
+                  <span className="faint">{c.author || 'non disponible'}</span>
+                  <Icon name="externalLink" size={12} />
+                </a>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="Sécurité" sub={security.data?.supported ? `${(security.data.items || []).length} alerte(s) ouverte(s) (Dependabot)` : 'Non disponible pour ce fournisseur'} span={12}>
+          {!security.data?.supported ? (
+            <div className="faint">Les alertes de dépendances ne sont exposées que pour GitHub (Dependabot) — non disponible pour {PROVIDER_LABEL[repo.provider] || repo.provider}.</div>
+          ) : (security.data.items || []).length === 0 ? (
+            <div className="faint">Aucune alerte de dépendance ouverte.</div>
+          ) : (
+            <div className="repo-detail-list">
+              {security.data.items.map((a) => (
+                <a key={a.number} href={a.webUrl} target="_blank" rel="noreferrer" className="repo-detail-row">
+                  <span className={`badge badge-${a.severity === 'critical' || a.severity === 'high' ? 'crit' : a.severity === 'moderate' ? 'warn' : 'mut'}`}>{a.severity || '—'}</span>
+                  <span className="repo-detail-row-title">{a.package}</span>
+                  <span className="faint">{a.summary}</span>
+                  <Icon name="externalLink" size={12} />
+                </a>
+              ))}
             </div>
           )}
         </Panel>
