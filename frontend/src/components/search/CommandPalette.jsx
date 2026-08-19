@@ -86,6 +86,46 @@ export default function CommandPalette({ open, onClose, context }) {
           items.push({ label: p.fullName || p.name, group: 'Dépôts', path: '/deployments', keywords: `dépôt repo github git ${p.fullName || ''}` });
         }
       } catch { /* github non disponible */ }
+      // Organisations et équipes de l'utilisateur (socle relationnel) :
+      // mêmes endpoints "mine" que OrganizationsPage/TeamWorkspacePage,
+      // aucune nouvelle route.
+      let myOrgs = [];
+      try {
+        const res = await api.get('/organizations');
+        myOrgs = res.items || [];
+        for (const o of myOrgs) {
+          items.push({ label: o.name, group: 'Organisations', path: `/deployments/organizations/${o.id}`, keywords: `organisation ${o.name} ${o.slug || ''}`, icon: 'users' });
+        }
+      } catch { /* socle organisations non disponible */ }
+      try {
+        const res = await api.get('/teams/mine');
+        for (const t of res.items || []) {
+          items.push({ label: t.name, group: 'Équipes', path: `/deployments/organizations/${t.org_id}`, keywords: `équipe team ${t.name}` });
+        }
+      } catch { /* équipes non disponibles */ }
+      // Tâches assignées : même endpoint que "Mon travail".
+      try {
+        const res = await api.get('/projects/mine/tasks');
+        for (const t of res.items || []) {
+          items.push({ label: `${t.projectName} — ${t.title}`, group: 'Tâches', path: `/deployments/projects/${t.projectId}`, keywords: `tâche task ${t.title} ${t.projectName}`, icon: 'check' });
+        }
+      } catch { /* tâches non disponibles */ }
+      // Environnements de preview sur mes projets : même endpoint que "Mon travail".
+      try {
+        const res = await api.get('/projects/mine/environments');
+        for (const e of res.items || []) {
+          items.push({ label: `${e.projectName} — ${e.name}`, group: 'Environnements', path: `/deployments/projects/${e.projectId}`, keywords: `environnement preview ${e.name} ${e.source_branch || ''} ${e.projectName}`, icon: 'gitBranch' });
+        }
+      } catch { /* environnements non disponibles */ }
+      // Pages du wiki d'équipe : une organisation à la fois (endpoint exige
+      // orgId), limité aux organisations de l'utilisateur — pas de nouvel
+      // endpoint, juste un appel par organisation déjà connue ci-dessus.
+      try {
+        const wikiLists = await Promise.all(myOrgs.map((o) => api.get(`/wiki?orgId=${o.id}`).then((r) => (r.items || []).map((page) => ({ ...page, orgName: o.name }))).catch(() => [])));
+        for (const page of wikiLists.flat()) {
+          items.push({ label: page.title, group: 'Documents', path: `/deployments/organizations/${page.org_id}/wiki`, keywords: `document wiki page ${page.title} ${page.orgName}`, icon: 'book' });
+        }
+      } catch { /* wiki non disponible */ }
       // Données personnelles / plateforme : les entrées "Mon compte" et
       // "Paramètres — Plateforme" existent déjà en statique, on enrichit juste
       // leurs mots-clés avec les valeurs réelles (nom, e-mail, organisation)
