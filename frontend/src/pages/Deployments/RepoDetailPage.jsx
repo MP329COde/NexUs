@@ -25,6 +25,11 @@ export default function RepoDetailPage() {
   const repos = useApi(() => api.get('/repos'), []);
   const reviews = useApi(() => api.get('/reviews'), []);
   const pipelines = useApi(() => api.get('/pipelines/runs'), []);
+  // Repository Links (todo.md item 44) : quels projets rattachent ce
+  // dépôt — dérivé de p.repoKeys (déjà la source de vérité du lien
+  // projet ↔ dépôt, voir ProjectDetailPage.jsx panneau "Dépôts
+  // rattachés"), jamais l'inverse d'une donnée qui n'existerait pas.
+  const projects = useApi(() => api.get('/projects'), []);
   // react-router décode déjà :key (y compris un %2F encodé pour un id GitHub
   // "owner/repo") avant de le donner à useParams — le réencoder ici est donc
   // nécessaire pour reconstruire une URL d'API valide vers ce même segment.
@@ -38,6 +43,7 @@ export default function RepoDetailPage() {
 
   const myReviews = (reviews.data?.items || []).filter((r) => r.repo === repo.path);
   const myPipelines = (pipelines.data?.items || []).filter((p) => p.repo === repo.path);
+  const linkedProjects = (projects.data?.items || []).filter((p) => (p.repoKeys || []).includes(repo.key));
 
   return (
     <>
@@ -73,6 +79,23 @@ export default function RepoDetailPage() {
             <div className="repo-detail-stack">
               <span className="faint">Stack détectée : </span>
               {structure.data.structure.stack.length === 0 ? <span className="faint">non détectée</span> : structure.data.structure.stack.map((s) => <span key={s} className="badge badge-mut">{s}</span>)}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="Projets rattachés" sub={`${linkedProjects.length} projet(s)`} span={12}>
+          {linkedProjects.length === 0 ? (
+            <div className="faint">Aucun projet ne rattache ce dépôt — voir la fiche projet, panneau "Dépôts rattachés".</div>
+          ) : (
+            <div className="repo-detail-list">
+              {linkedProjects.map((p) => (
+                <Link key={p.id} to={`/deployments/projects/${p.id}`} className="repo-detail-row">
+                  <span className="repo-detail-row-title">{p.name}</span>
+                  <Icon name="externalLink" size={12} />
+                </Link>
+              ))}
             </div>
           )}
         </Panel>
