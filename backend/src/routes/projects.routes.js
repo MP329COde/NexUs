@@ -796,6 +796,7 @@ router.post('/:id/incidents/:incidentId/comments', loadProjectAccess(), requireM
   const { body } = req.body || {};
   if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
   const comment = await incidentStore.addComment(incident.id, req.user.id, body.trim());
+  await logProjectActivity(req.pgProject.id, req.user.id, 'incident.comment', { incidentId: incident.id, title: incident.title }).catch(() => {});
   res.status(201).json({ ok: true, comment });
 }));
 

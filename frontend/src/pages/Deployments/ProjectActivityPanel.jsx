@@ -7,7 +7,8 @@ const ACTION_LABELS = {
   'task.status': (m) => `a déplacé « ${m.title} » vers ${m.status}`,
   'task.comment': (m) => `a commenté « ${m.title} »`,
   'adr.create': (m) => `a créé ADR-${String(m.number).padStart(3, '0')} « ${m.title} »`,
-  'docSite.update': (m) => `a mis à jour le lien ${m.kind}`
+  'docSite.update': (m) => `a mis à jour le lien ${m.kind}`,
+  'incident.comment': (m) => `a commenté l'incident « ${m.title} »`
 };
 
 // Activité d'équipe (todo.md items 28/31) : "qui a fait quoi, quand" —

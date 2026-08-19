@@ -15,6 +15,7 @@ import TaskCommentsModal from './TaskCommentsModal.jsx';
 import WorkspaceHealthPanel from './WorkspaceHealthPanel.jsx';
 import AdrPanel from './AdrPanel.jsx';
 import ProjectActivityPanel from './ProjectActivityPanel.jsx';
+import IncidentCommentsModal from './IncidentCommentsModal.jsx';
 import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
@@ -280,6 +281,7 @@ export default function ProjectDetailPage() {
           projectId={id}
           role={projectRole}
           onChanged={incidents.reload}
+          userName={userName}
         />
       </div>
 
@@ -575,10 +577,11 @@ function DocSiteEditForm({ site, onCancel, onSave }) {
   );
 }
 
-function IncidentsPanel({ incidents, projectId, role, onChanged }) {
+function IncidentsPanel({ incidents, projectId, role, onChanged, userName }) {
   const notify = useNotify();
   const [open, setOpen] = useState(false);
   const [resolving, setResolving] = useState(null);
+  const [commentingOn, setCommentingOn] = useState(null);
   const canCreate = roleAtLeast(role, 'developer');
   const canResolve = roleAtLeast(role, 'maintainer');
   const openCount = incidents.filter((i) => i.status !== 'resolved').length;
@@ -605,12 +608,17 @@ function IncidentsPanel({ incidents, projectId, role, onChanged }) {
                 </a>
               )}
               <span className="faint pd-row-date">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</span>
+              <span className="btn-outline pd-action-btn" onClick={() => setCommentingOn(inc)}>Commentaires</span>
               {inc.status !== 'resolved' && canResolve && (
                 <span className="btn-outline pd-action-btn" onClick={() => setResolving(inc)}>Résoudre</span>
               )}
             </div>
           ))}
         </div>
+      )}
+
+      {commentingOn && (
+        <IncidentCommentsModal projectId={projectId} incident={commentingOn} userName={userName} onClose={() => setCommentingOn(null)} />
       )}
 
       {open && (
