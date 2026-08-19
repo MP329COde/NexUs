@@ -117,6 +117,24 @@ function roleAtLeastForDecide(role) {
   return role === 'maintainer' || role === 'owner';
 }
 
+// "Mes environnements" (page "Mon travail") : environnements de type
+// preview sur MES projets — aucune notion de "créé par moi" n'existe sur
+// la table environments (pas de created_by), donc ce n'est pas un filtre
+// par propriétaire mais par appartenance projet, comme /mine/overview et
+// /mine/tasks juste au-dessus.
+router.get('/mine/environments', asyncHandler(async (req, res) => {
+  const myProjects = await listMyProjects(req.user);
+  if (!pool || myProjects.length === 0) return res.json({ ok: true, items: [] });
+  const perProject = await Promise.all(myProjects.map(async (legacy) => {
+    const pg = await orgStore.getProjectByLegacyId(legacy.id);
+    if (!pg) return [];
+    const envs = await orgStore.listEnvironments(pg.id);
+    return envs.filter((e) => e.kind === 'preview').map((e) => ({ ...e, projectId: legacy.id, projectName: legacy.name }));
+  }));
+  const items = perProject.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  res.json({ ok: true, items });
+}));
+
 // "Mon travail" (page frontend éponyme) : mes tâches, tous projets
 // confondus, avec le nom du projet pour affichage/navigation directe.
 // Filtre par appartenance projet (comme /mine/overview) pour ne jamais
