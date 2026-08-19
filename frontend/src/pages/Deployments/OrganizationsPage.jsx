@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
@@ -30,6 +30,17 @@ export default function OrganizationsPage() {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(null);
   const [managingMembers, setManagingMembers] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Ouverture directe depuis le Command Center ("Créer une organisation" —
+  // voir components/search/contextualActions.js#globalActions).
+  useEffect(() => {
+    if (searchParams.get('open') === 'create') {
+      setFormOpen(true);
+      setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete('open'); return next; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const organizations = data?.items || [];
   const configured = !error || !String(error).includes('DATABASE_URL');

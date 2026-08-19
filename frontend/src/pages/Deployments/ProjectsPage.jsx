@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
@@ -33,6 +33,19 @@ export default function ProjectsPage() {
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Ouverture directe depuis le Command Center ("Créer un projet" — voir
+  // components/search/contextualActions.js#globalActions) : ?open=create
+  // ouvre le formulaire au montage, puis nettoie l'URL pour ne pas rouvrir
+  // le formulaire à chaque navigation retour.
+  useEffect(() => {
+    if (searchParams.get('open') === 'create') {
+      setFormOpen(true);
+      setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete('open'); return next; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allProjects = data?.items || [];
   const allUsers = users.data?.items || [];

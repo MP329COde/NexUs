@@ -4,6 +4,7 @@
 export const STATIC_SEARCH_ITEMS = [
   { label: 'Vue générale', group: 'Pages', path: '/', keywords: 'accueil dashboard tableau de bord santé' },
   { label: 'Développement — Accès aux outils', group: 'Pages', path: '/deployments', keywords: 'dev outils raccourcis chaîne' },
+  { label: 'Mon travail', group: 'Pages', path: '/deployments/my-work', keywords: 'mes tâches revues incidents changements assignés' },
   { label: 'Développement — Projets', group: 'Pages', path: '/deployments/projects', keywords: 'projets équipe backlog tâches' },
   { label: 'Organisations', group: 'Pages', path: '/deployments/organizations', keywords: 'organisation équipe team membre rôle rbac' },
   { label: 'Wiki d\'équipe', group: 'Pages', path: '/deployments/wiki', keywords: 'wiki documentation connaissance procédure onboarding page' },
@@ -36,6 +37,7 @@ export const STATIC_SEARCH_ITEMS = [
   { label: 'Rapport de santé', group: 'Pages', path: '/report', keywords: 'rapport pdf export imprimer santé' },
   { label: 'Paramètres — Intégrations', group: 'Administration', path: '/settings', keywords: 'kubernetes argocd haproxy gitlab github proxmox traefik grafana wazuh token', adminOnly: true },
   { label: 'Paramètres — Utilisateurs', group: 'Administration', path: '/settings?tab=users', keywords: 'comptes rôles admin utilisateur', adminOnly: true },
+  { label: 'Paramètres — Plugins', group: 'Administration', path: '/settings?tab=plugins', keywords: 'plugins extensions registre installer activer' },
   { label: 'Paramètres — Groupes & permissions', group: 'Administration', path: '/settings?tab=groups', keywords: 'groupes permissions matrice droits rbac', adminOnly: true },
   { label: 'Paramètres — Inventaire', group: 'Administration', path: '/settings?tab=inventory', keywords: 'actifs matériel garantie serveurs', adminOnly: true },
   { label: 'Paramètres — Plateforme', group: 'Administration', path: '/settings?tab=platform', keywords: 'organisation fuseau horaire langue', adminOnly: true },
