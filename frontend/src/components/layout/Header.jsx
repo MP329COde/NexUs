@@ -46,6 +46,19 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
     await api.post('/notifications/read-all');
     serverNotifs.reload();
   }
+
+  // Notifications de développement persistantes, pour tout utilisateur —
+  // distinctes des alertes de sécurité (admin uniquement, ci-dessus) et de
+  // `history` (session en cours, perdue au rechargement, ci-dessous).
+  const myNotifs = useApi(() => api.get('/my-notifications'), [], { pollMs: 30000 });
+  const myItems = myNotifs.data?.items || [];
+  const myUnreadCount = myNotifs.data?.unreadCount || 0;
+
+  async function markAllMineRead() {
+    if (myUnreadCount === 0) return;
+    await api.post('/my-notifications/read-all');
+    myNotifs.reload();
+  }
   const { data: consoleData } = useApi(() => api.get('/console'), []);
   const score = data?.score ?? null;
   const tone = toneFromScore(score);
@@ -182,7 +195,7 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
         <div className="header-popover-anchor" ref={notif.ref}>
           <button onClick={() => { setNotifMenu((v) => !v); setUserMenu(false); }} title="Notifications" className="icon-btn header-notif-btn">
             <Icon name="bell" size={16} />
-            {(history.length > 0 || unreadCount > 0) && <span className="header-notif-dot" />}
+            {(history.length > 0 || unreadCount > 0 || myUnreadCount > 0) && <span className="header-notif-dot" />}
           </button>
           {notif.visible && (
             <div className={`card header-popover-card header-popover-card-right header-popover-card-narrow ${notif.closing ? 'header-popover-closing' : 'header-popover-opening'}`}>
@@ -207,6 +220,24 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
                   </div>
                 </>
               )}
+              <div className="header-panel-head">
+                <span className="header-panel-head-title">Mes notifications{myUnreadCount > 0 ? ` (${myUnreadCount})` : ''}</span>
+                {myUnreadCount > 0 && <span onClick={markAllMineRead} className="header-panel-head-action">Tout marquer lu</span>}
+              </div>
+              <div className="header-panel-list">
+                {myItems.length === 0 && <div className="header-panel-empty">Aucune notification</div>}
+                {myItems.map((n) => (
+                  <div key={n.id} className={`header-notif-item ${!n.read ? 'header-notif-item-unread' : ''}`}>
+                    <span className="header-notif-item-icon"><Icon name="bell" size={15} /></span>
+                    <div className="header-notif-item-body">
+                      {n.title && <div className="header-notif-item-title">{n.title}</div>}
+                      <div className="header-notif-item-message">{n.message}</div>
+                      <div className="mono header-notif-item-time">{new Date(n.created_at).toLocaleString('fr-FR')}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <div className="header-panel-head">
                 <span className="header-panel-head-title">Activité de la session</span>
                 {history.length > 0 && <span onClick={clearHistory} className="header-panel-head-action">Effacer</span>}
