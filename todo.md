@@ -155,3 +155,55 @@ Fichiers touchés cette session (Lots 37-40) : `frontend/src/pages/Deployments/W
 
 Fichiers touchés cette session (Lots 43-44) : `backend/src/services/integrations/haproxyService.js`, `backend/src/routes/haproxy.routes.js`, `frontend/src/pages/Network/HAProxyPage.jsx`, `frontend/src/pages/Network/CreateFrontendDialog.jsx`, `frontend/src/pages/Network/TopologyPage.jsx`, `frontend/src/pages/Network/TopologyGraph.jsx`, `frontend/src/pages/Network/NetworkShared.css`. Environnement de dev pour cette session : backend sur le port 4143, frontend Vite sur le port 5143 (ports dédiés pour ne pas entrer en conflit avec les agents Lot 41/42 travaillant en parallèle sur les ports 4000/5173 habituels), même Postgres partagé `nexus-dev-postgres` (port 5433).
 - [ ] **Tentative d'audit visuel large (polish général, Lot 45) — bloquée par l'environnement, pas de correction codée** : environnement de dev remonté (Postgres `nexus-dev-postgres` déjà actif, `backend/.env` complété avec `DATABASE_URL` + `ADMIN_EMAIL`/`ADMIN_PASSWORD` car aucun compte n'existait sur cette base fraîche — un admin `admin@nexus.local` a été créé via bootstrap), `npm install` exécuté dans `backend/` et `frontend/` (dépendances absentes dans ce worktree fraîchement créé), backend (`node src/index.js`, log `/tmp/nexus-backend.log`) et frontend (`vite`, port 5174 — 5173 déjà pris par un autre agent en parallèle) lancés avec succès. Connexion admin réussie via Playwright, deux captures réelles obtenues (Vue générale, clair et sombre) — aucun défaut visuel trouvé sur cette page (cartes, badges, contrastes cohérents avec les tokens de `theme.css`). **Le reste de l'audit (Projets, Équipes, Dépôts Git, Pipelines, Environnements, Documentation, Sécurité, Réseau, Kubernetes, Paramètres, Compte) n'a pas pu être mené de façon fiable** : le navigateur Playwright piloté par `mcp__playwright__*` s'est révélé être une instance **partagée entre tous les agents actifs en parallèle sur ce dépôt** (Lots 41-44 tournant simultanément) — onglets créés/fermés/renavigués par d'autres agents en continu, et même l'onglet "courant" a été réassigné à une autre URL (port d'un autre agent) entre deux appels d'outil consécutifs dans le même tour, de façon reproductible sur plus de six tentatives distinctes (nouvel onglet dédié, sélection explicite par index, revérification de l'URL avant chaque action). Aucune capture fiable n'a donc pu être obtenue pour les autres pages, et **aucune correction CSS n'a été appliquée** : la consigne de la tâche imposait de revérifier chaque correction par une nouvelle capture Playwright, ce qui n'était pas possible dans ces conditions — corriger à l'aveugle sur la seule base d'une lecture statique de `global.css`/`theme.css` (au demeurant déjà passés en revue en détail lors des lots CSS précédents, 99 fichiers, et de l'audit mobile) aurait été spéculatif. Aucun fichier modifié, aucun commit. À reprendre dans une session où l'agent dispose d'une instance de navigateur non partagée (ou en dehors d'une fenêtre de forte concurrence entre agents).
+
+- [x] **Kubernetes & HAProxy — vérification bout-en-bout contre de vraies instances locales (Lot 46)** : jusqu'ici, aucune des deux intégrations n'avait jamais été testée contre un cluster/une instance réels (todo.md l'indiquait explicitement pour Kubernetes, et pour HAProxy seule la route était vérifiée avec l'intégration non configurée, cf. Lot 43). Deux environnements réels montés localement (Docker) pour combler ça — voir section "Environnement de dev" ci-dessous pour les relancer.
+  - **Kubernetes** : cluster `k3d` réel (`nexus-test`, k3s v1.35 dans Docker), namespace `nexus-demo` avec un déploiement nginx (3 pods) + service, ServiceAccount `nexus-console` (cluster-admin, token longue durée) pour reproduire exactement le mode d'auth documenté dans `integrationForms.js` (token de ServiceAccount, pas kubeconfig client-cert par défaut de k3d — testé avec le vrai mécanisme recommandé aux utilisateurs). Intégration configurée dans NexUs (apiServer réel, token réel, `insecureSkipTlsVerify` pour la CA auto-signée du labo). Vérifié réellement : `namespaces`, `pods`, `deployments`, `services`, `logs` comparés champ à champ à `kubectl get -A`/`kubectl logs` — données identiques, aucune donnée inventée. **Deux vrais bugs trouvés et corrigés en testant les actions d'écriture** (jamais démontrées avant faute de cluster) :
+    1. `scaleDeployment()` envoyait un merge-patch (`{spec:{replicas}}`) à `patchNamespacedDeploymentScale`, mais le client `@kubernetes/client-node` v1 négocie `application/json-patch+json` par défaut sur cet endpoint aussi (pas seulement sur `patchNamespacedDeployment`, où c'était déjà géré) — l'API server rejetait avec 400 "cannot unmarshal object into []jsonPatchOp". Corrigé en JSON Patch (`[{op:'replace', path:'/spec/replicas', value: replicas}]`), revérifié : scale 3→5 réel confirmé par `kubectl get deploy`.
+    2. Non-bug confirmé par test : `deletePod` et `restartDeployment` fonctionnent tels quels (pod supprimé recréé par le ReplicaSet, rolling restart avec nouveaux noms de pods — vérifié par `kubectl get pods`).
+  - **HAProxy** : conteneur réel `nexus-test-haproxy` (`haproxytech/haproxy-alpine`, HAProxy 3.4 + Data Plane API embarqué lancé en tâche de fond dans le même conteneur), config de départ montée en volume (frontend + backend + userlist Data Plane API). Intégration configurée dans NexUs (URL Data Plane API réelle, identifiants réels). **Découverte majeure, corrigée** : `haproxyService.js` ciblait entièrement l'API v2 (`/v2/services/haproxy/...`) — **or aucune version de Data Plane API encore distribuée ne sert plus `/v2/*`** (testé avec `haproxytech/haproxy-alpine:latest` ET `:2.9`, deux versions de dataplaneapi différentes, 404 sur `/v2/*` dans les deux cas). Le guide utilisateur (`integrationForms.js`) annonçait "v2/v3" mais le code n'implémentait que v2, jamais vérifiable avant faute d'instance réelle. Migration complète vers v3 dans `haproxyService.js` : préfixe `/v3/`, réponses en tableau JSON brut (v3 ne wrappe plus dans `{data:[...]}`), sous-ressources désormais dans le chemin plutôt qu'en paramètre de requête (`/configuration/backends/{name}/servers`, `/runtime/backends/{name}/servers`, `/configuration/frontends/{name}/acls`...). Deux bugs supplémentaires trouvés en testant chaque action réellement (POST/PUT/PATCH, pas seulement les GET) :
+    1. `applyProxyBackend()` : création du serveur en `PUT` seul, qui échoue 404 "does not exist" sur un backend fraîchement créé (aucun serveur à mettre à jour) — corrigé en `POST` (création) avec repli `PUT` (mise à jour) si le serveur existe déjà, même pattern que la création de backend juste au-dessus.
+    2. `attachProxyToFrontend()` (et le `createFrontend()` du Lot 43, jamais testé contre une vraie instance à l'époque, mêmes sous-ressources) : `POST` unitaire sur `acls`/`backend_switching_rules` renvoie 405 "method POST is not allowed, but [GET,PUT] are" — l'API v3 ne permet plus d'ajouter un élément un par un sur ces sous-collections structurées, seulement un `PUT` qui remplace le tableau entier. Corrigé : lecture de la collection existante, ajout de l'élément, ré-indexation, `PUT` du tableau complet.
+  - Toutes les actions revérifiées après correction en inspectant directement `docker exec nexus-test-haproxy cat /usr/local/etc/haproxy/haproxy.cfg` (fichier géré par Data Plane API) après chaque appel API NexUs : backend+serveur créés (`server srv1 10.42.0.9:8080 check`), nouveau frontend créé (`bind *:8081`), ACL+règle de bascule ajoutées sur `main_fe` (`acl host_nexus_... hdr(host) testapp.homelab.local` / `use_backend ... if ...`), état runtime d'un serveur basculé en `drain` — tout persiste réellement dans la configuration HAProxy, pas seulement dans la réponse API.
+  - Suite de tests backend relancée après les deux fixes : **123/123 tests passent**, aucune régression.
+  - **Limite réelle découverte, non un bug** : la documentation utilisateur de l'intégration Kubernetes (guide dans `integrationForms.js`) recommande l'auth par token de ServiceAccount — confirmée correcte et suffisante, aucun changement nécessaire côté kubeconfig/client-cert.
+  - `backend/src/services/integrations/kubernetesService.js`, `backend/src/services/integrations/haproxyService.js`.
+
+## Environnement de dev — cluster Kubernetes et HAProxy locaux (Lot 46)
+
+En complément du Postgres local (voir plus haut), deux environnements de **test/dev local, pas de
+production** ont été montés pour vérifier les intégrations Kubernetes et HAProxy contre de vraies
+instances :
+
+**Kubernetes (k3d)** — cluster `nexus-test` (k3d, k3s dans Docker). S'il a disparu :
+```
+k3d cluster create nexus-test --wait
+kubectl config use-context k3d-nexus-test
+kubectl create namespace nexus-demo
+kubectl -n nexus-demo create deployment nginx-demo --image=nginx:alpine --replicas=3
+kubectl -n nexus-demo expose deployment nginx-demo --port=80 --target-port=80 --name=nginx-demo-svc
+kubectl -n default create serviceaccount nexus-console
+kubectl create clusterrolebinding nexus-console-admin --clusterrole=cluster-admin --serviceaccount=default:nexus-console
+kubectl -n default create token nexus-console --duration=87600h   # à coller dans Paramètres → Kubernetes
+```
+URL du serveur API à renseigner dans NexUs : `docker port k3d-nexus-test-serverlb` (colonne `6443/tcp`),
+ex. `https://127.0.0.1:<port>`. Cocher "Ignorer la vérification TLS" (CA auto-signée de labo).
+
+**HAProxy** — conteneur `nexus-test-haproxy` (image `haproxytech/haproxy-alpine`, HAProxy + Data Plane
+API v3 dans le même conteneur). S'il a disparu :
+```
+docker run -d --name nexus-test-haproxy -p 8404:5555 -p 8080:80 \
+  -v <dossier-config-haproxy.cfg>:/usr/local/etc/haproxy \
+  haproxytech/haproxy-alpine:latest
+docker exec -d nexus-test-haproxy dataplaneapi --host 0.0.0.0 --port 5555 \
+  --haproxy-bin /usr/sbin/haproxy --config-file /usr/local/etc/haproxy/haproxy.cfg \
+  --reload-cmd "kill -SIGUSR2 1" --restart-cmd "kill -SIGUSR2 1" --reload-delay 5 \
+  --userlist api_users --scheme http
+```
+`haproxy.cfg` doit contenir au minimum un `global`/`defaults` et un `userlist api_users` (utilisateur/mot
+de passe pour l'auth Data Plane API — à renseigner dans Paramètres → HAProxy avec l'URL
+`http://127.0.0.1:8404`). Le fichier de config est ensuite entièrement géré par Data Plane API (ne pas
+l'éditer à la main pendant que le conteneur tourne).
+
+Ces deux environnements ne sont pas persistants au sens strict (pas de volume nommé pour k3d ; le volume
+HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas seuls après un reboot —
+à relancer manuellement avec les commandes ci-dessus si absents à la prochaine session.
