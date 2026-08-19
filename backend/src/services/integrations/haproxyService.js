@@ -1,8 +1,15 @@
 import { getRawIntegration } from '../../store/settingsStore.js';
 import { buildClient, request, notConfigured, IntegrationError } from './httpClient.js';
 
-// Intégration via la HAProxy Data Plane API (v2/v3), standard pour piloter
-// HAProxy par API REST plutôt qu'en éditant haproxy.cfg à la main.
+// Intégration via la HAProxy Data Plane API. Ciblée v3 : testée en direct
+// contre une vraie instance (haproxytech/haproxy-alpine, dataplaneapi
+// embarqué) en août 2026, l'API v2 documentée à l'origine (guide
+// utilisateur, `integrationForms.js`) n'existe plus dans aucune version de
+// dataplaneapi encore distribuée (même les images HAProxy 2.9 embarquent un
+// dataplaneapi qui ne sert plus que /v3/*) — les endpoints /v2/* renvoient
+// 404 partout. v3 change aussi la forme des réponses (tableau JSON brut, pas
+// {data:[...]}) et le chemin des sous-ressources (backend dans l'URL,
+// ex. /configuration/backends/{name}/servers, plus en paramètre de requête).
 function client() {
   const cfg = getRawIntegration('haproxy');
   if (!cfg.dataPlaneUrl) return null;
@@ -12,29 +19,29 @@ function client() {
 export async function getStatus() {
   const c = client();
   if (!c) return notConfigured('HAProxy');
-  const info = await request(c.http, { method: 'GET', url: '/v2/info' }, 'HAProxy');
+  const info = await request(c.http, { method: 'GET', url: '/v3/info' }, 'HAProxy');
   return { configured: true, ok: true, message: `Data Plane API v${info.api?.version || '?'} joignable` };
 }
 
 export async function listBackends() {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
-  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/configuration/backends' }, 'HAProxy');
-  return (data.data || []).map((b) => ({ name: b.name, mode: b.mode, balance: b.balance?.algorithm }));
+  const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/backends' }, 'HAProxy');
+  return (data || []).map((b) => ({ name: b.name, mode: b.mode, balance: b.balance?.algorithm }));
 }
 
 export async function listServers(backend) {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
-  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/configuration/servers', params: { backend } }, 'HAProxy');
-  return (data.data || []).map((s) => ({ name: s.name, address: s.address, port: s.port, check: s.check, maxconn: s.maxconn }));
+  const data = await request(c.http, { method: 'GET', url: `/v3/services/haproxy/configuration/backends/${encodeURIComponent(backend)}/servers` }, 'HAProxy');
+  return (data || []).map((s) => ({ name: s.name, address: s.address, port: s.port, check: s.check, maxconn: s.maxconn }));
 }
 
 export async function listRuntimeServerStates(backend) {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
-  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/runtime/servers', params: { backend } }, 'HAProxy');
-  return (data.data || []).map((s) => ({ name: s.name, adminState: s.admin_state, operationalState: s.operational_state }));
+  const data = await request(c.http, { method: 'GET', url: `/v3/services/haproxy/runtime/backends/${encodeURIComponent(backend)}/servers` }, 'HAProxy');
+  return (data || []).map((s) => ({ name: s.name, adminState: s.admin_state, operationalState: s.operational_state }));
 }
 
 export async function setServerState(backend, server, state) {
@@ -43,23 +50,23 @@ export async function setServerState(backend, server, state) {
   const version = await getConfigVersion(c);
   await request(c.http, {
     method: 'PUT',
-    url: `/v2/services/haproxy/runtime/servers/${encodeURIComponent(server)}`,
-    params: { backend, version },
+    url: `/v3/services/haproxy/runtime/backends/${encodeURIComponent(backend)}/servers/${encodeURIComponent(server)}`,
+    params: { version },
     data: { admin_state: state } // ready | maint | drain
   }, 'HAProxy');
   return { ok: true, message: `Serveur ${server} → ${state}` };
 }
 
 async function getConfigVersion(c) {
-  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/configuration/version' }, 'HAProxy');
+  const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/version' }, 'HAProxy');
   return data;
 }
 
 export async function listFrontends() {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
-  const data = await request(c.http, { method: 'GET', url: '/v2/services/haproxy/configuration/frontends' }, 'HAProxy');
-  return (data.data || []).map((f) => ({ name: f.name, mode: f.mode }));
+  const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/frontends' }, 'HAProxy');
+  return (data || []).map((f) => ({ name: f.name, mode: f.mode }));
 }
 
 // Complète le rattachement documenté comme manuel dans applyProxyBackend() :
@@ -73,30 +80,38 @@ export async function attachProxyToFrontend(proxy, frontendName) {
   const backendName = `nexus_${proxy.id}`;
   const aclName = `host_nexus_${proxy.id}`;
 
+  // v3 n'accepte pas de POST unitaire sur ces sous-collections structurées
+  // (405 "method POST is not allowed, but [GET,PUT] are") — la seule méthode
+  // documentée est un PUT qui remplace la collection entière (tableau complet
+  // avec index recalculés), pas un ajout élément par élément comme en v2.
+  // Trouvé en testant contre un vrai HAProxy (jamais démontré avant faute
+  // d'instance réelle disponible).
   const existingAcls = await request(c.http, {
-    method: 'GET', url: '/v2/services/haproxy/configuration/acls', params: { parent_type: 'frontend', parent_name: frontendName }
+    method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(frontendName)}/acls`
   }, 'HAProxy');
-  const aclIndex = (existingAcls.data || []).length;
+  const acls = [...(existingAcls || []), { acl_name: aclName, criterion: 'hdr(host)', value: proxy.domain }]
+    .map((a, index) => ({ ...a, index }));
 
   const v1 = await getConfigVersion(c);
   await request(c.http, {
-    method: 'POST',
-    url: '/v2/services/haproxy/configuration/acls',
-    params: { parent_type: 'frontend', parent_name: frontendName, version: v1, force_reload: true },
-    data: { index: aclIndex, acl_name: aclName, criterion: 'hdr(host)', value: proxy.domain }
+    method: 'PUT',
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(frontendName)}/acls`,
+    params: { version: v1, force_reload: true },
+    data: acls
   }, 'HAProxy');
 
   const existingRules = await request(c.http, {
-    method: 'GET', url: '/v2/services/haproxy/configuration/backend_switching_rules', params: { parent_type: 'frontend', parent_name: frontendName }
+    method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(frontendName)}/backend_switching_rules`
   }, 'HAProxy');
-  const ruleIndex = (existingRules.data || []).length;
+  const rules = [...(existingRules || []), { cond: 'if', cond_test: aclName, name: backendName }]
+    .map((r, index) => ({ ...r, index }));
 
   const v2 = await getConfigVersion(c);
   await request(c.http, {
-    method: 'POST',
-    url: '/v2/services/haproxy/configuration/backend_switching_rules',
-    params: { parent_type: 'frontend', parent_name: frontendName, version: v2, force_reload: true },
-    data: { index: ruleIndex, cond: 'if', cond_test: aclName, name: backendName }
+    method: 'PUT',
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(frontendName)}/backend_switching_rules`,
+    params: { version: v2, force_reload: true },
+    data: rules
   }, 'HAProxy');
 
   return { ok: true, message: `${proxy.domain} → ${backendName} rattaché sur le frontend ${frontendName}` };
@@ -113,19 +128,33 @@ export async function applyProxyBackend(proxy) {
   const version = await getConfigVersion(c);
   await request(c.http, {
     method: 'POST',
-    url: '/v2/services/haproxy/configuration/backends',
+    url: '/v3/services/haproxy/configuration/backends',
     params: { version, force_reload: true },
     data: { name: backendName, mode: 'http', balance: { algorithm: 'roundrobin' } }
   }, 'HAProxy').catch((err) => {
     if (err.status !== 502) throw err; // tolère "existe déjà", géré par le PUT ci-dessous
   });
+  // POST (création) d'abord, PUT (mise à jour) en repli : un serveur n'existe
+  // pas encore la première fois qu'un backend est créé — PUT seul échoue alors
+  // avec 404 "does not exist" (trouvé en testant contre un vrai cluster HAProxy,
+  // jamais démontré avant faute d'instance réelle disponible).
+  const serverData = { name: 'srv1', address: proxy.targetService, port: Number(proxy.targetPort), check: 'enabled' };
   const version2 = await getConfigVersion(c);
   await request(c.http, {
-    method: 'PUT',
-    url: `/v2/services/haproxy/configuration/servers/srv1`,
-    params: { backend: backendName, version: version2, force_reload: true },
-    data: { name: 'srv1', address: proxy.targetService, port: Number(proxy.targetPort), check: 'enabled' }
-  }, 'HAProxy');
+    method: 'POST',
+    url: `/v3/services/haproxy/configuration/backends/${encodeURIComponent(backendName)}/servers`,
+    params: { version: version2, force_reload: true },
+    data: serverData
+  }, 'HAProxy').catch(async (err) => {
+    if (err.status !== 502) throw err; // 502 ici = "existe déjà" (voir httpClient.js), on bascule sur une mise à jour
+    const version3 = await getConfigVersion(c);
+    await request(c.http, {
+      method: 'PUT',
+      url: `/v3/services/haproxy/configuration/backends/${encodeURIComponent(backendName)}/servers/srv1`,
+      params: { version: version3, force_reload: true },
+      data: serverData
+    }, 'HAProxy');
+  });
   return { ok: true, message: `Backend HAProxy ${backendName} appliqué — utilisez "Attacher à un frontend" pour finaliser le routage` };
 }
 
@@ -140,7 +169,7 @@ export async function createFrontend({ name, port, mode = 'http', defaultBackend
   const version = await getConfigVersion(c);
   await request(c.http, {
     method: 'POST',
-    url: '/v2/services/haproxy/configuration/frontends',
+    url: '/v3/services/haproxy/configuration/frontends',
     params: { version, force_reload: true },
     data: {
       name,
@@ -152,8 +181,8 @@ export async function createFrontend({ name, port, mode = 'http', defaultBackend
   const version2 = await getConfigVersion(c);
   await request(c.http, {
     method: 'POST',
-    url: '/v2/services/haproxy/configuration/binds',
-    params: { parent_type: 'frontend', parent_name: name, version: version2, force_reload: true },
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/binds`,
+    params: { version: version2, force_reload: true },
     data: { name: `${name}_bind`, address: '*', port: Number(port) }
   }, 'HAProxy');
 
