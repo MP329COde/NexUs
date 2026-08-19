@@ -783,6 +783,50 @@ export async function getComponent(id) {
   return rows[0] || null;
 }
 
+// --- ADR (Architecture Decision Records) par projet (0034_adrs.sql) ---
+export async function listAdrs(projectId) {
+  const { rows } = await query('SELECT * FROM adrs WHERE project_id = $1 ORDER BY number DESC', [projectId]);
+  return rows;
+}
+
+export async function getAdr(id) {
+  const { rows } = await query('SELECT * FROM adrs WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+export async function createAdr(projectId, { title, status, content, userId }) {
+  const client = await (await import('../db/pool.js')).requirePool().connect();
+  try {
+    await client.query('BEGIN');
+    // FOR UPDATE est incompatible avec un agrégat (MAX) — verrouille la
+    // dernière ligne existante à la place (ORDER BY + LIMIT 1), suffisant
+    // pour sérialiser deux créations concurrentes sur le même projet.
+    const { rows: lastRow } = await client.query('SELECT number FROM adrs WHERE project_id = $1 ORDER BY number DESC LIMIT 1 FOR UPDATE', [projectId]);
+    const number = (lastRow[0]?.number || 0) + 1;
+    const { rows } = await client.query(
+      `INSERT INTO adrs (project_id, number, title, status, content, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
+      [projectId, number, title, status || 'proposed', content || '', userId]
+    );
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateAdr(id, { title, status, content, userId }) {
+  const { rows } = await query(
+    `UPDATE adrs SET title = COALESCE($2, title), status = COALESCE($3, status), content = COALESCE($4, content), updated_by = $5, updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [id, title || null, status || null, content ?? null, userId]
+  );
+  return rows[0] || null;
+}
+
 // --- Changelog / Releases par composant (voir 0033_component_releases.sql) ---
 export async function listComponentReleases(componentId) {
   const { rows } = await query('SELECT * FROM component_releases WHERE component_id = $1 ORDER BY created_at DESC', [componentId]);

@@ -38,7 +38,11 @@ test('la fiche projet affiche un fil d\'Ariane Développement / Organisation / P
   const crumbs = page.locator('.breadcrumbs');
   await expect(crumbs).toBeVisible();
   await expect(crumbs.getByText('Développement', { exact: true })).toBeVisible();
-  await expect(crumbs.getByText('Breadcrumb Org', { exact: true })).toBeVisible();
+  // Le nom de l'organisation vient d'un second appel réseau (GET
+  // /organizations/:id, déclenché seulement une fois GET /projects/:id
+  // résolu) — laisse plus de marge que le timeout par défaut quand le
+  // backend partagé est sous la charge du reste de la suite.
+  await expect(crumbs.getByText('Breadcrumb Org', { exact: true })).toBeVisible({ timeout: 15000 });
   await expect(crumbs.getByText('Projets', { exact: true })).toBeVisible();
   await expect(crumbs.locator('.breadcrumbs-current')).toHaveText('Breadcrumb Project');
 
