@@ -324,10 +324,15 @@ export async function scaleDeployment(namespace, name, replicas) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('scale deployment', async () => {
+    // Comme restartDeployment : le client v1 négocie "application/json-patch+json"
+    // par défaut, y compris sur le sous-endpoint /scale — un body merge-patch
+    // ({spec:{replicas}}) est rejeté par l'API server (400 "cannot unmarshal
+    // object into []jsonPatchOp"). Découvert en testant contre un vrai cluster
+    // k3d (échec silencieux jusque-là, jamais testé bout en bout).
     await c.apps.patchNamespacedDeploymentScale({
       name,
       namespace,
-      body: { spec: { replicas } }
+      body: [{ op: 'replace', path: '/spec/replicas', value: replicas }]
     });
     return { ok: true, message: `${namespace}/${name} mis à l'échelle sur ${replicas} réplique(s)` };
   });
