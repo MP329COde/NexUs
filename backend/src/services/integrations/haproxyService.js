@@ -27,7 +27,7 @@ export async function listBackends() {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/backends' }, 'HAProxy');
-  return (data || []).map((b) => ({ name: b.name, mode: b.mode, balance: b.balance?.algorithm }));
+  return (data || []).map((b) => ({ name: b.name, mode: b.mode || 'tcp', balance: b.balance?.algorithm }));
 }
 
 export async function listServers(backend) {
@@ -66,7 +66,7 @@ export async function listFrontends() {
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
   const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/frontends' }, 'HAProxy');
-  return (data || []).map((f) => ({ name: f.name, mode: f.mode }));
+  return (data || []).map((f) => ({ name: f.name, mode: f.mode || 'tcp' }));
 }
 
 // Complète le rattachement documenté comme manuel dans applyProxyBackend() :
