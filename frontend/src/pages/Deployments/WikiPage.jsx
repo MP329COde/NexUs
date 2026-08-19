@@ -86,6 +86,11 @@ export default function WikiPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[
+          { label: 'Développement', to: '/deployments' },
+          ...(currentOrg ? [{ label: currentOrg.name, to: `/deployments/organizations/${currentOrg.id}` }] : []),
+          { label: teamIdFilter ? "Documentation d'équipe" : projectIdFilter ? 'Documentation de projet' : 'Documentation générale' }
+        ]}
         title={teamIdFilter ? `Documentation d'équipe${currentTeam ? ` — ${currentTeam.name}` : ''}` : projectIdFilter ? 'Documentation de projet' : 'Documentation générale'}
         sub={routeOrgId ? `Organisation : ${currentOrg?.icon ? `${currentOrg.icon} ` : ''}${currentOrg?.name || '…'} — trois paliers : organisation, équipe, projet` : 'Base de connaissance partagée par organisation, équipe ou projet : procédures, décisions techniques, onboarding.'}
         actions={routeOrgId ? (

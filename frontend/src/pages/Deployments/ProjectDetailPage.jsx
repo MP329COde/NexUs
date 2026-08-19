@@ -37,6 +37,7 @@ export default function ProjectDetailPage() {
   const jobs = useApi(() => api.get(`/projects/${id}/jobs`), [id], { pollMs: 10000 });
   const securityScans = useApi(() => api.get(`/projects/${id}/security-scans`), [id]);
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
+  const orgForBreadcrumb = useApi(() => (project.data?.project?.orgId ? api.get(`/organizations/${project.data.project.orgId}`) : Promise.resolve(null)), [project.data?.project?.orgId]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
   const [boardView, setBoardView] = useState(false);
@@ -117,6 +118,12 @@ export default function ProjectDetailPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[
+          { label: 'Développement', to: '/deployments' },
+          ...(orgForBreadcrumb.data?.organization ? [{ label: orgForBreadcrumb.data.organization.name, to: `/deployments/organizations/${orgForBreadcrumb.data.organization.id}` }] : []),
+          { label: 'Projets', to: '/deployments/projects' },
+          { label: p.name }
+        ]}
         title={(
           <span className="pd-title-row">
             {p.icon ? (
