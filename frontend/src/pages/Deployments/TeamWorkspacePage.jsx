@@ -33,6 +33,13 @@ export default function TeamWorkspacePage() {
 
   const members = team.data?.members || [];
   const items = components.data?.items || [];
+  const relatedProjects = Array.from(
+    items.reduce((map, c) => {
+      if (!map.has(c.project_id)) map.set(c.project_id, { id: c.project_legacy_id || c.project_id, name: c.project_name, componentCount: 0 });
+      map.get(c.project_id).componentCount += 1;
+      return map;
+    }, new Map()).values()
+  );
 
   return (
     <>
@@ -82,6 +89,23 @@ export default function TeamWorkspacePage() {
                   <span className="pd-row-title">{c.name}</span>
                   {c.lifecycle && <span className={`badge badge-${LIFECYCLE_TONE[c.lifecycle] || 'mut'}`}>{c.lifecycle}</span>}
                   <span className="faint">{c.project_name}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="Projets liés" sub="Déduits des composants du catalogue possédés par l'équipe" span={12}>
+          {relatedProjects.length === 0 ? (
+            <div className="pd-empty">Aucun projet lié (aucun composant du catalogue possédé par cette équipe n'est encore rattaché à un projet).</div>
+          ) : (
+            <div className="pd-list-loose">
+              {relatedProjects.map((p) => (
+                <Link key={p.id} to={`/deployments/projects/${p.id}`} className="pd-row pd-row-link">
+                  <span className="pd-row-title">{p.name}</span>
+                  <span className="faint">{p.componentCount} composant(s)</span>
                 </Link>
               ))}
             </div>
