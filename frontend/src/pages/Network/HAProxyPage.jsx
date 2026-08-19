@@ -6,6 +6,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import CreateFrontendDialog from './CreateFrontendDialog.jsx';
 import './NetworkShared.css';
 
 const STATES = ['ready', 'drain', 'maint'];
@@ -13,7 +14,9 @@ const STATES = ['ready', 'drain', 'maint'];
 export default function HAProxyPage() {
   const status = useApi(() => api.get('/haproxy/status'), [], { pollMs: 30000 });
   const backends = useApi(() => api.get('/haproxy/backends'), [], { pollMs: 20000 });
+  const frontends = useApi(() => api.get('/haproxy/frontends'), [], { pollMs: 20000 });
   const [selected, setSelected] = useState(null);
+  const [showCreateFrontend, setShowCreateFrontend] = useState(false);
   const servers = useApi(() => (selected ? api.get(`/haproxy/backends/${selected}/servers/runtime`) : Promise.resolve(null)), [selected], { pollMs: 10000 });
   const notify = useNotify();
 
@@ -38,8 +41,29 @@ export default function HAProxyPage() {
 
   return (
     <>
-      <PageHeader title="HAProxy" sub={status.data?.status?.message} />
+      <PageHeader
+        title="HAProxy"
+        sub={status.data?.status?.message}
+        actions={<span className="btn" onClick={() => setShowCreateFrontend(true)}>+ Nouveau frontend</span>}
+      />
+      {showCreateFrontend && (
+        <CreateFrontendDialog onClose={() => setShowCreateFrontend(false)} onCreated={() => frontends.reload()} />
+      )}
       <div className="net-panel-grid">
+        <Panel title="Frontends" sub="Points d'écoute HAProxy" span={12}>
+          <DataTable
+            columns={['Nom', 'Mode']}
+            rows={frontends.data?.items}
+            emptyTitle="Aucun frontend"
+            renderRow={(f) => (
+              <tr key={f.name}>
+                <td className="net-cell-name">{f.name}</td>
+                <td>{f.mode}</td>
+              </tr>
+            )}
+          />
+        </Panel>
+
         <Panel title="Backends" sub="Cliquez sur un backend pour voir ses serveurs" span={12}>
           <DataTable
             columns={['Nom', 'Mode', 'Répartition', '']}

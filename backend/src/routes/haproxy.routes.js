@@ -22,4 +22,12 @@ router.post('/backends/:backend/servers/:server/state', requireRole('admin'), as
 }));
 router.get('/frontends', asyncHandler(async (req, res) => res.json({ ok: true, items: await haproxy.listFrontends() })));
 
+// Crée un frontend HAProxy : affecte directement le routage du reverse proxy,
+// réservé aux admins, même politique que la bascule d'état des serveurs.
+router.post('/frontends', requireRole('admin'), asyncHandler(async (req, res) => {
+  const result = await haproxy.createFrontend(req.body || {});
+  logAudit(req, 'haproxy.frontend.created', { name: req.body?.name, port: req.body?.port });
+  res.json({ ok: true, ...result });
+}));
+
 export default router;

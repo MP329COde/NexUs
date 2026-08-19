@@ -128,3 +128,34 @@ export async function applyProxyBackend(proxy) {
   }, 'HAProxy');
   return { ok: true, message: `Backend HAProxy ${backendName} appliqué — utilisez "Attacher à un frontend" pour finaliser le routage` };
 }
+
+// Crée un nouveau frontend HAProxy (écoute sur un port donné). Manquait jusqu'ici :
+// seuls le rattachement à un frontend existant (attachProxyToFrontend) et la
+// création de backend/serveur (applyProxyBackend) étaient possibles.
+export async function createFrontend({ name, port, mode = 'http', defaultBackend }) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  if (!name || !port) throw new IntegrationError('Nom et port requis', { status: 400 });
+
+  const version = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'POST',
+    url: '/v2/services/haproxy/configuration/frontends',
+    params: { version, force_reload: true },
+    data: {
+      name,
+      mode,
+      ...(defaultBackend ? { default_backend: defaultBackend } : {})
+    }
+  }, 'HAProxy');
+
+  const version2 = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'POST',
+    url: '/v2/services/haproxy/configuration/binds',
+    params: { parent_type: 'frontend', parent_name: name, version: version2, force_reload: true },
+    data: { name: `${name}_bind`, address: '*', port: Number(port) }
+  }, 'HAProxy');
+
+  return { ok: true, message: `Frontend HAProxy ${name} créé sur le port ${port}` };
+}
