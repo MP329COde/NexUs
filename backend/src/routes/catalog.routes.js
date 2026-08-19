@@ -13,6 +13,7 @@ import { computeScorecard } from '../services/catalogScorecard.js';
 import { evaluatePolicies } from '../services/policyEngine.js';
 import { findVaultEntry } from '../store/vaultStore.js';
 import { syncBindingSecret } from '../services/serviceBindingSyncService.js';
+import * as yaml from 'js-yaml';
 
 const router = Router();
 router.use(requireAuth);
@@ -120,6 +121,37 @@ router.post('/components/:id/releases', asyncHandler(async (req, res) => {
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ ok: false, error: 'Cette version existe déjà pour ce composant' });
     throw err;
+  }
+}));
+
+// API Docs (Étape 17 IDP, chantier #14) : pas de nouvelle table — réutilise
+// la convention déjà existante `links` (JSONB [{label,url}]) plutôt que
+// d'ajouter une colonne dédiée. Un composant kind='api' documente son
+// spec OpenAPI via un lien libellé "OpenAPI"/"Swagger" (insensible à la
+// casse) ; cette route va la chercher et la sert déjà parsée (JSON ou
+// YAML) pour que le frontend n'ait besoin d'aucune librairie Swagger UI
+// complète — juste un rendu simple endpoints/schémas. Proxy côté backend
+// (pas de fetch direct navigateur) pour éviter tout souci CORS sur la
+// spec hébergée par le dépôt/CI du service.
+router.get('/components/:id/openapi', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!role && !isPlatformAdmin(req.user)) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const link = (component.links || []).find((l) => /openapi|swagger/i.test(l.label || ''));
+  if (!link?.url) return res.json({ ok: true, configured: false });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(link.url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) return res.json({ ok: true, configured: true, error: `Échec du téléchargement (HTTP ${response.status})`, sourceUrl: link.url });
+    const text = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+    const spec = contentType.includes('json') || link.url.endsWith('.json') ? JSON.parse(text) : yaml.load(text);
+    res.json({ ok: true, configured: true, sourceUrl: link.url, spec });
+  } catch (err) {
+    res.json({ ok: true, configured: true, error: `Impossible de charger/parser la spec OpenAPI : ${err.message}`, sourceUrl: link.url });
   }
 }));
 

@@ -33,6 +33,58 @@ function EnvironmentPodsSummary({ namespace }) {
   );
 }
 
+const METHOD_TONE = { get: 'ok', post: 'vio', put: 'warn', patch: 'warn', delete: 'crit' };
+
+// API Docs (Étape 17 IDP, chantier #14) : rendu simple d'une spec OpenAPI
+// (pas de Swagger UI complet — trop lourd pour un simple lecteur d'endpoints,
+// voir todo.md) proxifiée par GET /catalog/components/:id/openapi. Ne
+// s'affiche que pour un composant kind='api' avec un lien "OpenAPI"/"Swagger"
+// déclaré (voir panneau Liens ci-dessus, même convention réutilisée).
+function ApiDocsPanel({ componentId }) {
+  const docs = useApi(() => api.get(`/catalog/components/${componentId}/openapi`), [componentId]);
+  if (docs.loading) return null;
+  if (!docs.data?.configured) {
+    return (
+      <div className="card catalog-detail-card">
+        <span className="faint">API Docs (OpenAPI)</span>
+        <p className="faint catalog-deps-empty">Aucune spec OpenAPI déclarée — ajoutez un lien libellé « OpenAPI » ou « Swagger » ci-dessus pointant vers le fichier JSON/YAML.</p>
+      </div>
+    );
+  }
+  if (docs.data.error) {
+    return (
+      <div className="card catalog-detail-card">
+        <span className="faint">API Docs (OpenAPI)</span>
+        <p className="faint catalog-deps-empty">{docs.data.error}</p>
+      </div>
+    );
+  }
+  const spec = docs.data.spec || {};
+  const paths = spec.paths || {};
+  const entries = Object.entries(paths).flatMap(([path, methods]) =>
+    Object.entries(methods).filter(([m]) => METHOD_TONE[m]).map(([method, op]) => ({ path, method, op }))
+  );
+  return (
+    <div className="card catalog-detail-card">
+      <div className="catalog-deps-header">
+        <span className="faint">API Docs (OpenAPI) — {spec.info?.title || 'sans titre'} {spec.info?.version ? `v${spec.info.version}` : ''}</span>
+        <a href={docs.data.sourceUrl} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Voir la spec brute</a>
+      </div>
+      {entries.length === 0 ? (
+        <p className="faint catalog-deps-empty">Spec chargée mais aucun endpoint déclaré.</p>
+      ) : (
+        entries.map(({ path, method, op }, i) => (
+          <div key={`${method}-${path}-${i}`} className="catalog-deps-row">
+            <span className={`badge badge-${METHOD_TONE[method]}`} style={{ textTransform: 'uppercase', minWidth: 52, textAlign: 'center' }}>{method}</span>
+            <span className="mono">{path}</span>
+            <span className="faint">{op.summary || ''}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 // Fiche composant : centre de travail du composant dans le Software
 // Catalog. Le runtime (section "Environnements du projet" ci-dessous)
 // réutilise les environnements du PROJET parent — un composant n'a pas ses
@@ -335,6 +387,8 @@ export default function CatalogComponentPage() {
             ))
           )}
         </div>
+
+        {component.kind === 'api' && <ApiDocsPanel componentId={id} />}
 
         {component.scorecard && (
           <div className="card catalog-detail-card">
