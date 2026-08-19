@@ -29,12 +29,14 @@
 
 .pd-back-link {
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .pd-header-actions-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .pd-status-select {
