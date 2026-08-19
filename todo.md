@@ -207,3 +207,57 @@ l'éditer à la main pendant que le conteneur tourne).
 Ces deux environnements ne sont pas persistants au sens strict (pas de volume nommé pour k3d ; le volume
 HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas seuls après un reboot —
 à relancer manuellement avec les commandes ci-dessus si absents à la prochaine session.
+
+- [x] **Audit visuel complet de la plateforme (Lot 47)** : contrairement au Lot 45 (bloqué par une
+  concurrence Playwright), aucun autre agent ne tournait sur le repo — audit mené en direct avec
+  Playwright, connecté en admin, clair et sombre, sur les pages principales : Vue générale, Projets
+  (liste + fiche projet complète), Équipe (workspace), Organisations (liste + fiche), Dépôts Git,
+  Pipelines CI/CD, Environnements, Documentation (Manuel d'utilisation, Wiki d'organisation),
+  Sécurité, Réseau (Topologie graphique du Lot 44 + HAProxy, avec la vraie instance Data Plane API
+  locale du Lot 46), Kubernetes (avec le vrai cluster k3d du Lot 46), Paramètres → Intégrations,
+  Mon compte/Apparence.
+  - **Défaut réel (pas seulement visuel) — badge de rôle/tag invisible** : la classe `.badge-vio`
+    était utilisée à 9 endroits (rôle « Administrateur » sur la fiche projet, rôle « owner » sur les
+    cartes d'organisation, tags de membre d'équipe...) mais n'avait **aucune règle CSS définie** dans
+    `frontend/src/styles/global.css` alors que les variables `--tone-vio-*` existaient déjà dans
+    `theme.css` — ces badges s'affichaient donc comme un simple encadré sans le remplissage violet
+    prévu, en rupture avec tous les autres badges de statut (ok/warn/crit/info/mut). Ajouté
+    `.badge-vio` / `.badge-vio .dot` sur le même modèle que les autres tons. Vérifié clair et sombre
+    sur Organisations et sur la fiche projet.
+  - **Mur de texte JSON brut dans deux panneaux d'état** : `AdminOverviewPanel` (page d'accueil) et
+    `InfrastructureStatusPanel` (Paramètres → Intégrations) affichaient le message d'erreur brut d'une
+    intégration en échec (ici Cert-Manager) sans aucune limite — un message d'erreur HTTP contenant les
+    en-têtes complets de la réponse s'étalait sur 3-4 lignes et cassait l'alignement de la liste par
+    rapport aux autres lignes, correctes et compactes. Ajouté troncature `text-overflow: ellipsis` sur
+    une seule ligne (`frontend/src/pages/Home/AdminOverviewPanel.css`,
+    `frontend/src/pages/Settings/InfrastructureStatusPanel.css`) + attribut `title` pour garder le
+    message complet au survol (`AdminOverviewPanel.jsx`, `InfrastructureStatusPanel.jsx`).
+  - **Boutons d'en-tête de la fiche projet à hauteur inégale** : sur `ProjectDetailPage`, la rangée
+    d'actions (sélecteur de statut, suppression, « Commencer à développer », « ← Tous les projets »)
+    n'avait ni `flex-wrap` ni `white-space: nowrap` — les deux liens à texte long retournaient à la
+    ligne dans leur propre bouton, changeant sa hauteur et cassant l'alignement vertical de toute la
+    rangée. Corrigé dans `frontend/src/pages/Deployments/ProjectDetailPage.css`
+    (`.pd-header-actions-row { flex-wrap: wrap }`, `.pd-back-link { white-space: nowrap }`).
+  - **`undefined` affiché en clair sur la Topologie réseau et la page HAProxy** : avec la vraie
+    instance HAProxy locale du Lot 46, le backend `demo_be` n'a pas de `mode` explicite dans sa
+    configuration (défaut HAProxy implicite `tcp`, absent du payload Data Plane API) — le frontend
+    affichait littéralement « undefined · roundrobin » sur la carte de topologie et une cellule Mode
+    vide dans le tableau HAProxy. Corrigé à la source, `listFrontends`/`listBackends` dans
+    `backend/src/services/integrations/haproxyService.js` retombent maintenant sur `'tcp'` (mode par
+    défaut réel de HAProxy) quand l'API ne renvoie pas le champ. Vérifié en direct sur les deux pages
+    après redémarrage du backend.
+  - **Couleur sémantique incorrecte pour les pods `Succeeded`** : sur Kubernetes → Charges de travail
+    (vrai cluster k3d), le badge de phase d'un pod classait tout ce qui n'est ni `Running` ni `Pending`
+    en rouge critique — y compris `Succeeded` (job terminé avec succès, ex. `helm-install-traefik`),
+    qui apparaissait donc comme une erreur alors que c'est un état normal. Corrigé dans
+    `frontend/src/pages/Kubernetes/KubernetesPage.jsx` : `Succeeded` rejoint `Running` dans le ton `ok`
+    (vert), seuls `Failed`/`Unknown`/etc. restent en `crit`.
+  - **Pages jugées déjà correctes, aucune modification forcée** : Vue générale (hors le mur de texte
+    corrigé ci-dessus), liste Projets, workspace Équipe, Organisations (hors badge), Dépôts Git
+    (état vide), Pipelines CI/CD, Environnements, Manuel d'utilisation, Wiki d'organisation, Sécurité,
+    Compte/Apparence — espacements, contrastes clair/sombre, troncature des libellés longs et style
+    des badges de statut cohérents avec le design system existant sur toutes ces pages.
+  - Un projet de test nommé `=HYPERLINK("http://evil.test","click")` (donnée de test d'injection de
+    formule existante en base) a été repéré sur la liste des projets ; il s'affiche correctement
+    (titre qui wrap, badge de statut qui reste aligné) et n'a pas été modifié — c'est une donnée de
+    test volontaire, pas un défaut visuel.
