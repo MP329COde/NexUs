@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { api } from '../../lib/apiClient.js';
 import { STATIC_SEARCH_ITEMS } from '../../config/searchIndex.js';
 import { fuzzyScore, queryTerms } from '../../lib/fuzzyMatch.js';
-import { contextualActions, contextLabel } from './contextualActions.js';
+import { contextualActions, contextLabel, globalActions } from './contextualActions.js';
 import Icon from '../ui/Icon.jsx';
 import './CommandPalette.css';
 
@@ -128,7 +128,16 @@ export default function CommandPalette({ open, onClose, context }) {
   }, [allItems, query]);
 
   const actions = useMemo(() => (query.trim() ? [] : contextualActions(context, navigate, onClose)), [context, query, navigate, onClose]);
-  const combined = useMemo(() => [...actions.map((a) => ({ ...a, __action: true, group: contextLabel(context) })), ...results], [actions, results, context]);
+  // Actions globales ("Créer un projet"...) : seulement quand la palette
+  // n'est pas ouverte pour une ressource précise — un contexte de ressource
+  // (pod, deployment...) reste prioritaire et sans ambiguïté sur ce qu'on
+  // peut y faire.
+  const globals = useMemo(() => (query.trim() || context ? [] : globalActions(navigate, onClose)), [context, query, navigate, onClose]);
+  const combined = useMemo(() => [
+    ...actions.map((a) => ({ ...a, __action: true, group: contextLabel(context) })),
+    ...globals.map((a) => ({ ...a, __action: true, group: 'Actions rapides' })),
+    ...results
+  ], [actions, globals, results, context]);
 
   useEffect(() => setActiveIndex(0), [query]);
 

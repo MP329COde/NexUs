@@ -11,6 +11,22 @@ export function contextLabel(context) {
   return null;
 }
 
+// Actions globales, toujours proposées en tête de la palette (query vide,
+// aucun contexte de ressource précis) — même contrat que les actions
+// contextuelles : jamais exécutées depuis la palette elle-même, seulement
+// une navigation vers la page réelle avec un paramètre qu'elle lit au
+// montage pour ouvrir directement le bon formulaire (voir ProjectsPage.jsx/
+// OrganizationsPage.jsx, ?open=create).
+export function globalActions(navigate, closePalette) {
+  function go(url) {
+    return () => { closePalette(); navigate(url); };
+  }
+  return [
+    { label: 'Créer un projet', icon: 'plus', run: go('/deployments/projects?open=create') },
+    { label: 'Créer une organisation', icon: 'plus', run: go('/deployments/organizations?open=create') }
+  ];
+}
+
 export function contextualActions(context, navigate, closePalette) {
   if (!context) return [];
 
