@@ -10,6 +10,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import ProjectShortcutsPanel from './ProjectShortcutsPanel.jsx';
 import ProjectVaultPanel from './ProjectVaultPanel.jsx';
+import ProjectBoard from './ProjectBoard.jsx';
+import TaskCommentsModal from './TaskCommentsModal.jsx';
 import './ProjectDetailPage.css';
 
 const STATUS_LABELS = { todo: 'À faire', in_progress: 'En cours', review: 'En revue', done: 'Terminé' };
@@ -37,6 +39,8 @@ export default function ProjectDetailPage() {
   const members = useApi(() => api.get(`/projects/${id}/members`), [id]);
   const users = useApi(() => (user?.role === 'admin' ? api.get('/users') : Promise.resolve(null)), [user?.role]);
   const [taskTitle, setTaskTitle] = useState('');
+  const [boardView, setBoardView] = useState(false);
+  const [commentsFor, setCommentsFor] = useState(null);
 
   if (project.error) {
     return <div className="card pd-error-state">Projet introuvable ou non accessible.</div>;
@@ -152,7 +156,17 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="pd-grid-row">
-        <Panel title="Backlog" sub="Tâches d'équipe — chacun peut s'assigner" span={8}>
+        <Panel
+          title="Backlog"
+          sub="Tâches d'équipe — chacun peut s'assigner"
+          span={8}
+          actions={(
+            <div className="pd-header-actions-row">
+              <span className={`btn-outline pd-action-btn${!boardView ? ' pd-action-btn-active' : ''}`} onClick={() => setBoardView(false)}>Liste</span>
+              <span className={`btn-outline pd-action-btn${boardView ? ' pd-action-btn-active' : ''}`} onClick={() => setBoardView(true)}>Tableau</span>
+            </div>
+          )}
+        >
           {user?.role === 'admin' || p.memberIds.includes(user?.id) ? (
             <form onSubmit={addTask} className="pd-form-row">
               <input className="input pd-form-input" placeholder="Nouvelle tâche…" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
@@ -161,6 +175,13 @@ export default function ProjectDetailPage() {
           ) : null}
           {taskItems.length === 0 ? (
             <div className="pd-empty">Aucune tâche</div>
+          ) : boardView ? (
+            <ProjectBoard
+              tasks={taskItems}
+              userName={userName}
+              onStatusChange={(taskId, status) => setTaskStatus(taskItems.find((t) => t.id === taskId), status)}
+              onOpenComments={setCommentsFor}
+            />
           ) : (
             <div className="pd-list-loose">
               {taskItems.map((t) => (
@@ -174,6 +195,7 @@ export default function ProjectDetailPage() {
                   ) : (
                     <span className="btn-outline pd-action-btn" onClick={() => assignTask(t, user?.id)}>S'assigner</span>
                   )}
+                  <span onClick={() => setCommentsFor(t)} className="pd-task-remove" title="Commentaires"><Icon name="edit" size={13} /></span>
                   <span onClick={() => removeTask(t.id)} className="pd-task-remove"><Icon name="trash" size={13} /></span>
                 </div>
               ))}
@@ -313,6 +335,10 @@ export default function ProjectDetailPage() {
       )}
 
       <ApiPreviewPanel project={p} canEdit={user?.role === 'admin'} onSaved={project.reload} />
+
+      {commentsFor && (
+        <TaskCommentsModal projectId={id} task={commentsFor} userName={userName} onClose={() => setCommentsFor(null)} />
+      )}
     </>
   );
 }

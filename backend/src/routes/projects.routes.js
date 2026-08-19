@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { loadProjectAccess, requireMinRole, resolveProjectRole } from '../middleware/projectAccess.js';
 import * as store from '../store/projectsStore.js';
 import { notifyUser } from '../services/userNotificationService.js';
+import { findUserByUsername, listUsers } from '../store/usersStore.js';
 import * as shortcutsStore from '../store/shortcutsStore.js';
 import * as vaultStore from '../store/vaultStore.js';
 import * as orgStore from '../store/orgStore.js';
@@ -931,6 +932,55 @@ router.delete('/:id/tasks/:taskId', loadProjectAccess(), requireMinRole('develop
   if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
   store.deleteTask(req.params.taskId);
   res.json({ ok: true });
+}));
+
+// Résout @handle en id réel, pour notifier une mention dans un commentaire.
+// `username` est optionnel (souvent absent, cf. usersStore.js createUser) :
+// repli sur la partie locale de l'e-mail (avant @), qui existe toujours et
+// reste le handle affiché par défaut dans l'UI (ex. "alex.lambert" pour
+// alex.lambert@exemple.com). Un handle inconnu est simplement ignoré —
+// jamais d'erreur pour une faute de frappe dans une mention.
+function extractMentionedUserIds(text) {
+  const handles = [...text.matchAll(/@([a-z0-9._-]+)/gi)].map((m) => m[1].toLowerCase());
+  const ids = new Set();
+  for (const handle of handles) {
+    const byUsername = findUserByUsername(handle);
+    const byEmailPrefix = byUsername ? null : listUsers().find((u) => u.email.split('@')[0].toLowerCase() === handle);
+    const match = byUsername || byEmailPrefix;
+    if (match) ids.add(match.id);
+  }
+  return [...ids];
+}
+
+router.get('/:id/tasks/:taskId/comments', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const existing = store.findTask(req.params.taskId);
+  if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
+  res.json({ ok: true, items: store.listTaskComments(req.params.taskId) });
+}));
+
+router.post('/:id/tasks/:taskId/comments', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const existing = store.findTask(req.params.taskId);
+  if (!existing || existing.projectId !== req.legacyProject.id) return res.status(404).json({ ok: false, error: 'Tâche introuvable' });
+  const { text } = req.body || {};
+  if (!text || !text.trim()) return res.status(400).json({ ok: false, error: 'Texte requis' });
+  const comment = store.addTaskComment({ taskId: req.params.taskId, userId: req.user.id, text: text.trim() });
+
+  for (const mentionedId of extractMentionedUserIds(text)) {
+    if (mentionedId === req.user.id) continue; // pas de notification en se mentionnant soi-même
+    notifyUser(mentionedId, {
+      type: 'task.mention', title: 'Mention dans un commentaire',
+      message: `${req.user.name || req.user.email} vous a mentionné dans « ${existing.title} »`,
+      meta: { projectId: req.legacyProject.id, taskId: existing.id, commentId: comment.id }
+    }).catch(() => {});
+  }
+  if (existing.assigneeId && existing.assigneeId !== req.user.id) {
+    notifyUser(existing.assigneeId, {
+      type: 'task.comment', title: 'Nouveau commentaire',
+      message: `${req.user.name || req.user.email} a commenté « ${existing.title} »`,
+      meta: { projectId: req.legacyProject.id, taskId: existing.id, commentId: comment.id }
+    }).catch(() => {});
+  }
+  res.status(201).json({ ok: true, comment });
 }));
 
 // --- Redirections du projet : raccourcis vers des services externes créés
