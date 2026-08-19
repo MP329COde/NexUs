@@ -50,3 +50,47 @@ export function getMinPasswordLength() {
   const len = Number(data.minPasswordLength);
   return Number.isInteger(len) && len >= 8 && len <= 128 ? len : 8;
 }
+
+// Complexité de mot de passe (todo.md, chantier sécurité de plateforme) :
+// désactivée par défaut (comportement historique inchangé, seule la longueur
+// minimale s'appliquait) — chaque règle est un booléen indépendant plutôt
+// qu'un niveau global, pour ne jamais activer une contrainte que
+// l'administrateur n'a pas explicitement choisie.
+export function getPasswordComplexity() {
+  const data = readStore('identity') || {};
+  return {
+    requireUppercase: Boolean(data.pwRequireUppercase),
+    requireDigit: Boolean(data.pwRequireDigit),
+    requireSymbol: Boolean(data.pwRequireSymbol)
+  };
+}
+
+// Restriction CIDR de connexion : liste vide = aucune restriction (défaut,
+// comportement historique inchangé). Volontairement PAS de validation ici
+// qui empêcherait d'enregistrer une valeur "risquée" — la route d'API
+// (routes/identity.routes.js) est celle qui doit avertir/confirmer avant
+// d'appliquer une restriction pouvant verrouiller l'administrateur
+// lui-même hors de la console.
+export function getLoginCidrAllowlist() {
+  const data = readStore('identity') || {};
+  return Array.isArray(data.loginCidrAllowlist) ? data.loginCidrAllowlist : [];
+}
+
+// Point d'entrée unique combinant longueur minimale + complexité, pour que
+// les quatre routes qui valident un mot de passe de compte (auth.routes.js
+// changement/onboarding, users.routes.js création) appliquent exactement la
+// même règle plutôt que de dupliquer la logique. Ne couvre PAS le mot de
+// passe de coffre-fort projet (routes/projects.routes.js vault-password) :
+// classe de secret différente, volontairement hors de cette politique de
+// compte.
+export function passwordPolicyError(password) {
+  const minLength = getMinPasswordLength();
+  if (!password || password.length < minLength) {
+    return `Le mot de passe doit contenir au moins ${minLength} caractères`;
+  }
+  const { requireUppercase, requireDigit, requireSymbol } = getPasswordComplexity();
+  if (requireUppercase && !/[A-Z]/.test(password)) return 'Le mot de passe doit contenir au moins une majuscule';
+  if (requireDigit && !/[0-9]/.test(password)) return 'Le mot de passe doit contenir au moins un chiffre';
+  if (requireSymbol && !/[^A-Za-z0-9]/.test(password)) return 'Le mot de passe doit contenir au moins un symbole';
+  return null;
+}

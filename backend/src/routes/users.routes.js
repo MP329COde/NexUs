@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/permissions.js';
 import { listUsers, createUser, setUserAdminFields, setTerminalTier, deleteUser } from '../store/usersStore.js';
 import { assignUserToGroups, setUserGroups, groupIdsForUser } from '../store/groupsStore.js';
 import { logAudit } from '../services/auditService.js';
-import { getMinPasswordLength } from '../store/identityStore.js';
+import { passwordPolicyError } from '../store/identityStore.js';
 
 // Gestion des comptes : réservée aux administrateurs. Chaque utilisateur gère
 // ses propres préférences (nom, avatar, mot de passe) via /api/auth/profile.
@@ -22,9 +22,12 @@ router.get('/', (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { email, password, name, role, skipOnboarding, groupIds, validFrom, validUntil } = req.body || {};
-  const minLength = getMinPasswordLength();
-  if (!email || !password || password.length < minLength) {
-    return res.status(400).json({ ok: false, error: `E-mail requis et mot de passe d'au moins ${minLength} caractères` });
+  if (!email) {
+    return res.status(400).json({ ok: false, error: 'E-mail requis' });
+  }
+  const policyError = passwordPolicyError(password);
+  if (policyError) {
+    return res.status(400).json({ ok: false, error: policyError });
   }
   // isPrimaryAdmin n'est jamais accepté ici : posé uniquement par
   // ensureBootstrapAdmin() sur le tout premier compte (usersStore.js).

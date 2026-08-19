@@ -5,6 +5,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { getRedacted, save } from '../store/identityStore.js';
 import { logAudit } from '../services/auditService.js';
+import { isValidCidr, ipMatchesAnyCidr } from '../utils/cidr.js';
+import { normalizeIp } from '../store/banlistStore.js';
 
 // Politique de connexion + configuration SSO : réservé aux administrateurs.
 const router = Router();
@@ -26,6 +28,20 @@ router.put('/', asyncHandler(async (req, res) => {
     const l = Number(minPasswordLength);
     if (!Number.isInteger(l) || l < 8 || l > 128) {
       return res.status(400).json({ ok: false, error: 'Longueur de mot de passe invalide (8 à 128)' });
+    }
+  }
+  const { loginCidrAllowlist } = req.body || {};
+  if (loginCidrAllowlist !== undefined) {
+    if (!Array.isArray(loginCidrAllowlist) || !loginCidrAllowlist.every(isValidCidr)) {
+      return res.status(400).json({ ok: false, error: 'Liste CIDR invalide (attendu : adresses/plages IPv4, ex. 10.0.0.0/24)' });
+    }
+    // Garde-fou : jamais enregistrer une restriction qui verrouillerait
+    // l'administrateur qui l'enregistre hors de la console — il n'existerait
+    // alors plus aucun moyen de la retirer sans accès direct au fichier de
+    // données. Une liste vide (désactivation) reste toujours autorisée.
+    const requesterIp = normalizeIp(req.ip);
+    if (loginCidrAllowlist.length > 0 && !ipMatchesAnyCidr(requesterIp, loginCidrAllowlist)) {
+      return res.status(400).json({ ok: false, error: `Votre propre adresse (${requesterIp}) ne correspond à aucune des plages fournies — refusé pour éviter de vous verrouiller vous-même hors de la console.` });
     }
   }
   const identity = save(req.body || {});

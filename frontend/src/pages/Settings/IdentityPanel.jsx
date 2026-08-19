@@ -19,6 +19,10 @@ export default function IdentityPanel() {
       setForm({
         sessionMinutes: data.identity.sessionMinutes ?? 720,
         minPasswordLength: data.identity.minPasswordLength ?? 8,
+        pwRequireUppercase: Boolean(data.identity.pwRequireUppercase),
+        pwRequireDigit: Boolean(data.identity.pwRequireDigit),
+        pwRequireSymbol: Boolean(data.identity.pwRequireSymbol),
+        loginCidrAllowlistText: (data.identity.loginCidrAllowlist || []).join('\n'),
         oidcIssuer: data.identity.oidcIssuer || '',
         oidcClientId: data.identity.oidcClientId || '',
         oidcClientSecret: '',
@@ -52,7 +56,9 @@ export default function IdentityPanel() {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.put('/identity', form);
+      const { loginCidrAllowlistText, ...rest } = form;
+      const loginCidrAllowlist = loginCidrAllowlistText.split('\n').map((s) => s.trim()).filter(Boolean);
+      await api.put('/identity', { ...rest, loginCidrAllowlist });
       notify('Politique de connexion enregistrée', { type: 'ok' });
       reload();
     } catch (err) {
@@ -84,6 +90,31 @@ export default function IdentityPanel() {
           </Field>
           <Field label="Longueur minimale du mot de passe" hint="Appliquée à la création de compte et au changement de mot de passe.">
             <input className="input" type="number" min={8} max={128} value={form.minPasswordLength} onChange={(e) => set('minPasswordLength', Number(e.target.value))} />
+          </Field>
+          <Field label="Complexité du mot de passe" hint="Règles additionnelles, désactivées par défaut.">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={form.pwRequireUppercase} onChange={(e) => set('pwRequireUppercase', e.target.checked)} />
+                Au moins une majuscule
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={form.pwRequireDigit} onChange={(e) => set('pwRequireDigit', e.target.checked)} />
+                Au moins un chiffre
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={form.pwRequireSymbol} onChange={(e) => set('pwRequireSymbol', e.target.checked)} />
+                Au moins un symbole
+              </label>
+            </div>
+          </Field>
+          <Field label="Restriction réseau (CIDR)" hint="Une plage par ligne (ex. 10.0.0.0/24). Vide = aucune restriction. Votre propre adresse doit être incluse, sinon refusé à l'enregistrement.">
+            <textarea
+              className="input"
+              rows={3}
+              placeholder={'10.0.0.0/24\n192.168.1.42'}
+              value={form.loginCidrAllowlistText}
+              onChange={(e) => set('loginCidrAllowlistText', e.target.value)}
+            />
           </Field>
         </div>
       </Panel>

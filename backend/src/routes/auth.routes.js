@@ -4,7 +4,8 @@ import { requireAuth, toPublicUser, issueSessionCookies, clearSessionCookies } f
 import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion } from '../store/usersStore.js';
 import { verifyPassword, hashPassword } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
-import { getMinPasswordLength } from '../store/identityStore.js';
+import { passwordPolicyError, getLoginCidrAllowlist } from '../store/identityStore.js';
+import { ipMatchesAnyCidr } from '../utils/cidr.js';
 import { banIp, normalizeIp } from '../store/banlistStore.js';
 import { permissionsForUser } from '../store/groupsStore.js';
 import { createNotification } from '../store/notificationsStore.js';
@@ -35,6 +36,16 @@ function validateAvatarImage(avatarImage) {
 }
 
 router.post('/login', asyncHandler(async (req, res) => {
+  // Restriction CIDR (identityStore.loginCidrAllowlist) : vérifiée avant
+  // toute recherche de compte, pour qu'une tentative depuis une IP non
+  // autorisée n'entame jamais le compteur de verrouillage d'un compte réel
+  // ni ne révèle son existence.
+  const cidrAllowlist = getLoginCidrAllowlist();
+  if (cidrAllowlist.length > 0 && !ipMatchesAnyCidr(normalizeIp(req.ip), cidrAllowlist)) {
+    logAudit({ user: null, ip: req.ip }, 'auth.login.blocked_ip', {});
+    return res.status(403).json({ ok: false, error: 'Connexion refusée depuis cette adresse (restriction réseau activée par un administrateur).' });
+  }
+
   // `email` accepté par rétrocompatibilité (formulaires/scripts existants) ;
   // `identifier` est le nom générique côté API — l'un ou l'autre peut
   // contenir soit une adresse e-mail, soit un nom de connexion.
@@ -161,9 +172,9 @@ router.put('/profile', requireAuth, asyncHandler(async (req, res) => {
 
 router.put('/password', requireAuth, asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
-  const minLength = getMinPasswordLength();
-  if (!newPassword || newPassword.length < minLength) {
-    return res.status(400).json({ ok: false, error: `Le nouveau mot de passe doit contenir au moins ${minLength} caractères` });
+  const policyError = passwordPolicyError(newPassword);
+  if (policyError) {
+    return res.status(400).json({ ok: false, error: policyError });
   }
   const user = findUserByEmail(req.user.email);
   if (!verifyPassword(currentPassword || '', user.passwordHash)) {
@@ -184,9 +195,9 @@ router.put('/onboarding/complete', requireAuth, asyncHandler(async (req, res) =>
     return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
   }
   if (newPassword) {
-    const minLength = getMinPasswordLength();
-    if (newPassword.length < minLength) {
-      return res.status(400).json({ ok: false, error: `Le mot de passe doit contenir au moins ${minLength} caractères` });
+    const policyError = passwordPolicyError(newPassword);
+    if (policyError) {
+      return res.status(400).json({ ok: false, error: policyError });
     }
     updatePassword(req.user.id, hashPassword(newPassword));
   }
