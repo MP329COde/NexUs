@@ -252,3 +252,16 @@ export const INTEGRATION_FORMS = {
 };
 
 export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
+
+// Regroupement purement visuel de INTEGRATION_ORDER ci-dessus (mêmes clés,
+// même ordre au sein de chaque catégorie) — la grille était une liste plate
+// de 17 intégrations sans logique apparente. Catégories reprises du plan de
+// refonte de navigation (Source Control / Runtime / Observability /
+// Networking / Plateforme).
+export const INTEGRATION_CATEGORIES = [
+  { label: 'Source Control', keys: ['gitlab', 'github', 'githubPlatform', 'gitea'] },
+  { label: 'Runtime', keys: ['kubernetes', 'argocd', 'proxmox'] },
+  { label: 'Observability', keys: ['grafana', 'wazuh'] },
+  { label: 'Networking', keys: ['haproxy', 'traefik', 'certManager', 'ovh', 'duckdns'] },
+  { label: 'Plateforme', keys: ['registry', 'notificationsWebhook', 'gitBackup'] }
+];

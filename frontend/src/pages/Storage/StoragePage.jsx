@@ -8,10 +8,16 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
 import './StoragePage.css';
 
 const TYPE_LABELS = { volume: 'Volume', nas: 'NAS', zfs_pool: 'Pool ZFS', partage: 'Partage' };
 const EMPTY_FORM = { name: '', type: 'volume', host: '', totalGB: '', usedGB: '', notes: '' };
+const STO_TABS = [
+  { id: 'volumes', label: 'Volumes' },
+  { id: 'proxmox', label: 'Stockage Proxmox' },
+  { id: 'backups', label: 'Sauvegardes' }
+];
 
 export default function StoragePage() {
   const { user } = useAuth();
@@ -19,6 +25,7 @@ export default function StoragePage() {
   const notify = useNotify();
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState('volumes');
 
   const volumes = data?.items || [];
   const totalCapacity = volumes.reduce((s, v) => s + v.totalGB, 0);
@@ -58,6 +65,9 @@ export default function StoragePage() {
         <KpiCard label="Utilisé" value={totalCapacity ? Math.round((totalUsed / totalCapacity) * 100) : 0} unit="%" tint="#F59E0B" />
       </div>
 
+      <Tabs tabs={STO_TABS} active={tab} onChange={setTab} className="sto-tabs" />
+
+      {tab === 'volumes' && (
       <div className="storage-panel-grid">
         <Panel title="Ajouter un volume" span={4}>
           <form onSubmit={createVolume} style={{ padding: 16 }}>
@@ -104,11 +114,24 @@ export default function StoragePage() {
             </div>
           )}
         </Panel>
-
-        <ProxmoxStoragePanel />
-
-        {user?.role === 'admin' && <BackupSummaryPanel />}
       </div>
+      )}
+
+      {tab === 'proxmox' && (
+        <div className="storage-panel-grid">
+          <ProxmoxStoragePanel />
+        </div>
+      )}
+
+      {tab === 'backups' && (
+        <div className="storage-panel-grid">
+          {user?.role === 'admin' ? <BackupSummaryPanel /> : (
+            <Panel title="Sauvegardes de la console" span={12}>
+              <div className="storage-empty">Réservé aux administrateurs</div>
+            </Panel>
+          )}
+        </div>
+      )}
     </>
   );
 }

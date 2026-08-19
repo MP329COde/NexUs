@@ -9,7 +9,15 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import Tabs from '../../components/ui/Tabs.jsx';
 import './SecurityPage.css';
+
+const SEC_TABS = [
+  { id: 'overview', label: "Vue d'ensemble" },
+  { id: 'agents', label: 'Agents Wazuh' },
+  { id: 'compliance', label: 'Conformité' },
+  { id: 'scans', label: 'IPs bannies & scans' }
+];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,6 +40,7 @@ export default function SecurityPage() {
   const agents = useApi(() => api.get('/wazuh/agents'), [], { pollMs: 20000 });
   const summary = useApi(() => api.get('/wazuh/summary'), [], { pollMs: 20000 });
   const sca = useApi(() => api.get('/wazuh/sca-summary'), [], { pollMs: 60000 });
+  const [tab, setTab] = useState('overview');
 
   const s = summary.data?.summary?.connection || {};
   const wazuhConfigured = status.data?.status?.configured;
@@ -40,12 +49,15 @@ export default function SecurityPage() {
     <>
       <PageHeader title="Cybersécurité" sub={status.data?.status?.message || 'Agents, IPs bannies, scans réseau et conformité'} />
 
-      {user?.role === 'admin' && (
+      <Tabs tabs={SEC_TABS} active={tab} onChange={setTab} className="sec-tabs" />
+
+      {tab === 'overview' && user?.role === 'admin' && (
         <div className="security-panel-row">
           <SecurityOverviewPanel />
         </div>
       )}
 
+      {tab === 'agents' && (<>
       {wazuhConfigured && (
         <div className="security-kpi-grid">
           <KpiCard label="Agents actifs" value={s.active ?? '—'} tint="#10B981" />
@@ -78,15 +90,24 @@ export default function SecurityPage() {
           <EmptyState title="Wazuh n'est pas configuré" hint="Renseignez l'URL du gestionnaire et des identifiants API depuis Paramètres → Wazuh pour superviser vos agents." />
         </div>
       )}
+      </>)}
 
-      {wazuhConfigured && <SCAPanel data={sca.data} />}
+      {tab === 'compliance' && (wazuhConfigured ? <SCAPanel data={sca.data} /> : (
+        <div className="card security-empty-wrap">
+          <EmptyState title="Wazuh n'est pas configuré" hint="La conformité (SCA) dépend des mêmes agents Wazuh que l'onglet précédent." />
+        </div>
+      ))}
 
-      {user?.role === 'admin' && (
+      {tab === 'scans' && (user?.role === 'admin' ? (
         <div className="security-panel-row" style={{ marginBottom: 0 }}>
           <BanlistPanel />
           <NetworkScanPanel />
         </div>
-      )}
+      ) : (
+        <div className="card security-empty-wrap">
+          <EmptyState title="Réservé aux administrateurs" hint="Le bannissement d'IP et les scans réseau sont des actions sensibles réservées aux comptes administrateur." />
+        </div>
+      ))}
     </>
   );
 }

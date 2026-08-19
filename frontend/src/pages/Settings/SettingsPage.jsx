@@ -3,7 +3,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
+import { INTEGRATION_FORMS, INTEGRATION_ORDER, INTEGRATION_CATEGORIES } from '../../config/integrationForms.js';
 import IntegrationPanel from './IntegrationPanel.jsx';
 import InfrastructureStatusPanel from './InfrastructureStatusPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
@@ -41,6 +41,20 @@ const TABS = [
   { id: 'audit', label: 'Journal', adminOnly: true }
 ];
 
+// Regroupement purement visuel des 13 onglets ci-dessus (ids/routes/permissions
+// inchangés — `?tab=` continue de cibler les mêmes ids) : la barre d'onglets à
+// plat mélangeait des destinations très différentes (gouvernance, plateforme,
+// intégrations, identité...), un développeur devait déjà savoir dans quel
+// onglet chercher. Catégories reprises du plan de refonte de navigation.
+const TAB_CATEGORIES = [
+  { label: 'Général', tabIds: ['platform', 'inventory'] },
+  { label: 'Identité & accès', tabIds: ['users', 'groups', 'identity'] },
+  { label: 'Intégrations', tabIds: ['integrations', 'git'] },
+  { label: 'Plateforme', tabIds: ['plugins', 'feature-flags', 'environment-blueprints'] },
+  { label: 'Policies & audit', tabIds: ['policies', 'audit'] },
+  { label: 'Système', tabIds: ['system'] }
+];
+
 export default function SettingsPage() {
   const { data, error, reload } = useApi(() => api.get('/settings'), []);
   const { user, hasPermission } = useAuth();
@@ -50,9 +64,17 @@ export default function SettingsPage() {
     return hasPermission(t.domain, t.level);
   };
   const visibleTabs = TABS.filter(canSeeTab);
+  const visibleIds = new Set(visibleTabs.map((t) => t.id));
+  const visibleCategories = TAB_CATEGORIES
+    .map((c) => ({ ...c, tabs: c.tabIds.map((id) => visibleTabs.find((t) => t.id === id)).filter(Boolean) }))
+    .filter((c) => c.tabs.length > 0);
+  // Filet de sécurité : si un onglet est un jour ajouté à TABS sans être
+  // rattaché à TAB_CATEGORIES, il reste visible (non perdu silencieusement)
+  // plutôt que de disparaître de la barre.
+  const uncategorized = visibleTabs.filter((t) => !TAB_CATEGORIES.some((c) => c.tabIds.includes(t.id)));
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab = visibleTabs.some((t) => t.id === tabParam) ? tabParam : (visibleTabs[0]?.id || null);
+  const tab = visibleIds.has(tabParam) ? tabParam : (visibleTabs[0]?.id || null);
   const setTab = (id) => setSearchParams(id === visibleTabs[0]?.id ? {} : { tab: id }, { replace: true });
 
   return (
@@ -61,8 +83,22 @@ export default function SettingsPage() {
         title="Paramètres d'administration"
         sub="Utilisateurs, permissions, plateforme et intégrations. Réservé aux administrateurs — les secrets sont chiffrés au repos et ne sont jamais renvoyés au navigateur."
         actions={(
-          <div className="settings-tabs">
-            {visibleTabs.map((t) => (
+          <div className="settings-tabs settings-tabs-grouped">
+            {visibleCategories.map((c) => (
+              <div key={c.label} className="settings-tab-group">
+                <span className="faint settings-tab-group-label">{c.label}</span>
+                {c.tabs.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`settings-tab${tab === t.id ? ' settings-tab-active' : ''}`}
+                  >
+                    {t.label}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {uncategorized.map((t) => (
               <div
                 key={t.id}
                 onClick={() => setTab(t.id)}
@@ -84,16 +120,24 @@ export default function SettingsPage() {
       {tab === 'integrations' && (
         <div className="settings-integrations-grid">
           <div className="settings-integrations-full"><InfrastructureStatusPanel /></div>
-          {INTEGRATION_ORDER.map((key) => (
-            <IntegrationPanel
-              key={key}
-              integrationKey={key}
-              schema={INTEGRATION_FORMS[key]}
-              initial={data?.integrations[key]}
-              allIntegrations={data?.integrations}
-              onSaved={reload}
-            />
-          ))}
+          {INTEGRATION_CATEGORIES.map((cat) => {
+            const keys = cat.keys.filter((k) => INTEGRATION_ORDER.includes(k));
+            if (keys.length === 0) return null;
+            return (
+              <FragmentWithLabel key={cat.label} label={cat.label}>
+                {keys.map((key) => (
+                  <IntegrationPanel
+                    key={key}
+                    integrationKey={key}
+                    schema={INTEGRATION_FORMS[key]}
+                    initial={data?.integrations[key]}
+                    allIntegrations={data?.integrations}
+                    onSaved={reload}
+                  />
+                ))}
+              </FragmentWithLabel>
+            );
+          })}
         </div>
       )}
       {tab === 'users' && <UsersPanel />}
@@ -108,6 +152,19 @@ export default function SettingsPage() {
       {tab === 'git' && <GitServicesPanel />}
       {tab === 'system' && <SystemPanel />}
       {tab === 'audit' && <AuditPanel />}
+    </>
+  );
+}
+
+// Rend un libellé de catégorie en pleine largeur suivi de ses cartes,
+// tout en gardant chaque carte comme enfant direct de la grille CSS
+// parente (`.settings-integrations-grid`) — un wrapper <div> autour du
+// groupe casserait la mise en colonnes automatique du grid.
+function FragmentWithLabel({ label, children }) {
+  return (
+    <>
+      <div className="settings-integrations-category">{label}</div>
+      {children}
     </>
   );
 }
