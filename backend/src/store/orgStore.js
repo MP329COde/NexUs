@@ -529,6 +529,18 @@ export async function listTeamsForOrg(orgId, userId) {
   return rows;
 }
 
+export async function listTeamsForUser(userId) {
+  const { rows } = await query(
+    `SELECT t.*, tm.role AS my_role, o.name AS org_name
+     FROM teams t
+     JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = $1
+     JOIN organizations o ON o.id = t.org_id
+     ORDER BY t.name`,
+    [userId]
+  );
+  return rows;
+}
+
 export async function getTeam(id) {
   const { rows } = await query('SELECT * FROM teams WHERE id = $1', [id]);
   return rows[0] || null;
@@ -756,7 +768,7 @@ export async function listComponentsForUser(userId, { q, kind, lifecycle, ownerT
     );
   }
   const { rows } = await query(
-    `SELECT DISTINCT c.*, p.name AS project_name, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
+    `SELECT DISTINCT c.*, p.name AS project_name, p.legacy_id AS project_legacy_id, p.org_id AS org_id, t.name AS owner_team_name, t.slug AS owner_team_slug,
         (SELECT COUNT(*) FROM environments env WHERE env.project_id = c.project_id AND env.argocd_app IS NOT NULL) AS project_linked_environment_count
      FROM components c
      JOIN projects p ON p.id = c.project_id

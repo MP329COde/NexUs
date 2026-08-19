@@ -33,6 +33,10 @@ router.get('/org/:orgId', asyncHandler(async (req, res) => {
   res.json({ ok: true, items: await orgStore.listTeamsForOrg(req.params.orgId, req.user.id) });
 }));
 
+router.get('/mine', asyncHandler(async (req, res) => {
+  res.json({ ok: true, items: await orgStore.listTeamsForUser(req.user.id) });
+}));
+
 router.post('/org/:orgId', asyncHandler(async (req, res) => {
   const orgRole = await requireOrgMembership(req, res, req.params.orgId);
   if (!orgRole) return;

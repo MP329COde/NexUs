@@ -64,6 +64,7 @@ const GROUPS = [
 export default function DeploymentsLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
   const { data } = useApi(() => api.get('/status/overview'), []);
+  const { data: myTeams } = useApi(() => api.get('/teams/mine'), []);
 
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
@@ -73,11 +74,24 @@ export default function DeploymentsLayout() {
     .filter((e) => e.domain === 'dev' && e.configured && e.baseUrl)
     .map((e) => ({ label: e.label, url: e.baseUrl }));
 
+  const myTeam = (myTeams?.items || [])[0] || null;
+  const groups = GROUPS.map((g) => {
+    if (g.label !== 'Aperçu') return g;
+    if (!myTeam) return g;
+    return {
+      ...g,
+      items: [
+        ...g.items,
+        { to: `/deployments/teams/${myTeam.id}`, label: 'Mon équipe', icon: 'users' }
+      ]
+    };
+  });
+
   return (
     <div className={`dev-layout${collapsed ? ' dev-layout-collapsed' : ''}`}>
       <nav className={`card dev-nav${collapsed ? ' dev-nav-collapsed' : ''}`}>
         <div className="dev-nav-groups">
-          {GROUPS.map((g) => (
+          {groups.map((g) => (
             <div key={g.label}>
               {!collapsed && <div className="dev-nav-group-label">{g.label}</div>}
               <div className="dev-nav-group-items">
