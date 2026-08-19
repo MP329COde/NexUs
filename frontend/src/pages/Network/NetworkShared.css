@@ -81,6 +81,63 @@
   font-size: 20px;
 }
 
+.topo-view-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.topo-view-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.topo-graph-scroll {
+  overflow: auto;
+  padding: 8px;
+}
+
+.topo-graph-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.4;
+  opacity: .7;
+}
+
+.topo-graph-layer-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  fill: var(--text-faint);
+}
+
+.topo-graph-node-clickable {
+  cursor: pointer;
+}
+
+.topo-graph-rect {
+  fill: var(--surface);
+  stroke-width: 2;
+}
+
+.topo-graph-tone-ok { stroke: var(--tone-ok-dot); }
+.topo-graph-tone-crit { stroke: var(--tone-crit-dot); }
+.topo-graph-tone-warn { stroke: var(--tone-warn-dot); }
+.topo-graph-tone-info { stroke: var(--tone-info-dot); }
+.topo-graph-tone-vio { stroke: var(--tone-vio-dot); }
+.topo-graph-tone-mut { stroke: var(--tone-mut-dot); }
+
+.topo-graph-node-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.topo-graph-node-meta {
+  font-size: 10.5px;
+  fill: var(--text-faint);
+}
+
 /* HAProxy */
 
 .haproxy-row-selectable {
