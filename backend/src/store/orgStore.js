@@ -783,6 +783,21 @@ export async function getComponent(id) {
   return rows[0] || null;
 }
 
+// --- Changelog / Releases par composant (voir 0033_component_releases.sql) ---
+export async function listComponentReleases(componentId) {
+  const { rows } = await query('SELECT * FROM component_releases WHERE component_id = $1 ORDER BY created_at DESC', [componentId]);
+  return rows;
+}
+
+export async function createComponentRelease(componentId, { version, notes, commitSha, prUrl, pipelineUrl, deploymentUrl, userId }) {
+  const { rows } = await query(
+    `INSERT INTO component_releases (component_id, version, notes, commit_sha, pr_url, pipeline_url, deployment_url, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [componentId, version, notes || '', commitSha || null, prUrl || null, pipelineUrl || null, deploymentUrl || null, userId]
+  );
+  return rows[0];
+}
+
 // Résolution utilisée par l'import service.yaml (services/serviceManifest.js) :
 // spec.owner y référence une équipe par son slug (lisible, stable dans un
 // fichier versionné), jamais par son UUID interne.

@@ -60,6 +60,10 @@ export default function CatalogComponentPage() {
   const [syncing, setSyncing] = useState(null);
   const [syncEnvId, setSyncEnvId] = useState('');
   const [syncBusy, setSyncBusy] = useState(false);
+  const releases = useApi(() => api.get(`/catalog/components/${id}/releases`), [id]);
+  const [addingRelease, setAddingRelease] = useState(false);
+  const [releaseForm, setReleaseForm] = useState({ version: '', notes: '', commitSha: '', prUrl: '', pipelineUrl: '', deploymentUrl: '' });
+  const [releaseBusy, setReleaseBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -97,6 +101,22 @@ export default function CatalogComponentPage() {
       notify(err.message, { type: 'crit' });
     } finally {
       setBindingBusy(false);
+    }
+  }
+
+  async function addRelease(e) {
+    e.preventDefault();
+    setReleaseBusy(true);
+    try {
+      await api.post(`/catalog/components/${id}/releases`, releaseForm);
+      notify('Version publiée', { type: 'ok' });
+      setReleaseForm({ version: '', notes: '', commitSha: '', prUrl: '', pipelineUrl: '', deploymentUrl: '' });
+      setAddingRelease(false);
+      releases.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setReleaseBusy(false);
     }
   }
 
@@ -465,6 +485,48 @@ export default function CatalogComponentPage() {
               )}
             </div>
           ))}
+        </div>
+
+        <div className="card catalog-detail-card">
+          <div className="catalog-deps-header">
+            <span className="faint">Versions</span>
+            {canManage && !addingRelease && (
+              <span className="btn-outline catalog-deps-add-btn" onClick={() => setAddingRelease(true)}>
+                <Icon name="plus" size={12} />Publier une version
+              </span>
+            )}
+          </div>
+
+          {addingRelease && (
+            <form onSubmit={addRelease} className="catalog-deps-form">
+              <input className="input mono" required placeholder="1.4.0" value={releaseForm.version} onChange={(e) => setReleaseForm((f) => ({ ...f, version: e.target.value }))} />
+              <input className="input" placeholder="Notes (optionnel)" value={releaseForm.notes} onChange={(e) => setReleaseForm((f) => ({ ...f, notes: e.target.value }))} />
+              <input className="input mono" placeholder="commit SHA" value={releaseForm.commitSha} onChange={(e) => setReleaseForm((f) => ({ ...f, commitSha: e.target.value }))} />
+              <input className="input" placeholder="URL de la PR" value={releaseForm.prUrl} onChange={(e) => setReleaseForm((f) => ({ ...f, prUrl: e.target.value }))} />
+              <input className="input" placeholder="URL du pipeline" value={releaseForm.pipelineUrl} onChange={(e) => setReleaseForm((f) => ({ ...f, pipelineUrl: e.target.value }))} />
+              <input className="input" placeholder="URL du déploiement" value={releaseForm.deploymentUrl} onChange={(e) => setReleaseForm((f) => ({ ...f, deploymentUrl: e.target.value }))} />
+              <div className="projects-form-actions">
+                <span className="btn-outline" onClick={() => setAddingRelease(false)}>Annuler</span>
+                <button className="btn" type="submit" disabled={releaseBusy}>{releaseBusy ? 'Publication…' : 'Publier'}</button>
+              </div>
+            </form>
+          )}
+
+          {(releases.data?.items || []).length === 0 ? (
+            <p className="faint catalog-deps-empty">Aucune version publiée.</p>
+          ) : (
+            (releases.data?.items || []).map((r) => (
+              <div key={r.id} className="catalog-deps-row">
+                <span className="catalog-deps-link mono">{r.version}</span>
+                {r.notes && <span className="faint">{r.notes}</span>}
+                {r.commit_sha && <span className="faint mono">{r.commit_sha.slice(0, 7)}</span>}
+                {r.pr_url && <a href={r.pr_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">PR</a>}
+                {r.pipeline_url && <a href={r.pipeline_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Pipeline</a>}
+                {r.deployment_url && <a href={r.deployment_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Déploiement</a>}
+                <span className="faint" style={{ marginLeft: 'auto' }}>{new Date(r.created_at).toLocaleDateString('fr-FR')}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>
