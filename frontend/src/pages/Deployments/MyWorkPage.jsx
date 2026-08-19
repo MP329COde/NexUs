@@ -20,12 +20,14 @@ export default function MyWorkPage() {
   const tasks = useApi(() => api.get('/projects/mine/tasks'), []);
   const overview = useApi(() => api.get('/projects/mine/overview'), []);
   const reviews = useApi(() => api.get('/reviews'), []);
+  const environments = useApi(() => api.get('/projects/mine/environments'), []);
 
   const myTasks = (tasks.data?.items || []).filter((t) => t.status !== 'done');
   const myReviews = (reviews.data?.items || []).filter((r) => (r.reviewerIds || []).includes(user?.id));
   const openIncidents = overview.data?.openIncidents || [];
   const pendingChanges = overview.data?.pendingChanges || [];
   const myProjects = overview.data?.projects || [];
+  const myEnvironments = environments.data?.items || [];
 
   return (
     <>
@@ -91,6 +93,25 @@ export default function MyWorkPage() {
                 <Link key={c.id} to={`/deployments/projects/${c.projectId}`} className="mywork-row">
                   <span className="mywork-row-title">{c.title}</span>
                   <span className="faint">{c.projectName}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="pd-grid-row">
+        <Panel title="Mes environnements" sub={`${myEnvironments.length} environnement(s) de preview`} span={12}>
+          {myEnvironments.length === 0 ? (
+            <div className="faint">Aucun environnement de preview sur vos projets.</div>
+          ) : (
+            <div className="mywork-list">
+              {myEnvironments.map((e) => (
+                <Link key={e.id} to={`/deployments/projects/${e.projectId}`} className="mywork-row">
+                  <span className="mywork-row-title">{e.name}</span>
+                  {e.source_branch && <span className="faint mono">{e.source_branch}</span>}
+                  <span className="faint">{e.projectName}</span>
+                  {e.expires_at && <span className="faint">expire le {new Date(e.expires_at).toLocaleDateString('fr-FR')}</span>}
                 </Link>
               ))}
             </div>
