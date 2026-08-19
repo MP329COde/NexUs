@@ -8,6 +8,9 @@ import { logAudit } from '../services/auditService.js';
 import * as projectsStore from '../store/projectsStore.js';
 import * as orgStore from '../store/orgStore.js';
 import { resolveProjectRole } from '../middleware/projectAccess.js';
+import * as entityCommentsStore from '../store/entityCommentsStore.js';
+import { notifyUser } from '../services/userNotificationService.js';
+import { extractMentionedUserIds } from '../services/mentionService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -170,6 +173,37 @@ router.post('/:id/provision-argocd-app', asyncHandler(async (req, res) => {
 
   logAudit(req, 'argocd.application.provisioned', { linkId: link.id, appName, namespace });
   res.status(201).json({ ok: true, appName });
+}));
+
+// Commentaires génériques sur un déploiement (entity_comments, migration
+// 0041, todo.md ligne ~118) — même pattern que /projects/:id/comments et
+// /wiki/:id/comments (Lot 49) : lecture ouverte à tout authentifié (comme
+// GET /:id/pipeline ci-dessus), écriture au moins développeur sur le projet
+// rattaché (comme les autres actions de ce routeur via
+// requireMinRoleForLink), admin requis si le lien n'est rattaché à aucun
+// projet (pas de contexte de rôle auquel se raccrocher).
+router.get('/:id/comments', asyncHandler(async (req, res) => {
+  const link = requireLink(req, res);
+  if (!link) return;
+  res.json({ ok: true, items: await entityCommentsStore.listComments('deployment', link.id) });
+}));
+
+router.post('/:id/comments', asyncHandler(async (req, res) => {
+  const link = requireLink(req, res);
+  if (!link) return;
+  if (!(await requireMinRoleForLink(req, res, link, 'developer'))) return;
+  const { body } = req.body || {};
+  if (!body || !body.trim()) return res.status(400).json({ ok: false, error: 'Commentaire vide' });
+  const comment = await entityCommentsStore.addComment('deployment', link.id, req.user.id, body.trim());
+  for (const mentionedId of extractMentionedUserIds(body)) {
+    if (mentionedId === req.user.id) continue;
+    notifyUser(mentionedId, {
+      type: 'deployment.mention', title: 'Mention dans un commentaire',
+      message: `${req.user.name || req.user.email} vous a mentionné sur le déploiement « ${link.name} »`,
+      meta: { linkId: link.id, projectId: link.projectId || null, commentId: comment.id }
+    }).catch(() => {});
+  }
+  res.status(201).json({ ok: true, comment });
 }));
 
 export default router;

@@ -12,6 +12,7 @@ import DeploymentFormDialog from './DeploymentFormDialog.jsx';
 import PipelineView from './PipelineView.jsx';
 import GitOpsDiffPanel from './GitOpsDiffPanel.jsx';
 import DevToolsPanel from './DevToolsPanel.jsx';
+import EntityCommentsPanel from './EntityCommentsPanel.jsx';
 import './ReleasesPage.css';
 
 export default function ReleasesPage() {
@@ -27,6 +28,7 @@ export default function ReleasesPage() {
 
   const apps = links.data?.items || [];
   const fullyLinked = apps.filter((l) => l.argocdAppName && l.k8sDeployment).length;
+  function userName(uid) { return uid === user?.id ? 'Vous' : uid; }
 
   async function remove(id) {
     if (!confirm('Retirer cette application suivie ?')) return;
@@ -77,6 +79,7 @@ export default function ReleasesPage() {
         <div className="rlp-detail-stack">
           <PipelineView linkId={selected} span={12} />
           <GitOpsDiffPanel linkId={selected} span={12} />
+          <EntityCommentsPanel endpoint={`/deployments/${selected}/comments`} userName={userName} span={12} />
         </div>
       )}
 

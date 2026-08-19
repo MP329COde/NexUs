@@ -467,3 +467,101 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
   DeploymentsLayout.jsx`, `CodeLayout.jsx` (nouveau), `DeliveryLayout.jsx` (nouveau),
   `QualitySecurityLayout.jsx` (nouveau), `GroupTabs.css` (nouveau), `frontend/src/App.jsx`. Plan complet
   des lots suivants (50-58+) dans `/Users/matthew/.claude/plans/voici-la-liste-int-grale-unified-llama.md`.
+
+- [x] **Catalogue regroupé (Lot 50, 1re moitié)** : "Catalogue", "Templates" et "Demandes" étaient trois
+  entrées distinctes de la sidebar Développement (aucun lien réel entre elles pour l'utilisateur, alors
+  que les trois s'appuient sur le même référentiel `kind` de composant — service/api/website/worker/
+  library/cronjob/infrastructure, cf. `catalog.routes.js`). Enveloppées dans `CatalogLayout.jsx`
+  (nouveau, même pattern `NavLink`+`Outlet` sans préfixe de chemin que `CodeLayout.jsx`/
+  `DeliveryLayout.jsx`/`QualitySecurityLayout.jsx` du Lot 49 — chemins existants `/deployments/catalog`,
+  `/deployments/catalog/:id`, `/deployments/templates`, `/deployments/requests` strictement inchangés,
+  donc aucun lien cassé). Sidebar : le groupe "Catalogue" n'a plus qu'une seule entrée. **Documentation
+  transverse (2e moitié du Lot 50, prévue par le plan) volontairement non codée** : audit confirme
+  qu'aucun agrégat global n'existe pour la documentation — `DocumentationPanel`/`DocSitesPanel`/
+  `AdrPanel` de `ProjectDetailPage.jsx` sont tous strictement scopés à un projet (`GET /projects/:id/
+  doc-sites`, `/projects/:id/adrs`), `WikiPage.jsx` est scopée à une organisation à la fois
+  (`GET /wiki?orgId=`), et aucune page ne liste les sites Docusaurus/Storybook de tous les projets.
+  Construire un espace "Documentation" avec un vrai contenu agrégé demanderait de nouveaux endpoints
+  backend (`GET /doc-sites` toutes organisations, `GET /wiki` multi-org, `GET /adrs` toutes équipes) —
+  un chantier de modélisation distinct, pas une simple réorganisation de nav ; documenté pour un lot
+  dédié plutôt que de créer une page vide ou un lien trompeur. Vérifié : build Vite propre, suite
+  `frontend/tests/e2e/` complète (30/30, dont `smokeNavigation.spec.js`) sur environnement fraîchement
+  provisionné. `frontend/src/pages/Deployments/CatalogLayout.jsx` (nouveau), `DeploymentsLayout.jsx`,
+  `frontend/src/App.jsx`.
+
+- [x] **Page Projet en onglets (Lot 51)** : `ProjectDetailPage.jsx` empilait ~20 panels sur une seule
+  page (Backlog, Équipe, Dépôts, Revues, Activité des dépôts, Environnements, Incidents, Documentation
+  wiki, DocSites, ADR, Activité projet, Commentaires, Santé du workspace, Changements, Jobs, Scans de
+  sécurité, Fenêtres de maintenance, Raccourcis, Coffre-fort, Webhook, Endpoints API) — l'utilisateur
+  devait faire défiler une page très longue pour trouver quoi que ce soit. Regroupé derrière le
+  composant `Tabs.jsx` du design system (Lot 48) en 7 onglets, sans toucher à la logique de données
+  (mêmes hooks `useApi`, mêmes handlers, aucune route/endpoint modifié) — uniquement du JSX enveloppé
+  dans des conditions `{tab === 'x' && (...)}` : **Vue générale** (description/tags, santé du workspace,
+  activité), **Travail** (backlog, équipe), **Code** (dépôts rattachés, revues liées, activité des
+  dépôts), **Livraison** (environnements, jobs CI), **Documentation** (wiki lié, DocSites, ADR),
+  **Qualité & sécurité** (changements, scans de sécurité), **Paramètres** (incidents, commentaires,
+  fenêtres de maintenance, raccourcis, coffre-fort, webhook, endpoints API). Le fil d'Ariane
+  Développement/Organisation/Projets/nom déjà en place (`PageHeader`) n'a pas eu besoin de modification.
+  **7 régressions trouvées et corrigées** dans la suite `tests/e2e-postgres/` (des tests cliquaient
+  directement sur des panels désormais cachés derrière un onglet non actif par défaut) : `adr.spec.js`,
+  `adrRevisions.spec.js`, `docsTiers.spec.js`, `rbac.spec.js` (onglet Documentation), `projectBoard.spec.js`,
+  `taskCodeLink.spec.js` (onglet Travail), `incidentComments.spec.js` (onglet Paramètres) — un clic sur
+  l'onglet concerné ajouté avant l'interaction, via un sélecteur scopé `.pd-tabs .ui-tab` (le premier
+  essai avec `getByText('Documentation')` était ambigu : un `ProjectActivityPanel` peut afficher une
+  entrée d'activité contenant aussi le mot "Documentation"). Vérifié de bout en bout sur une base
+  Postgres jetable fraîchement migrée (`docker run postgres:16-alpine` + `db/migrate.js`, suite
+  `playwright.postgres.config.js`) : **64/64 tests verts**, plus la suite par défaut
+  `frontend/tests/e2e/` (30/30) et un build Vite propre. `frontend/src/pages/Deployments/
+  ProjectDetailPage.jsx`, et dans `frontend/tests/e2e-postgres/` : `adr.spec.js`, `adrRevisions.spec.js`,
+  `docsTiers.spec.js`, `rbac.spec.js`, `projectBoard.spec.js`, `taskCodeLink.spec.js`,
+  `incidentComments.spec.js`.
+
+- [x] **Sous-nav à onglets pour Cybersécurité et Stockage (Lot 52, 1re moitié)** : `SecurityPage.jsx`
+  (5 panels : tableau de sécurité, agents Wazuh, conformité SCA, IPs bannies, scans réseau) et
+  `StoragePage.jsx` (formulaire volume, liste volumes, stockage Proxmox réel, sauvegardes console)
+  affichaient tout empilé sur une seule page. Même technique que le Lot 51 (composant `Tabs.jsx` du
+  design system, état local, aucune donnée/route touchée) : Sécurité → **Vue d'ensemble** / **Agents
+  Wazuh** / **Conformité** / **IPs bannies & scans** (les deux derniers onglets réservés admin affichent
+  un état vide honnête "Réservé aux administrateurs" pour un compte non-admin plutôt que de masquer
+  silencieusement l'onglet) ; Stockage → **Volumes** / **Stockage Proxmox** / **Sauvegardes**. **Monitoring
+  volontairement laissé tel quel** : audit de `MonitoringPage.jsx` montre seulement 4 panels déjà
+  concis (Alertes actives, Tendance de charge, Hôtes, Tableaux de bord) tenant sur un écran avec les
+  KPIs toujours visibles — un découpage en onglets y aurait ajouté un clic sans réduire de clutter
+  réel, contrairement à Sécurité/Stockage. **Paramètres (réorganisation `TABS` + page Intégrations
+  catégorisée) et sous-nav Réseau simplifiée reportés** : périmètre plus large (13 onglets Settings à
+  regrouper en 9 catégories, `IntegrationPanel.jsx` à catégoriser Source Control/Runtime/Observability/
+  Networking) nécessitant sa propre vérification dédiée plutôt que d'être ajouté en fin de lot. Vérifié :
+  build Vite propre, suite `frontend/tests/e2e/` complète (30/30, `smokeNavigation.spec.js` visite
+  `/security` et `/storage` sans erreur JS). `frontend/src/pages/Security/SecurityPage.jsx`,
+  `frontend/src/pages/Storage/StoragePage.jsx`.
+
+- [x] **Commentaires génériques étendus aux déploiements (Lot 53)** : la table `entity_comments`
+  (migration 0041, Lot 49) couvrait déjà `project` et `wiki_page` — étendue à `deployment`, seul autre
+  type de ressource avec un ID stable côté NexUs (les PR n'en ont pas, cf. todo.md ligne ~118, laissées
+  de côté comme déjà documenté). `deploymentStore.js` (store JSON/SQLite via `store/jsonStore.js`, pas
+  Postgres) génère des `id` en UUID v4 (`uuid()`), compatibles avec `entity_id UUID` de la table —
+  aucune migration nécessaire. Routes `GET`/`POST /deployments/:id/comments` ajoutées dans
+  `backend/src/routes/deployments.routes.js`, réutilisant telles quelles `entityCommentsStore.js` et
+  `services/mentionService.js` (Lot 49) : lecture ouverte à tout authentifié (même politique que
+  `GET /:id/pipeline` déjà existant sur ce routeur), écriture au moins développeur sur le projet
+  rattaché au lien de déploiement en réutilisant `requireMinRoleForLink` déjà défini dans ce fichier
+  (même fonction que sync/update/delete), admin requis si le lien n'est rattaché à aucun projet (même
+  règle que `POST /deployments` pour un lien sans projet — pas de contexte de rôle auquel se raccrocher).
+  Notification `deployment.mention` sur `@mention` via `notifyUser`, même schéma que `project.mention`/
+  `wiki.mention`. **UI** : `EntityCommentsPanel.jsx` (créé au Lot 49) ajouté à `ReleasesPage.jsx`
+  (`/deployments/releases`, page de liste des déploiements — PAS `ProjectDetailPage.jsx`, protégée par
+  une autre session en cours sur ce fichier, donc non touchée), affiché aux côtés de `PipelineView`/
+  `GitOpsDiffPanel` dès qu'une ligne de la table "Applications suivies" est sélectionnée ; `userName()`
+  minimal (id brut sauf "Vous" pour l'utilisateur courant), identique au pattern déjà utilisé dans
+  `WikiPage.jsx`. **Vérifié par un scénario réel de bout en bout** (backend relancé sur le port `4100`
+  pour ne pas interférer avec le process déjà actif sur `4000` d'une autre session, deux comptes de
+  test créés directement via `usersStore.createUser` puis supprimés en fin de vérification — aucun
+  compte ni mot de passe existant n'était connu/deviné) : connexion admin, création d'un lien de
+  déploiement sans projet (`POST /deployments`), `POST /deployments/:id/comments` avec une mention
+  `@e2e-comments-mentioned` → commentaire bien retourné par `GET /deployments/:id/comments`, et ligne
+  réelle insérée dans `user_notifications` (`type='deployment.mention'`, `user_id` du compte mentionné,
+  vérifié directement via `psql` sur `nexus-dev-postgres`). Contrôle RBAC confirmé : le compte mentionné
+  (rôle `user`, non-admin) reçoit un `403 "Réservé aux administrateurs (déploiement non rattaché à un
+  projet)"` sur le même `POST`, cohérent avec la règle ci-dessus. Toutes les données de test (lien de
+  déploiement, commentaire, notification, deux comptes) nettoyées après vérification. `backend/src/
+  routes/deployments.routes.js`, `frontend/src/pages/Deployments/ReleasesPage.jsx`.
