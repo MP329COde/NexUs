@@ -719,3 +719,43 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
     `backend/src/store/identityStore.js`, `backend/src/routes/identity.routes.js`,
     `backend/src/routes/auth.routes.js`, `backend/src/routes/users.routes.js`,
     `frontend/src/pages/Settings/IdentityPanel.jsx`.
+
+- [x] **MFA (TOTP) — connexion en deux étapes (Lot 60-nav, feuille de route "refonte navigation", complète
+  le Lot 59-nav)** : dernière pièce volontairement différée au Lot 59-nav (portée jugée trop sensible
+  pour être ajoutée sans confirmation explicite — obtenue). TOTP (RFC 6238) implémenté sans dépendance
+  externe : nouveau `backend/src/utils/totp.js` (encodage base32 + HOTP/TOTP via `node:crypto`
+  `createHmac('sha1', ...)`, tolérance ±30s de dérive d'horloge), aucune librairie `qrcode`/`speakeasy`
+  ajoutée. Flux de connexion en deux étapes : `POST /auth/login` détecte `user.mfaEnabled` et, si activé,
+  n'émet **aucun cookie de session** — retourne à la place un jeton intermédiaire signé `{sub, mfaPending:
+  true}`, expirant en 5 minutes, jamais accepté comme session complète (`requireAuth` le rejette
+  explicitement en défense en profondeur, vérifié qu'un jeton MFA pending utilisé en `Authorization:
+  Bearer` échoue bien). `POST /auth/mfa/verify` consomme ce jeton + un code TOTP ou un code de secours,
+  n'émet la vraie session qu'à ce moment — les échecs alimentent le même compteur de verrouillage que
+  les mots de passe (`recordLoginFailure`), un code à 6 chiffres étant nettement plus facile à
+  brute-forcer qu'un mot de passe. Activation en deux temps (`POST /auth/mfa/setup` puis `POST
+  /auth/mfa/enable`) : un secret généré n'est jamais actif tant qu'un code réellement produit à partir
+  de lui n'a pas été vérifié (`mfaPendingSecret` distinct de `mfaSecret`, `usersStore.js`), pour ne
+  jamais activer un secret que l'utilisateur n'a en réalité jamais scanné. 8 codes de secours à usage
+  unique générés à l'activation (`crypto.randomInt`, jamais `Math.random`), affichés une seule fois,
+  stockés hachés (même `hashPassword`/`verifyPassword` que les mots de passe de compte) et retirés de la
+  liste dès consommation (`consumeBackupCodeHash`). Désactivation exige une réauthentification par mot
+  de passe (`POST /auth/mfa/disable`), même politique que le changement de mot de passe. UI : connexion
+  en deux étapes dans `LoginPage.jsx` (formulaire de code après mot de passe si `mfaRequired`), nouveau
+  panel dans `AccountPage.jsx` (`MfaPanel`, sur le modèle déjà en place de `PasskeysPanel` — activation
+  avec secret + URL `otpauth://` affichés en clair pour saisie manuelle faute de génération de QR code
+  dans ce repo, désactivation avec mot de passe, affichage unique des codes de secours). Pas de QR code
+  affiché graphiquement (aucune dépendance `qrcode`) — limite assumée et documentée dans le code, pas
+  masquée. 10 nouveaux tests unitaires (`test/totp.test.js`, `test/cidr.test.js` — ce dernier manquait
+  depuis le Lot 59-nav) : 133/133 tests backend Node natifs verts (3 skipped préexistants). **Vérifié
+  réellement de bout en bout** (backend isolé, port `4099`, propre `NEXUS_DATA_DIR`) : login sans MFA
+  activé (session directe) → activation (`setup` puis `enable` avec un vrai code TOTP généré par
+  `totp.js`, 8 codes de secours reçus) → nouveau login retourne bien `mfaRequired:true` sans cookie de
+  session → mauvais code rejeté (401) → bon code TOTP accepté (session émise) → jeton `mfaPending`
+  utilisé en Bearer refusé par `requireAuth` (défense en profondeur confirmée) → code de secours accepté
+  une première fois → même code de secours réutilisé refusé (usage unique confirmé) → désactivation avec
+  mauvais mot de passe refusée, avec bon mot de passe acceptée → login redevient direct sans MFA. Suite
+  `frontend/tests/e2e/` (30/30) toujours verte. `backend/src/utils/totp.js` (nouveau),
+  `backend/test/totp.test.js` (nouveau), `backend/test/cidr.test.js` (nouveau),
+  `backend/src/store/usersStore.js`, `backend/src/middleware/auth.js`, `backend/src/routes/
+  auth.routes.js`, `frontend/src/context/AuthContext.jsx`, `frontend/src/pages/Login/LoginPage.jsx`,
+  `frontend/src/pages/Account/AccountPage.jsx(.css)`.
