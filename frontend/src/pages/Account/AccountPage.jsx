@@ -209,6 +209,7 @@ export default function AccountPage() {
         </Panel>
 
         <PasskeysPanel />
+        <MfaPanel />
       </div>
     </>
   );
@@ -278,6 +279,117 @@ function PasskeysPanel() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+// MFA (TOTP) — voir backend/src/routes/auth.routes.js. Pas de génération de
+// QR code (aucune dépendance qrcode dans ce repo) : le secret base32 est
+// affiché en clair pour saisie manuelle dans l'application d'authentification
+// (Google Authenticator, Authy, 1Password... tous l'acceptent), avec l'URL
+// otpauth:// complète en repli pour les outils qui savent la coller
+// directement.
+function MfaPanel() {
+  const { user, refresh } = useAuth();
+  const notify = useNotify();
+  const [setupData, setSetupData] = useState(null);
+  const [code, setCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState(null);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function startSetup() {
+    setBusy(true);
+    try {
+      const data = await api.post('/auth/mfa/setup', {});
+      setSetupData(data);
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmSetup(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const data = await api.post('/auth/mfa/enable', { code: code.trim() });
+      setBackupCodes(data.backupCodes);
+      setSetupData(null);
+      setCode('');
+      notify('MFA activé', { type: 'ok' });
+      refresh();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disable(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.post('/auth/mfa/disable', { password: disablePassword });
+      setDisablePassword('');
+      notify('MFA désactivé', { type: 'info' });
+      refresh();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (backupCodes) {
+    return (
+      <Panel title="Codes de secours" sub="Notez-les maintenant — ils ne seront plus jamais affichés" span={12}>
+        <div className="account-panel-body">
+          <div className="account-mfa-backup-grid">
+            {backupCodes.map((c) => <span key={c} className="mono account-mfa-backup-code">{c}</span>)}
+          </div>
+          <button className="btn" type="button" onClick={() => setBackupCodes(null)}>J'ai noté ces codes</button>
+        </div>
+      </Panel>
+    );
+  }
+
+  if (user?.mfaEnabled) {
+    return (
+      <Panel title="Authentification à deux facteurs" sub="Activée — chaque connexion demande un code en plus du mot de passe" span={12}>
+        <form onSubmit={disable} className="account-form-body">
+          <Field label="Mot de passe (pour désactiver)">
+            <input className="input" type="password" required value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} />
+          </Field>
+          <button className="btn-outline" type="submit" disabled={busy}>{busy ? 'Désactivation…' : 'Désactiver le MFA'}</button>
+        </form>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title="Authentification à deux facteurs" sub="Désactivée — ajoutez un code TOTP en plus du mot de passe" span={12}>
+      <div className="account-panel-body">
+        {!setupData ? (
+          <button className="btn" type="button" onClick={startSetup} disabled={busy}>
+            {busy ? 'Génération…' : 'Activer le MFA'}
+          </button>
+        ) : (
+          <form onSubmit={confirmSetup} className="account-form-body">
+            <p className="faint">Scannez ou saisissez ce secret dans votre application d'authentification, puis entrez le code généré :</p>
+            <div className="mono account-mfa-secret">{setupData.secret}</div>
+            <div className="faint account-mfa-otpauth">{setupData.otpauthUrl}</div>
+            <Field label="Code à 6 chiffres">
+              <input className="input" type="text" inputMode="numeric" required value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
+            </Field>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" type="submit" disabled={busy}>{busy ? 'Vérification…' : 'Confirmer'}</button>
+              <span className="btn-outline" onClick={() => { setSetupData(null); setCode(''); }}>Annuler</span>
+            </div>
+          </form>
         )}
       </div>
     </Panel>

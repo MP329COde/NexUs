@@ -1,15 +1,22 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, toPublicUser, issueSessionCookies, clearSessionCookies } from '../middleware/auth.js';
-import { findUserByEmail, findUserByIdentifier, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion } from '../store/usersStore.js';
-import { verifyPassword, hashPassword } from '../utils/crypto.js';
+import { findUserByEmail, findUserByIdentifier, findUserById, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion, setPendingMfaSecret, enableMfa, disableMfa, consumeBackupCodeHash } from '../store/usersStore.js';
+import { verifyPassword, hashPassword, encryptSecret, decryptSecret } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { passwordPolicyError, getLoginCidrAllowlist } from '../store/identityStore.js';
 import { ipMatchesAnyCidr } from '../utils/cidr.js';
+import { generateSecret, verifyTotpCode, buildOtpauthUrl } from '../utils/totp.js';
 import { banIp, normalizeIp } from '../store/banlistStore.js';
 import { permissionsForUser } from '../store/groupsStore.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { readStore } from '../store/jsonStore.js';
+import { env } from '../config/env.js';
+
+const MFA_PENDING_ALGORITHM = 'HS256';
+const MFA_PENDING_TTL = '5m';
 
 const router = Router();
 const AVATAR_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -97,6 +104,19 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   recordLoginSuccess(user.id);
+
+  // MFA (todo.md, durcissement sécurité de plateforme) : le mot de passe seul
+  // vient d'être validé, mais aucune session complète n'est émise tant que le
+  // second facteur n'est pas vérifié — voir POST /auth/mfa/verify ci-dessous.
+  // Le jeton retourné ici est volontairement à part du cookie de session
+  // (jamais posé via issueSessionCookies) et porte mfaPending:true, rejeté
+  // explicitement par requireAuth en défense en profondeur.
+  if (user.mfaEnabled) {
+    const mfaToken = jwt.sign({ sub: user.id, mfaPending: true }, env.jwtSecret, { expiresIn: MFA_PENDING_TTL, algorithm: MFA_PENDING_ALGORITHM });
+    logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login.mfa_required', {});
+    return res.json({ ok: true, mfaRequired: true, mfaToken });
+  }
+
   // Reflète la connexion réelle (via X-Forwarded-Proto derrière nginx/Traefik,
   // cf. trust proxy dans index.js) plutôt qu'un simple NODE_ENV : sur un LAN
   // homelab sans TLS, un cookie "Secure" ne serait jamais renvoyé par le
@@ -106,6 +126,104 @@ router.post('/login', asyncHandler(async (req, res) => {
   logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login', {});
   res.json({ ok: true, user: toPublicUser(user) });
 }));
+
+// Second facteur (TOTP ou code de secours) : consomme le jeton intermédiaire
+// émis par POST /auth/login quand mfaEnabled=true. Les échecs alimentent le
+// même compteur de verrouillage que les mots de passe (recordLoginFailure) —
+// un code à 6 chiffres est bien plus facile à brute-forcer qu'un mot de
+// passe, il n'y a aucune raison qu'il échappe à la même protection.
+router.post('/mfa/verify', asyncHandler(async (req, res) => {
+  const { mfaToken, code } = req.body || {};
+  let payload;
+  try {
+    payload = jwt.verify(mfaToken || '', env.jwtSecret, { algorithms: [MFA_PENDING_ALGORITHM] });
+  } catch {
+    return res.status(401).json({ ok: false, error: 'Jeton MFA invalide ou expiré — reconnectez-vous.' });
+  }
+  if (!payload.mfaPending) return res.status(401).json({ ok: false, error: 'Jeton MFA invalide' });
+  const user = findUserById(payload.sub);
+  if (!user || !user.mfaEnabled) return res.status(401).json({ ok: false, error: 'MFA non activé pour ce compte' });
+
+  const lock = getLockStatus(user);
+  if (lock.locked) {
+    return res.status(423).json({ ok: false, error: `Compte temporairement verrouillé après plusieurs échecs. Réessayez après ${new Date(lock.lockUntil).toLocaleTimeString('fr-FR')}.` });
+  }
+
+  const secret = decryptSecret(user.mfaSecret);
+  const validTotp = verifyTotpCode(secret, code);
+  const validBackup = !validTotp && consumeBackupCodeHash(user.id, (h) => verifyPassword(code || '', h));
+  if (!validTotp && !validBackup) {
+    const { locked, attempts } = recordLoginFailure(user.id);
+    logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.mfa.failed', { attempts, locked });
+    return res.status(401).json({ ok: false, error: 'Code invalide' });
+  }
+
+  recordLoginSuccess(user.id);
+  issueSessionCookies(res, req, user);
+  logAudit({ user: toPublicUser(user), ip: req.ip }, 'auth.login', { via: validBackup ? 'mfa_backup_code' : 'mfa_totp' });
+  if (validBackup) {
+    createNotification({
+      type: 'auth.mfa.backup_code_used', severity: 'warn', title: 'Code de secours MFA utilisé',
+      message: `Le compte ${user.email} s'est connecté avec un code de secours MFA — il en reste ${(user.mfaBackupCodeHashes || []).length - 1}.`,
+      meta: { email: user.email }
+    });
+  }
+  res.json({ ok: true, user: toPublicUser(user) });
+}));
+
+// Étape 1/2 de l'activation : génère un secret et le stocke en attente
+// (mfaPendingSecret, distinct de mfaSecret) — rien n'est actif tant que
+// POST /auth/mfa/enable n'a pas reçu un code valide généré à partir de ce
+// secret, pour ne jamais activer un secret que l'utilisateur n'a jamais
+// réellement scanné/saisi dans son application d'authentification.
+router.post('/mfa/setup', requireAuth, asyncHandler(async (req, res) => {
+  const secret = generateSecret();
+  setPendingMfaSecret(req.user.id, encryptSecret(secret));
+  const consoleName = readStore('console')?.name || 'Nexus Console';
+  const otpauthUrl = buildOtpauthUrl({ secret, accountName: req.user.email, issuer: consoleName });
+  res.json({ ok: true, secret, otpauthUrl });
+}));
+
+// Étape 2/2 : vérifie un code généré à partir du secret en attente, puis
+// l'active et génère les codes de secours — retournés une seule fois en
+// clair ici (jamais renvoyés ensuite, seuls leurs hachages sont conservés,
+// même fonction hashPassword/verifyPassword que les mots de passe de
+// compte).
+router.post('/mfa/enable', requireAuth, asyncHandler(async (req, res) => {
+  const { code } = req.body || {};
+  const user = findUserById(req.user.id);
+  if (!user.mfaPendingSecret) return res.status(400).json({ ok: false, error: "Aucune configuration MFA en attente — commencez par POST /auth/mfa/setup" });
+  const secret = decryptSecret(user.mfaPendingSecret);
+  if (!verifyTotpCode(secret, code)) return res.status(400).json({ ok: false, error: 'Code invalide — vérifiez que l\'heure de votre appareil est synchronisée.' });
+  const backupCodes = Array.from({ length: 8 }, () => cryptoRandomBackupCode());
+  enableMfa(user.id, encryptSecret(secret), backupCodes.map((c) => hashPassword(c)));
+  logAudit(req, 'auth.mfa.enabled', {});
+  res.json({ ok: true, backupCodes });
+}));
+
+// Réauthentification par mot de passe exigée, comme pour tout changement
+// touchant la sécurité du compte (voir PUT /password) — désactiver le MFA
+// est une action au moins aussi sensible que changer le mot de passe.
+router.post('/mfa/disable', requireAuth, asyncHandler(async (req, res) => {
+  const { password } = req.body || {};
+  const user = findUserByEmail(req.user.email);
+  if (!password || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ ok: false, error: 'Mot de passe incorrect' });
+  }
+  disableMfa(user.id);
+  logAudit(req, 'auth.mfa.disabled', {});
+  res.json({ ok: true });
+}));
+
+function cryptoRandomBackupCode() {
+  // 10 caractères alphanumériques majuscules, lisibles à la main (pas de
+  // confusion 0/O ou 1/I/L) — un code de secours doit pouvoir être recopié
+  // depuis un papier sans ambiguïté.
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 10; i++) out += alphabet[crypto.randomInt(alphabet.length)];
+  return `${out.slice(0, 5)}-${out.slice(5)}`;
+}
 
 router.post('/logout', requireAuth, (req, res) => {
   // Révoque le token courant côté serveur (voir tokenVersion dans

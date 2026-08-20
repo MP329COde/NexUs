@@ -191,3 +191,31 @@
   padding: 0 10px;
   font-size: 11.5px;
 }
+
+.account-mfa-secret {
+  font-size: 15px;
+  letter-spacing: .05em;
+  padding: 10px 12px;
+  background: var(--border-soft);
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.account-mfa-otpauth {
+  font-size: 10.5px;
+  word-break: break-all;
+}
+
+.account-mfa-backup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.account-mfa-backup-code {
+  padding: 8px 10px;
+  background: var(--border-soft);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+}

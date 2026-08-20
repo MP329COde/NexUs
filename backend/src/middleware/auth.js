@@ -54,7 +54,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // d'envoyer ces cookies sur une requête POST cross-site déclenchée par un
 // autre site, donc ces routes n'ont pas besoin d'une protection double-submit
 // en plus.
-const SESSION_ISSUING_PATHS = new Set(['/auth/login', '/auth/webauthn/login-verify', '/setup']);
+const SESSION_ISSUING_PATHS = new Set(['/auth/login', '/auth/webauthn/login-verify', '/auth/mfa/verify', '/setup']);
 
 // Double-submit cookie : n'a de sens que pour les requêtes authentifiées par
 // cookie (seul mécanisme qu'un navigateur envoie automatiquement cross-site
@@ -82,7 +82,8 @@ export function toPublicUser(user) {
     theme: user.theme || 'system', mustOnboard: user.mustOnboard === true,
     terminalTier: user.role === 'admin' ? 'admin' : (user.terminalTier || null),
     validFrom: user.validFrom || null, validUntil: user.validUntil || null,
-    isPrimaryAdmin: user.isPrimaryAdmin === true
+    isPrimaryAdmin: user.isPrimaryAdmin === true,
+    mfaEnabled: user.mfaEnabled === true
   };
 }
 
@@ -95,6 +96,11 @@ export function requireAuth(req, res, next) {
     // la bibliothèque jsonwebtoken rejette déjà "none" par défaut, mais autant
     // ne jamais dépendre du comportement implicite pour une vérification de session.
     const payload = jwt.verify(token, env.jwtSecret, { algorithms: [JWT_ALGORITHM] });
+    // Défense en profondeur : un jeton MFA intermédiaire (mfaPending, émis par
+    // POST /auth/login quand mfaEnabled=true, voir routes/auth.routes.js) ne
+    // doit jamais pouvoir servir de session complète, même s'il finissait par
+    // être envoyé dans le cookie de session par erreur côté client.
+    if (payload.mfaPending) return res.status(401).json({ ok: false, error: 'Vérification MFA requise' });
     const user = findUserById(payload.sub);
     if (!user || user.active === false) return res.status(401).json({ ok: false, error: 'Session invalide' });
     // Session révoquée (logout serveur ou changement de mot de passe depuis

@@ -179,6 +179,62 @@ export function updatePassword(id, passwordHash) {
   return users[idx];
 }
 
+// MFA (TOTP, todo.md — durcissement sécurité de plateforme) : le secret n'est
+// jamais stocké en clair (chiffré par l'appelant via utils/crypto.js
+// encryptSecret, même politique que les secrets OIDC/LDAP dans
+// identityStore.js) — cette fonction ne fait que persister ce qu'on lui
+// donne. `mfaPendingSecret` reste distinct de `mfaSecret` tant que
+// enableMfa() n'a pas confirmé un code valide : un secret généré mais jamais
+// vérifié ne doit jamais pouvoir authentifier personne.
+export function setPendingMfaSecret(id, encryptedSecret) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].mfaPendingSecret = encryptedSecret;
+  writeStore('users', users);
+  return users[idx];
+}
+
+export function enableMfa(id, encryptedSecret, backupCodeHashes) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].mfaSecret = encryptedSecret;
+  users[idx].mfaEnabled = true;
+  users[idx].mfaBackupCodeHashes = backupCodeHashes;
+  users[idx].mfaPendingSecret = null;
+  writeStore('users', users);
+  return users[idx];
+}
+
+export function disableMfa(id) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  users[idx].mfaEnabled = false;
+  users[idx].mfaSecret = null;
+  users[idx].mfaPendingSecret = null;
+  users[idx].mfaBackupCodeHashes = null;
+  writeStore('users', users);
+  return users[idx];
+}
+
+// Un code de secours n'est utilisable qu'une seule fois : retiré de la liste
+// dès qu'il sert, pour qu'un code intercepté (capture d'écran, log...) ne
+// reste pas indéfiniment valide.
+export function consumeBackupCodeHash(id, matchFn) {
+  const users = listUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return false;
+  const hashes = users[idx].mfaBackupCodeHashes || [];
+  const matchIdx = hashes.findIndex(matchFn);
+  if (matchIdx === -1) return false;
+  hashes.splice(matchIdx, 1);
+  users[idx].mfaBackupCodeHashes = hashes;
+  writeStore('users', users);
+  return true;
+}
+
 // Révoque toutes les sessions actives de l'utilisateur (logout serveur) sans
 // toucher au mot de passe. Idempotent : appeler plusieurs fois n'a pas
 // d'effet de bord au-delà de la revocation.

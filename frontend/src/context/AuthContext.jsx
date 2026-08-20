@@ -23,10 +23,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Peut renvoyer soit { user }, soit { mfaRequired: true, mfaToken } si le
+  // compte a activé le MFA (voir routes/auth.routes.js) — dans ce second cas,
+  // aucune session n'est encore établie et l'appelant (LoginPage.jsx) doit
+  // poursuivre avec POST /auth/mfa/verify avant que `user` ne soit renseigné.
   const login = useCallback(async (email, password) => {
     const data = await api.post('/auth/login', { email, password });
-    setUser(data.user);
-    return data.user;
+    if (data.user) setUser(data.user);
+    return data;
   }, []);
 
   const setUserFromSession = useCallback((u) => setUser(u), []);
