@@ -81,6 +81,26 @@ export function saveIntegration(key, payload) {
   return getRedactedIntegration(key);
 }
 
+// Lot B4 (Certificats) : mode TLS global — sert de valeur par défaut affichée
+// / documentée pour l'utilisateur, mais NE modifie PAS le comportement réel
+// des intégrations : chaque intégration garde son propre `allowSelfSigned`
+// (voir buildHttpsAgentFromConfig dans services/integrations/httpClient.js)
+// qui prime toujours. C'est un réglage informatif + un défaut visuel proposé
+// dans le formulaire d'une nouvelle intégration, pas un interrupteur global
+// qui écraserait les réglages déjà faits intégration par intégration.
+export function getTlsMode() {
+  const s = readStore('tlsSettings') || {};
+  return s.mode === 'permissive' ? 'permissive' : 'strict';
+}
+
+export function setTlsMode(mode) {
+  if (mode !== 'strict' && mode !== 'permissive') {
+    throw Object.assign(new Error('Mode TLS invalide (strict|permissive attendu)'), { status: 400 });
+  }
+  writeStore('tlsSettings', { mode });
+  return { mode };
+}
+
 function isConfigured(key, entry) {
   const required = {
     kubernetes: ['apiServer'],

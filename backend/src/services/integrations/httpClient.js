@@ -28,18 +28,26 @@ export function buildClient(baseURL, opts = {}) {
 // vérification sans action explicite de l'utilisateur dans les Paramètres.
 // Retourne undefined si rien n'a été configuré : axios/Node utilisent alors
 // leur agent HTTPS par défaut (vérification stricte), inchangé.
+// Lot B4 : certificat client (mTLS) — câblé ici (cfg.clientCertPem/clientKeyPem
+// passés tels quels à https.Agent) mais AUCUN formulaire frontend ne les
+// expose encore et aucun test contre un vrai serveur exigeant un certificat
+// client n'a été effectué. Documenté honnêtement dans todo.md (Lot B4) :
+// "câblé mais non testé", à ne pas présenter comme un support validé.
 export function buildHttpsAgentFromConfig(cfg = {}) {
-  if (!cfg.allowSelfSigned && !cfg.caCertPem) return undefined;
+  const hasClientCert = Boolean(cfg.clientCertPem && cfg.clientKeyPem);
+  if (!cfg.allowSelfSigned && !cfg.caCertPem && !hasClientCert) return undefined;
   return new https.Agent({
     rejectUnauthorized: !cfg.allowSelfSigned,
-    ca: cfg.caCertPem || undefined
+    ca: cfg.caCertPem || undefined,
+    cert: cfg.clientCertPem || undefined,
+    key: cfg.clientKeyPem || undefined
   });
 }
 
 // Codes Node.js renvoyés par OpenSSL/tls quand la chaîne de certificats
 // présentée par le serveur distant n'est pas vérifiable (typiquement un
 // certificat auto-signé ou une CA interne non reconnue par le système).
-const TLS_VERIFY_ERROR_CODES = new Set([
+export const TLS_VERIFY_ERROR_CODES = new Set([
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'DEPTH_ZERO_SELF_SIGNED_CERT',
   'SELF_SIGNED_CERT_IN_CHAIN',

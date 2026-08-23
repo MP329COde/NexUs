@@ -76,6 +76,37 @@ export function getLoginCidrAllowlist() {
   return Array.isArray(data.loginCidrAllowlist) ? data.loginCidrAllowlist : [];
 }
 
+// Lot B3 (durcissement auth) — MFA obligatoire par rôle : liste vide = aucun
+// rôle contraint (défaut, comportement historique inchangé — le MFA reste
+// une option que chacun active ou non). Un rôle présent ici force
+// middleware/auth.js#requireAuth à bloquer (403 mfaSetupRequired) tout accès
+// aux routes protégées pour un compte de ce rôle tant que mfaEnabled=false,
+// à l'exception des routes d'enrôlement listées dans
+// MFA_ENROLLMENT_ALLOWED_PATHS. Ne s'applique qu'aux comptes déjà créés
+// avant l'activation : un admin qui active cette contrainte sur son propre
+// rôle sans avoir configuré son MFA se bloquerait lui-même à la requête
+// suivante — voir l'avertissement rendu par la route PUT /identity.
+export function getMfaRequiredRoles() {
+  const data = readStore('identity') || {};
+  return Array.isArray(data.mfaRequiredRoles) ? data.mfaRequiredRoles : [];
+}
+
+// Déconnexion sur inactivité : 0 = désactivé (défaut, comportement
+// historique inchangé — seule l'expiration absolue du JWT, sessionMinutes,
+// s'applique). Quand > 0, requireAuth compare `now` à sessions.lastSeenAt
+// (store/sessionsStore.js) et révoque la session serveur dès que l'écart
+// dépasse cette valeur — indépendant de la durée de vie du JWT lui-même.
+// Choix documenté : les requêtes de polling/health (marquées côté frontend
+// par l'en-tête X-Nexus-Background, voir lib/apiClient.js#markBackground)
+// NE comptent PAS comme activité, pour ne jamais garder une session ouverte
+// indéfiniment simplement parce qu'un onglet inactif continue de sonder un
+// tableau de bord en arrière-plan.
+export function getInactivityTimeoutMinutes() {
+  const data = readStore('identity') || {};
+  const minutes = Number(data.inactivityTimeoutMinutes);
+  return Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440 ? minutes : 0;
+}
+
 // Point d'entrée unique combinant longueur minimale + complexité, pour que
 // les quatre routes qui valident un mot de passe de compte (auth.routes.js
 // changement/onboarding, users.routes.js création) appliquent exactement la

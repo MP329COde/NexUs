@@ -41,7 +41,9 @@ const DEFAULTS = {
   sboms: [], // historique des SBOM générés via Syft (voir store/sbomStore.js)
   signatures: {}, // signatures cosign des SBOM, indexées par id de SBOM (voir store/signaturesStore.js)
   webauthnCredentials: [], // clés d'accès (passkeys) enregistrées par utilisateur (voir store/webauthnStore.js)
-  sessions: [] // sessions actives émises (une par login), pour la vue "Sessions actives" (voir store/sessionsStore.js)
+  sessions: [], // sessions actives émises (une par login), pour la vue "Sessions actives" (voir store/sessionsStore.js)
+  permissionOverrides: {}, // permissions individuelles hors groupe, indexées par userId (voir store/groupsStore.js)
+  tlsSettings: { mode: 'strict' } // mode TLS global par défaut (strict|permissive), voir store/settingsStore.js (Lot B4)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

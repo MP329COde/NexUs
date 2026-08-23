@@ -30,7 +30,7 @@ router.put('/', asyncHandler(async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Longueur de mot de passe invalide (8 à 128)' });
     }
   }
-  const { loginCidrAllowlist } = req.body || {};
+  const { loginCidrAllowlist, mfaRequiredRoles, inactivityTimeoutMinutes } = req.body || {};
   if (loginCidrAllowlist !== undefined) {
     if (!Array.isArray(loginCidrAllowlist) || !loginCidrAllowlist.every(isValidCidr)) {
       return res.status(400).json({ ok: false, error: 'Liste CIDR invalide (attendu : adresses/plages IPv4, ex. 10.0.0.0/24)' });
@@ -39,9 +39,34 @@ router.put('/', asyncHandler(async (req, res) => {
     // l'administrateur qui l'enregistre hors de la console — il n'existerait
     // alors plus aucun moyen de la retirer sans accès direct au fichier de
     // données. Une liste vide (désactivation) reste toujours autorisée.
+    // S'applique désormais à CHAQUE requête authentifiée (middleware/auth.js),
+    // pas seulement à la connexion — donc requesterIp doit rester valide
+    // aussi pour la requête PUT elle-même qui vient de passer requireAuth.
     const requesterIp = normalizeIp(req.ip);
     if (loginCidrAllowlist.length > 0 && !ipMatchesAnyCidr(requesterIp, loginCidrAllowlist)) {
       return res.status(400).json({ ok: false, error: `Votre propre adresse (${requesterIp}) ne correspond à aucune des plages fournies — refusé pour éviter de vous verrouiller vous-même hors de la console.` });
+    }
+  }
+  if (mfaRequiredRoles !== undefined) {
+    const validRoles = ['admin', 'user'];
+    if (!Array.isArray(mfaRequiredRoles) || !mfaRequiredRoles.every((r) => validRoles.includes(r))) {
+      return res.status(400).json({ ok: false, error: "Rôles invalides (attendu : 'admin' et/ou 'user')" });
+    }
+    // Garde-fou symétrique au CIDR ci-dessus : jamais imposer le MFA à un
+    // rôle si le compte qui enregistre ce réglage (l'admin courant) n'a pas
+    // lui-même déjà activé le sien — sans quoi il se bloquerait lui-même dès
+    // la requête suivante, sans aucune route d'enrôlement accessible avant
+    // d'avoir pu configurer son MFA depuis un état déjà bloqué. Il doit
+    // d'abord activer son propre MFA (POST /auth/mfa/setup puis /enable),
+    // ENSUITE seulement rendre le MFA obligatoire pour son rôle.
+    if (mfaRequiredRoles.includes(req.user.role) && req.user.mfaEnabled !== true) {
+      return res.status(400).json({ ok: false, error: `Activez d'abord le MFA sur votre propre compte avant de le rendre obligatoire pour le rôle "${req.user.role}" — sinon vous vous bloqueriez vous-même.` });
+    }
+  }
+  if (inactivityTimeoutMinutes !== undefined) {
+    const m = Number(inactivityTimeoutMinutes);
+    if (!Number.isInteger(m) || m < 0 || m > 1440) {
+      return res.status(400).json({ ok: false, error: "Délai d'inactivité invalide (0 = désactivé, 1 à 1440 minutes)" });
     }
   }
   const identity = save(req.body || {});

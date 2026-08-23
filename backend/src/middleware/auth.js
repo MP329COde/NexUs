@@ -2,8 +2,31 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { findUserById, validityWindowError } from '../store/usersStore.js';
-import { getSessionMinutes } from '../store/identityStore.js';
-import { createSession, getSession, touchSession } from '../store/sessionsStore.js';
+import { getSessionMinutes, getLoginCidrAllowlist, getMfaRequiredRoles, getInactivityTimeoutMinutes } from '../store/identityStore.js';
+import { createSession, getSession, touchSession, revokeSession } from '../store/sessionsStore.js';
+import { ipMatchesAnyCidr } from '../utils/cidr.js';
+import { normalizeIp } from '../store/banlistStore.js';
+
+// En-tête posé par le frontend (lib/apiClient.js#markBackground, lu par
+// hooks/useApi.js sur les rechargements silencieux de polling) pour signaler
+// une requête d'arrière-plan plutôt qu'une action réellement initiée par
+// l'utilisateur. Choix documenté (Lot B3, déconnexion sur inactivité) : ces
+// requêtes ne rafraîchissent JAMAIS `lastSeenAt` — sans ça, un onglet ouvert
+// en arrière-plan qui continue de sonder un tableau de bord empêcherait
+// indéfiniment le timeout d'inactivité de jouer son rôle.
+const BACKGROUND_HEADER = 'x-nexus-background';
+
+// Routes accessibles même à un compte dont le rôle impose le MFA
+// (getMfaRequiredRoles) mais qui ne l'a pas encore configuré : il faut bien
+// un chemin pour aller le configurer, se déconnecter, ou consulter son
+// propre profil, sans quoi le compte serait bloqué sans aucune issue.
+// Comparé à req.originalUrl (préfixe /api inclus) plutôt qu'à req.path :
+// requireAuth est monté sur des routeurs distincts, req.path seul serait
+// relatif à chacun d'eux et donc ambigu d'un routeur à l'autre.
+const MFA_ENROLLMENT_ALLOWED_PATHS = [
+  '/api/auth/me', '/api/auth/logout', '/api/auth/mfa/setup', '/api/auth/mfa/enable',
+  '/api/auth/mfa/disable', '/api/auth/profile', '/api/auth/password'
+];
 
 export const SESSION_COOKIE = 'nexus_session';
 // Cookie CSRF (double-submit) : volontairement PAS httpOnly — le frontend
@@ -111,15 +134,49 @@ export function requireAuth(req, res, next) {
     if ((payload.tv || 0) !== (user.tokenVersion || 0)) {
       return res.status(401).json({ ok: false, error: 'Session révoquée' });
     }
+    // Restriction CIDR (identityStore.loginCidrAllowlist) : historiquement
+    // vérifiée uniquement à la connexion (POST /auth/login) — un jeton déjà
+    // émis depuis une adresse autorisée restait valable depuis n'importe où
+    // ensuite. Revérifiée ici sur CHAQUE requête authentifiée (Lot B3) :
+    // liste vide = aucune restriction, comportement historique inchangé par
+    // défaut. La route PUT /identity refuse déjà d'enregistrer une plage qui
+    // exclurait l'adresse de l'administrateur qui l'enregistre.
+    const cidrAllowlist = getLoginCidrAllowlist();
+    if (cidrAllowlist.length > 0 && !ipMatchesAnyCidr(normalizeIp(req.ip), cidrAllowlist)) {
+      return res.status(403).json({ ok: false, error: 'Accès refusé depuis cette adresse (restriction réseau activée par un administrateur).' });
+    }
     // Jetons émis avant l'introduction du suivi de session (payload.sid absent)
     // restent valides jusqu'à expiration naturelle — pas de session à vérifier.
     if (payload.sid) {
       const session = getSession(payload.sid);
       if (!session || session.revoked) return res.status(401).json({ ok: false, error: 'Session révoquée' });
-      touchSession(payload.sid);
+      // Déconnexion sur inactivité (Lot B3) : désactivée par défaut
+      // (inactivityTimeoutMinutes=0). Comparaison faite AVANT le touch
+      // ci-dessous, sur le lastSeenAt encore non rafraîchi par cette requête.
+      const inactivityMinutes = getInactivityTimeoutMinutes();
+      if (inactivityMinutes > 0) {
+        const elapsedMs = Date.now() - new Date(session.lastSeenAt).getTime();
+        if (elapsedMs > inactivityMinutes * 60_000) {
+          revokeSession(session.id, session.userId);
+          return res.status(401).json({ ok: false, error: 'Session expirée pour inactivité — reconnectez-vous.' });
+        }
+      }
+      // Voir BACKGROUND_HEADER ci-dessus : une requête de polling ne compte
+      // jamais comme activité, seul un touch "réel" repousse l'expiration.
+      if (req.headers[BACKGROUND_HEADER] !== '1') touchSession(payload.sid);
     }
     const validityError = validityWindowError(user);
     if (validityError) return res.status(401).json({ ok: false, error: validityError });
+    // MFA obligatoire par rôle (Lot B3, identityStore.mfaRequiredRoles) :
+    // un compte dont le rôle est contraint et qui n'a pas encore activé son
+    // MFA est bloqué sur toute route protégée, à l'exception des quelques
+    // routes d'enrôlement/déconnexion listées ci-dessus — jamais juste
+    // "invité", réellement empêché d'agir tant qu'il ne s'est pas enrôlé.
+    if (getMfaRequiredRoles().includes(user.role) && user.mfaEnabled !== true) {
+      if (!MFA_ENROLLMENT_ALLOWED_PATHS.includes(req.originalUrl.split('?')[0])) {
+        return res.status(403).json({ ok: false, error: 'MFA obligatoire pour votre rôle — configurez-le avant de continuer.', mfaSetupRequired: true });
+      }
+    }
     req.user = toPublicUser(user);
     req.sessionId = payload.sid || null;
     next();

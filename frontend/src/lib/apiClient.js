@@ -29,16 +29,31 @@ function readCsrfCookie() {
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+// Marqueur "requête d'arrière-plan" pour le prochain appel — posé par
+// hooks/useApi.js juste avant un rechargement silencieux de polling, lu et
+// remis à zéro ici avant l'appel réseau (aucun await entre les deux, donc
+// pas de risque de fuite vers un autre appel concurrent). Backend :
+// middleware/auth.js ignore cet en-tête pour décider de l'expiration sur
+// inactivité — voir le commentaire BACKGROUND_HEADER là-bas pour le choix
+// documenté (le polling ne compte pas comme activité utilisateur réelle).
+let nextRequestIsBackground = false;
+export function markBackground() {
+  nextRequestIsBackground = true;
+}
+
 async function request(path, options = {}) {
   let res;
   try {
     const method = options.method || 'GET';
     const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null;
+    const isBackground = nextRequestIsBackground;
+    nextRequestIsBackground = false;
     res = await fetch(`/api${path}`, {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...(isBackground ? { 'X-Nexus-Background': '1' } : {}),
         ...(options.headers || {})
       },
       ...options,

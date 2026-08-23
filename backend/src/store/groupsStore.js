@@ -13,8 +13,89 @@ export const PERMISSION_DOMAINS = [
 export const PERMISSION_LEVELS = ['none', 'read', 'write', 'admin'];
 const LEVEL_RANK = { none: 0, read: 1, write: 2, admin: 3 };
 
+// Sous-domaines : restreignent une sous-fonctionnalité précise d'un domaine
+// existant à un niveau distinct, sans dupliquer toute la matrice. Tant
+// qu'aucun groupe n'a explicitement défini de valeur pour un sous-domaine,
+// son niveau effectif est HÉRITÉ du domaine parent (voir permissionsForUser)
+// — c'est ce qui garantit qu'introduire un sous-domaine ne change RIEN au
+// comportement des groupes existants (aucune régression au déploiement).
+// Exemple concret déjà en place avant ce lot : /vault/prod exigeait déjà
+// vault:admin (voir routes/vault.routes.js) — 'vault-prod' rend ce niveau
+// réglable indépendamment du reste du domaine 'vault' (ex: dev en écriture
+// pour tous les devs, prod réservé à un sous-groupe précis) plutôt que de
+// rester câblé en dur sur le niveau 'admin' du domaine parent.
+// Lot B2 (vault multi-niveaux) : deux nouveaux sous-domaines, même mécanique
+// d'héritage que 'vault-prod' ci-dessus (rien ne change pour les groupes
+// existants tant qu'ils ne les définissent pas explicitement).
+// - 'vault-user' : coffre-fort personnel (secrets propres à un utilisateur,
+//   ex. tokens d'API personnels) — en pratique chaque utilisateur gère déjà
+//   ses propres entrées sans avoir besoin d'un octroi (voir vault.routes.js,
+//   scoping strict par req.user.id), ce sous-domaine sert surtout à un futur
+//   usage admin (support consultant les métadonnées, jamais les secrets en
+//   clair) plutôt qu'à restreindre l'accès de chacun à SES PROPRES secrets.
+// - 'vault-infra' : lecture des secrets d'intégration d'infrastructure
+//   (Proxmox/Kubernetes/HAProxy...) exposée en lecture seule (métadonnées,
+//   jamais le secret en clair — ces secrets restent la propriété de
+//   settingsStore.js, voir vault.routes.js GET /infra) à un niveau plus fin
+//   que le domaine 'settings' complet (qui donne aussi le droit d'écrire).
+export const SUBDOMAINS = {
+  'vault-prod': 'vault',
+  'vault-user': 'vault',
+  'vault-infra': 'vault',
+  'users-permissions': 'users'
+};
+export const SUBDOMAIN_KEYS = Object.keys(SUBDOMAINS);
+
+// Préréglages de matrice ("grosses permissions") proposés à la création d'un
+// groupe pour éviter de cocher un par un 17 domaines — de purs raccourcis
+// UI : le résultat reste une matrice domaine×niveau ordinaire, modifiable
+// ensuite comme n'importe quel groupe créé à la main.
+export const PERMISSION_PRESETS = {
+  'admin-complet': {
+    label: 'Administrateur complet',
+    description: 'Accès admin sur tous les domaines et sous-domaines (équivalent à un compte admin plateforme, mais révocable comme un groupe).',
+    permissions: Object.fromEntries(PERMISSION_DOMAINS.map((d) => [d, 'admin'])),
+    subPermissions: Object.fromEntries(SUBDOMAIN_KEYS.map((d) => [d, 'admin']))
+  },
+  'lecture-seule': {
+    label: 'Lecture seule plateforme',
+    description: 'Consultation de tous les domaines, aucune écriture ni action admin.',
+    permissions: Object.fromEntries(PERMISSION_DOMAINS.map((d) => [d, 'read'])),
+    subPermissions: Object.fromEntries(SUBDOMAIN_KEYS.map((d) => [d, 'none']))
+  },
+  'developpeur': {
+    label: 'Développeur',
+    description: 'Écriture sur infrastructure/réseaux/automatisation/monitoring/terminal/kubernetes/hôtes/inventaire, lecture ailleurs, coffre-fort dev en écriture (prod exclu).',
+    permissions: {
+      infrastructure: 'write', network: 'write', security: 'read', automation: 'write',
+      monitoring: 'write', terminal: 'write', identity: 'none', users: 'none',
+      settings: 'none', inventory: 'write', vault: 'write', kubernetes: 'write',
+      hosts: 'write', backups: 'read', audit: 'none', proxmox: 'read', plugins: 'read'
+    },
+    subPermissions: { 'vault-prod': 'none', 'vault-user': 'none', 'vault-infra': 'none', 'users-permissions': 'none' }
+  },
+  'support-monitoring': {
+    label: 'Support / Monitoring',
+    description: 'Lecture sur monitoring, audit, sécurité et inventaire — pour une astreinte qui observe sans pouvoir modifier.',
+    permissions: {
+      infrastructure: 'read', network: 'read', security: 'read', automation: 'none',
+      monitoring: 'read', terminal: 'none', identity: 'none', users: 'none',
+      settings: 'none', inventory: 'read', vault: 'none', kubernetes: 'read',
+      hosts: 'read', backups: 'read', audit: 'read', proxmox: 'read', plugins: 'none'
+    },
+    subPermissions: { 'vault-prod': 'none', 'vault-user': 'none', 'vault-infra': 'none', 'users-permissions': 'none' }
+  }
+};
+
 function emptyMatrix() {
   return Object.fromEntries(PERMISSION_DOMAINS.map((d) => [d, 'none']));
+}
+
+function emptySubMatrix() {
+  // {} et non 'none' explicite : une clé absente signifie "hérite du domaine
+  // parent" (voir permissionsForUser), alors qu'une valeur explicite (même
+  // 'none') signifie "un admin a volontairement isolé ce sous-domaine".
+  return {};
 }
 
 export function listGroups() {
@@ -25,17 +106,25 @@ export function getGroup(id) {
   return listGroups().find((g) => g.id === id);
 }
 
-export function createGroup({ name, description, memberIds = [], permissions = {} }) {
+export function createGroup({ name, description, memberIds = [], permissions = {}, subPermissions = {}, preset }) {
   if (!name || !name.trim()) {
     throw Object.assign(new Error('Nom de groupe requis'), { status: 400 });
   }
+  // Préréglage ("grosse permission") appliqué en base : les valeurs
+  // explicitement fournies dans permissions/subPermissions par l'appelant
+  // priment dessus, pour permettre "préréglage Développeur + vault:admin en
+  // plus" en un seul appel plutôt que deux.
+  const presetDef = preset && PERMISSION_PRESETS[preset];
+  const basePermissions = presetDef ? presetDef.permissions : {};
+  const baseSubPermissions = presetDef ? presetDef.subPermissions : {};
   const groups = listGroups();
   const group = {
     id: uuid(),
     name: name.trim(),
     description: description || '',
     memberIds: Array.isArray(memberIds) ? memberIds : [],
-    permissions: { ...emptyMatrix(), ...sanitizePermissions(permissions) },
+    permissions: { ...emptyMatrix(), ...sanitizePermissions(basePermissions), ...sanitizePermissions(permissions) },
+    subPermissions: { ...emptySubMatrix(), ...sanitizeSubPermissions(baseSubPermissions), ...sanitizeSubPermissions(subPermissions) },
     createdAt: new Date().toISOString()
   };
   groups.push(group);
@@ -53,6 +142,7 @@ export function updateGroup(id, patch) {
   if (patch.description !== undefined) next.description = patch.description;
   if (patch.memberIds !== undefined) next.memberIds = Array.isArray(patch.memberIds) ? patch.memberIds : current.memberIds;
   if (patch.permissions !== undefined) next.permissions = { ...current.permissions, ...sanitizePermissions(patch.permissions) };
+  if (patch.subPermissions !== undefined) next.subPermissions = { ...(current.subPermissions || {}), ...sanitizeSubPermissions(patch.subPermissions) };
   groups[idx] = next;
   writeStore('groups', groups);
   return next;
@@ -76,6 +166,14 @@ export function groupsForUser(userId) {
 // utilisateur : c'est ce qui rend les rôles composables — appartenir à
 // "développeur" (infrastructure:write) ET "monitoring" (monitoring:read)
 // donne accès aux deux, sans qu'aucun groupe seul ne les couvre.
+// Union des groupes (niveau max par domaine, voir plus haut) + niveau des
+// sous-domaines (hérité du domaine parent tant qu'aucun groupe ne l'a isolé
+// explicitement) + overrides individuels hors groupe (permissionOverrides,
+// voir userOverrides ci-dessous) — chaque source ne peut qu'AUGMENTER le
+// niveau final par rapport aux groupes seuls, jamais le restreindre : un
+// override individuel sert à accorder un accès ponctuel en plus des groupes,
+// pas à retirer ce qu'un groupe donne déjà (cohérent avec la composabilité
+// des groupes entre eux).
 export function permissionsForUser(userId) {
   const groups = groupsForUser(userId);
   const out = emptyMatrix();
@@ -85,12 +183,54 @@ export function permissionsForUser(userId) {
       if (LEVEL_RANK[level] > LEVEL_RANK[out[domain]]) out[domain] = level;
     }
   }
+  for (const sub of SUBDOMAIN_KEYS) {
+    const parent = SUBDOMAINS[sub];
+    out[sub] = 'none';
+    for (const g of groups) {
+      const explicit = g.subPermissions?.[sub];
+      const level = explicit !== undefined ? explicit : (g.permissions?.[parent] || 'none');
+      if (LEVEL_RANK[level] > LEVEL_RANK[out[sub]]) out[sub] = level;
+    }
+  }
+  const overrides = getUserOverrides(userId);
+  for (const [domain, level] of Object.entries(overrides)) {
+    if (out[domain] !== undefined && LEVEL_RANK[level] > LEVEL_RANK[out[domain]]) out[domain] = level;
+  }
   return out;
 }
 
 export function hasPermission(userId, domain, minLevel = 'read') {
   const level = permissionsForUser(userId)[domain] || 'none';
   return LEVEL_RANK[level] >= LEVEL_RANK[minLevel];
+}
+
+// Permissions individuelles "hors groupe" : réponse au besoin de sélection
+// fine par utilisateur sans passer par un groupe (ex. accorder vault:read à
+// UN utilisateur précis, sans créer/rejoindre un groupe pour lui seul). Se
+// superpose à la matrice des groupes (jamais en dessous, voir
+// permissionsForUser ci-dessus) — ne remplace pas les groupes, qui restent
+// le mécanisme principal pour tout accès partagé par plusieurs comptes.
+const ALL_OVERRIDABLE_DOMAINS = [...PERMISSION_DOMAINS, ...SUBDOMAIN_KEYS];
+
+export function getUserOverrides(userId) {
+  const all = readStore('permissionOverrides') || {};
+  return all[userId] || {};
+}
+
+export function setUserOverrides(userId, overrides) {
+  const all = readStore('permissionOverrides') || {};
+  const sanitized = {};
+  for (const domain of ALL_OVERRIDABLE_DOMAINS) {
+    const level = overrides?.[domain];
+    if (PERMISSION_LEVELS.includes(level) && level !== 'none') sanitized[domain] = level;
+  }
+  if (Object.keys(sanitized).length === 0) {
+    delete all[userId];
+  } else {
+    all[userId] = sanitized;
+  }
+  writeStore('permissionOverrides', all);
+  return sanitized;
 }
 
 // Ajoute un utilisateur aux groupes/rôles sélectionnés à sa création
@@ -145,6 +285,16 @@ function sanitizePermissions(permissions) {
   const out = {};
   for (const domain of PERMISSION_DOMAINS) {
     const level = permissions[domain];
+    if (PERMISSION_LEVELS.includes(level)) out[domain] = level;
+  }
+  return out;
+}
+
+function sanitizeSubPermissions(subPermissions) {
+  const out = {};
+  if (!subPermissions) return out;
+  for (const domain of SUBDOMAIN_KEYS) {
+    const level = subPermissions[domain];
     if (PERMISSION_LEVELS.includes(level)) out[domain] = level;
   }
   return out;

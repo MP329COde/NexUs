@@ -68,6 +68,7 @@ import wikiRoutes from './wiki.routes.js';
 import pluginsRoutes from './plugins.routes.js';
 import repositoryProvisioningRoutes from './repositoryProvisioning.routes.js';
 import personalTokensRoutes from './personalTokens.routes.js';
+import certificatesRoutes from './certificates.routes.js';
 
 const router = Router();
 
@@ -143,5 +144,6 @@ router.use('/repository-provisioning', repositoryProvisioningRoutes);
 // sur tout le préfixe, y compris les sous-chemins non définis) pour rester
 // accessible à tout utilisateur authentifié gérant SON propre token.
 router.use('/personal-tokens', personalTokensRoutes);
+router.use('/certificates', certificatesRoutes);
 
 export default router;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { markBackground } from '../lib/apiClient.js';
 
 // Charge une ressource API et expose { data, error, loading, reload }.
 // pollMs > 0 relance automatiquement l'appel (utilisé pour le dashboard temps réel).
@@ -9,6 +10,12 @@ export function useApi(fetcher, deps = [], { pollMs = 0 } = {}) {
 
   const load = useCallback(async (silent) => {
     if (!silent) setLoading(true);
+    // Un rechargement silencieux (déclenché par pollMs, jamais par une
+    // action de l'utilisateur) est marqué "arrière-plan" pour le prochain
+    // appel api.* déclenché par `fetcher()` juste en dessous — voir
+    // lib/apiClient.js#markBackground : le backend ne le compte pas comme
+    // activité pour la déconnexion sur inactivité (Lot B3).
+    if (silent) markBackground();
     try {
       const result = await fetcher();
       setData(result);

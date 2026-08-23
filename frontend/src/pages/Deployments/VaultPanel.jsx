@@ -20,28 +20,67 @@ function accessIcon(url) {
   return 'externalLink';
 }
 
-// Gestionnaire de mots de passe à deux niveaux : mots de passe dev (machines
-// de test partagées, lisibles par tout développeur) et mots de passe prod
+// Vault plateforme à deux niveaux (API historique 'dev'/'prod', inchangée
+// pour ne rien casser — voir vaultStore.js) : mots de passe dev (machines de
+// test partagées, lisibles par tout développeur) et mots de passe prod
 // (générés automatiquement côté serveur, réservés aux admins, révélés
 // seulement après avoir retapé son propre mot de passe). Chaque entrée peut
 // porter une URL d'accès (SSH, RDP, console web...) pour ouvrir directement
 // la machine concernée, sans jongler entre le coffre et un terminal.
+//
+// Lot B2 : complété par un Vault utilisateur (secrets personnels, visible
+// seulement par leur propriétaire) et une vue Vault infrastructure
+// (lecture seule des intégrations Proxmox/Kubernetes/HAProxy déjà
+// configurées dans Paramètres, jamais un cinquième magasin de secrets — voir
+// commentaire détaillé dans vaultStore.js). Le Vault projet reste dans
+// ProjectVaultPanel.jsx (page d'un projet précis, pas ici).
 export default function VaultPanel({ refreshKey }) {
   const { user } = useAuth();
   return (
     <>
-      <VaultTier tier="dev" title="Mots de passe dev" sub="Accès aux machines de test/dev — visible par tous les développeurs" canManage={user?.role === 'admin'} refreshKey={refreshKey} />
+      <VaultTier tier="user" title="Vault utilisateur" sub="Vos secrets personnels — visibles par vous seul, même un administrateur ne peut pas les lire" canManage refreshKey={refreshKey} />
+      <VaultTier tier="dev" title="Vault plateforme — dev" sub="Accès aux machines de test/dev — visible par tous les développeurs" canManage={user?.role === 'admin'} refreshKey={refreshKey} />
       {user?.role === 'admin' && (
-        <VaultTier tier="prod" title="Mots de passe production" sub="Générés automatiquement (256 caractères), révélés après triple vérification" canManage requireStepUp tripleVerify refreshKey={refreshKey} />
+        <VaultTier tier="prod" title="Vault plateforme — prod" sub="Générés automatiquement (256 caractères), révélés après triple vérification" canManage requireStepUp tripleVerify allowRotate refreshKey={refreshKey} />
       )}
+      <VaultInfraPanel refreshKey={refreshKey} />
     </>
   );
 }
 
-function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, refreshKey }) {
+// Vue en lecture seule des secrets d'intégration d'infrastructure —
+// n'affiche jamais de secret en clair (settingsStore ne les renvoie jamais
+// déchiffrés, voir getRedactedIntegration côté backend) : seul un indicateur
+// "configuré/non configuré" par champ sensible. Modifier ces intégrations
+// reste réservé à Paramètres → Intégrations.
+function VaultInfraPanel({ refreshKey }) {
+  const { data } = useApi(() => api.get('/vault/infra'), [refreshKey]);
+  const items = data?.items || [];
+  const LABELS = { proxmox: 'Proxmox', kubernetes: 'Kubernetes', haproxy: 'HAProxy', traefik: 'Traefik' };
+  return (
+    <Panel title="Vault infrastructure" sub="Identifiants Proxmox / Kubernetes / HAProxy / Traefik — lecture seule, gérés depuis Paramètres → Intégrations" span={12}>
+      <div className="vault-list">
+        {items.length === 0 && <div className="faint vault-empty">Aucune donnée (permission insuffisante ou aucune intégration déclarée)</div>}
+        {items.map((it) => (
+          <div key={it.key} className="vault-row">
+            <div className="vault-row-main">
+              <div className="vault-row-info">
+                <div className="vault-row-label">{LABELS[it.key] || it.key}</div>
+                <div className="faint vault-row-username">{it.configured ? 'Configuré' : 'Non configuré'}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, allowRotate, refreshKey }) {
   const notify = useNotify();
   const { data, reload } = useApi(() => api.get(`/vault/${tier}`), [refreshKey]);
-  const [form, setForm] = useState(tier === 'dev' ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
+  const hasSecretField = tier === 'dev' || tier === 'user';
+  const [form, setForm] = useState(hasSecretField ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
   const [busy, setBusy] = useState(false);
   const [revealing, setRevealing] = useState(null); // { id, label } en attente de mot de passe
   const [revealStep, setRevealStep] = useState(1); // triple vérification prod : 1 avertissement, 2 mot de passe, 3 confirmation finale
@@ -65,7 +104,7 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
     try {
       await api.post(`/vault/${tier}`, form);
       notify(`${form.label} ajouté`, { type: 'ok' });
-      setForm(tier === 'dev' ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
+      setForm(hasSecretField ? EMPTY_DEV_FORM : EMPTY_PROD_FORM);
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
@@ -95,6 +134,22 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
     setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; });
     notify('Entrée supprimée', { type: 'info' });
     reload();
+  }
+
+  // Rotation manuelle immédiate — complète la rotation automatique
+  // planifiée sans attendre l'échéance (voir POST /vault/:id/rotate).
+  async function rotateNow(entry) {
+    if (!confirm(`Régénérer immédiatement le secret de "${entry.label}" ?`)) return;
+    try {
+      await api.post(`/vault/${entry.id}/rotate`, {});
+      notify('Secret régénéré', { type: 'ok' });
+      // Un secret déjà révélé à l'écran est maintenant obsolète.
+      setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; });
+      delete sessionPasswordsRef.current[entry.id];
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
   }
 
   async function doReveal(entry, currentPassword, silent) {
@@ -177,6 +232,11 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
                     <Icon name="eyeOff" size={12} />
                   </span>
                 </>
+              )}
+              {canManage && allowRotate && (
+                <span className="btn-outline vault-action-btn-icon" title="Rotation immédiate (sans attendre la rotation automatique)" onClick={() => rotateNow(entry)}>
+                  <Icon name="rotate" size={12} />
+                </span>
               )}
               {canManage && (
                 <>
@@ -282,8 +342,8 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
         <form onSubmit={create} autoComplete="off" className="vault-create-form">
           <input className="input vault-create-field-label" autoComplete="off" placeholder="Nom (ex. VM test devops-1)" required value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} />
           <input className="input vault-create-field-username" autoComplete="off" placeholder="Utilisateur (optionnel)" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-          {tier === 'dev' && (
-            <input className="input vault-create-field-secret" type="password" autoComplete="new-password" placeholder="Mot de passe" required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} />
+          {hasSecretField && (
+            <input className="input vault-create-field-secret" type="password" autoComplete="new-password" placeholder={tier === 'user' ? 'Secret (ex. clé API personnelle)' : 'Mot de passe'} required value={form.secret} onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))} />
           )}
           <input className="input vault-create-field-url" autoComplete="off" placeholder="URL d'accès (optionnel) — ssh://…" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} />
           {tier === 'prod' && (
@@ -293,10 +353,12 @@ function VaultTier({ tier, title, sub, canManage, requireStepUp, tripleVerify, r
               title="Rotation automatique du secret"
             >
               <option value="">Pas de rotation auto</option>
-              <option value="2">Rotation toutes les 2 min</option>
-              <option value="3">Rotation toutes les 3 min</option>
-              <option value="4">Rotation toutes les 4 min</option>
-              <option value="5">Rotation toutes les 5 min</option>
+              <option value="15">Rotation toutes les 15 min</option>
+              <option value="60">Rotation toutes les heures</option>
+              <option value="1440">Rotation quotidienne</option>
+              <option value="10080">Rotation hebdomadaire</option>
+              <option value="43200">Rotation mensuelle</option>
+              <option value="129600">Rotation trimestrielle</option>
             </select>
           )}
           <button className="btn vault-create-submit" type="submit" disabled={busy}>

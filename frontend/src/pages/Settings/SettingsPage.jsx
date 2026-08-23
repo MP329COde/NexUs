@@ -16,6 +16,7 @@ import EnvironmentBlueprintsPanel from './EnvironmentBlueprintsPanel.jsx';
 import PoliciesPanel from './PoliciesPanel.jsx';
 import IdentityPanel from './IdentityPanel.jsx';
 import GitServicesPanel from './GitServicesPanel.jsx';
+import CertificatesPanel from './CertificatesPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
 import AuditPanel from './AuditPanel.jsx';
 import './SettingsPage.css';
@@ -37,6 +38,7 @@ const TABS = [
   { id: 'policies', label: 'Policies', domain: 'settings', level: 'admin' },
   { id: 'identity', label: 'Connexion & identité', domain: 'identity', level: 'admin' },
   { id: 'git', label: 'Services Git', adminOnly: true },
+  { id: 'certificates', label: 'Certificats', domain: 'settings', level: 'admin' },
   { id: 'system', label: 'Système', adminOnly: true },
   { id: 'audit', label: 'Journal', adminOnly: true }
 ];
@@ -49,7 +51,7 @@ const TABS = [
 const TAB_CATEGORIES = [
   { label: 'Général', tabIds: ['platform', 'inventory'] },
   { label: 'Identité & accès', tabIds: ['users', 'groups', 'identity'] },
-  { label: 'Intégrations', tabIds: ['integrations', 'git'] },
+  { label: 'Intégrations', tabIds: ['integrations', 'git', 'certificates'] },
   { label: 'Plateforme', tabIds: ['plugins', 'feature-flags', 'environment-blueprints'] },
   { label: 'Policies & audit', tabIds: ['policies', 'audit'] },
   { label: 'Système', tabIds: ['system'] }
@@ -150,6 +152,7 @@ export default function SettingsPage() {
       {tab === 'policies' && <PoliciesPanel />}
       {tab === 'identity' && <IdentityPanel />}
       {tab === 'git' && <GitServicesPanel />}
+      {tab === 'certificates' && <CertificatesPanel />}
       {tab === 'system' && <SystemPanel />}
       {tab === 'audit' && <AuditPanel />}
     </>

@@ -15,7 +15,8 @@ et documentée dans `fonctions.md` une fois réellement faite.
 - [x] Revue de code : planification de créneaux récurrents (jour de semaine + plage horaire + relecteurs désignés), CRUD complet, lecture pour tous/écriture admin. `backend/src/store/reviewStore.js` (listSchedules/createSchedule/updateSchedule/deleteSchedule), `backend/src/routes/reviews.routes.js` (`/reviews/schedules`), `frontend/src/pages/Deployments/ReviewSchedulePanel.jsx`, branché dans `CodeReviewsPage.jsx`.
 - [x] Tests & Qualité : rendue réelle — dérivée de l'historique CI réel (`/pipelines/runs`, GitLab+GitHub), plus de chiffres inventés. Recadrée honnêtement en "fiabilité des pipelines" (taux de succès, tendance quotidienne, détail par dépôt) car aucun framework de tests/format JUnit n'est parsé — un vrai "nombre de tests"/"couverture" resterait fabriqué sans ça. `frontend/src/pages/Deployments/TestsQualityPage.jsx`.
 - [x] Releases : panneau "Fichiers à corriger" (factice, façon SonarQube) remplacé par les vrais résultats du dernier scan Semgrep déjà réel (`/code-scans`), avec lien vers Supply Chain pour lancer/voir un scan. Le reste de la page (applications suivies, pipeline, diff GitOps) était déjà réel. `frontend/src/pages/Deployments/ReleasesPage.jsx`.
-- [ ] MFA obligatoire, restriction par CIDR, déconnexion sur inactivité : retirés volontairement car "décoratifs" (non branchés à une vraie logique) — à re-évaluer si un durcissement auth est voulu.
+- [x] ~~MFA obligatoire, restriction par CIDR, déconnexion sur inactivité : retirés volontairement car "décoratifs" (non branchés à une vraie logique) — à re-évaluer si un durcissement auth est voulu.~~ **CORRECTION (2026-08-23, Lot B3)** : cette entrée était déjà obsolète avant même ce lot — entre-temps, un MFA TOTP complet (setup/enable/disable, codes de secours, vérification en deux étapes à la connexion) et une restriction CIDR de connexion avaient été réellement implémentés (Lot 59-60-nav, commits `0178bf7`/`77713de`/`07cfd29`), tous deux branchés à une vraie logique côté backend — rien de décoratif à cette date-là. Seul restait manquant : rendre le MFA *obligatoire* par rôle (jusqu'ici uniquement optionnel/auto-activé), étendre le CIDR à *chaque* requête authentifiée (jusqu'ici vérifié seulement à la connexion), et la déconnexion sur inactivité (absente). Voir l'entrée détaillée ci-dessous pour ce qui a été ajouté.
+- [x] **Lot B3 — durcissement auth (MFA obligatoire par rôle, CIDR sur chaque requête, déconnexion sur inactivité)**, 2026-08-23. État réel constaté au départ : TOTP MFA existait mais restait *optionnel* (aucun moyen de le forcer) ; le CIDR de connexion (`identityStore.loginCidrAllowlist`) n'était vérifié qu'à `POST /auth/login`, jamais ensuite sur une session déjà émise ; aucune déconnexion sur inactivité n'existait (seule l'expiration absolue du JWT, `sessionMinutes`, s'appliquait — `sessionsStore.js` traçait bien `lastSeenAt` par session mais rien ne le comparait à un seuil). Ajouté : (1) `mfaRequiredRoles` (`identityStore.js`) — rôles pour lesquels `middleware/auth.js#requireAuth` bloque désormais (403 `mfaSetupRequired:true`) toute route protégée tant que `mfaEnabled` n'est pas vrai, sauf les routes d'enrôlement/déconnexion explicitement listées (`/auth/me`, `/auth/mfa/setup`, `/auth/mfa/enable`, `/auth/mfa/disable`, `/auth/logout`, `/auth/profile`, `/auth/password`) ; garde-fou côté `PUT /identity` (`identity.routes.js`) : impossible de cocher son propre rôle sans avoir déjà activé son propre MFA. (2) Restriction CIDR revérifiée sur CHAQUE requête authentifiée dans `requireAuth` (pas seulement au login), même garde-fou existant conservé (jamais enregistrable si ça exclurait l'IP de l'admin qui l'enregistre). (3) Déconnexion sur inactivité : `identityStore.getInactivityTimeoutMinutes()` (0=désactivé par défaut), comparé dans `requireAuth` à `session.lastSeenAt` avant de la rafraîchir — dépassement ⇒ `revokeSession()` + 401. **Choix documenté** : les requêtes de polling/health ne comptent PAS comme activité — marquées côté frontend par un en-tête `X-Nexus-Background` (`lib/apiClient.js#markBackground`, posé automatiquement par `hooks/useApi.js` sur tout rechargement silencieux `pollMs`), ignoré par `touchSession`. Panneau Paramètres → Sécurité étendu (`frontend/src/pages/Settings/IdentityPanel.jsx`) : les 3 réglages avec valeurs par défaut sûres (CIDR vide, MFA non obligatoire, inactivité désactivée) et explications inline. Fichiers modifiés : `backend/src/middleware/auth.js`, `backend/src/store/identityStore.js`, `backend/src/routes/identity.routes.js`, `frontend/src/lib/apiClient.js`, `frontend/src/hooks/useApi.js`, `frontend/src/pages/Settings/IdentityPanel.jsx`. **Testé réellement** (curl direct contre le serveur de dev, jamais sur le compte admin — utilisation du compte de test `alice@homelab.local`, rôle `user`) : MFA obligatoire activé sur le rôle `user` ⇒ `GET /projects` renvoie 403 `mfaSetupRequired`, `GET /auth/me` et `POST /auth/mfa/setup` restent accessibles, puis `POST /auth/mfa/enable` avec un vrai code TOTP généré débloque immédiatement l'accès (200) ; CIDR réglé sur une plage excluant volontairement l'IP de test (`10.99.99.0/24`) ⇒ 403 aussi bien à la connexion qu'sur une session déjà active, puis remis à liste vide (aucune restriction) ; inactivité réglée à 1 minute puis `lastSeenAt` de la session antidaté de 5 minutes (pour ne pas attendre en réel) ⇒ requête suivante 401 "Session expirée pour inactivité", session bien révoquée en base, requête suivante 401 "Session révoquée" ; requête marquée `X-Nexus-Background: 1` confirmée sans effet sur `lastSeenAt` (resté égal à `createdAt`). Tous les réglages de test remis à leur valeur par défaut sûre (CIDR vide, `mfaRequiredRoles: []`, inactivité 0) après vérification — l'admin actif n'a jamais été touché. `node --check` OK sur tous les fichiers backend modifiés ; `node --test` : 129/136 avant et après (aucune régression, les 4 échecs et 3 skips sont préexistants, non liés à ce lot). **Limites connues** : pas de restriction CIDR par rôle (seulement globale, comme demandé implicitement par l'emplacement existant du réglage) ; le seuil minimal configurable pour l'inactivité est 1 minute (pas de secondes) — testé en antidatant directement la session plutôt qu'en attendant en temps réel, ce qui vérifie la même logique de comparaison ; le CIDR reste IPv4 uniquement (limite déjà documentée dans `utils/cidr.js`, non spécifique à ce lot).
 - [x] Réseau — DNS OVH + DuckDNS : intégrations réelles ajoutées (`backend/src/services/integrations/ovhService.js` — API OVH signée, `duckdnsService.js`), branchées dans Paramètres (formulaires + guide), action « DNS » par domaine dans Réseaux → Proxies & domaines (`POST /dns/sync`, détection auto OVH/DuckDNS). Vérifié via Playwright : formulaires, sauvegarde chiffrée, échec propre sans intégration réelle configurée.
 - [x] Réseau — Topologie : ajout d'une couche listant les VM/LXC réels de chaque nœud Proxmox (`networkTopologyService.js`), pas seulement les nœuds. Vérifié (empty state correct sans Proxmox configuré).
 - [ ] Réseau — reste à faire sur ce chantier : édition visuelle du fichier haproxy.cfg / des frontends HAProxy directement (actuellement : lecture + création de backend/serveur + rattachement à un frontend existant, pas de création de frontend), et un vrai rendu graphique de topologie (actuellement liste par couches, pas de schéma).
@@ -47,6 +48,14 @@ et documentée dans `fonctions.md` une fois réellement faite.
 - [x] Vue générale : panneau « Fonctionnalités bloquées » retiré (demandé explicitement) — composant supprimé, plus aucune référence. Vérifié via Playwright : n'apparaît plus, aucune erreur.
 - [x] Admin → Utilisateurs : rôles réels par utilisateur vérifiés de bout en bout (pas seulement visuellement) — création d'un groupe avec une permission précise sur un seul domaine (`hosts`), assignation à un compte de test, connexion effective avec ce compte : accès refusé avec un niveau insuffisant (`write` là où `admin` est requis), accordé une fois le niveau corrigé. Le système de groupes composables déjà en place (`GroupsPanel.jsx`) fait bien ce qui était demandé ("chaque développeur n'aura pas le même droit") — pas de nouvelle fonctionnalité nécessaire, seulement vérifié réellement. **Bug trouvé et corrigé au passage** : le formulaire de création d'utilisateur se faisait pré-remplir par le navigateur avec les identifiants de l'admin connecté (pas de `name`/`autoComplete` sur les champs) — un admin distrait pouvait créer un compte avec ses propres identifiants sans s'en apercevoir.
 - [ ] **Incident constaté, cause non identifiée** : le mot de passe admin ne correspondait plus à celui de `backend/.env` (`admin1234`) au moment de tester la connexion avec le compte de test — connexion admin refusée en plein test. Mot de passe réinitialisé directement en base pour poursuivre (même compte, mêmes droits, aucune donnée perdue). Cause probable : une action de cette très longue session a modifié le hash sans que ce soit noté explicitement (aucune trace utile dans les logs applicatifs consultés). À surveiller si ça se reproduit — pourrait indiquer un bug dans un flux de changement de mot de passe non lié à cette session de travail.
+
+- [x] **Lot B1 — Permissions avancées** (suite au signalement : « il manque beaucoup de permissions de base […] on doit aussi pouvoir définir le niveau d'accès pour accéder à certains éléments, ex. être admin pour accéder au coffre-fort admin »). Le modèle domaine×niveau existant (`groupsStore.js`, 17 domaines × none/read/write/admin, groupes composables) a été **étendu**, pas remplacé :
+  - **Préréglages de groupe** ("grosses permissions") : `PERMISSION_PRESETS` (Administrateur complet, Lecture seule plateforme, Développeur, Support/Monitoring) — sélectionnables en un clic à la création d'un groupe (`GroupsPanel.jsx`), pré-remplissent la matrice ; reste modifiable ensuite comme un groupe normal. Vérifié via Playwright : création avec préréglage « Développeur », matrice bien pré-remplie (infrastructure/réseaux/etc. en écriture, vault en écriture, vault-prod à none).
+  - **Permissions individuelles hors groupe** ("permissions uniques" par utilisateur) : n'existaient pas du tout avant ce lot (audité — seuls les groupes portaient des permissions). Ajouté `getUserOverrides`/`setUserOverrides` (`groupsStore.js`, nouvelle collection `permissionOverrides` dans `jsonStore.js`), routes `GET`/`PUT /groups/user-overrides/:userId`, panneau dédié dans `GroupsPanel.jsx`. Se superposent à la matrice des groupes (max, jamais en dessous) — jamais un remplacement. Même garde-fou anti-auto-élévation que pour les groupes. Vérifié via Playwright + appel direct : override `audit:read` posé sur Alice (qui n'a aucun groupe donnant audit) → `hasPermission` renvoie bien `true` ensuite.
+  - **Sous-domaines** pour restreindre une sous-fonctionnalité précise indépendamment du reste du domaine parent : `SUBDOMAINS` (`vault-prod` → hérite de `vault`, `users-permissions` → hérite de `users`). Tant qu'un groupe ne les isole pas explicitement, ils héritent du niveau du domaine parent — **aucune régression sur les groupes existants** (vérifié : `node --test` complet avant/après, y compris `groupsSelfEscalation.test.js`, résultats identiques). `vault-prod` remplace le câblage en dur `requirePermission('vault','admin')` sur `GET`/`POST /vault/prod` (`vault.routes.js`) — comportement inchangé par défaut, mais désormais réglable indépendamment du reste de `vault` (ex. dev en écriture pour toute l'équipe, prod isolé à un sous-groupe précis). `users-permissions` remplace `requirePermission('users','admin')` en tête de `groups.routes.js` — permet de déléguer la gestion des comptes sans déléguer la capacité de modifier qui a accès à quoi. Vérifié de bout en bout en conditions réelles (backend démarré, vrai login HTTP, vrai cookie de session) : un utilisateur avec seulement `vault:write` obtient `200` sur `GET /api/vault/dev` mais `403 Permission insuffisante` sur `GET /api/vault/prod` — exactement le scénario demandé.
+  - Garde-fou anti-auto-élévation (`groups.routes.js`) étendu pour couvrir les sous-domaines et les préréglages (résolus en matrice concrète avant vérification), pas seulement les 17 domaines d'origine.
+  - Fichiers modifiés : `backend/src/store/groupsStore.js`, `backend/src/store/jsonStore.js`, `backend/src/routes/groups.routes.js`, `backend/src/routes/vault.routes.js`, `frontend/src/pages/Settings/GroupsPanel.jsx`, `frontend/src/pages/Settings/GroupsPanel.css`.
+  - **Limites assumées** : seulement 2 sous-domaines introduits (`vault-prod`, `users-permissions`) — volontairement pas généralisé à tous les domaines pour ne pas exploser la matrice UI, conformément à la consigne (« 2-3 exemples pertinents »). Le vault multi-niveaux complet (dev/prod/projet, mots de passe par tier) existait déjà avant ce lot et n'a pas été retouché en profondeur — seul le point d'entrée de permission a changé de nom de domaine. Le MFA (TOTP) est une fonctionnalité distincte déjà livrée dans une session précédente (commits « Lot 60-nav », voir historique git) — non touché ici, hors périmètre B1. `node --check` OK sur tous les fichiers backend modifiés ; `node --test test/*.test.js` : 129/136 passent, les 4 échecs restants (backupService/jobService, absence de `DATABASE_URL`) sont préexistants et confirmés identiques sur `main` avant ce lot (vérifié par `git stash`). Test de bout en bout réalisé sur les comptes de développement existants (`admin@homelab.local`, `alice@homelab.local`) — leurs mots de passe ont été réinitialisés ponctuellement en base pour permettre la connexion (mêmes comptes, mêmes droits, aucune donnée perdue), comme lors des vérifications précédentes de cette même session de travail.
 
 ## Environnement de développement (contexte pour la prochaine session)
 Un Postgres local a été démarré pour cette session (conteneur Docker `nexus-dev-postgres`,
@@ -1241,3 +1250,260 @@ une vraie instance de production (seul un clone de développement a été testé
 modifiés/créés : `backend/src/services/updateService.js`, `backend/src/services/
 startupStatusService.js` (nouveau), `backend/src/routes/system.routes.js`, `backend/src/index.js`,
 `frontend/src/pages/Settings/SystemPanel.jsx`.
+
+## Lot B2 — Vault multi-niveaux (2026-08-23)
+
+Demande : distinguer clairement 4 niveaux de coffre-fort (utilisateur / projet / plateforme /
+infrastructure), avec RBAC cohérent avec les sous-domaines `vault-*` introduits au Lot B1
+(`backend/src/store/groupsStore.js`, non commité au moment de ce lot), audit des accès, révélation
+temporaire + copie contrôlée généralisée, rotation manuelle en plus de l'automatique. **Audit
+préalable des sous-domaines B1** effectué avant toute modification : `vault-prod` (réservé au tier
+`prod`) et `users-permissions` existaient déjà dans `SUBDOMAINS` (`groupsStore.js`), avec héritage
+du domaine parent tant qu'un groupe ne les définit pas explicitement (`permissionsForUser`) —
+mécanisme repris à l'identique pour les deux nouveaux sous-domaines de ce lot, sans toucher à la
+logique d'héritage elle-même.
+
+**Mapping retenu** (documenté en tête de `backend/src/store/vaultStore.js`) :
+1. **Vault utilisateur** = nouveau tier `'user'` dans `vaultStore.js`/`vault.routes.js`
+   (`GET/POST /api/vault/user`, `POST /:id/reveal`, `PUT/DELETE /:id`), strictement scoppé à
+   `req.user.id` — aucune lecture croisée, y compris par un admin (même garantie que le token
+   GitLab personnel du Lot A6). **`personalGitTokensStore.js` n'a volontairement PAS été fusionné**
+   dans ce tier générique : il reste un cas spécial documenté (un seul provider GitLab, câblé dans
+   `gitlabService.clientForUser`), fonctionnel et déjà utilisé — le dupliquer dans un magasin
+   générique aurait cassé sa résolution existante sans bénéfice réel. Aucun octroi de permission
+   requis pour gérer ses propres secrets (chacun gère déjà les siens) ; le sous-domaine
+   `vault-user` ajouté à `SUBDOMAINS` sert pour un futur usage admin/support (métadonnées
+   seulement, jamais le secret en clair), pas à restreindre l'accès de chacun à SES secrets.
+2. **Vault projet** = tier `'project'` déjà existant, audité sans modification structurelle : RBAC
+   déjà correct depuis un lot précédent (`projectEntryAccess`/`projectEntryRole` dans
+   `vault.routes.js`, résolution du rôle réel viewer/developer/maintainer/owner + octrois ponctuels
+   `getResourceGrant`), audit déjà en place (`logAudit('vault.create'|'reveal'|'update'|'delete')`).
+   Seul ajout : rotation manuelle immédiate (voir point 5) et bornes de rotation automatique
+   élargies (voir point 6).
+3. **Vault plateforme** = tiers `'dev'`/`'prod'` déjà existants, **API inchangée** (grep effectué
+   avant tout renommage : `/vault/dev` et `/vault/prod` référencés uniquement depuis
+   `VaultPanel.jsx` et `vault.routes.js` lui-même — renommer l'API n'aurait cassé aucun autre
+   appelant, mais gardé stable par prudence contractuelle et parce que le seul problème signalé
+   était la lisibilité UI, pas le contrat d'API). Renommage cosmétique côté frontend uniquement :
+   titres « Vault plateforme — dev » / « Vault plateforme — prod » dans `VaultPanel.jsx`.
+4. **Vault infrastructure** = **PAS un nouveau tier de stockage** dans `vaultStore.js` — décision
+   documentée en détail dans le commentaire d'en-tête de `vaultStore.js`. Audit préalable :
+   `backend/src/store/settingsStore.js` stocke déjà les identifiants Proxmox/Kubernetes/HAProxy/
+   Traefik/... chiffrés AES-256-GCM (`SECRET_FIELDS`), jamais renvoyés en clair au frontend
+   (`getRedactedIntegration`), déjà audités en écriture (`logAudit('settings.integration.save')`
+   dans `settings.routes.js`) — et c'est cette même donnée qui fait foi pour tous les services
+   d'intégration au runtime (`integrationRegistry.js`). Dupliquer ces secrets dans `vaultStore.js`
+   aurait créé deux sources de vérité divergentes sans aucun bénéfice (le vault ne serait jamais lu
+   par les services d'intégration eux-mêmes). Le « Vault infrastructure » est donc une **vue en
+   lecture seule** agrégeant `settingsStore` : nouvelle route `GET /api/vault/infra`
+   (`vault.routes.js`), restreinte à un sous-ensemble volontairement ciblé
+   (`INFRA_INTEGRATION_KEYS = ['proxmox', 'kubernetes', 'haproxy', 'traefik']` — pas les forges, pas
+   l'observabilité, pas les notifications, hors périmètre "infrastructure"), gardée derrière un
+   nouveau sous-domaine `vault-infra` (lecture seule) plutôt que le domaine `settings` complet
+   (qui donnerait aussi le droit d'écrire), et journalisée (`logAudit('vault.infra.view')`) à
+   chaque consultation. **Limite honnête** : reste donc une consultation de statut
+   (configuré/non configuré par intégration), jamais un vrai stockage indépendant — modifier ces
+   identifiants reste réservé à Paramètres → Intégrations (`settings:admin`, inchangé). Non
+   généralisé aux autres intégrations (GitLab, Grafana, Wazuh...) par manque de justification
+   d'y donner un statut "infrastructure" au sens de la demande.
+5. **Rotation manuelle immédiate** : n'existait pas du tout côté UI/API avant ce lot (seule la
+   rotation automatique planifiée, `vaultRotationService.js`, existait). Nouvelle route
+   `POST /api/vault/:id/rotate` (mêmes seuils d'autorisation que la modification de métadonnées :
+   developer + octroi `vault` écriture, admin requis hors tier `project`), réutilise
+   `forceRotateSecret()` déjà existant (jusqu'ici seulement appelé automatiquement par
+   `secretLeakScanService.js`), journalisée (`vault.rotate.manual`, avec `secretVersion` pour
+   distinguer une rotation manuelle d'une automatique dans l'historique). Bouton dédié (icône
+   rotation) ajouté dans `VaultPanel.jsx` (tier `prod`) et `ProjectVaultPanel.jsx` (tier `project`)
+   — exclu du tier `dev` (mot de passe partagé stable, jamais généré aléatoirement) et du tier
+   `user` (secret fourni par l'utilisateur depuis un service tiers : le régénérer aléatoirement
+   côté NexUs le rendrait invalide côté service externe, aucune rotation n'y a jamais de sens).
+6. **Bornes de rotation automatique ajustées** : les constantes trouvées avant ce lot
+   (`MIN_ROTATION_MINUTES = 2`, `MAX_ROTATION_MINUTES = 5`, en MINUTES) étaient manifestement
+   pensées pour une démo/un test manuel — une rotation toutes les 2 minutes ne laisserait aucune
+   automatisation consommer un secret avant qu'il ne change, inutilisable en usage réel. Portées à
+   15 minutes (rotation la plus courte réaliste) – 129 600 minutes (90 jours, politique
+   trimestrielle courante). Options du sélecteur frontend (`VaultPanel.jsx`,
+   `ProjectVaultPanel.jsx`) alignées : 15 min / 1 h / 1 j / 7 j / 30 j / 90 j au lieu de 2/3/4/5 min.
+7. **RBAC** : deux nouveaux sous-domaines ajoutés à `SUBDOMAINS` (`groupsStore.js`) —
+   `vault-user` et `vault-infra` (voir points 1 et 4) — même mécanique d'héritage que `vault-prod`
+   du Lot B1, aucune régression pour les groupes existants (valeur héritée du domaine parent
+   `vault` tant qu'un groupe ne la définit pas explicitement). Ajoutés aux préréglages
+   `developpeur`/`support-monitoring` (valeur `'none'` explicite, cohérent avec le style déjà en
+   place pour `vault-prod`).
+8. **Révélation temporaire + copie contrôlée** : déjà en place pour `prod` (triple vérification) et
+   `project` (mot de passe de coffre projet ou mot de passe du compte) — vérifié sans modification.
+   Généralisé au tier `user` sous une forme plus légère et volontairement différente : pas de
+   step-up (l'utilisateur est déjà authentifié et le secret est déjà strictement le sien, à la
+   différence de `prod`/`project` qui sont partagés entre plusieurs comptes), mais même mécanique
+   de masquage par défaut + bouton Copier + bouton Masquer que les autres tiers
+   (`VaultTier`/`revealed` state dans `VaultPanel.jsx`, code déjà générique, aucune duplication).
+
+**Vérifié réellement** :
+- `node --check` sur les 3 fichiers backend modifiés (`vaultStore.js`, `groupsStore.js`,
+  `vault.routes.js`) : OK.
+- `npx vite build` (frontend) : succès, sans nouvelle erreur.
+- `node --test` (backend) : **129/136 passent avant et après ce lot** (4 échecs préexistants
+  confirmés indépendants de ce lot — `backupService`/`jobService`, liés à l'absence de
+  `DATABASE_URL` en environnement de test isolé — et 3 skipped, comptes identiques avant/après,
+  aucune régression introduite).
+- **Cycle complet testé via Playwright réel** (Chromium, backend+frontend relancés localement,
+  compte admin déjà connecté au démarrage de la session) : page Secrets & variables affichant bien
+  les 4 sections (Vault utilisateur / Vault plateforme — dev / Vault plateforme — prod / Vault
+  infrastructure) ; création d'une entrée `user` (« Clé API test B2 ») → apparaît immédiatement,
+  masquée par défaut (bouton « Révéler ») ; révélation → secret en clair confirmé identique à la
+  valeur saisie, sans step-up (comportement voulu pour ce tier) ; Vault infrastructure affichant
+  l'état réel des intégrations déjà configurées sur cette instance de dev (Kubernetes et HAProxy
+  « Configuré », Proxmox et Traefik « Non configuré » — cohérent avec Paramètres → Intégrations
+  vérifié en parallèle sur la même page). **Test RBAC négatif réel** : création d'un compte de test
+  sans permission (`vaulttest@homelab.local`, rôle "Utilisateur" par défaut, aucun groupe), connexion
+  effective, puis `fetch('/api/vault/infra')` renvoie **403** (`Permission insuffisante`) —
+  confirmé que `requirePermission('vault-infra', 'read')` bloque bien un compte sans ce
+  sous-domaine ; `fetch('/api/vault/user')` renvoie `items: []` pour ce compte alors que l'entrée
+  créée par l'admin existe bien en base — confirmé qu'un tier `user` d'un autre compte n'est jamais
+  visible (isolation par `userId`, pas seulement par l'UI). Interface non-admin confirmée cohérente
+  (tier `prod` absent, Vault infrastructure affiché mais vide avec message explicite plutôt qu'une
+  page cassée).
+- **Non testé en direct** : le bouton de rotation manuelle (`POST /vault/:id/rotate`) n'a pas pu
+  être cliqué en conditions réelles dans cette session — la session admin du navigateur a été
+  perdue en testant la déconnexion/reconnexion pour le scénario RBAC ci-dessus, et le mot de passe
+  admin réel de cet environnement de dev (distinct de `admin1234` dans `backend/.env`, incident déjà
+  documenté dans une entrée précédente de ce fichier) n'était pas connu pour se reconnecter ; aucune
+  tentative de contournement (modification directe du hash en base) n'a été faite cette fois. La
+  route elle-même reste couverte par lecture de code (réutilise `forceRotateSecret()`, déjà exercé
+  par `secretLeakScanService.js` en conditions réelles lors d'un lot précédent) et par le
+  raisonnement de seuils d'autorisation identique à `PUT /:id` (déjà testé, mêmes gardes). Le
+  compte de test `vaulttest@homelab.local` créé pour le scénario RBAC négatif n'a pas pu être
+  supprimé pour la même raison (perte de session admin) — reste dans la base de développement,
+  sans permission particulière, mot de passe `VaultTest1234!` (à supprimer manuellement). Aucun
+  test unitaire `node --test` dédié au vault n'existait avant ce lot et aucun n'a été ajouté
+  (aucun répertoire de test vault préexistant à étendre ; la couverture de ce lot repose sur le
+  test Playwright réel ci-dessus plutôt que sur des tests unitaires nouveaux — limite assumée par
+  manque de temps).
+
+**Limite honnête globale** : le « Vault infrastructure » reste une vue de statut, pas un vrai
+stockage indépendant (voir point 4) — c'est un choix délibéré (éviter une double source de vérité),
+pas une fonctionnalité inachevée par manque de temps. Aucune intégration Proxmox/Kubernetes réelle
+connectée dans cet environnement de dev (Kubernetes pointe vers un serveur API local éphémère,
+`ECONNREFUSED` constaté sur plusieurs services au moment du test) — le contenu de la vue
+infrastructure reflète donc des identifiants stockés, pas une infrastructure réellement joignable,
+ce qui est cohérent avec ce que fait déjà Paramètres → Intégrations pour ces mêmes services.
+
+Fichiers modifiés/créés : `backend/src/store/vaultStore.js`, `backend/src/store/groupsStore.js`,
+`backend/src/routes/vault.routes.js`, `frontend/src/pages/Deployments/VaultPanel.jsx`,
+`frontend/src/pages/Deployments/ProjectVaultPanel.jsx`. Aucun fichier du Lot B1 (non commité) n'a
+été modifié au-delà de l'ajout des deux nouveaux sous-domaines dans `SUBDOMAINS`/les préréglages de
+`groupsStore.js`, conformément à la consigne de ne pas casser ce lot précédent.
+
+- [x] **Lot B4 — Certificats, fonctionnalité centrale (2026-08-23)**, dernier lot du Groupe B.
+  Contexte de départ (Lot A1, déjà en place, non touché en profondeur) : `buildHttpsAgentFromConfig`
+  (`backend/src/services/integrations/httpClient.js`) construisait déjà un `https.Agent` à partir de
+  `allowSelfSigned`/`caCertPem`, câblé sur Argo CD, HAProxy, GitLab, Proxmox, Wazuh — mais aucun
+  écran centralisé, aucun moyen d'importer une CA depuis le frontend, aucun diagnostic TLS réel,
+  aucun réglage global. Ajouté :
+  1. **Écran centralisé « Certificats »** (Paramètres → Certificats, nouvel onglet dans
+     `SettingsPage.jsx`, catégorie « Intégrations ») : `frontend/src/pages/Settings/CertificatesPanel.jsx`.
+     Liste dynamiquement les 6 intégrations HTTPS-configurables détectées dans
+     `backend/src/services/tlsDiagnosticsService.js#TLS_INTEGRATIONS` (Argo CD, HAProxy, GitLab,
+     Proxmox, Wazuh — toutes câblées sur `buildHttpsAgentFromConfig` — et Kubernetes en lecture
+     seule, voir limite ci-dessous). Volontairement limité à ces 6 : ajouter une intégration à cette
+     liste sans qu'elle lise réellement `allowSelfSigned`/`caCertPem` aurait affiché un réglage sans
+     effet, ce que je voulais éviter.
+  2. **Diagnostic TLS réel** (`tlsDiagnosticsService.js#diagnoseHost`) : une connexion `tls.connect`
+     permissive (`rejectUnauthorized:false`) pour lire le certificat serveur réel (sujet, émetteur,
+     dates de validité, chaîne via `issuerCertificate`) même s'il n'est pas fiable, **puis** une
+     connexion stricte séparée (`rejectUnauthorized:true`, avec la CA configurée le cas échéant)
+     pour détecter précisément si/pourquoi la vérification échouerait en usage réel (code d'erreur
+     TLS exact). Un hôte injoignable (`ECONNREFUSED`, timeout...) renvoie honnêtement
+     `reachable:false` + le code d'erreur réel — **aucune donnée de certificat n'est jamais
+     inventée** dans ce cas (vérifié par un test dédié, voir plus bas). Jours avant expiration
+     calculés depuis la vraie date `validTo`. Suggestion actionnable (`suggestFix`) dérivée du code
+     d'erreur réel, pas d'un texte générique.
+  3. **Import de CA personnalisée** : `POST /certificates/:key/ca` valide le PEM par regex
+     `-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----` **et** tente un vrai parse via
+     `crypto.X509Certificate` (`validateCaCertPem`) — rejette avec message clair si l'un des deux
+     échoue, jamais un simple "ça devrait être bon". Sauvegardé dans `caCertPem`, déjà lu par
+     `buildHttpsAgentFromConfig`. `DELETE /certificates/:key/ca` retire la CA. Non proposé pour
+     Kubernetes (`supportsCaImport:false`, voir limite ci-dessous).
+  4. **Mode TLS global** : `tlsSettings` (nouvelle collection `jsonStore.js`, `{mode:'strict'}` par
+     défaut), `getTlsMode`/`setTlsMode` (`settingsStore.js`), `GET`/`PUT /certificates/mode`.
+     **Hiérarchie documentée explicitement dans l'UI** : ce réglage est un défaut informatif/visuel
+     pour la configuration d'une nouvelle intégration — il ne modifie **aucune** connexion déjà
+     configurée ; `allowSelfSigned` par intégration prime toujours (c'est littéralement ce que fait
+     déjà `buildHttpsAgentFromConfig`, qui ne lit que la config de l'intégration, jamais un réglage
+     global). Pas de faux effet global inventé pour donner l'illusion d'un "mode permissif qui
+     désactive tout" — ça aurait été dangereux et mensonger.
+  5. **Certificat client (mTLS)** : `buildHttpsAgentFromConfig` étendu pour passer
+     `cert: cfg.clientCertPem, key: cfg.clientKeyPem` à `https.Agent` si les deux sont présents —
+     câblage trivial et couvert par un test unitaire qui vérifie que l'agent transporte bien ces
+     options. **Mais aucun champ UI n'a été ajouté** (ni dans `CertificatesPanel.jsx` ni dans les
+     formulaires d'intégration) et **aucun test contre un vrai serveur exigeant un certificat
+     client (mTLS) n'a été fait** — seul un aller-retour "les options arrivent bien dans l'agent"
+     est vérifié, pas un vrai handshake mTLS de bout en bout. Choix assumé conformément à la
+     consigne : plutôt que d'exposer un champ non testé comme s'il était fiable, le câblage reste
+     présent (silencieux, sans effet tant qu'aucune config ne renseigne ces deux champs) mais
+     **non exposé et non validé en conditions réelles** — à ne pas présenter comme un support mTLS
+     opérationnel.
+  6. **Kubernetes — limite documentée** : son "ignorer le certificat" (`insecureSkipTlsVerify`) est
+     câblé séparément via `@kubernetes/client-node` (`skipTLSVerify`), pas via
+     `buildHttpsAgentFromConfig` — le diagnostic TLS (lecture seule, `supportsCaImport:false`) reste
+     utile et fonctionne (même connexion `tls.connect` brute vers `apiServer`), mais **aucun import
+     de CA Kubernetes n'a été ajouté** : le code existant ne lit aucun `caCertPem` pour ce cluster,
+     en ajouter un dans l'UI sans le câbler côté `kubernetesService.js` aurait été un réglage sans
+     effet. Non traité par manque de temps dans ce lot, documenté honnêtement plutôt que masqué.
+  7. **Notification d'expiration** : badge rouge « Expire dans N jours » sur chaque carte
+     d'intégration si `daysUntilExpiry < 30` (donnée réelle, jamais un seuil arbitraire affiché sans
+     base). Non ajouté au panneau de statut global existant (`InfrastructureStatusPanel.jsx`) faute
+     de temps dans ce lot — limité à l'écran Certificats lui-même, qui est le nouvel emplacement
+     canonique pour cette information.
+
+  **Vérifié réellement** :
+  - `node --check` sur les 6 fichiers backend modifiés/créés (`httpClient.js`, `jsonStore.js`,
+    `settingsStore.js`, `tlsDiagnosticsService.js`, `certificates.routes.js`, `routes/index.js`) : OK.
+  - `node --test` (backend) : **133/140 passent après ce lot** (129/136 avant, mêmes 4 échecs
+    préexistants confirmés indépendants — `backupService`/`jobService`, absence de `DATABASE_URL` en
+    environnement de test isolé — et 3 skipped identiques ; +4 nouveaux tests ajoutés, tous passent,
+    aucune régression).
+  - **Nouveau fichier de test réel** `backend/test/tlsDiagnosticsService.test.js`, contre un vrai
+    serveur HTTPS auto-signé (certificat généré via `openssl req -x509`, comme au Lot A1, pas de
+    certificat simulé/en dur) : (1) hôte injoignable → `reachable:false` avec le vrai code d'erreur,
+    `certificate:null`, aucune donnée inventée ; (2) connexion réelle au serveur de test → sujet
+    (`CN=localhost`) et dates de validité réelles lus correctement, `daysUntilExpiry` numérique,
+    connexion **stricte sans CA → échoue** avec un vrai code d'erreur TLS et une suggestion générée ;
+    (3) même connexion stricte **avec la CA du serveur de test fournie → réussit** ; (4) vérifié en
+    plus que `buildHttpsAgentFromConfig` (le câblage réellement utilisé par les intégrations, pas
+    seulement `tls.connect` brut) produit un agent qui fait une vraie requête HTTPS complète avec
+    succès une fois la bonne CA configurée ; (5) `validateCaCertPem` rejette un texte non-PEM et
+    accepte le certificat auto-signé réel en en extrayant le sujet. Les 4 tests passent.
+  - `npx vite build` (frontend) : succès, aucune nouvelle erreur (bundle existant déjà >500KB,
+    avertissement préexistant non lié à ce lot).
+  - Route montée vérifiée en direct : `curl http://localhost:4000/api/certificates` sur le backend
+    de dev déjà démarré renvoie `401 Authentification requise` (pas de 404) — confirme que la route
+    est bien chargée par le processus backend actif.
+  - **Vérification visuelle Playwright non aboutie** : tentative de connexion sur l'instance de dev
+    déjà démarrée avec les identifiants de `backend/.env` (`admin@homelab.local`/`admin1234`) →
+    "Identifiants invalides", même incident déjà documenté dans une entrée précédente de ce fichier
+    (mot de passe admin réel de cet environnement distinct de `.env`, cause non identifiée). Contrairement
+    aux sessions précédentes, **aucune réinitialisation du mot de passe admin en base n'a été
+    tentée** cette fois (plusieurs autres tentatives de connexion échouées déjà visibles dans le
+    journal d'audit au moment du constat, laissant penser à une session de test concurrente sur la
+    même instance — modifier le mot de passe admin partagé semblait plus risqué que de documenter
+    honnêtement cette limite). L'écran Certificats n'a donc **pas** été vérifié visuellement dans un
+    vrai navigateur dans ce lot — seule sa construction (JSX valide, build Vite réussi, contrat
+    d'API aligné avec les routes réellement testées côté backend) a été vérifiée par lecture de code
+    et par les tests ci-dessus.
+
+  Fichiers modifiés/créés : `backend/src/services/integrations/httpClient.js`,
+  `backend/src/store/jsonStore.js`, `backend/src/store/settingsStore.js`,
+  `backend/src/services/tlsDiagnosticsService.js` (nouveau),
+  `backend/src/routes/certificates.routes.js` (nouveau), `backend/src/routes/index.js`,
+  `backend/test/tlsDiagnosticsService.test.js` (nouveau),
+  `frontend/src/pages/Settings/CertificatesPanel.jsx` (nouveau),
+  `frontend/src/pages/Settings/CertificatesPanel.css` (nouveau),
+  `frontend/src/pages/Settings/SettingsPage.jsx`.
+
+  **Limites honnêtes** : mTLS câblé côté backend mais non exposé en UI et non testé contre un vrai
+  serveur mTLS (point 5 ci-dessus) ; Kubernetes en diagnostic lecture seule uniquement, pas d'import
+  de CA (point 6) ; pas de vérification Playwright réelle dans un navigateur (identifiants admin de
+  l'environnement de dev partagé inconnus, non contournés volontairement cette fois) ; badge
+  d'expiration non répercuté sur le panneau de statut global existant, seulement sur l'écran
+  Certificats lui-même.

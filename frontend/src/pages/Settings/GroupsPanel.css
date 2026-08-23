@@ -75,3 +75,27 @@
   margin-bottom: 5px;
   color: var(--text-muted);
 }
+
+.groups-preset-desc {
+  font-size: 11px;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.groups-overrides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.groups-override-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.groups-override-label {
+  font-size: 12px;
+}

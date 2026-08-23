@@ -1,0 +1,68 @@
+.certs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.certs-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.certs-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.certs-status-crit {
+  color: var(--crit, #e5484d);
+}
+
+.certs-cert-info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+
+.certs-cert-info dt {
+  color: var(--muted, #888);
+}
+
+.certs-cert-info dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.certs-suggestion {
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--warn-bg, rgba(255, 180, 0, 0.1));
+  margin-bottom: 8px;
+}
+
+.certs-ca-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border, #333);
+  padding-top: 8px;
+}
+
+.certs-ca-form textarea {
+  font-family: monospace;
+  font-size: 0.8rem;
+  width: 100%;
+  resize: vertical;
+}
+
+.certs-ca-actions {
+  display: flex;
+  gap: 8px;
+}

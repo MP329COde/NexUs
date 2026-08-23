@@ -23,6 +23,8 @@ export default function IdentityPanel() {
         pwRequireDigit: Boolean(data.identity.pwRequireDigit),
         pwRequireSymbol: Boolean(data.identity.pwRequireSymbol),
         loginCidrAllowlistText: (data.identity.loginCidrAllowlist || []).join('\n'),
+        mfaRequiredRoles: Array.isArray(data.identity.mfaRequiredRoles) ? data.identity.mfaRequiredRoles : [],
+        inactivityTimeoutMinutes: data.identity.inactivityTimeoutMinutes ?? 0,
         oidcIssuer: data.identity.oidcIssuer || '',
         oidcClientId: data.identity.oidcClientId || '',
         oidcClientSecret: '',
@@ -107,7 +109,7 @@ export default function IdentityPanel() {
               </label>
             </div>
           </Field>
-          <Field label="Restriction réseau (CIDR)" hint="Une plage par ligne (ex. 10.0.0.0/24). Vide = aucune restriction. Votre propre adresse doit être incluse, sinon refusé à l'enregistrement.">
+          <Field label="Restriction réseau (CIDR)" hint="Une plage par ligne (ex. 10.0.0.0/24). Vide = aucune restriction. Vérifiée à la connexion ET sur chaque requête authentifiée suivante — pas seulement à l'écran de connexion. Votre propre adresse doit être incluse, sinon refusé à l'enregistrement.">
             <textarea
               className="input"
               rows={3}
@@ -115,6 +117,21 @@ export default function IdentityPanel() {
               value={form.loginCidrAllowlistText}
               onChange={(e) => set('loginCidrAllowlistText', e.target.value)}
             />
+          </Field>
+          <Field label="Déconnexion sur inactivité" hint="Minutes sans activité réelle avant révocation de la session côté serveur. 0 = désactivé. Le polling de fond (tableaux de bord, statuts) ne compte pas comme activité.">
+            <input className="input" type="number" min={0} max={1440} value={form.inactivityTimeoutMinutes} onChange={(e) => set('inactivityTimeoutMinutes', Number(e.target.value))} />
+          </Field>
+          <Field label="MFA obligatoire par rôle" hint="Un compte du rôle coché est bloqué sur toute route protégée (hors enrôlement/déconnexion) tant qu'il n'a pas configuré son MFA. Vous devez avoir activé le vôtre avant de cocher votre propre rôle, sinon refusé à l'enregistrement.">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={form.mfaRequiredRoles.includes('admin')} onChange={(e) => set('mfaRequiredRoles', e.target.checked ? [...form.mfaRequiredRoles, 'admin'] : form.mfaRequiredRoles.filter((r) => r !== 'admin'))} />
+                Administrateurs
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={form.mfaRequiredRoles.includes('user')} onChange={(e) => set('mfaRequiredRoles', e.target.checked ? [...form.mfaRequiredRoles, 'user'] : form.mfaRequiredRoles.filter((r) => r !== 'user'))} />
+                Utilisateurs standards
+              </label>
+            </div>
           </Field>
         </div>
       </Panel>

@@ -3,7 +3,8 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import {
-  listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry, generateProdSecret, nextRotationAt
+  listVaultEntries, createVaultEntry, updateVaultEntry, deleteVaultEntry, revealVaultEntry, findVaultEntry,
+  generateProdSecret, nextRotationAt, forceRotateSecret
 } from '../store/vaultStore.js';
 import { findUserByEmail } from '../store/usersStore.js';
 import { verifyPassword } from '../utils/crypto.js';
@@ -11,6 +12,16 @@ import { logAudit } from '../services/auditService.js';
 import { getProject } from '../store/projectsStore.js';
 import { resolveProjectRole } from '../middleware/projectAccess.js';
 import { projectRoleAtLeast, getProjectByLegacyId, getResourceGrant, resourceLevelAtLeast } from '../store/orgStore.js';
+import { getRedactedIntegration } from '../store/settingsStore.js';
+
+// Clés d'intégration considérées comme « infrastructure » pour la vue
+// agrégée en lecture seule /vault/infra (voir commentaire détaillé dans
+// vaultStore.js sur la décision de ne PAS dupliquer ces secrets dans le
+// coffre-fort). Sous-ensemble volontairement restreint aux intégrations qui
+// pilotent réellement de l'infrastructure — les forges (gitlab/github/gitea),
+// l'observabilité (grafana/wazuh/tracing) et les notifications restent hors
+// de ce périmètre, gérées comme avant depuis Paramètres → Intégrations.
+const INFRA_INTEGRATION_KEYS = ['proxmox', 'kubernetes', 'haproxy', 'traefik'];
 
 // Résout le rôle réel (viewer/developer/maintainer/owner, ou null) via la
 // même logique que /projects/:id/* (middleware/projectAccess.js) — aupara-
@@ -51,8 +62,36 @@ router.get('/dev', (req, res) => {
   res.json({ ok: true, items: listVaultEntries('dev') });
 });
 
-router.get('/prod', requirePermission('vault', 'admin'), (req, res) => {
+router.get('/prod', requirePermission('vault-prod', 'admin'), (req, res) => {
   res.json({ ok: true, items: listVaultEntries('prod') });
+});
+
+// Vault utilisateur (Lot B2) : scoping strict à req.user.id, aucune
+// permission supplémentaire requise — chacun gère ses propres secrets
+// personnels comme il gère déjà son token GitLab personnel (voir
+// store/personalGitTokensStore.js), sans dépendre d'un octroi de groupe.
+router.get('/user', (req, res) => {
+  res.json({ ok: true, items: listVaultEntries('user', null, req.user.id) });
+});
+
+router.post('/user', asyncHandler(async (req, res) => {
+  const { label, username, secret, notes, url } = req.body || {};
+  if (!label || !secret) return res.status(400).json({ ok: false, error: 'Nom et secret requis' });
+  const entry = createVaultEntry({ tier: 'user', label, username, secret, notes, url, userId: req.user.id, actor: req.user });
+  logAudit(req, 'vault.create', { id: entry.id, tier: 'user', label });
+  res.status(201).json({ ok: true, entry });
+}));
+
+// Vault infrastructure (Lot B2) : vue en LECTURE SEULE, jamais de secret en
+// clair ici (voir getRedactedIntegration) — modifier ces intégrations reste
+// réservé à Paramètres → Intégrations (settings.routes.js, settings:admin).
+// Gardé derrière un sous-domaine dédié ('vault-infra') plutôt que le domaine
+// 'settings' complet, pour permettre d'accorder la simple consultation sans
+// accorder le droit d'écrire sur toute la configuration d'intégrations.
+router.get('/infra', requirePermission('vault-infra', 'read'), (req, res) => {
+  const items = INFRA_INTEGRATION_KEYS.map((key) => ({ key, ...getRedactedIntegration(key) }));
+  logAudit(req, 'vault.infra.view', { keys: INFRA_INTEGRATION_KEYS });
+  res.json({ ok: true, items });
 });
 
 router.post('/dev', requirePermission('vault', 'write'), asyncHandler(async (req, res) => {
@@ -63,7 +102,7 @@ router.post('/dev', requirePermission('vault', 'write'), asyncHandler(async (req
   res.status(201).json({ ok: true, entry });
 }));
 
-router.post('/prod', requirePermission('vault', 'admin'), asyncHandler(async (req, res) => {
+router.post('/prod', requirePermission('vault-prod', 'admin'), asyncHandler(async (req, res) => {
   const { label, username, notes, url, rotationMinutes } = req.body || {};
   if (!label) return res.status(400).json({ ok: false, error: 'Nom requis' });
   const entry = createVaultEntry({ tier: 'prod', label, username, secret: generateProdSecret(), notes, url, rotationMinutes, actor: req.user });
@@ -74,11 +113,15 @@ router.post('/prod', requirePermission('vault', 'admin'), asyncHandler(async (re
 router.post('/:id/reveal', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
   // 404 générique (pas 403) pour ne pas confirmer l'existence d'une entrée
-  // hors de portée — même logique que projects.routes.js. Révéler un secret
-  // exige au moins developer (même seuil que la création — voir
-  // projects.routes.js POST /:id/vault), ou un octroi ponctuel "vault"
+  // hors de portée — même logique que projects.routes.js. Tier 'user' :
+  // strictement réservé au propriétaire, même un admin plateforme n'y a pas
+  // accès (même garantie que personalGitTokensStore.js). Autres tiers :
+  // révéler un secret exige au moins developer (même seuil que la création —
+  // voir projects.routes.js POST /:id/vault), ou un octroi ponctuel "vault"
   // (lecture) accordé au membre pour ce projet précis.
-  if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'read'))) {
+  if (entry?.tier === 'user') {
+    if (entry.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  } else if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'read'))) {
     return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
   }
 
@@ -119,13 +162,17 @@ router.post('/:id/reveal', asyncHandler(async (req, res) => {
 
 router.put('/:id', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
-  // Modifier les métadonnées exige un octroi "vault" au niveau écriture
-  // (pas seulement lecture) quand le rôle global ne suffit pas déjà.
-  if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'write'))) {
-    return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
-  }
-  if (entry.tier !== 'project' && req.user.role !== 'admin') {
-    return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+  if (entry?.tier === 'user') {
+    if (entry.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  } else {
+    // Modifier les métadonnées exige un octroi "vault" au niveau écriture
+    // (pas seulement lecture) quand le rôle global ne suffit pas déjà.
+    if (!entry || !(await projectEntryAccess(entry, req.user, 'developer', 'write'))) {
+      return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+    }
+    if (entry.tier !== 'project' && req.user.role !== 'admin') {
+      return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+    }
   }
   const { label, username, url, notes, rotationMinutes } = req.body || {};
   const updated = updateVaultEntry(entry.id, { label, username, url, notes, rotationMinutes });
@@ -133,14 +180,40 @@ router.put('/:id', asyncHandler(async (req, res) => {
   res.json({ ok: true, entry: updated });
 }));
 
-router.delete('/:id', asyncHandler(async (req, res) => {
+// Rotation manuelle immédiate (Lot B2) — complète la rotation automatique
+// planifiée (vaultRotationService.js) sans attendre l'échéance. Réservée aux
+// tiers dont le secret est généré par NexUs (voir ROTATABLE_TIERS dans
+// vaultStore.js) : mêmes seuils d'autorisation que la modification des
+// métadonnées de l'entrée (developer + octroi "vault" écriture, admin requis
+// hors tier 'project'). Tier 'user' exclu (secret fourni par l'utilisateur
+// depuis un service tiers, pas régénérable côté NexUs).
+router.post('/:id/rotate', asyncHandler(async (req, res) => {
   const entry = findVaultEntry(req.params.id);
-  // Suppression = action destructrice : seuil plus élevé que la simple
-  // modification de métadonnées (maintainer, pas developer).
-  const role = await projectEntryRole(entry, req.user);
-  if (!entry || !projectRoleAtLeast(role, 'maintainer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  if (!entry || entry.tier === 'user') return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  if (!(await projectEntryAccess(entry, req.user, 'developer', 'write'))) {
+    return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  }
   if (entry.tier !== 'project' && req.user.role !== 'admin') {
     return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+  }
+  const rotated = forceRotateSecret(entry.id);
+  if (!rotated) return res.status(400).json({ ok: false, error: 'Ce tier ne supporte pas la rotation' });
+  logAudit(req, 'vault.rotate.manual', { id: entry.id, tier: entry.tier, label: rotated.label, secretVersion: rotated.secretVersion });
+  res.json({ ok: true, entry: rotated });
+}));
+
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const entry = findVaultEntry(req.params.id);
+  if (entry?.tier === 'user') {
+    if (entry.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+  } else {
+    // Suppression = action destructrice : seuil plus élevé que la simple
+    // modification de métadonnées (maintainer, pas developer).
+    const role = await projectEntryRole(entry, req.user);
+    if (!entry || !projectRoleAtLeast(role, 'maintainer')) return res.status(404).json({ ok: false, error: 'Entrée introuvable' });
+    if (entry.tier !== 'project' && req.user.role !== 'admin') {
+      return res.status(403).json({ ok: false, error: 'Réservé aux administrateurs' });
+    }
   }
   deleteVaultEntry(req.params.id);
   logAudit(req, 'vault.delete', { id: req.params.id, tier: entry.tier, label: entry.label });

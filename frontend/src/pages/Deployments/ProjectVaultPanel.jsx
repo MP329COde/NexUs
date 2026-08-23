@@ -90,6 +90,20 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
     reload();
   }
 
+  // Rotation manuelle immédiate (Lot B2) — voir POST /vault/:id/rotate.
+  async function rotateNow(entry) {
+    if (!confirm(`Régénérer immédiatement le secret de « ${entry.label} » ?`)) return;
+    try {
+      await api.post(`/vault/${entry.id}/rotate`, {});
+      notify('Secret régénéré', { type: 'ok' });
+      setRevealed((r) => { const n = { ...r }; delete n[entry.id]; return n; });
+      delete sessionPasswordsRef.current[entry.id];
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    }
+  }
+
   async function doReveal(entry, password = stepUpPassword, silent) {
     try {
       const body = vaultPasswordSet ? { projectPassword: password } : { currentPassword: password };
@@ -189,6 +203,9 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
                 )}
                 {canManage && (
                   <>
+                    <span className="btn-outline vault-action-btn-icon" title="Rotation immédiate" onClick={() => rotateNow(entry)}>
+                      <Icon name="rotate" size={12} />
+                    </span>
                     <span className="btn-outline vault-action-btn-icon" onClick={() => setEditing({ id: entry.id, label: entry.label, username: entry.username || '', url: entry.url || '', notes: entry.notes || '' })}>
                       <Icon name="edit" size={12} />
                     </span>
@@ -291,10 +308,12 @@ export default function ProjectVaultPanel({ project, canManage, onProjectChanged
               <label className="vault-field-label">Rotation automatique</label>
               <select className="input" value={form.rotationMinutes} onChange={(e) => setForm((f) => ({ ...f, rotationMinutes: e.target.value }))}>
                 <option value="">Pas de rotation auto</option>
-                <option value="2">Toutes les 2 min</option>
-                <option value="3">Toutes les 3 min</option>
-                <option value="4">Toutes les 4 min</option>
-                <option value="5">Toutes les 5 min</option>
+                <option value="15">Toutes les 15 min</option>
+                <option value="60">Toutes les heures</option>
+                <option value="1440">Quotidienne</option>
+                <option value="10080">Hebdomadaire</option>
+                <option value="43200">Mensuelle</option>
+                <option value="129600">Trimestrielle</option>
               </select>
             </div>
             <div className="vault-modal-actions">
