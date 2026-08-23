@@ -6,6 +6,7 @@ import { getServiceHistory } from '../services/statusHistoryService.js';
 import { list as listProxies } from '../services/proxyService.js';
 import { getSamples, getWorkloadCounts } from '../services/infraLoadService.js';
 import * as kubernetesService from '../services/integrations/kubernetesService.js';
+import { getStartupStatus } from '../services/startupStatusService.js';
 
 const router = Router();
 
@@ -14,6 +15,29 @@ const router = Router();
 // d'aucune intégration externe. Doit rester avant router.use(requireAuth).
 router.get('/health', (req, res) => {
   res.json({ ok: true, status: 'healthy', uptimeSeconds: Math.round(process.uptime()) });
+});
+
+// Résumé de démarrage accessible SANS authentification (Lot D9) : c'est
+// précisément le scénario "pourquoi NexUs ne démarre pas correctement" que
+// l'écran de bootstrap doit couvrir — si l'admin ne peut pas encore se
+// connecter (démarrage en échec, DB injoignable...), il doit quand même
+// pouvoir voir CETTE vue avant de s'authentifier. Volontairement réduite par
+// rapport à GET /api/system/status/startup (réservée admin) : uniquement
+// nom d'étape + statut + durée, JAMAIS le message d'erreur détaillé (peut
+// contenir un hôte, un chemin ou un détail d'infra interne) — un admin qui a
+// besoin du détail complet doit se connecter ou consulter les logs serveur.
+router.get('/startup', (req, res) => {
+  const full = getStartupStatus();
+  res.json({
+    ok: true,
+    startup: {
+      ready: full.ready,
+      degraded: full.degraded,
+      failedAtStep: full.failedAtStep,
+      uptimeMs: full.uptimeMs,
+      steps: full.steps.map((s) => ({ name: s.name, status: s.status, durationMs: s.durationMs }))
+    }
+  });
 });
 
 router.use(requireAuth);

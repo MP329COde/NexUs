@@ -33,3 +33,5 @@ frontend/playwright-report/
 
 base-dev
 .playwright-mcp.playwright-cli/
+.playwright-cli
+.playwright-mcp

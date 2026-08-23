@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Panel from '../../components/ui/Panel.jsx';
 import DataTable from '../../components/ui/DataTable.jsx';
 import Icon from '../../components/ui/Icon.jsx';
@@ -139,6 +140,17 @@ export default function SystemPanel() {
 
   return (
     <div className="system-grid">
+      <Panel title="Démarrage & état du système" span={6}>
+        <div className="system-panel-body">
+          <p className="faint system-note">
+            Timeline détaillée du démarrage (étapes, durées mesurées) et état runtime continu (backend, frontend, workers planifiés) — utile pour diagnostiquer pourquoi NexUs ne démarre pas correctement.
+          </p>
+          <Link to="/system/startup" className="btn-outline system-check-btn">
+            <Icon name="timer" size={13} />Voir l'écran de démarrage
+          </Link>
+        </div>
+      </Panel>
+
       <Panel title="Version" span={6}>
         <div className="system-panel-body">
           <div className="system-version-row">

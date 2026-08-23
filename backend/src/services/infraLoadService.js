@@ -1,5 +1,8 @@
 import * as proxmox from './integrations/proxmoxService.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('infraLoadSampling', { description: "Échantillonnage de charge CPU/RAM Proxmox", intervalMs: 30_000 });
 
 const SAMPLE_INTERVAL_MS = 30_000;
 const MAX_SAMPLES = 720; // ~6h à 30s d'intervalle
@@ -36,7 +39,12 @@ export function getSamples() {
 }
 
 export function scheduleInfraLoadSampling() {
-  const run = () => { sample().catch((err) => logger.error({ err }, 'Échec du relevé de charge infra')); setTimeout(run, SAMPLE_INTERVAL_MS); };
+  const run = () => {
+    sample()
+      .then(() => recordWorkerRun('infraLoadSampling', { ok: true }))
+      .catch((err) => { logger.error({ err }, 'Échec du relevé de charge infra'); recordWorkerRun('infraLoadSampling', { ok: false, error: err }); });
+    setTimeout(run, SAMPLE_INTERVAL_MS);
+  };
   run();
 }
 

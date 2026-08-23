@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getVersion, checkForUpdates } from '../services/updateService.js';
-import { getStartupStatus } from '../services/startupStatusService.js';
+import { getStartupStatus, getWorkersStatus, getProcessRuntimeStatus } from '../services/startupStatusService.js';
+import { env } from '../config/env.js';
 import { integrations } from '../services/integrationRegistry.js';
 import { listBackups } from '../services/backupService.js';
 import { listRecentJobs } from '../services/jobService.js';
@@ -28,6 +29,42 @@ router.get('/updates/check', asyncHandler(async (req, res) => {
 router.get('/status/startup', (req, res) => {
   res.json({ ok: true, startup: getStartupStatus() });
 });
+
+// État runtime continu (Lot D9) : backend (uptime process), frontend
+// (accessibilité, testée par une requête sortante réelle vers
+// FRONTEND_ORIGIN — pas un simple "supposé joignable"), et workers/jobs
+// planifiés (registre alimenté par index.js#runStep + chaque service de
+// planification, voir startupStatusService.js#registerWorker).
+router.get('/status/runtime', asyncHandler(async (req, res) => {
+  const backend = getProcessRuntimeStatus();
+
+  let frontend = { checked: false, reachable: null, message: "Aucune origine frontend configurée (FRONTEND_ORIGIN)" };
+  if (env.frontendOrigin) {
+    const startedAt = Date.now();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(env.frontendOrigin, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+      frontend = { checked: true, reachable: resp.ok || resp.status < 500, status: resp.status, latencyMs: Date.now() - startedAt, origin: env.frontendOrigin };
+    } catch (err) {
+      // Limite documentée (todo.md) : en dev, le frontend Vite tourne
+      // souvent sur un process séparé de ce backend — une requête sortante
+      // depuis le backend vers FRONTEND_ORIGIN peut échouer pour des
+      // raisons de réseau/CORS qui ne signifient pas que le frontend est
+      // réellement injoignable pour un navigateur. On rapporte l'échec tel
+      // quel, sans le maquiller en "down" certain.
+      frontend = { checked: true, reachable: false, error: err.message, origin: env.frontendOrigin, latencyMs: Date.now() - startedAt };
+    }
+  }
+
+  res.json({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    backend,
+    frontend,
+    workers: getWorkersStatus()
+  });
+}));
 
 // Vue destinée à un responsable système : agrège en un seul appel ce qui
 // mérite son attention immédiate — intégrations en erreur, incidents

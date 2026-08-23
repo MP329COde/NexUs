@@ -26,11 +26,16 @@ import { trafficLogger } from './middleware/trafficLogger.js';
 import { csrfProtection } from './middleware/auth.js';
 import router from './routes/index.js';
 import { beginStep, markReady } from './services/startupStatusService.js';
+import { pool } from './db/pool.js';
+import { integrations } from './services/integrationRegistry.js';
+import { listTlsIntegrationKeys, diagnoseIntegration } from './services/tlsDiagnosticsService.js';
+import dns from 'node:dns/promises';
 
 // Chaque étape de démarrage est chronométrée et son issue mémorisée pour
 // GET /api/system/status/startup (voir startupStatusService.js) — c'est le
-// minimum viable demandé au Lot A7 pour rendre le démarrage observable
-// depuis l'UI, pas l'écran de bootstrap complet du Lot D9.
+// minimum viable demandé au Lot A7, complété au Lot D9 avec les étapes
+// listées ci-dessous (connexion DB, config, intégrations, certificats,
+// réseau) pour couvrir l'écran de bootstrap dédié.
 async function runStep(name, fn) {
   const step = beginStep(name);
   try {
@@ -41,6 +46,48 @@ async function runStep(name, fn) {
     throw err;
   }
 }
+
+// Étape non bloquante : un échec ici ne doit jamais empêcher le reste du
+// démarrage (contrairement à runStep ci-dessus) — utilisée pour des
+// vérifications de diagnostic (intégrations, certificats, réseau) dont le
+// résultat doit être visible sur l'écran de bootstrap sans jamais faire
+// planter le process pour autant.
+async function runOptionalStep(name, fn) {
+  const step = beginStep(name);
+  try {
+    const detail = await fn();
+    step.ok(detail);
+  } catch (err) {
+    step.degraded({ message: err?.message || String(err) });
+  }
+}
+
+// Chargement/validation de la configuration (env.js est déjà importé et
+// évalué avant ce point — cette étape ne fait donc que vérifier après coup
+// que les variables structurantes sont dans un état cohérent, honnêtement:
+// elle ne "recharge" rien, dotenv/config a déjà fait son travail à l'import).
+await runStep('configLoad', () => {
+  if (!env.jwtSecret) throw new Error('JWT_SECRET manquant');
+  if (env.jwtSecret === 'dev-only-insecure-secret-change-me') {
+    // Ne bloque pas le démarrage (comportement historique de dev conservé),
+    // mais reste tracé dans les logs — pas un throw pour ne pas casser cet
+    // environnement de développement partagé.
+    logger.warn('JWT_SECRET utilise la valeur de développement par défaut — à changer en production.');
+  }
+});
+
+// Connexion DB : rendue explicite (elle était jusqu'ici implicite dans la
+// première requête de runMigrations). Absence de DATABASE_URL = mode
+// dégradé documenté (socle organisations/projets désactivé), pas un échec.
+await runStep('dbConnection', async () => {
+  if (!pool) return; // ok() avec detail resterait plus honnête mais l'API reste simple ici
+  const client = await pool.connect();
+  try {
+    await client.query('SELECT 1');
+  } finally {
+    client.release();
+  }
+});
 
 await runStep('migrations', runMigrations);
 await runStep('recoverInterruptedJobs', recoverInterruptedJobs);
@@ -56,6 +103,61 @@ await runStep('schedulers', () => {
   scheduleClusterHealthChecks();
   scheduleHourlyPreviewCleanup();
   scheduleWazuhAlertChecks();
+});
+
+// Initialisation plugins (Lot D8) : PAS instrumentée ici volontairement.
+// backend/src/services/plugins/pluginRegistry.js n'a aucune fonction de
+// bootstrap appelée au démarrage du process (pas d'"init" chargeant les
+// plugins actifs en mémoire) — chaque route (routes/plugins.routes.js)
+// interroge la table `plugins` en base à la demande via listPlugins()/
+// getPlugin(). Il n'y a donc rien de réel à chronométrer ici : ajouter une
+// étape "pluginsInit" qui ne ferait qu'un listPlugins() de complaisance
+// inventerait une étape de démarrage qui n'existe pas dans le code du Lot
+// D8. Si le Lot D8 gagne un jour un vrai chargement en mémoire au boot
+// (ex: instancier des workers par plugin actif), une étape runStep()
+// dédiée devra être ajoutée ici à ce moment-là.
+
+// Vérification intégrations : statut de chaque intégration configurée
+// (integrationRegistry.js), sans bloquer le démarrage — une intégration en
+// panne au boot ne doit jamais empêcher NexUs de démarrer.
+await runOptionalStep('integrationsCheck', async () => {
+  const entries = await Promise.all(Object.entries(integrations).map(async ([key, def]) => {
+    try {
+      const status = await def.service.getStatus();
+      return { key, label: def.label, ...status };
+    } catch (err) {
+      return { key, label: def.label, configured: true, ok: false, message: err.message };
+    }
+  }));
+  const configured = entries.filter((e) => e.configured);
+  const failing = configured.filter((e) => !e.ok);
+  if (failing.length > 0) throw new Error(`${failing.length}/${configured.length} intégration(s) configurée(s) en échec: ${failing.map((f) => f.key).join(', ')}`);
+  return { configuredCount: configured.length, entries: entries.map((e) => ({ key: e.key, configured: e.configured, ok: e.ok })) };
+});
+
+// Vérification certificats : réutilise le diagnostic TLS du Lot B4
+// (tlsDiagnosticsService.js) plutôt que d'en dupliquer la logique.
+await runOptionalStep('certificatesCheck', async () => {
+  const results = await Promise.all(listTlsIntegrationKeys().map(async (key) => {
+    try {
+      const diag = await diagnoseIntegration(key);
+      return { key, configured: diag.configured, ok: diag.configured ? diag.ok !== false : true };
+    } catch (err) {
+      return { key, configured: false, ok: true, error: err.message };
+    }
+  }));
+  const failing = results.filter((r) => r.configured && !r.ok);
+  if (failing.length > 0) throw new Error(`Certificat(s) TLS en échec: ${failing.map((f) => f.key).join(', ')}`);
+  return { checked: results.length, entries: results };
+});
+
+// Vérification réseau : connectivité de base sortante (résolution DNS
+// publique) — ne peut pas vérifier "tout le réseau", seulement un signal
+// simple que le process a une résolution DNS/sortie réseau fonctionnelle.
+await runOptionalStep('networkCheck', async () => {
+  const start = Date.now();
+  await dns.lookup('github.com');
+  return { dnsLookupMs: Date.now() - start };
 });
 
 const app = express();

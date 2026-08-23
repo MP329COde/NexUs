@@ -1,6 +1,9 @@
 import { readStore, writeStore } from '../store/jsonStore.js';
 import { list as listProxies, testConnection } from './proxyService.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('hourlyStatusSnapshot', { description: 'Relevé de disponibilité 24h des services critiques', intervalMs: 60 * 60 * 1000 });
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
 const SNAPSHOT_INTERVAL_MS = 60 * 60 * 1000; // 1 heure
@@ -36,7 +39,9 @@ export function getServiceHistory() {
 // scheduleDailyBackups() dans backupService.js).
 export function scheduleHourlyStatusSnapshot() {
   const run = () => {
-    recordServiceSnapshot().catch((err) => logger.error({ err }, 'Échec du relevé de disponibilité par service'));
+    recordServiceSnapshot()
+      .then(() => recordWorkerRun('hourlyStatusSnapshot', { ok: true }))
+      .catch((err) => { logger.error({ err }, 'Échec du relevé de disponibilité par service'); recordWorkerRun('hourlyStatusSnapshot', { ok: false, error: err }); });
     setTimeout(run, SNAPSHOT_INTERVAL_MS);
   };
   run();

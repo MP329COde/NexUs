@@ -1,6 +1,9 @@
 import * as k8s from './integrations/kubernetesService.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('clusterHealthChecks', { description: 'Vérification santé Kubernetes (CrashLoopBackOff, Pending prolongé)', intervalMs: 60_000 });
 
 const CHECK_INTERVAL_MS = 60_000;
 const RESTART_THRESHOLD = 5;
@@ -67,7 +70,9 @@ export async function checkClusterHealth() {
 
 export function scheduleClusterHealthChecks() {
   const run = () => {
-    checkClusterHealth().catch((err) => logger.error({ err }, 'Échec de la vérification santé Kubernetes'));
+    checkClusterHealth()
+      .then(() => recordWorkerRun('clusterHealthChecks', { ok: true }))
+      .catch((err) => { logger.error({ err }, 'Échec de la vérification santé Kubernetes'); recordWorkerRun('clusterHealthChecks', { ok: false, error: err }); });
     setTimeout(run, CHECK_INTERVAL_MS);
   };
   run();

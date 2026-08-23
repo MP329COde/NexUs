@@ -59,6 +59,7 @@ import AccountPage from './pages/Account/AccountPage.jsx';
 import ManualPage from './pages/Manual/ManualPage.jsx';
 import ReportPage from './pages/Report/ReportPage.jsx';
 import StoragePage from './pages/Storage/StoragePage.jsx';
+import StartupStatusPage from './pages/System/StartupStatusPage.jsx';
 
 // createBrowserRouter (plutôt que <Routes>) est nécessaire ici car Shell utilise
 // useMatches() pour dériver le titre affiché dans le header depuis `handle`.
@@ -178,6 +179,7 @@ export const router = createBrowserRouter([
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
           { path: 'report', element: <ReportPage />, handle: { title: 'Rapport de santé' } },
+          { path: 'system/startup', element: <RequirePermission domain="settings" level="admin"><StartupStatusPage /></RequirePermission>, handle: { title: 'Démarrage & système' } },
           // Garde globale retirée : chaque onglet a désormais sa propre
           // permission RBAC (voir RequirePermission dans SettingsPage.jsx),
           // un compte "user" peut donc accéder à la page si au moins un

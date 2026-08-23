@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DB_FILE } from '../store/jsonStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('dailyBackups', { description: 'Sauvegarde quotidienne (nexus.db)', intervalHint: 'chaque nuit à 3h locale' });
 import { dataDir } from '../config/paths.js';
 import { dumpRelationalCore, restoreRelationalCore, relationalCoreConfigured } from './pgDumpService.js';
 
@@ -142,7 +145,7 @@ export function scheduleDailyBackups() {
     return next.getTime() - now.getTime();
   };
   const run = async () => {
-    try { await createBackup(); } catch (err) { logger.error({ err }, 'Échec de la sauvegarde planifiée'); }
+    try { await createBackup(); recordWorkerRun('dailyBackups', { ok: true }); } catch (err) { logger.error({ err }, 'Échec de la sauvegarde planifiée'); recordWorkerRun('dailyBackups', { ok: false, error: err }); }
     setTimeout(run, 24 * 60 * 60 * 1000);
   };
   setTimeout(run, msUntilNext3am());

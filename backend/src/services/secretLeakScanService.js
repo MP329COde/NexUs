@@ -5,6 +5,9 @@ import { findSecretMatchInText, forceRotateSecret } from '../store/vaultStore.js
 import { recordLeak } from '../store/secretLeaksStore.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('dailySecretLeakScan', { description: 'Scan quotidien de fuite de secrets dans les dépôts', intervalHint: 'chaque nuit à 4h locale' });
 
 // Scan quotidien des dépôts liés à un projet, à la recherche d'un mot de
 // passe prod/projet connu du coffre-fort committé en clair. Bornes
@@ -97,7 +100,7 @@ export function scheduleDailySecretLeakScan() {
     return next.getTime() - now.getTime();
   };
   const run = async () => {
-    try { await runSecretLeakScan(); } catch (err) { logger.error({ err }, 'Échec du scan planifié de fuite de secrets'); }
+    try { await runSecretLeakScan(); recordWorkerRun('dailySecretLeakScan', { ok: true }); } catch (err) { logger.error({ err }, 'Échec du scan planifié de fuite de secrets'); recordWorkerRun('dailySecretLeakScan', { ok: false, error: err }); }
     setTimeout(run, 24 * 60 * 60 * 1000);
   };
   setTimeout(run, msUntilNext4am());

@@ -518,6 +518,19 @@
   white-space: nowrap;
 }
 
+.pd-repo-ci-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.pd-repo-stack-badge {
+  font-weight: 500;
+}
+
 .pd-repo-mr-row {
   display: flex;
   align-items: center;
@@ -547,6 +560,11 @@
   color: var(--text-faint);
   text-align: center;
   padding: 10px;
+}
+
+.pd-picker-search {
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .pd-picker-list {

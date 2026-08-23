@@ -2,6 +2,9 @@ import net from 'node:net';
 import { Client } from 'ssh2';
 import { getConsoleKeypair } from '../utils/sshKeypair.js';
 import * as store from '../store/hostsStore.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('criticalHostsRefresh', { description: 'Rafraîchissement des métriques des hôtes critiques', intervalMs: 30_000 });
 
 const REFRESH_MS = 30_000;
 const TCP_TIMEOUT_MS = 2_500;
@@ -110,6 +113,11 @@ export async function getCriticalHostsSnapshot() {
 // connexion SSH vers chaque hôte critique à chaque chargement de la page
 // d'accueil : suit le même principe que scheduleHourlyStatusSnapshot.
 export function scheduleCriticalHostsRefresh() {
-  const run = () => { refresh().catch(() => {}); setTimeout(run, REFRESH_MS); };
+  const run = () => {
+    refresh()
+      .then(() => recordWorkerRun('criticalHostsRefresh', { ok: true }))
+      .catch((err) => recordWorkerRun('criticalHostsRefresh', { ok: false, error: err }));
+    setTimeout(run, REFRESH_MS);
+  };
   run();
 }

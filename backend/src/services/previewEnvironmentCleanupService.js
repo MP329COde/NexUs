@@ -3,6 +3,9 @@ import * as orgStore from '../store/orgStore.js';
 import * as kubernetes from './integrations/kubernetesService.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('hourlyPreviewCleanup', { description: 'Nettoyage des environnements de preview expirés', intervalMs: 60 * 60 * 1000 });
 
 // Nettoyage automatique des environnements de preview expirés (ÉTAPE 11,
 // suite) : `expires_at` était affiché (EnvironmentsPage.jsx, MyWorkPage.jsx)
@@ -45,7 +48,7 @@ const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
 export function scheduleHourlyPreviewCleanup() {
   const run = async () => {
-    try { await runPreviewCleanup(); } catch (err) { logger.error({ err }, 'Échec du cycle de nettoyage des previews'); }
+    try { await runPreviewCleanup(); recordWorkerRun('hourlyPreviewCleanup', { ok: true }); } catch (err) { logger.error({ err }, 'Échec du cycle de nettoyage des previews'); recordWorkerRun('hourlyPreviewCleanup', { ok: false, error: err }); }
     setTimeout(run, CLEANUP_INTERVAL_MS);
   };
   setTimeout(run, CLEANUP_INTERVAL_MS);

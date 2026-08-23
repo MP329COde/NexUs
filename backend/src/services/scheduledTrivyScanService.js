@@ -2,6 +2,9 @@ import { scanImage } from './trivyService.js';
 import { listScans, recordScan } from '../store/imageScansStore.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('hourlyTrivyScan', { description: 'Re-scan Trivy horaire des images déjà scannées', intervalMs: 60 * 60 * 1000 });
 
 // Re-scanne périodiquement chaque image déjà scannée manuellement au moins
 // une fois (voir routes/imageScans.routes.js) plutôt qu'un ensemble d'images
@@ -48,7 +51,7 @@ export async function runScheduledTrivyScan() {
 
 export function scheduleHourlyTrivyScan() {
   const run = async () => {
-    try { await runScheduledTrivyScan(); } catch (err) { logger.error({ err }, 'Échec du cycle de scan Trivy planifié'); }
+    try { await runScheduledTrivyScan(); recordWorkerRun('hourlyTrivyScan', { ok: true }); } catch (err) { logger.error({ err }, 'Échec du cycle de scan Trivy planifié'); recordWorkerRun('hourlyTrivyScan', { ok: false, error: err }); }
     setTimeout(run, SCAN_INTERVAL_MS);
   };
   setTimeout(run, SCAN_INTERVAL_MS);

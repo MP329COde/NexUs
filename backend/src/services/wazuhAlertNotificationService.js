@@ -1,6 +1,9 @@
 import * as wazuh from './integrations/wazuhService.js';
 import { createNotification } from '../store/notificationsStore.js';
 import { logger } from '../utils/logger.js';
+import { registerWorker, recordWorkerRun } from './startupStatusService.js';
+
+registerWorker('wazuhAlertChecks', { description: 'Notification des alertes Wazuh critiques', intervalMs: 60_000 });
 
 const CHECK_INTERVAL_MS = 60_000;
 const MAX_NOTIFIED_KEYS = 2000;
@@ -39,7 +42,9 @@ export async function checkCriticalAlerts() {
 
 export function scheduleWazuhAlertChecks() {
   const run = () => {
-    checkCriticalAlerts().catch((err) => logger.error({ err }, 'Échec de la vérification des alertes Wazuh'));
+    checkCriticalAlerts()
+      .then(() => recordWorkerRun('wazuhAlertChecks', { ok: true }))
+      .catch((err) => { logger.error({ err }, 'Échec de la vérification des alertes Wazuh'); recordWorkerRun('wazuhAlertChecks', { ok: false, error: err }); });
     setTimeout(run, CHECK_INTERVAL_MS);
   };
   run();

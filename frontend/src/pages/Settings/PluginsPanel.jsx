@@ -9,6 +9,10 @@ import './PluginsPanel.css';
 
 const STATUS_LABELS = { installed: 'Installé', active: 'Actif', disabled: 'Désactivé' };
 const STATUS_TONE = { installed: 'mut', active: 'ok', disabled: 'warn' };
+const PERM_STATUS_LABELS = { pending: 'En attente', granted: 'Accordée', denied: 'Refusée' };
+const PERM_STATUS_TONE = { pending: 'warn', granted: 'ok', denied: 'crit' };
+const HEALTH_LABELS = { healthy: 'Sain', degraded: 'Dégradé', unhealthy: 'Défaillant' };
+const HEALTH_TONE = { healthy: 'ok', degraded: 'warn', unhealthy: 'crit' };
 
 const MANIFEST_PLACEHOLDER = `{
   "id": "mon-plugin",
@@ -28,7 +32,13 @@ export default function PluginsPanel() {
   const { data, error, reload } = useApi(() => api.get('/plugins'), []);
   const notify = useNotify();
   const [installing, setInstalling] = useState(false);
+  const [installMode, setInstallMode] = useState('manifest'); // 'manifest' | 'local' | 'git'
   const [manifestText, setManifestText] = useState('');
+  const [localPath, setLocalPath] = useState('');
+  const [gitRepoUrl, setGitRepoUrl] = useState('');
+  const [gitRef, setGitRef] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [templateName, setTemplateName] = useState('');
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -37,25 +47,42 @@ export default function PluginsPanel() {
 
   async function install(e) {
     e.preventDefault();
-    let manifest;
-    try {
-      manifest = JSON.parse(manifestText);
-    } catch {
-      notify('Manifest JSON invalide', { type: 'crit' });
-      return;
-    }
     setBusy(true);
     try {
-      await api.post('/plugins/install', { manifest });
-      notify('Plugin installé', { type: 'ok' });
+      if (installMode === 'manifest') {
+        let manifest;
+        try {
+          manifest = JSON.parse(manifestText);
+        } catch {
+          notify('Manifest JSON invalide', { type: 'crit' });
+          setBusy(false);
+          return;
+        }
+        await api.post('/plugins/install', { manifest });
+      } else if (installMode === 'local') {
+        await api.post('/plugins/install-local', { path: localPath });
+      } else {
+        await api.post('/plugins/install-git', { repoUrl: gitRepoUrl, ref: gitRef || undefined });
+      }
+      notify('Plugin installé (permissions en attente d\'approbation)', { type: 'ok' });
       setInstalling(false);
       setManifestText('');
+      setLocalPath('');
+      setGitRepoUrl('');
+      setGitRef('');
       reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
     } finally {
       setBusy(false);
     }
+  }
+
+  function downloadTemplate() {
+    const params = new URLSearchParams();
+    if (templateId) params.set('id', templateId);
+    if (templateName) params.set('name', templateName);
+    window.open(`/api/plugins/template${params.toString() ? `?${params}` : ''}`, '_blank');
   }
 
   async function toggleActive(plugin) {
@@ -123,14 +150,46 @@ export default function PluginsPanel() {
       {installing && (
         <Modal title="Installer un plugin" onClose={() => setInstalling(false)}>
           <form onSubmit={install} className="plugins-install-form">
-            <p className="faint">Collez le manifest JSON du plugin (voir le format dans la documentation développeur — id, name, version, apiVersion, permissions, contributes).</p>
-            <textarea
-              className="input"
-              rows={12}
-              placeholder={MANIFEST_PLACEHOLDER}
-              value={manifestText}
-              onChange={(e) => setManifestText(e.target.value)}
-            />
+            <div className="plugins-template-row">
+              <span className="faint">Nouveau plugin ? Téléchargez le template officiel (manifest valide, tests, CI, README) : </span>
+              <input className="input" placeholder="id (ex: mon-plugin)" value={templateId} onChange={(e) => setTemplateId(e.target.value)} />
+              <input className="input" placeholder="nom affiché" value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
+              <span className="btn-outline" onClick={downloadTemplate}>Télécharger le template</span>
+            </div>
+
+            <div className="plugins-install-tabs">
+              <span className={`btn-outline${installMode === 'manifest' ? ' plugins-tab-active' : ''}`} onClick={() => setInstallMode('manifest')}>Manifest collé</span>
+              <span className={`btn-outline${installMode === 'local' ? ' plugins-tab-active' : ''}`} onClick={() => setInstallMode('local')}>Dossier local (dev)</span>
+              <span className={`btn-outline${installMode === 'git' ? ' plugins-tab-active' : ''}`} onClick={() => setInstallMode('git')}>Dépôt Git distant</span>
+            </div>
+
+            {installMode === 'manifest' && (
+              <>
+                <p className="faint">Collez le manifest JSON du plugin (voir le format dans la documentation développeur — id, name, version, apiVersion, permissions, contributes).</p>
+                <textarea
+                  className="input"
+                  rows={12}
+                  placeholder={MANIFEST_PLACEHOLDER}
+                  value={manifestText}
+                  onChange={(e) => setManifestText(e.target.value)}
+                />
+              </>
+            )}
+            {installMode === 'local' && (
+              <>
+                <p className="faint">Chemin absolu, sur le serveur backend, d'un dossier contenant un fichier <code>manifest.json</code> (mode développeur).</p>
+                <input className="input" placeholder="/chemin/absolu/vers/mon-plugin" value={localPath} onChange={(e) => setLocalPath(e.target.value)} />
+              </>
+            )}
+            {installMode === 'git' && (
+              <>
+                <p className="faint">URL d'un dépôt Git public (GitHub/GitLab/Gitea) contenant <code>manifest.json</code> à la racine.</p>
+                <input className="input" placeholder="https://github.com/compte/mon-plugin" value={gitRepoUrl} onChange={(e) => setGitRepoUrl(e.target.value)} />
+                <input className="input" placeholder="branche/ref (défaut : main)" value={gitRef} onChange={(e) => setGitRef(e.target.value)} />
+              </>
+            )}
+
+            <p className="faint">Après installation, toutes les permissions déclarées restent en attente jusqu'à approbation admin dans la fiche du plugin — le plugin ne pourra pas être activé tant qu'elles ne sont pas toutes accordées.</p>
             <div className="plugins-install-actions">
               <button className="btn" type="submit" disabled={busy}>Installer</button>
               <span className="btn-outline" onClick={() => setInstalling(false)}>Annuler</span>
@@ -151,17 +210,66 @@ export default function PluginsPanel() {
 function PluginDetail({ plugin }) {
   const permissions = useApi(() => api.get(`/plugins/${plugin.id}/permissions`), [plugin.id]);
   const events = useApi(() => api.get(`/plugins/${plugin.id}/events`), [plugin.id]);
+  const health = useApi(() => api.get(`/plugins/${plugin.id}/health`), [plugin.id]);
+  const notify = useNotify();
+  const [decidingKey, setDecidingKey] = useState(null);
+
+  const items = permissions.data?.items || [];
+  const blockedCount = items.filter((p) => p.status !== 'granted').length;
+
+  async function decide(permissionKey, decision) {
+    setDecidingKey(permissionKey);
+    try {
+      await api.post(`/plugins/${plugin.id}/permissions/${encodeURIComponent(permissionKey)}/${decision}`);
+      notify(decision === 'grant' ? 'Permission accordée' : 'Permission refusée', { type: 'ok' });
+      permissions.reload();
+      health.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setDecidingKey(null);
+    }
+  }
+
   return (
     <div className="plugins-detail">
       <div><strong>Version :</strong> {plugin.version} (API {plugin.apiVersion})</div>
       <div><strong>Statut :</strong> {STATUS_LABELS[plugin.status]}</div>
+      <div><strong>Origine :</strong> {plugin.source === 'local-dev' ? `Dossier local (${plugin.sourceRef})` : plugin.source === 'git' ? `Dépôt Git (${plugin.sourceRef})` : 'Manifest collé'}</div>
+      <div>
+        <strong>Santé :</strong>{' '}
+        {health.data ? (
+          <span className={`badge badge-${HEALTH_TONE[health.data.status]}`}><span className="dot" />{HEALTH_LABELS[health.data.status]}</span>
+        ) : <span className="faint">chargement…</span>}
+        {health.data && (
+          <ul className="plugins-events-list">
+            {health.data.checks.map((c) => (
+              <li key={c.name} className={c.ok ? '' : 'plugins-health-fail'}>{c.ok ? '✓' : '✗'} {c.detail}</li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div>
         <strong>Permissions :</strong>
-        {(permissions.data?.items || []).length === 0 ? (
+        {blockedCount > 0 && plugin.status !== 'active' && (
+          <div className="plugins-permissions-warning">Ce plugin ne peut pas être activé : {blockedCount} permission(s) non accordée(s).</div>
+        )}
+        {items.length === 0 ? (
           <span className="faint"> aucune</span>
         ) : (
           <div className="plugins-permissions-list">
-            {permissions.data.items.map((p) => <span key={p} className="badge badge-mut">{p}</span>)}
+            {items.map((p) => (
+              <div key={p.key} className="plugins-permission-row">
+                <span className="badge badge-mut">{p.key}</span>
+                <span className={`badge badge-${PERM_STATUS_TONE[p.status]}`}><span className="dot" />{PERM_STATUS_LABELS[p.status]}</span>
+                {p.status !== 'granted' && (
+                  <span className="btn-outline plugins-action-btn" aria-busy={decidingKey === p.key} onClick={() => decide(p.key, 'grant')}>Accorder</span>
+                )}
+                {p.status !== 'denied' && (
+                  <span className="btn-outline plugins-action-btn plugins-danger" aria-busy={decidingKey === p.key} onClick={() => decide(p.key, 'deny')}>Refuser</span>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

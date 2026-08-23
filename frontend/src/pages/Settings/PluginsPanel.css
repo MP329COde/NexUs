@@ -62,3 +62,45 @@
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+.plugins-health-fail {
+  color: var(--danger, #e5484d);
+}
+
+.plugins-template-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.plugins-template-row .input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.plugins-install-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.plugins-tab-active {
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+}
+
+.plugins-permission-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.plugins-permissions-warning {
+  margin-top: 6px;
+  color: var(--danger, #e5484d);
+  font-size: 0.9em;
+}

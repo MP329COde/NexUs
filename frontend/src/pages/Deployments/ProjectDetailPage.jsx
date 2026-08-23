@@ -112,11 +112,14 @@ export default function ProjectDetailPage() {
       notify(err.message, { type: 'crit' });
     }
   }
-  async function toggleRepo(key) {
-    const repoKeys = p.repoKeys.includes(key) ? p.repoKeys.filter((k) => k !== key) : [...p.repoKeys, key];
+  async function saveRepoKeys(repoKeys) {
     try {
       await api.put(`/projects/${id}`, { repoKeys });
-      notify('Dépôts rattachés mis à jour', { type: 'ok' });
+      const delta = repoKeys.length - p.repoKeys.length;
+      notify(
+        delta > 0 ? `${delta} dépôt${delta > 1 ? 's' : ''} rattaché${delta > 1 ? 's' : ''}` : 'Dépôts rattachés mis à jour',
+        { type: 'ok' }
+      );
       project.reload();
     } catch (err) {
       notify(err.message, { type: 'crit' });
@@ -251,7 +254,7 @@ export default function ProjectDetailPage() {
 
       {tab === 'code' && (<>
       <div className="pd-grid-row">
-        <Panel title="Dépôts rattachés" span={6} actions={user?.role === 'admin' && <RepoPicker allRepos={repos.data?.items || []} linkedKeys={p.repoKeys} onToggle={toggleRepo} />}>
+        <Panel title="Dépôts rattachés" span={6} actions={user?.role === 'admin' && <RepoPicker allRepos={repos.data?.items || []} linkedKeys={p.repoKeys} onSave={saveRepoKeys} />}>
           {linkedRepos.length === 0 ? (
             <div className="pd-empty">Aucun dépôt rattaché</div>
           ) : (
@@ -1544,9 +1547,81 @@ const PIPELINE_LABEL = { success: 'Succès', failed: 'Échec', running: 'En cour
 // (forge non configurée, token invalide, dépôt supprimé) affiche son
 // message d'erreur exact plutôt que d'être masqué ou de faire planter tout
 // le panneau — jamais de donnée inventée à sa place.
+// Lot D11 : la stack de chaque dépôt rattaché n'est connue qu'après lecture
+// de son arborescence réelle (GET /repos/:key/structure, service partagé
+// avec GitReposPage.jsx et le Lot D6) — jamais devinée depuis le nom du
+// dépôt. Chargée une fois par dépôt (pas de polling), séparément de
+// `workspace` qui n'expose ni la stack ni l'état CI.
+function useRepoStacks(repos) {
+  const [stacks, setStacks] = useState({});
+  const reposKey = repos.map((r) => `${r.key}:${r.defaultBranch}`).join(',');
+  useEffect(() => {
+    let cancelled = false;
+    for (const r of repos) {
+      if (r.error || !r.key) continue;
+      setStacks((prev) => (prev[r.key] ? prev : { ...prev, [r.key]: { loading: true } }));
+      api.get(`/repos/${encodeURIComponent(r.key)}/structure${r.defaultBranch ? `?ref=${encodeURIComponent(r.defaultBranch)}` : ''}`)
+        .then((res) => { if (!cancelled) setStacks((prev) => ({ ...prev, [r.key]: { loading: false, structure: res.structure } })); })
+        .catch((err) => { if (!cancelled) setStacks((prev) => ({ ...prev, [r.key]: { loading: false, error: err.message } })); });
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reposKey]);
+  return stacks;
+}
+
 function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
   const notify = useNotify();
   const [busyKey, setBusyKey] = useState(null);
+  const stacks = useRepoStacks(repos);
+  const [ciResults, setCiResults] = useState({});
+  const [groupBusy, setGroupBusy] = useState(false);
+
+  // Génération CI/CD (Lot D6, POST /repos/:key/workflows/generate-ci) : ne
+  // concerne que GitHub côté backend (GitLab garde son .gitlab-ci.yml natif
+  // équivalent — voir commentaire de la route). Un dépôt éligible doit donc
+  // être GitHub ET avoir une stack détectée non vide (sinon le workflow
+  // généré ne contiendrait qu'un job générique sans intérêt à proposer en
+  // un clic).
+  function isCiEligible(r) {
+    const s = stacks[r.key];
+    return r.provider === 'github' && s?.structure?.stack?.length > 0;
+  }
+
+  async function generateCi(r) {
+    setBusyKey(`ci:${r.key}`);
+    setCiResults((prev) => ({ ...prev, [r.key]: null }));
+    try {
+      const res = await api.post(`/repos/${encodeURIComponent(r.key)}/workflows/generate-ci`, { baseBranch: r.defaultBranch });
+      setCiResults((prev) => ({ ...prev, [r.key]: { ok: true, pr: res.pullRequest } }));
+      notify(`Pull request de workflow CI créée pour ${r.name}`, { type: 'ok' });
+    } catch (err) {
+      setCiResults((prev) => ({ ...prev, [r.key]: { ok: false, message: err.message } }));
+      notify(`Échec de génération CI pour ${r.name} : ${err.message}`, { type: 'crit' });
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  // "Tout brancher d'un coup" : applique generateCi() séquentiellement à
+  // chaque dépôt éligible, chacun gardant sa PROPRE stack détectée (pas de
+  // stack unique appliquée à tous) — la boucle appelle simplement generateCi
+  // par dépôt, chaque appel relit sa propre structure côté backend.
+  // Séquentiel plutôt que Promise.all : évite de saturer l'API du forge en
+  // cas de nombreux dépôts, et laisse chaque résultat s'afficher au fur et à
+  // mesure plutôt que tout d'un coup à la fin.
+  async function generateAllCi() {
+    const eligible = repos.filter((r) => !r.error && isCiEligible(r));
+    if (eligible.length === 0) return;
+    setGroupBusy(true);
+    for (const r of eligible) {
+      // eslint-disable-next-line no-await-in-loop
+      await generateCi(r);
+    }
+    setGroupBusy(false);
+  }
+
+  const eligibleCount = repos.filter((r) => !r.error && isCiEligible(r)).length;
 
   // Les deux actions ci-dessous appellent les routes scopées au projet
   // (POST /projects/:id/workspace/pipelines/:runKey/retry et
@@ -1580,7 +1655,16 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
   }
 
   return (
-    <Panel title="Activité des dépôts" sub="Commits, branches, revues et pipelines — par dépôt rattaché" span={12}>
+    <Panel
+      title="Activité des dépôts"
+      sub="Commits, branches, revues et pipelines — par dépôt rattaché"
+      span={12}
+      actions={eligibleCount > 1 && (
+        <button className="btn-outline pd-action-btn" disabled={groupBusy} onClick={generateAllCi} title="Génère un pipeline CI/CD pour chaque dépôt GitHub rattaché, avec sa propre stack détectée">
+          {groupBusy ? 'Génération en cours…' : `Générer les pipelines pour tous les dépôts (${eligibleCount})`}
+        </button>
+      )}
+    >
       {loading ? (
         <div className="pd-empty">Chargement…</div>
       ) : repos.length === 0 ? (
@@ -1625,6 +1709,7 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
                       <span className="faint">{r.commits[0].author}</span>
                     </div>
                   )}
+                  <RepoCiRow repo={r} stackState={stacks[r.key]} busy={busyKey === `ci:${r.key}`} result={ciResults[r.key]} onGenerate={() => generateCi(r)} />
                   {r.mergeRequests?.map((mr) => {
                     const reviewKey = `${r.provider}:${r.id}:${mr.id}`;
                     return (
@@ -1648,27 +1733,122 @@ function RepoActivityPanel({ repos, loading, projectId, onChanged }) {
   );
 }
 
+// Ligne CI/CD par dépôt (Lot D11) : affiche la stack réellement détectée
+// (jamais une hypothèse) et, quand c'est applicable, le bouton de
+// génération partagé avec GitReposPage.jsx (même route backend). Pour
+// GitLab, la route de génération ne s'applique pas (.gitlab-ci.yml natif —
+// voir commentaire de routes/repos.routes.js) : on l'indique honnêtement au
+// lieu d'afficher un bouton qui échouerait toujours.
+function RepoCiRow({ repo, stackState, busy, result, onGenerate }) {
+  if (!stackState || stackState.loading) {
+    return <div className="pd-repo-ci-row faint">Détection de la stack…</div>;
+  }
+  if (stackState.error) {
+    return <div className="pd-repo-ci-row faint" title={stackState.error}>Stack non détectée ({stackState.error})</div>;
+  }
+  const { stack = [], hasCI } = stackState.structure || {};
+  return (
+    <div className="pd-repo-ci-row">
+      {stack.length > 0 ? (
+        stack.map((s) => <span key={s} className="badge badge-mut pd-repo-stack-badge">{s}</span>)
+      ) : (
+        <span className="faint">Stack non reconnue</span>
+      )}
+      {hasCI && <span className="badge badge-ok" title="Un pipeline CI existe déjà dans ce dépôt">CI déjà présente</span>}
+      {repo.provider === 'github' ? (
+        stack.length > 0 ? (
+          result ? (
+            result.ok ? (
+              <a href={result.pr.webUrl} target="_blank" rel="noreferrer" className="btn-outline pd-action-btn">
+                Voir la pull request #{result.pr.number}
+              </a>
+            ) : (
+              <span className="badge badge-crit" title={result.message}>Échec : {result.message}</span>
+            )
+          ) : (
+            <button className="btn-outline pd-action-btn" disabled={busy} onClick={onGenerate}>
+              {busy ? 'Génération…' : 'Générer le pipeline CI/CD'}
+            </button>
+          )
+        ) : (
+          <span className="faint">Aucune stack reconnue à automatiser</span>
+        )
+      ) : (
+        <span className="faint" title="GitLab dispose déjà de son propre .gitlab-ci.yml natif — génération non applicable ici">CI native GitLab</span>
+      )}
+    </div>
+  );
+}
+
 // Rendu via le Modal partagé (portail hors de la page) plutôt qu'une carte
 // en position absolue : imbriquée dans un Panel (overflow: hidden), une
 // liste de dépôts un peu longue se retrouvait coupée net au lieu de défiler.
-function RepoPicker({ allRepos, linkedKeys, onToggle }) {
+// Sélecteur multi-dépôts : ouvre une modale avec recherche, permet de
+// cocher/décocher plusieurs dépôts existants d'un coup (un même dépôt peut
+// déjà être rattaché à d'autres projets — repoKeys est un tableau par
+// projet, donc aucune exclusivité côté données) puis valide en un seul
+// appel PUT /projects/:id plutôt qu'un appel par case cochée.
+function RepoPicker({ allRepos, linkedKeys, onSave }) {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(linkedKeys);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function launch() {
+    setPending(linkedKeys);
+    setQ('');
+    setOpen(true);
+  }
+  function toggle(key) {
+    setPending((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+  async function save() {
+    setBusy(true);
+    try {
+      await onSave(pending);
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const query = q.trim().toLowerCase();
+  const visibleRepos = query ? allRepos.filter((r) => r.name.toLowerCase().includes(query)) : allRepos;
+  const dirty = pending.length !== linkedKeys.length || pending.some((k) => !linkedKeys.includes(k));
+
   return (
     <>
-      <span className="btn-outline pd-header-action-btn" onClick={() => setOpen(true)}>Rattacher</span>
+      <span className="btn-outline pd-header-action-btn" onClick={launch}>Rattacher</span>
       {open && (
-        <Modal title="Rattacher des dépôts" sub="Cochez les dépôts liés à ce projet" onClose={() => setOpen(false)} width={380}>
+        <Modal title="Rattacher des dépôts" sub="Cochez un ou plusieurs dépôts existants, puis validez en une fois" onClose={() => setOpen(false)} width={380}>
           {allRepos.length === 0 ? (
             <div className="pd-picker-empty">Aucun dépôt disponible</div>
           ) : (
-            <div className="pd-team-member-col">
-              {allRepos.map((r) => (
-                <label key={r.key} className="pd-picker-row">
-                  <input type="checkbox" checked={linkedKeys.includes(r.key)} onChange={() => onToggle(r.key)} />
-                  {r.name}
-                </label>
-              ))}
-            </div>
+            <>
+              <input
+                className="input pd-picker-search"
+                placeholder="Rechercher un dépôt…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                autoFocus
+              />
+              <div className="pd-team-member-col">
+                {visibleRepos.length === 0 ? (
+                  <div className="pd-picker-empty">Aucun dépôt ne correspond à « {q} »</div>
+                ) : visibleRepos.map((r) => (
+                  <label key={r.key} className="pd-picker-row">
+                    <input type="checkbox" checked={pending.includes(r.key)} onChange={() => toggle(r.key)} />
+                    {r.name}
+                  </label>
+                ))}
+              </div>
+              <div className="projects-form-actions">
+                <span className="btn-outline" onClick={() => setOpen(false)}>Annuler</span>
+                <button className="btn" type="button" onClick={save} disabled={busy || !dirty}>
+                  {busy ? 'Enregistrement…' : `Enregistrer (${pending.length} rattaché${pending.length > 1 ? 's' : ''})`}
+                </button>
+              </div>
+            </>
           )}
         </Modal>
       )}
