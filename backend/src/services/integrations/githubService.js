@@ -10,6 +10,12 @@ function client() {
   };
 }
 
+// Exposé pour repositoryProvisioningService.js : réutilise le même client
+// authentifié plutôt que dupliquer la lecture de token/en-têtes.
+export function getClient() {
+  return client();
+}
+
 export async function getStatus() {
   const c = client();
   if (!c) return notConfigured('GitHub');
@@ -24,19 +30,24 @@ export async function getAuthenticatedUser() {
   return { login: user.login };
 }
 
-// Utilisé par le miroir automatique GitLab → GitHub (services/gitMirrorService.js) :
-// crée le dépôt de sauvegarde s'il n'existe pas encore. 422 = existe déjà,
-// toléré (idempotent) plutôt que remonté comme une erreur.
-export async function createRepo(name, { private: isPrivate = true, description } = {}) {
+// Utilisé par le miroir automatique GitLab → GitHub (services/gitMirrorService.js)
+// et par le provisioning réel (services/repositoryProvisioningService.js) :
+// crée le dépôt s'il n'existe pas encore. 422 = existe déjà, toléré
+// (idempotent) plutôt que remonté comme une erreur. `autoInit` reste
+// désactivable pour le miroir de sauvegarde (qui pousse son propre contenu
+// juste après), mais activé par défaut pour le provisioning (README requis
+// avant protection de branche/webhooks).
+export async function createRepo(name, { private: isPrivate = true, description, autoInit = false } = {}) {
   const c = client();
   if (!c) throw new IntegrationError('GitHub non configuré', { status: 409 });
   try {
-    const repo = await request(c.http, { method: 'POST', url: '/user/repos', data: { name, private: isPrivate, description, auto_init: false } }, 'GitHub');
-    return { created: true, fullName: repo.full_name, cloneUrl: repo.clone_url };
+    const repo = await request(c.http, { method: 'POST', url: '/user/repos', data: { name, private: isPrivate, description, auto_init: autoInit } }, 'GitHub');
+    return { created: true, owner: repo.owner?.login, fullName: repo.full_name, cloneUrl: repo.clone_url, webUrl: repo.html_url, defaultBranch: repo.default_branch };
   } catch (err) {
     if (err.status === 502 && /422/.test(err.message)) {
       const user = await getAuthenticatedUser();
-      return { created: false, fullName: `${user.login}/${name}`, cloneUrl: `https://github.com/${user.login}/${name}.git` };
+      const repo = await request(c.http, { method: 'GET', url: `/repos/${user.login}/${name}` }, 'GitHub');
+      return { created: false, owner: user.login, fullName: repo.full_name, cloneUrl: repo.clone_url, webUrl: repo.html_url, defaultBranch: repo.default_branch };
     }
     throw err;
   }

@@ -15,6 +15,7 @@ import NetworkLayout from './pages/Network/NetworkLayout.jsx';
 import NetworkPage from './pages/Network/NetworkPage.jsx';
 import NetworkServicesPage from './pages/Network/NetworkServicesPage.jsx';
 import HAProxyPage from './pages/Network/HAProxyPage.jsx';
+import HAProxyConfigEditor from './pages/Network/HAProxyConfigEditor.jsx';
 import TopologyPage from './pages/Network/TopologyPage.jsx';
 import CertificatesPage from './pages/Network/CertificatesPage.jsx';
 import FirewallPage from './pages/Network/FirewallPage.jsx';
@@ -165,6 +166,7 @@ export const router = createBrowserRouter([
               { path: 'proxies', element: <NetworkPage />, handle: { title: 'Proxies & domaines' } },
               { path: 'services', element: <NetworkServicesPage />, handle: { title: 'Réseaux internes' } },
               { path: 'haproxy', element: <HAProxyPage />, handle: { title: 'HAProxy' } },
+              { path: 'haproxy/config', element: <HAProxyConfigEditor />, handle: { title: 'Éditeur HAProxy' } },
               { path: 'certificates', element: <CertificatesPage />, handle: { title: 'Certificats' } },
               { path: 'firewall', element: <FirewallPage />, handle: { title: 'Pare-feu' } }
             ]

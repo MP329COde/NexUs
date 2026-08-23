@@ -412,6 +412,10 @@
   font-size: 12px;
 }
 
+.pd-env-expired {
+  color: var(--tone-crit-fg);
+}
+
 .pd-env-link-icon {
   color: var(--text-faint);
 }

@@ -9,6 +9,7 @@ const ITEMS = [
   { to: '/network/proxies', label: 'Proxies & domaines', icon: 'globe' },
   { to: '/network/services', label: 'Réseaux internes', icon: 'net' },
   { to: '/network/haproxy', label: 'HAProxy', icon: 'server' },
+  { to: '/network/haproxy/config', label: 'Éditeur HAProxy', icon: 'edit' },
   { to: '/network/certificates', label: 'Certificats', icon: 'lock' },
   { to: '/network/firewall', label: 'Pare-feu', icon: 'shield' }
 ];

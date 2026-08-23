@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Panel from '../../components/ui/Panel.jsx';
@@ -210,8 +210,102 @@ export default function AccountPage() {
 
         <PasskeysPanel />
         <MfaPanel />
+        <PersonalGitTokenPanel />
       </div>
     </>
+  );
+}
+
+// Token GitLab personnel : distinct de l'intégration GitLab d'instance
+// (Paramètres admin → Forges déclarées), qui reste un compte de service
+// partagé au niveau plateforme. Ici, chaque utilisateur renseigne SON propre
+// token pour que les actions personnelles (ex: approuver une merge request)
+// soient attribuées à son propre compte GitLab plutôt qu'au compte partagé.
+// Base minimale (Lot A6 du plan approuvé) : un seul provider (GitLab), pas
+// encore le vault multi-niveaux complet prévu au Lot B2 à venir.
+function PersonalGitTokenPanel() {
+  const notify = useNotify();
+  const { data, loading, reload } = useApi(() => api.get('/personal-tokens/gitlab'), []);
+  const [editing, setEditing] = useState(false);
+  const [tokenValue, setTokenValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const hasToken = data?.token?.hasToken === true;
+
+  async function save(e) {
+    e.preventDefault();
+    if (!tokenValue.trim()) return;
+    setBusy(true);
+    try {
+      await api.put('/personal-tokens/gitlab', { token: tokenValue.trim() });
+      notify('Token GitLab personnel enregistré', { type: 'ok' });
+      setTokenValue('');
+      setEditing(false);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!confirm('Supprimer votre token GitLab personnel ?')) return;
+    setBusy(true);
+    try {
+      await api.del('/personal-tokens/gitlab');
+      notify('Token GitLab personnel supprimé', { type: 'info' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel
+      title="Mon token GitLab personnel"
+      sub="Utilisé pour vos actions GitLab (ex: approuver une merge request) au nom de votre propre compte, pas celui de la plateforme"
+      span={12}
+    >
+      <div className="account-panel-body">
+        {loading ? (
+          <div className="faint">Chargement…</div>
+        ) : hasToken && !editing ? (
+          <div className="account-form-body">
+            <div className="faint">
+              Token enregistré{data.token.updatedAt ? ` · mis à jour le ${formatDate(data.token.updatedAt)}` : ''}. Il reste masqué et ne sera plus jamais réaffiché en clair.
+            </div>
+            <div className="account-passkey-row" style={{ gap: '0.5rem' }}>
+              <button className="btn-outline" type="button" onClick={() => setEditing(true)} disabled={busy}>Remplacer</button>
+              <button className="btn-outline" type="button" onClick={remove} disabled={busy}>Supprimer</button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={save} className="account-form-body">
+            <Field label="Token d'accès personnel GitLab (scope « api »)">
+              <input
+                className="input"
+                type="password"
+                autoComplete="off"
+                placeholder="glpat-…"
+                value={tokenValue}
+                onChange={(e) => setTokenValue(e.target.value)}
+              />
+            </Field>
+            <div className="faint">
+              Généré dans GitLab : avatar → Edit profile → Access Tokens. Utilise la même URL d'instance que celle configurée par l'administrateur en Paramètres.
+            </div>
+            <div className="account-passkey-row" style={{ gap: '0.5rem' }}>
+              <button className="btn" type="submit" disabled={busy || !tokenValue.trim()}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
+              {hasToken && (
+                <button className="btn-outline" type="button" onClick={() => { setEditing(false); setTokenValue(''); }} disabled={busy}>Annuler</button>
+              )}
+            </div>
+          </form>
+        )}
+      </div>
+    </Panel>
   );
 }
 
@@ -230,11 +324,44 @@ function PasskeysPanel() {
   const [registering, setRegistering] = useState(false);
   const items = data?.items || [];
 
+  // IMPORTANT (bug Safari/WebKit corrigé ici) : comme pour la connexion par
+  // clé d'accès (voir LoginPage.jsx), `navigator.credentials.create()` doit
+  // être appelé quasi synchroniquement depuis le clic pour que Safari
+  // considère encore l'activation utilisateur comme valide. L'ancien code
+  // attendait la réponse réseau de `POST /register-options` AVANT d'appeler
+  // `startRegistration`, ce qui casse ce lien sur Safari (rejet silencieux
+  // en `NotAllowedError`, avalé par le `catch` ci-dessous) et, de façon
+  // moins systématique, sur d'autres navigateurs en cas de latence réseau.
+  // Les options sont donc préchargées au montage du panneau et rafraîchies
+  // périodiquement (le défi expire côté serveur après 5 min, voir
+  // `CHALLENGE_TTL_MS` dans `webauthn.routes.js`) ainsi qu'après chaque
+  // ajout/suppression de clé (la liste `excludeCredentials` doit rester à
+  // jour), pour que le clic déclenche `startRegistration` sans attente
+  // réseau intercalée.
+  const registerOptionsRef = useRef(null);
+  const registerOptionsPromiseRef = useRef(null);
+
+  function fetchRegisterOptions() {
+    const promise = api.post('/auth/webauthn/register-options')
+      .then((data) => { registerOptionsRef.current = data; return data; })
+      .catch(() => { registerOptionsRef.current = null; return null; });
+    registerOptionsPromiseRef.current = promise;
+    return promise;
+  }
+
+  useEffect(() => {
+    fetchRegisterOptions();
+    const interval = setInterval(fetchRegisterOptions, 4 * 60_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function register() {
     setRegistering(true);
     try {
-      const { options } = await api.post('/auth/webauthn/register-options');
-      const response = await startRegistration({ optionsJSON: options });
+      const cached = registerOptionsRef.current || await (registerOptionsPromiseRef.current || fetchRegisterOptions());
+      if (!cached) throw new Error('Impossible de préparer la cérémonie WebAuthn (réseau indisponible)');
+      const response = await startRegistration({ optionsJSON: cached.options });
       await api.post('/auth/webauthn/register-verify', { response });
       notify('Clé d\'accès enregistrée', { type: 'ok' });
       reload();
@@ -242,6 +369,7 @@ function PasskeysPanel() {
       if (err.name !== 'NotAllowedError') notify(err.message, { type: 'crit' });
     } finally {
       setRegistering(false);
+      fetchRegisterOptions();
     }
   }
 
@@ -251,6 +379,7 @@ function PasskeysPanel() {
       await api.del(`/auth/webauthn/credentials/${id}`);
       notify('Clé supprimée', { type: 'ok' });
       reload();
+      fetchRegisterOptions();
     } catch (err) {
       notify(err.message, { type: 'crit' });
     }

@@ -10,6 +10,14 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  /* Reste fixe (sticky) au lieu de défiler avec le contenu, et défile en
+     interne si son propre contenu dépasse la hauteur visible. 104px = 56px
+     de header + 24px de marge sticky haute + 24px de marge basse. */
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .network-layout-nav-link {

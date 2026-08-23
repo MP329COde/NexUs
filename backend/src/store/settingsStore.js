@@ -20,7 +20,11 @@ export const SECRET_FIELDS = {
   notificationsWebhook: ['url'],
   ovh: ['appSecret', 'consumerKey'],
   duckdns: ['token'],
-  gitBackup: ['token']
+  gitBackup: ['token'],
+  // Traces distribuées (Priorité 5, Lot 56-nav) : Tempo ou Jaeger, seul le
+  // token est sensible (Tempo public sans auth par défaut, Jaeger idem —
+  // le champ reste optionnel selon le déploiement).
+  tracing: ['token']
 };
 
 export const INTEGRATION_KEYS = Object.keys(SECRET_FIELDS);
@@ -95,7 +99,8 @@ function isConfigured(key, entry) {
     notificationsWebhook: ['url'],
     ovh: ['appKey', 'appSecret', 'consumerKey'],
     duckdns: ['token'],
-    gitBackup: ['remoteUrl', 'token']
+    gitBackup: ['remoteUrl', 'token'],
+    tracing: ['baseUrl', 'type']
   }[key] || [];
   return required.every((f) => Boolean(entry[f]));
 }

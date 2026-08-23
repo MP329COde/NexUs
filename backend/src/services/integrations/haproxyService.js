@@ -1,5 +1,5 @@
 import { getRawIntegration } from '../../store/settingsStore.js';
-import { buildClient, request, notConfigured, IntegrationError } from './httpClient.js';
+import { buildClient, request, notConfigured, IntegrationError, buildHttpsAgentFromConfig } from './httpClient.js';
 
 // Intégration via la HAProxy Data Plane API. Ciblée v3 : testée en direct
 // contre une vraie instance (haproxytech/haproxy-alpine, dataplaneapi
@@ -13,7 +13,7 @@ import { buildClient, request, notConfigured, IntegrationError } from './httpCli
 function client() {
   const cfg = getRawIntegration('haproxy');
   if (!cfg.dataPlaneUrl) return null;
-  return { http: buildClient(cfg.dataPlaneUrl, { auth: cfg.username ? { username: cfg.username, password: cfg.password || '' } : undefined }), cfg };
+  return { http: buildClient(cfg.dataPlaneUrl, { auth: cfg.username ? { username: cfg.username, password: cfg.password || '' } : undefined, httpsAgent: buildHttpsAgentFromConfig(cfg) }), cfg };
 }
 
 export async function getStatus() {
@@ -158,6 +158,56 @@ export async function applyProxyBackend(proxy) {
   return { ok: true, message: `Backend HAProxy ${backendName} appliqué — utilisez "Attacher à un frontend" pour finaliser le routage` };
 }
 
+// Éditeur sécurisé (Priorité 4) : lit/écrit le haproxy.cfg complet via
+// l'endpoint "raw" de la Data Plane API v3, plutôt que les sous-ressources
+// structurées (backends/frontends/acls) utilisées ailleurs dans ce fichier —
+// c'est le seul endpoint qui expose la config texte brute, nécessaire pour un
+// diff ligne à ligne lisible par un humain. La réponse JSON documentée est
+// {_version, data: "<texte>"} ; on tolère aussi un corps texte brut si
+// l'instance ne le wrappe pas (observé selon les versions de dataplaneapi).
+export async function getRawConfig() {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const data = await request(c.http, { method: 'GET', url: '/v3/services/haproxy/configuration/raw' }, 'HAProxy');
+  if (typeof data === 'string') {
+    const version = await getConfigVersion(c);
+    return { version, config: data };
+  }
+  return { version: data?._version ?? (await getConfigVersion(c)), config: data?.data ?? '' };
+}
+
+// only_validate=true : demande à HAProxy de parser/valider la config sans
+// l'appliquer (paramètre documenté de la Data Plane API v3). N'invente pas de
+// validation côté NexUs — si l'instance ne supporte pas ce paramètre, l'appel
+// échoue explicitement plutôt que de prétendre avoir validé quoi que ce soit.
+export async function validateRawConfig(configText) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const version = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'PUT',
+    url: '/v3/services/haproxy/configuration/raw',
+    params: { version, only_validate: true, skip_version_check: true },
+    headers: { 'Content-Type': 'text/plain' },
+    data: configText
+  }, 'HAProxy');
+  return { ok: true, message: 'Configuration valide' };
+}
+
+export async function applyRawConfig(configText) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const version = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'PUT',
+    url: '/v3/services/haproxy/configuration/raw',
+    params: { version, force_reload: true },
+    headers: { 'Content-Type': 'text/plain' },
+    data: configText
+  }, 'HAProxy');
+  return { ok: true, message: 'Configuration appliquée et rechargée' };
+}
+
 // Crée un nouveau frontend HAProxy (écoute sur un port donné). Manquait jusqu'ici :
 // seuls le rattachement à un frontend existant (attachProxyToFrontend) et la
 // création de backend/serveur (applyProxyBackend) étaient possibles.
@@ -165,6 +215,13 @@ export async function createFrontend({ name, port, mode = 'http', defaultBackend
   const c = client();
   if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
   if (!name || !port) throw new IntegrationError('Nom et port requis', { status: 400 });
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new IntegrationError('Nom de frontend invalide (lettres, chiffres, "-", "_" uniquement)', { status: 400 });
+  const portNum = Number(port);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new IntegrationError('Port invalide (1-65535)', { status: 400 });
+  if (!['http', 'tcp'].includes(mode)) throw new IntegrationError('Mode invalide (http ou tcp)', { status: 400 });
+
+  const existing = await listFrontends();
+  if (existing.some((f) => f.name === name)) throw new IntegrationError(`Un frontend "${name}" existe déjà`, { status: 409 });
 
   const version = await getConfigVersion(c);
   await request(c.http, {

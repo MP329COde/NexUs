@@ -31,7 +31,8 @@ export const INTEGRATION_FORMS = {
     ],
     fields: [
       { key: 'baseUrl', label: 'URL du serveur', placeholder: 'https://argocd.homelab.local' },
-      { key: 'token', label: 'Token API', type: 'password', secret: true, hint: 'Généré via `argocd account generate-token`.' }
+      { key: 'token', label: 'Token API', type: 'password', secret: true, hint: 'Généré via `argocd account generate-token`.' },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté (ex: CA interne, certificat auto-signé de votre labo).' }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'argocd' }
   },
@@ -47,7 +48,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'dataPlaneUrl', label: 'URL Data Plane API', placeholder: 'https://haproxy.homelab.local:5555' },
       { key: 'username', label: "Nom d'utilisateur" },
-      { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
+      { key: 'password', label: 'Mot de passe', type: 'password', secret: true },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté (ex: CA interne, certificat auto-signé de votre labo).' }
     ],
     hostSuggestion: { field: 'dataPlaneUrl', subdomain: 'haproxy', port: 5555 }
   },
@@ -62,7 +64,8 @@ export const INTEGRATION_FORMS = {
     ],
     fields: [
       { key: 'baseUrl', label: 'URL de l\'instance', placeholder: 'https://gitlab.homelab.local' },
-      { key: 'token', label: 'Token d\'accès personnel', type: 'password', secret: true, hint: 'Scope « api » requis.' }
+      { key: 'token', label: 'Token d\'accès personnel', type: 'password', secret: true, hint: 'Scope « api » requis.' },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté (ex: CA interne, certificat auto-signé de votre labo).' }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'gitlab' }
   },
@@ -119,7 +122,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'baseUrl', label: 'URL de l\'API', placeholder: 'https://pve.homelab.local:8006' },
       { key: 'tokenId', label: 'Token ID', placeholder: 'root@pam!nexus', hint: 'Format utilisateur@royaume!nomdutoken.' },
-      { key: 'tokenSecret', label: 'Token Secret', type: 'password', secret: true, hint: "Affiché une seule fois à la création du token." }
+      { key: 'tokenSecret', label: 'Token Secret', type: 'password', secret: true, hint: "Affiché une seule fois à la création du token." },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — Proxmox utilise un certificat auto-signé par défaut, à ne contourner qu\'en connaissance de cause (ou installez un vrai certificat).' }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'pve', port: 8006 }
   },
@@ -162,6 +166,21 @@ export const INTEGRATION_FORMS = {
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'grafana' }
   },
+  tracing: {
+    label: 'Traces distribuées',
+    hint: 'Recherche de traces par service (Grafana Tempo ou Jaeger).',
+    guide: [
+      "Renseignez l'URL de l'API HTTP du collecteur (Tempo : port 3200 par défaut ; Jaeger Query : port 16686 par défaut).",
+      "Le token est optionnel : la plupart des déploiements Tempo/Jaeger auto-hébergés n'exigent pas d'authentification.",
+      "NexUs recherche par tag `service.name` (convention OpenTelemetry) — le composant doit déjà émettre ses traces sous ce nom pour apparaître."
+    ],
+    fields: [
+      { key: 'baseUrl', label: 'URL du collecteur', placeholder: 'https://tempo.homelab.local:3200' },
+      { key: 'type', label: 'Type', type: 'select', options: [{ value: 'tempo', label: 'Grafana Tempo' }, { value: 'jaeger', label: 'Jaeger' }] },
+      { key: 'token', label: 'Token (optionnel)', type: 'password', secret: true }
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'tempo' }
+  },
   wazuh: {
     label: 'Wazuh',
     hint: 'Agents, alertes de sécurité et conformité (API du gestionnaire, port 55000 par défaut).',
@@ -173,7 +192,8 @@ export const INTEGRATION_FORMS = {
     fields: [
       { key: 'baseUrl', label: 'URL de l\'API', placeholder: 'https://wazuh.homelab.local:55000' },
       { key: 'username', label: "Nom d'utilisateur", placeholder: 'wazuh-wui' },
-      { key: 'password', label: 'Mot de passe', type: 'password', secret: true }
+      { key: 'password', label: 'Mot de passe', type: 'password', secret: true },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté.' }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'wazuh', port: 55000 }
   },
@@ -251,7 +271,7 @@ export const INTEGRATION_FORMS = {
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
+export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'tracing', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
 
 // Regroupement purement visuel de INTEGRATION_ORDER ci-dessus (mêmes clés,
 // même ordre au sein de chaque catégorie) — la grille était une liste plate
@@ -261,7 +281,7 @@ export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', '
 export const INTEGRATION_CATEGORIES = [
   { label: 'Source Control', keys: ['gitlab', 'github', 'githubPlatform', 'gitea'] },
   { label: 'Runtime', keys: ['kubernetes', 'argocd', 'proxmox'] },
-  { label: 'Observability', keys: ['grafana', 'wazuh'] },
+  { label: 'Observability', keys: ['grafana', 'tracing', 'wazuh'] },
   { label: 'Networking', keys: ['haproxy', 'traefik', 'certManager', 'ovh', 'duckdns'] },
   { label: 'Plateforme', keys: ['registry', 'notificationsWebhook', 'gitBackup'] }
 ];

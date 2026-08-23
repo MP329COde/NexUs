@@ -153,6 +153,40 @@
   color: var(--primary);
 }
 
+/* HAProxy editor */
+
+.net-action-disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+
+.net-config-textarea {
+  width: 100%;
+  min-height: 420px;
+  resize: vertical;
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+}
+
+.net-validation-banner {
+  padding: 10px 14px;
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+
+.net-validation-ok {
+  color: var(--tone-ok-fg);
+}
+
+.net-validation-crit {
+  color: var(--tone-crit-fg);
+}
+
 /* Certificates */
 
 .cert-cell-domains {

@@ -59,6 +59,20 @@ export async function listNamespaces() {
   })));
 }
 
+// Utilisé par le nettoyage automatique des environnements de preview expirés
+// (previewEnvironmentCleanupService.js) : supprime réellement le namespace
+// provisionné, pas seulement l'enregistrement en base — sans quoi les
+// ressources restaient orphelines indéfiniment (limite documentée dans
+// todo.md, "aucune infrastructure cron/setInterval n'existe").
+export async function deleteNamespace(namespace) {
+  const c = clients();
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('delete namespace', async () => {
+    await c.core.deleteNamespace({ name: namespace });
+    return { ok: true, message: `Namespace ${namespace} en cours de suppression` };
+  });
+}
+
 export async function listPods(namespace) {
   const c = clients();
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });

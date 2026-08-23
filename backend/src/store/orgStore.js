@@ -415,6 +415,17 @@ export async function listExpiredEnvironments(projectId) {
   return rows;
 }
 
+// Toutes plateformes confondues (pas de projectId) : consommé par
+// previewEnvironmentCleanupService.js pour le nettoyage automatique planifié
+// — jamais une production (is_production=false), même garde-fou que
+// deleteEnvironment().
+export async function listAllExpiredEnvironments() {
+  const { rows } = await query(
+    `SELECT * FROM environments WHERE expires_at IS NOT NULL AND expires_at < now() AND is_production = false ORDER BY expires_at`
+  );
+  return rows;
+}
+
 // --- Environment Blueprints ------------------------------------------
 export async function listEnvironmentBlueprintsForOrg(orgId) {
   const { rows } = await query('SELECT * FROM environment_blueprints WHERE org_id = $1 ORDER BY name', [orgId]);
@@ -962,7 +973,7 @@ export async function createComponent({ projectId, ownerTeamId, name, slug, kind
   return rows[0];
 }
 
-export async function updateComponent(id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links }) {
+export async function updateComponent(id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links, k8sNamespace, grafanaDashboardUid, sloTarget }) {
   const sets = ['updated_at = now()'];
   const params = [];
   const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
@@ -977,6 +988,11 @@ export async function updateComponent(id, { ownerTeamId, name, kind, lifecycle, 
   if (repositoryUrl !== undefined) set('repository_url', repositoryUrl);
   if (tags !== undefined) set('tags', JSON.stringify(tags));
   if (links !== undefined) set('links', JSON.stringify(links));
+  // Observabilité centrée Service (Priorité 5) : rattachements optionnels,
+  // jamais de valeur devinée — voir migration 0046_component_observability.sql.
+  if (k8sNamespace !== undefined) set('k8s_namespace', k8sNamespace || '');
+  if (grafanaDashboardUid !== undefined) set('grafana_dashboard_uid', grafanaDashboardUid || '');
+  if (sloTarget !== undefined) set('slo_target', sloTarget === null || sloTarget === '' ? null : Number(sloTarget));
   params.push(id);
   const { rows } = await query(`UPDATE components SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
   return rows[0] || null;

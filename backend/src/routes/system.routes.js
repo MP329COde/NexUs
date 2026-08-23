@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getVersion, checkForUpdates } from '../services/updateService.js';
+import { getStartupStatus } from '../services/startupStatusService.js';
 import { integrations } from '../services/integrationRegistry.js';
 import { listBackups } from '../services/backupService.js';
 import { listRecentJobs } from '../services/jobService.js';
@@ -16,8 +17,17 @@ router.get('/version', (req, res) => {
 });
 
 router.get('/updates/check', asyncHandler(async (req, res) => {
-  res.json({ ok: true, ...checkForUpdates() });
+  const targetBranch = typeof req.query.targetBranch === 'string' ? req.query.targetBranch.trim().slice(0, 200) : undefined;
+  res.json({ ok: true, ...checkForUpdates(targetBranch || undefined) });
 }));
+
+// Instantané honnête du démarrage du process (migrations, admin bootstrap,
+// planificateurs) — pas l'écran de bootstrap complet (voir Lot D9), juste de
+// quoi vérifier que le démarrage s'est bien déroulé sans dépouiller les logs
+// serveur.
+router.get('/status/startup', (req, res) => {
+  res.json({ ok: true, startup: getStartupStatus() });
+});
 
 // Vue destinée à un responsable système : agrège en un seul appel ce qui
 // mérite son attention immédiate — intégrations en erreur, incidents

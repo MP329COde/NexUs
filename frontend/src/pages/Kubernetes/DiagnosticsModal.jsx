@@ -16,9 +16,10 @@ export default function DiagnosticsModal({ namespace, name, onClose }) {
   const result = data ? runDiagnostics({ deploymentName: name, ...data }) : null;
   const worst = result?.findings.some((f) => f.severity === 'crit') ? 'crit' : result?.findings.length ? 'warn' : 'ok';
   const link = linkData?.link;
-  const gitWebUrl = link?.gitProvider === 'github' && link.githubOwner && link.githubRepo
-    ? `https://github.com/${link.githubOwner}/${link.githubRepo}`
-    : null;
+  // gitWebUrl vient désormais du backend (GET .../links, résout la vraie URL
+  // via l'API GitHub/GitLab configurée) — ne plus la reconstruire ici : ça
+  // ne fonctionnait que pour GitHub, avec un domaine github.com en dur.
+  const gitWebUrl = link?.gitWebUrl || null;
 
   return (
     <Modal

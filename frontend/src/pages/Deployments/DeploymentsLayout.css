@@ -17,6 +17,13 @@
   gap: 14px;
   position: sticky;
   top: 24px;
+  /* Reste fixe verticalement (sticky) et défile en interne si son propre
+     contenu (groupes + liens + "Outils réels") dépasse la hauteur visible,
+     au lieu de s'étirer hors écran sans moyen d'y accéder. 104px = 56px de
+     header + 24px de marge sticky haute + 24px de marge basse. */
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: width .15s ease;
 }
 

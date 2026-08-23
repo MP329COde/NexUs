@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -17,6 +17,30 @@ export default function LoginPage() {
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [mfaToken, setMfaToken] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
+
+  // Préchargement des options de connexion par clé d'accès (voir le
+  // commentaire détaillé sur `onPasskey` plus bas) : ces hooks doivent être
+  // déclarés avant tout `return` conditionnel (règle des Hooks React), donc
+  // ici, avant le court-circuit `if (user) return <Navigate />` juste en
+  // dessous.
+  const passkeyOptionsRef = useRef(null);
+  const passkeyOptionsPromiseRef = useRef(null);
+
+  function fetchPasskeyOptions() {
+    const promise = api.post('/auth/webauthn/login-options', { identifier: email || undefined })
+      .then((data) => { passkeyOptionsRef.current = data; return data; })
+      .catch(() => { passkeyOptionsRef.current = null; return null; });
+    passkeyOptionsPromiseRef.current = promise;
+    return promise;
+  }
+
+  useEffect(() => {
+    if (user) return undefined;
+    fetchPasskeyOptions();
+    const interval = setInterval(fetchPasskeyOptions, 4 * 60_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   if (user) return <Navigate to={location.state?.from || '/'} replace />;
 
@@ -51,11 +75,35 @@ export default function LoginPage() {
   // Clé d'accès (passkey) : options envoyées même sans identifiant renseigné
   // (le navigateur propose alors les passkeys "découvrables" qu'il connaît
   // pour ce site) — jamais de mot de passe impliqué dans ce flux.
+  //
+  // IMPORTANT (bug Safari/WebKit corrigé ici) : `navigator.credentials.get()`
+  // doit être appelé de façon quasi synchrone dans le gestionnaire de clic,
+  // sinon Safari considère l'activation utilisateur ("user gesture") comme
+  // expirée et rejette la cérémonie avec `NotAllowedError` — silencieusement,
+  // puisque ce code l'ignore volontairement pour ne pas gêner un clic annulé
+  // par l'utilisateur. Avant ce correctif, un aller-retour réseau
+  // (`await api.post('/auth/webauthn/login-options', ...)`) avait lieu AVANT
+  // l'appel à `startAuthentication`, ce qui casse ce lien pour Safari (et,
+  // de façon moins systématique, pour Chrome sur connexion lente). Les
+  // options sont donc désormais préchargées en amont via `fetchPasskeyOptions`
+  // (déclaré plus haut, avant le `return` anticipé imposé par les règles des
+  // Hooks) et rafraîchies périodiquement tant que le défi reste valide côté
+  // serveur — TTL de 5 min, voir `CHALLENGE_TTL_MS` dans
+  // `webauthn.routes.js` — pour que le clic déclenche `startAuthentication`
+  // immédiatement, sans attente réseau intercalée.
   async function onPasskey() {
     setPasskeyBusy(true);
     setError(null);
     try {
-      const { requestId, options } = await api.post('/auth/webauthn/login-options', { identifier: email || undefined });
+      // Utilise les options déjà en cache (chargées au montage/en tâche de
+      // fond) pour ne jamais insérer d'attente réseau entre le clic et
+      // l'appel WebAuthn. Si aucune option n'est encore disponible (échec
+      // réseau ou premier rendu trop rapide), on retombe sur l'ancien
+      // comportement en dernier recours — mieux vaut tenter avec le risque
+      // Safari connu que ne rien proposer du tout.
+      const cached = passkeyOptionsRef.current || await (passkeyOptionsPromiseRef.current || fetchPasskeyOptions());
+      if (!cached) throw new Error('Impossible de préparer la cérémonie WebAuthn (réseau indisponible)');
+      const { requestId, options } = cached;
       const response = await startAuthentication({ optionsJSON: options });
       const data = await api.post('/auth/webauthn/login-verify', { requestId, response });
       setUserFromSession(data.user);
@@ -63,6 +111,7 @@ export default function LoginPage() {
       if (err.name !== 'NotAllowedError') setError(err.message);
     } finally {
       setPasskeyBusy(false);
+      fetchPasskeyOptions();
     }
   }
 

@@ -15,6 +15,7 @@ import proxmoxRoutes from './proxmox.routes.js';
 import traefikRoutes from './traefik.routes.js';
 import certmanagerRoutes from './certmanager.routes.js';
 import grafanaRoutes from './grafana.routes.js';
+import tracingRoutes from './tracing.routes.js';
 import wazuhRoutes from './wazuh.routes.js';
 import proxiesRoutes from './proxies.routes.js';
 import domainsRoutes from './domains.routes.js';
@@ -66,6 +67,7 @@ import terminalRoutes from './terminal.routes.js';
 import wikiRoutes from './wiki.routes.js';
 import pluginsRoutes from './plugins.routes.js';
 import repositoryProvisioningRoutes from './repositoryProvisioning.routes.js';
+import personalTokensRoutes from './personalTokens.routes.js';
 
 const router = Router();
 
@@ -85,6 +87,7 @@ router.use('/proxmox', proxmoxRoutes);
 router.use('/traefik', traefikRoutes);
 router.use('/certmanager', certmanagerRoutes);
 router.use('/grafana', grafanaRoutes);
+router.use('/tracing', tracingRoutes);
 router.use('/wazuh', wazuhRoutes);
 router.use('/proxies', proxiesRoutes);
 router.use('/domains', domainsRoutes);
@@ -136,5 +139,9 @@ router.use('/terminal', terminalRoutes);
 router.use('/wiki', wikiRoutes);
 router.use('/plugins', pluginsRoutes);
 router.use('/repository-provisioning', repositoryProvisioningRoutes);
+// Monté hors de /users (dont usersRoutes exige déjà requirePermission('users','admin')
+// sur tout le préfixe, y compris les sous-chemins non définis) pour rester
+// accessible à tout utilisateur authentifié gérant SON propre token.
+router.use('/personal-tokens', personalTokensRoutes);
 
 export default router;

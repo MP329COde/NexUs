@@ -14,6 +14,10 @@ import { evaluatePolicies } from '../services/policyEngine.js';
 import { findVaultEntry } from '../store/vaultStore.js';
 import { syncBindingSecret } from '../services/serviceBindingSyncService.js';
 import * as yaml from 'js-yaml';
+import * as componentImagesStore from '../store/componentImagesStore.js';
+import * as privateRegistry from '../services/integrations/privateRegistryService.js';
+import * as incidentStore from '../store/incidentStore.js';
+import * as tracing from '../services/integrations/tracingService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -88,12 +92,134 @@ router.put('/components/:id', asyncHandler(async (req, res) => {
   if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
     return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
   }
-  const { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links } = req.body || {};
+  const { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links, k8sNamespace, grafanaDashboardUid, sloTarget } = req.body || {};
   if (kind && !KINDS.includes(kind)) return res.status(400).json({ ok: false, error: 'Type invalide' });
   if (lifecycle && !LIFECYCLES.includes(lifecycle)) return res.status(400).json({ ok: false, error: 'Cycle de vie invalide' });
-  const component = await orgStore.updateComponent(req.params.id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links });
+  if (sloTarget !== undefined && sloTarget !== null && sloTarget !== '' && (Number.isNaN(Number(sloTarget)) || Number(sloTarget) <= 0 || Number(sloTarget) > 100)) {
+    return res.status(400).json({ ok: false, error: 'Objectif de disponibilité invalide (0-100)' });
+  }
+  const component = await orgStore.updateComponent(req.params.id, { ownerTeamId, name, kind, lifecycle, description, language, framework, repositoryProvider, repositoryUrl, tags, links, k8sNamespace, grafanaDashboardUid, sloTarget });
   logAudit(req, 'catalog.component.update', { componentId: component.id, name: component.name });
   res.json({ ok: true, component });
+}));
+
+// Images Docker rattachées au composant (Registry ↔ Projets/Services) :
+// ferme la chaîne Projet → Repository → Pipeline → Image Docker → Registry
+// → Deployment — registry.routes.js reste un proxy plateforme sans notion
+// de projet, mais chaque image enregistrée ici pointe vers un component_id
+// précis (donc un projet via components.project_id). GET enrichit avec les
+// tags réellement présents dans le registre privé configuré, quand
+// l'intégration existe — jamais de tags inventés si non configurée.
+router.get('/components/:id/images', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const images = await componentImagesStore.listForComponent(req.params.id);
+  const enriched = await Promise.all(images.map(async (img) => {
+    const tags = await privateRegistry.listTags(img.repository).catch(() => null);
+    return { ...img, registryTags: tags };
+  }));
+  res.json({ ok: true, items: enriched });
+}));
+
+router.post('/components/:id/images', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const { repository, tag, digest, pipelineProvider, pipelineUrl } = req.body || {};
+  if (!repository || !repository.trim()) return res.status(400).json({ ok: false, error: 'repository requis' });
+  const image = await componentImagesStore.createImage(req.params.id, {
+    repository: repository.trim(), tag: tag?.trim() || 'latest', digest, pipelineProvider, pipelineUrl, createdBy: req.user.id
+  });
+  logAudit(req, 'catalog.component.image.registered', { componentId: component.id, repository: image.repository, tag: image.tag });
+  res.status(201).json({ ok: true, item: image });
+}));
+
+router.delete('/components/:id/images/:imageId', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const role = await orgStore.getProjectRole(component.project_id, req.user.id);
+  if (!isPlatformAdmin(req.user) && !orgStore.projectRoleAtLeast(role, 'maintainer')) {
+    return res.status(403).json({ ok: false, error: 'Rôle insuffisant sur ce projet (requis : maintainer)' });
+  }
+  const deleted = await componentImagesStore.deleteImage(req.params.id, req.params.imageId);
+  if (!deleted) return res.status(404).json({ ok: false, error: 'Image introuvable' });
+  logAudit(req, 'catalog.component.image.deleted', { componentId: component.id, imageId: req.params.imageId });
+  res.json({ ok: true });
+}));
+
+// Observabilité centrée Service (Priorité 5) : incidents réellement rattachés
+// au composant (voir incidents.component_id, migration 0046) — base du calcul
+// de disponibilité ci-dessous. Lecture ouverte, comme le reste de la fiche.
+router.get('/components/:id/incidents', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const items = await incidentStore.listForComponent(req.params.id);
+  res.json({ ok: true, items });
+}));
+
+// Vue SLO/SLA réelle (pas de donnée inventée) : la disponibilité est
+// calculée à partir du temps d'impact réel des incidents rattachés au
+// composant (created_at → resolved_at, ou → maintenant si encore ouvert),
+// borné à la fenêtre demandée. Simplification assumée et documentée : les
+// incidents qui se chevauchent dans le temps sont comptés indépendamment
+// (pas de fusion d'intervalles), donc le temps d'indisponibilité calculé
+// est un majorant, jamais un chiffre sous-estimé. slo_target vient du
+// composant (défini par l'équipe) ; sans valeur, "objectif" est null et
+// error_budget_remaining_pct n'est pas calculé plutôt que d'inventer 99.9%
+// par défaut.
+router.get('/components/:id/slo', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const windowDays = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+  const windowMs = windowDays * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const incidents = await incidentStore.listForComponent(req.params.id);
+
+  function impactMs(periodStart, periodEnd) {
+    let total = 0;
+    for (const inc of incidents) {
+      const start = new Date(inc.created_at).getTime();
+      const end = inc.resolved_at ? new Date(inc.resolved_at).getTime() : now;
+      const overlapStart = Math.max(start, periodStart);
+      const overlapEnd = Math.min(end, periodEnd);
+      if (overlapEnd > overlapStart) total += overlapEnd - overlapStart;
+    }
+    return total;
+  }
+
+  const currentStart = now - windowMs;
+  const previousStart = currentStart - windowMs;
+  const currentImpact = impactMs(currentStart, now);
+  const previousImpact = impactMs(previousStart, currentStart);
+  const availabilityPct = Math.max(0, 100 - (currentImpact / windowMs) * 100);
+  const previousAvailabilityPct = Math.max(0, 100 - (previousImpact / windowMs) * 100);
+  const target = component.slo_target != null ? Number(component.slo_target) : null;
+
+  res.json({
+    ok: true,
+    windowDays,
+    availabilityPct: Number(availabilityPct.toFixed(3)),
+    target,
+    errorBudgetRemainingPct: target != null ? Number((availabilityPct - (100 - target)).toFixed(3)) : null,
+    trend: Number((availabilityPct - previousAvailabilityPct).toFixed(3)),
+    incidentCount: incidents.filter((i) => new Date(i.created_at).getTime() >= currentStart).length,
+    openIncidentCount: incidents.filter((i) => i.status !== 'resolved').length,
+    history: incidents.slice(0, 20)
+  });
+}));
+
+// Traces distribuées (Priorité 5) : recherche par le nom du composant
+// (convention `service.name` OpenTelemetry — best-effort, NexUs n'injecte
+// aucun SDK de traçage, voir tracingService.js). 409 si non configuré,
+// jamais de traces inventées.
+router.get('/components/:id/traces', asyncHandler(async (req, res) => {
+  const component = await orgStore.getComponent(req.params.id);
+  if (!component) return res.status(404).json({ ok: false, error: 'Composant introuvable' });
+  const items = await tracing.searchTraces(component.slug);
+  res.json({ ok: true, items, uiUrl: tracing.tracingUiUrl(component.slug) });
 }));
 
 // Changelog / Releases (todo.md item 37) : mêmes règles d'accès que le

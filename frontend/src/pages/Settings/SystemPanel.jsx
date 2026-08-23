@@ -29,6 +29,7 @@ export default function SystemPanel() {
   const backups = useApi(() => api.get('/backups'), []);
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [targetBranch, setTargetBranch] = useState('');
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [importing, setImporting] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
@@ -37,10 +38,12 @@ export default function SystemPanel() {
   const fileInputRef = useRef(null);
   const notify = useNotify();
 
-  async function checkUpdates() {
+  async function checkUpdates(branchOverride) {
     setChecking(true);
     try {
-      const res = await api.get('/system/updates/check');
+      const branch = branchOverride ?? targetBranch;
+      const qs = branch ? `?targetBranch=${encodeURIComponent(branch)}` : '';
+      const res = await api.get(`/system/updates/check${qs}`);
       setUpdateInfo(res);
     } catch (err) {
       notify(err.message, { type: 'crit' });
@@ -149,13 +152,45 @@ export default function SystemPanel() {
             </div>
             <div>
               <div className="faint system-version-label">Branche</div>
-              <div className="mono system-version-value">{version.data?.version.branch || '—'}</div>
+              <div className="mono system-version-value">
+                {version.data?.version.detached
+                  ? `HEAD détaché (${version.data.version.commit || '—'})`
+                  : version.data?.version.branch || '—'}
+              </div>
             </div>
           </div>
-          <span className="btn-outline system-check-btn" onClick={checkUpdates}>
+          <span className="btn-outline system-check-btn" onClick={() => checkUpdates()}>
             <Icon name="refresh" size={13} className={checking ? 'spin' : ''} />Vérifier les mises à jour
           </span>
-          {updateInfo && (
+          {updateInfo?.needsTargetBranch && (
+            <div className="system-update-result" style={{ background: 'var(--tone-warn-bg)', color: 'var(--tone-warn-fg)' }}>
+              <p style={{ margin: '0 0 8px' }}>{updateInfo.message}</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="ex: main"
+                  value={targetBranch}
+                  onChange={(e) => setTargetBranch(e.target.value)}
+                  className="mono"
+                  style={{ flex: 1 }}
+                />
+                <span className="btn-outline" onClick={() => targetBranch.trim() && checkUpdates(targetBranch.trim())}>
+                  Comparer
+                </span>
+              </div>
+            </div>
+          )}
+          {updateInfo?.alternative === 'download-archive' && (
+            <div className="system-update-result" style={{ background: 'var(--tone-warn-bg)', color: 'var(--tone-warn-fg)' }}>
+              <p style={{ margin: '0 0 8px' }}>{updateInfo.message}</p>
+              {updateInfo.releasesUrl && (
+                <a href={updateInfo.releasesUrl} target="_blank" rel="noreferrer" className="btn-outline">
+                  Voir les releases
+                </a>
+              )}
+            </div>
+          )}
+          {updateInfo && !updateInfo.needsTargetBranch && updateInfo.alternative !== 'download-archive' && (
             <div className="system-update-result" style={{ background: updateInfo.upToDate ? 'var(--tone-ok-bg)' : 'var(--tone-warn-bg)', color: updateInfo.upToDate ? 'var(--tone-ok-fg)' : 'var(--tone-warn-fg)' }}>
               {updateInfo.message}
             </div>

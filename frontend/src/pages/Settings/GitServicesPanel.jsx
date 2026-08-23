@@ -17,6 +17,12 @@ export default function GitServicesPanel() {
   const notify = useNotify();
   const [defaultForge, setDefaultForge] = useState('gitlab');
   const [testing, setTesting] = useState(null);
+  // Résultat du dernier test live par forge (non persisté côté backend) :
+  // /settings ne renvoie que la config statique (`configured`), jamais un
+  // `ok` réellement vérifié. On mémorise donc ici le dernier résultat obtenu
+  // via /settings/:key/test pour que le badge reflète immédiatement le
+  // vrai statut testé, sans devoir recharger toute la page.
+  const [testedStatus, setTestedStatus] = useState({});
 
   useEffect(() => {
     if (data?.console?.defaultForge) setDefaultForge(data.console.defaultForge);
@@ -38,8 +44,13 @@ export default function GitServicesPanel() {
     try {
       const res = await api.post(`/settings/${forge}/test`, {});
       notify(res.status.message, { type: res.status.ok ? 'ok' : 'crit' });
+      setTestedStatus((s) => ({ ...s, [forge]: { ok: res.status.ok, message: res.status.message } }));
     } catch (err) {
+      // err.message porte déjà la cause précise remontée par le backend
+      // (ex: "GitLab: 401 ...", "GitLab: connexion impossible (ETIMEDOUT)"),
+      // voir services/integrations/httpClient.js#request.
       notify(err.message, { type: 'crit' });
+      setTestedStatus((s) => ({ ...s, [forge]: { ok: false, message: err.message } }));
     } finally {
       setTesting(null);
     }
@@ -67,10 +78,20 @@ export default function GitServicesPanel() {
         <div className="gitsvc-list">
           {FORGES.map((f) => {
             const integ = data?.integrations?.[f.key];
+            // Le résultat d'un test live déclenché dans cette session prime sur
+            // l'objet statique de /settings (qui ne contient jamais `ok`).
+            const effective = testedStatus[f.key] ? { ...integ, ok: testedStatus[f.key].ok } : integ;
             return (
               <div key={f.key} className="gitsvc-row">
                 <span className="gitsvc-row-label">{f.label}</span>
-                <StatusBadge tone={toneFromStatus(integ)} label={integ?.configured ? 'Configuré' : 'Non configuré'} />
+                <StatusBadge
+                  tone={toneFromStatus(effective)}
+                  label={
+                    !effective?.configured
+                      ? 'Non configuré'
+                      : effective.ok === true ? 'Connecté' : effective.ok === false ? 'Erreur' : 'Configuré (non testé)'
+                  }
+                />
                 <span className="btn-outline gitsvc-test-btn" onClick={() => test(f.key)}>
                   <Icon name="refresh" size={12} className={testing === f.key ? 'spin' : ''} />Tester
                 </span>

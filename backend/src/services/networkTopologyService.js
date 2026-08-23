@@ -3,6 +3,7 @@ import * as haproxy from './integrations/haproxyService.js';
 import * as traefik from './integrations/traefikService.js';
 import * as proxmox from './integrations/proxmoxService.js';
 import * as kubernetes from './integrations/kubernetesService.js';
+import * as ovh from './integrations/ovhService.js';
 import { getRawIntegration } from '../store/settingsStore.js';
 
 async function safe(fn) {
@@ -19,6 +20,23 @@ async function safe(fn) {
 // /infrastructure plutôt que de dupliquer le détail des VM/LXC ici.
 export async function getTopology() {
   const layers = [];
+
+  // Couche DNS : zones OVH réellement configurées, plus les domaines
+  // *.duckdns.org déjà déclarés parmi les proxies (DuckDNS n'a pas d'API de
+  // liste des sous-domaines, voir duckdnsService.js — on ne peut afficher que
+  // ceux que NexUs connaît déjà via un proxy).
+  const dnsNodes = [];
+  const ovhCfg = getRawIntegration('ovh');
+  if (ovhCfg.appKey) {
+    const zones = await safe(() => ovh.listZones());
+    for (const z of zones || []) dnsNodes.push({ id: `dns-ovh-${z}`, label: z, meta: 'Zone OVH', tone: 'ok', linkTo: '/network/proxies' });
+  }
+  const duckdnsCfg = getRawIntegration('duckdns');
+  if (duckdnsCfg.token) {
+    const proxiesForDns = listProxies().filter((p) => p.domain?.endsWith('.duckdns.org'));
+    for (const p of proxiesForDns) dnsNodes.push({ id: `dns-duckdns-${p.id}`, label: p.domain, meta: 'DuckDNS', tone: 'ok', linkTo: '/network/proxies' });
+  }
+  if (dnsNodes.length) layers.push({ id: 'dns', label: 'DNS', nodes: dnsNodes });
 
   const proxies = listProxies();
   if (proxies.length) {
@@ -97,6 +115,23 @@ export async function getTopology() {
             label: v.name || `${v.type}/${v.vmid}`,
             meta: `${v.node} · ${v.type.toUpperCase()} #${v.vmid}`,
             tone: v.status === 'running' ? 'ok' : v.status === 'stopped' ? 'mut' : 'warn',
+            linkTo: '/infrastructure'
+          }))
+        });
+      }
+
+      // Dernière couche : le stockage Proxmox (used/avail réels par pool,
+      // /nodes/{node}/storage) — complète la chaîne demandée jusqu'à "Stockage".
+      const allStorage = await safe(() => proxmox.listStorage());
+      if (allStorage?.length) {
+        layers.push({
+          id: 'proxmox-storage',
+          label: `Stockage (${allStorage.length})`,
+          nodes: allStorage.map((s) => ({
+            id: `storage-${s.node}-${s.storage}`,
+            label: s.storage,
+            meta: `${s.node} · ${s.type}${s.total ? ` · ${Math.round(s.usedFraction * 100)}% utilisé` : ''}`,
+            tone: s.usedFraction > 0.9 ? 'crit' : s.usedFraction > 0.75 ? 'warn' : 'ok',
             linkTo: '/infrastructure'
           }))
         });

@@ -1,5 +1,5 @@
 import { getRawIntegration } from '../../store/settingsStore.js';
-import { buildClient, request, notConfigured, IntegrationError } from './httpClient.js';
+import { buildClient, request, notConfigured, IntegrationError, buildHttpsAgentFromConfig } from './httpClient.js';
 
 // L'API Wazuh (gestionnaire, port 55000 par défaut) s'authentifie via
 // utilisateur/mot de passe pour obtenir un JWT de courte durée (~15 min) :
@@ -10,19 +10,20 @@ let tokenCache = { token: null, expiresAt: 0 };
 function baseClient() {
   const cfg = getRawIntegration('wazuh');
   if (!cfg.baseUrl) return null;
-  return { http: buildClient(cfg.baseUrl, { timeout: 8000 }), cfg };
+  return { http: buildClient(cfg.baseUrl, { timeout: 8000, httpsAgent: buildHttpsAgentFromConfig(cfg) }), cfg };
 }
 
 async function authenticatedClient() {
   const base = baseClient();
   if (!base) return null;
+  const httpsAgent = buildHttpsAgentFromConfig(base.cfg);
   if (tokenCache.token && tokenCache.expiresAt > Date.now()) {
-    return { http: buildClient(base.cfg.baseUrl, { headers: { Authorization: `Bearer ${tokenCache.token}` } }), cfg: base.cfg };
+    return { http: buildClient(base.cfg.baseUrl, { headers: { Authorization: `Bearer ${tokenCache.token}` }, httpsAgent }), cfg: base.cfg };
   }
-  const authClient = buildClient(base.cfg.baseUrl, { auth: { username: base.cfg.username, password: base.cfg.password || '' } });
+  const authClient = buildClient(base.cfg.baseUrl, { auth: { username: base.cfg.username, password: base.cfg.password || '' }, httpsAgent });
   const data = await request(authClient, { method: 'POST', url: '/security/user/authenticate' }, 'Wazuh · authentification');
   tokenCache = { token: data.data.token, expiresAt: Date.now() + 14 * 60 * 1000 };
-  return { http: buildClient(base.cfg.baseUrl, { headers: { Authorization: `Bearer ${tokenCache.token}` } }), cfg: base.cfg };
+  return { http: buildClient(base.cfg.baseUrl, { headers: { Authorization: `Bearer ${tokenCache.token}` }, httpsAgent }), cfg: base.cfg };
 }
 
 export async function getStatus() {

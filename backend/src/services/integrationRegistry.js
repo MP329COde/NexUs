@@ -9,6 +9,7 @@ import * as proxmoxService from './integrations/proxmoxService.js';
 import * as traefikService from './integrations/traefikService.js';
 import * as certManagerService from './integrations/certManagerService.js';
 import * as grafanaService from './integrations/grafanaService.js';
+import * as tracingService from './integrations/tracingService.js';
 import * as wazuhService from './integrations/wazuhService.js';
 import * as privateRegistryService from './integrations/privateRegistryService.js';
 import * as notificationWebhookService from './integrations/notificationWebhookService.js';
@@ -31,6 +32,7 @@ export const integrations = {
   traefik: { label: 'Traefik', service: traefikService, domain: 'net' },
   certManager: { label: 'Cert-Manager', service: certManagerService, domain: 'net' },
   grafana: { label: 'Grafana', service: grafanaService, domain: 'mon' },
+  tracing: { label: 'Traces distribuées', service: tracingService, domain: 'mon' },
   wazuh: { label: 'Wazuh', service: wazuhService, domain: 'sec' },
   registry: { label: 'Registre privé', service: privateRegistryService, domain: 'dev' },
   notificationsWebhook: { label: 'Notifications sortantes', service: notificationWebhookService, domain: 'mon' },
@@ -41,6 +43,6 @@ export const integrations = {
 
 export {
   kubernetesService, argocdService, haproxyService, gitlabService, githubService, githubPlatformService, giteaService,
-  proxmoxService, traefikService, certManagerService, grafanaService, wazuhService,
+  proxmoxService, traefikService, certManagerService, grafanaService, tracingService, wazuhService,
   privateRegistryService, notificationWebhookService, ovhService, duckdnsService, gitBackupService
 };

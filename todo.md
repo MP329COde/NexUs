@@ -759,3 +759,485 @@ HAProxy est un dossier local du scratchpad de session) et ne redémarreront pas 
   `backend/src/store/usersStore.js`, `backend/src/middleware/auth.js`, `backend/src/routes/
   auth.routes.js`, `frontend/src/context/AuthContext.jsx`, `frontend/src/pages/Login/LoginPage.jsx`,
   `frontend/src/pages/Account/AccountPage.jsx(.css)`.
+- [~] **Certificats TLS auto-signés — case « Ignorer la vérification du certificat » (Lot A1, bug bloquant
+  identifié dans l'audit du plan "pare des agents pour Cosmic Shannon")** : cause confirmée de l'erreur
+  `UNABLE_TO_VERIFY_LEAF_SIGNATURE` remontée par l'utilisateur avec Proxmox/Argo CD/etc. —
+  `httpClient.js` (`buildClient()`) acceptait déjà un `httpsAgent` mais aucun service ne le construisait
+  ni ne le transmettait. Ajout de `buildHttpsAgentFromConfig(cfg)` dans `backend/src/services/
+  integrations/httpClient.js` : construit un `https.Agent({ rejectUnauthorized: !cfg.allowSelfSigned, ca:
+  cfg.caCertPem })` uniquement si `allowSelfSigned` ou `caCertPem` est explicitement présent dans la
+  config de l'intégration — par défaut (absent), vérification TLS strate inchangée (`undefined`, agent
+  Node par défaut). Câblé dans les 5 services qui en avaient besoin : `proxmoxService.js`,
+  `argocdService.js`, `haproxyService.js`, `gitlabService.js`, `wazuhService.js` (les 3 `buildClient()`
+  du flux d'authentification token). **`kubernetesService.js` avait déjà son propre mécanisme
+  équivalent** (`insecureSkipTlsVerify` dans le kubeconfig `@kubernetes/client-node`, pré-existant,
+  non touché). `githubService.js`/`githubPlatformService.js`/`dockerHubService.js` non modifiés : ciblent
+  des API publiques à domaine fixe (api.github.com, hub.docker.com), pas de cas d'usage certificat
+  auto-signé. Erreur claire ajoutée dans `request()` : les codes Node
+  `UNABLE_TO_VERIFY_LEAF_SIGNATURE`/`DEPTH_ZERO_SELF_SIGNED_CERT`/`SELF_SIGNED_CERT_IN_CHAIN`/
+  `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`/`CERT_HAS_EXPIRED` déclenchent un message explicite ("certificat non
+  vérifiable... activez « Ignorer la vérification du certificat »...") au lieu d'une erreur réseau
+  générique — remonté tel quel côté UI puisque tous les statuts d'intégration affichent déjà
+  `IntegrationError.message`. Frontend : nouvelle case à cocher `allowSelfSigned` (type `checkbox`,
+  libellé + avertissement ⚠️ explicite) ajoutée dans `frontend/src/config/integrationForms.js` pour
+  Proxmox, Argo CD, HAProxy, GitLab et Wazuh — aucun changement de composant nécessaire, le rendu
+  générique des champs `checkbox` existait déjà (utilisé par `insecureSkipTlsVerify` de Kubernetes dans
+  `IntegrationPanel.jsx`). Pas de champ `caCertPem` (upload de CA personnalisée) ajouté — au-delà du
+  temps disponible pour ce lot, laissé comme suite possible (le paramètre est déjà prévu côté
+  `buildHttpsAgentFromConfig`, juste pas exposé côté formulaire). **Vérifié réellement** : `node --check`
+  OK sur tous les fichiers backend modifiés ; script de test bout en bout contre un vrai serveur HTTPS
+  auto-signé généré localement (`openssl req -x509 ...` + `https.createServer`) — confirmé qu'une requête
+  échoue avec le message clair en mode strict par défaut, et réussit une fois `allowSelfSigned: true`
+  passé à `buildHttpsAgentFromConfig`. **Non testé** : aucune instance Proxmox/Argo CD/HAProxy/GitLab/
+  Wazuh réelle disponible pour valider le chemin complet config → sauvegarde → requête via l'UI ; le
+  frontend n'était pas démarré pendant ce lot donc la case à cocher n'a pas été vérifiée visuellement par
+  Playwright (juste la config JSON et la réutilisation confirmée du rendu générique `checkbox` déjà en
+  production pour Kubernetes). `backend/src/services/integrations/httpClient.js`,
+  `backend/src/services/integrations/{proxmoxService,argocdService,haproxyService,gitlabService,
+  wazuhService}.js`, `frontend/src/config/integrationForms.js`.
+- [~] Réseau (Priorité 4) : éditeur sécurisé HAProxy (édition texte de `haproxy.cfg` via l'endpoint
+  `raw` de la Data Plane API v3, validation `only_validate=true` réelle — pas de validation inventée
+  côté NexUs —, diff avant application via `DiffView`, historique/rollback réel appuyé sur une
+  nouvelle table `network_config_history`, migration `0043_network_config_history.sql`). Validation
+  avant enregistrement ajoutée sur `POST /haproxy/frontends` (nom/port/mode/unicité, manquait). Couches
+  DNS (zones OVH + domaines DuckDNS déjà connus) et Stockage (pools Proxmox réels, used/avail) ajoutées
+  à la topologie — le graphe interactif cliquable existait déjà (Lot 44), pas reconstruit. Non testé
+  contre une vraie instance HAProxy dans cette session (pas d'accès à un cluster réel ici, contrairement
+  au Lot 46) : le code suit fidèlement la Data Plane API v3 documentée mais reste à vérifier en
+  conditions réelles. `backend/src/services/integrations/haproxyService.js`,
+  `backend/src/routes/haproxy.routes.js`, `backend/src/store/networkConfigHistoryStore.js`,
+  `backend/src/services/networkTopologyService.js`, `frontend/src/pages/Network/HAProxyConfigEditor.jsx`
+  (nouveau), `frontend/src/pages/Network/NetworkLayout.jsx`, `frontend/src/pages/Network/
+  NetworkShared.css`, `frontend/src/App.jsx`.
+- [~] Provisioning des repositories (Priorité 1, suite du Lot 54) : `POST /repository-provisioning`
+  déclenche désormais réellement `runProvisioning()` au lieu de laisser la demande en `pending` — crée
+  le dépôt (GitHub personnel, GitHub compte plateforme NexUs choisi explicitement, ou GitLab), protège
+  la branche par défaut, crée des labels standards, des variables CI, un webhook NexUs (réutilise
+  `webhook_secret`/`legacy_id` déjà existants) et rattache une équipe GitHub si `team_slug` fourni ;
+  chaque étape annexe est best-effort (échec journalisé dans `status_detail`, jamais un faux succès).
+  `POST /:id/provision` rejoue une demande `failed`. Repositories annexes (doc Docusaurus, Storybook,
+  Design System, Infra/IaC — 4 nouveaux templates `annex: true`) provisionnables automatiquement à la
+  création d'un projet via `repoProvisioning.annexKeys`. UI ajoutée (`ManagedRepositoriesPanel.jsx`,
+  onglet Code de la fiche projet — manquait explicitement d'après todo-lot54.md). **Non testé contre un
+  vrai compte GitHub/GitLab** (pas de credentials disponibles dans cette session) : suit les API REST
+  documentées mais pas vérifié en conditions réelles, contrairement au reste des intégrations du repo —
+  limite assumée, pas masquée. Gitea non supporté (échec explicite). Migration
+  `0044_repository_provisioning_apply.sql`, `backend/src/services/repositoryProvisioningService.js`
+  (nouveau), `backend/src/services/integrations/githubRepoSetup.js` (nouveau),
+  `backend/src/services/integrations/{githubService,githubPlatformService,gitlabService}.js`,
+  `backend/src/routes/{repositoryProvisioning,projects}.routes.js`,
+  `backend/src/store/managedRepositoriesStore.js`, `frontend/src/pages/Deployments/
+  ManagedRepositoriesPanel.jsx` (nouveau), `frontend/src/pages/Deployments/ProjectDetailPage.jsx`.
+- [~] Registry ↔ Projets (chaîne Projet → Repository → Pipeline → Image Docker → Registry →
+  Deployment) : jusqu'ici confirmé par 3 audits successifs (Lots 38/48/58-nav) que `registry.routes.js`
+  n'avait aucune notion de `project_id`/`component_id`. Nouvelle table `component_images` (migration
+  `0045_component_images.sql`) relie une image (repo+tag+digest dans le registre) à un `component_id`
+  précis (donc à son projet via `components.project_id`) et à la source pipeline qui l'a produite ;
+  `GET /catalog/components/:id/images` enrichit avec les tags réellement présents dans le registre privé
+  configuré (`privateRegistryService.listTags`, jamais de tags inventés si non configuré). Deployment
+  peut désormais référencer `componentId`/`imageRepository`/`imageTag` (`deploymentStore.createLink`,
+  champs optionnels, rétrocompatibles). UI : panneau "Images Docker (Registry)" dans la fiche composant
+  du Catalog. Limite assumée : Pipeline → Repository reste une jointure informelle par nom de repo (pas
+  de table `pipeline_runs` persistée) — hors périmètre de ce lot. `backend/src/db/migrations/
+  0045_component_images.sql`, `backend/src/store/componentImagesStore.js` (nouveau),
+  `backend/src/routes/catalog.routes.js`, `backend/src/store/deploymentStore.js`,
+  `frontend/src/pages/Deployments/CatalogComponentPage.jsx`.
+- [~] Redirections externes & previews PR (audit + corrections) : bug réel trouvé et corrigé —
+  `DiagnosticsModal.jsx` reconstruisait l'URL du dépôt Git à la main (`https://github.com/{owner}/
+  {repo}` en dur), ce qui ne fonctionnait jamais pour GitLab et cassait pour tout GitHub Enterprise
+  auto-hébergé ; l'URL réelle est désormais résolue côté backend (`GET /kubernetes/deployments/:ns/
+  :name/links` appelle `github.getRepo`/`gitlab.getProject`) comme partout ailleurs dans le repo. Le
+  reste de l'audit (commit/PR/pipeline/job/registry/Argo CD/Grafana) confirme que les liens externes
+  utilisent déjà systématiquement l'URL réelle renvoyée par l'API, jamais reconstruite côté frontend —
+  rien d'autre à corriger. Aucun lien pod → dashboard Kubernetes externe (Lens/Octant) n'existe, ni
+  n'est demandé de façon actionnable (pas d'outil configuré) : laissé tel quel. Previews de PR : tous
+  les champs demandés existaient déjà en base (migration 0018) sauf l'application réelle de
+  `expires_at` — affiché mais jamais nettoyé (confirmé par audit croisant 3 mentions dans todo.md/
+  fonctions.md). Nettoyage automatique ajouté : `previewEnvironmentCleanupService.js` (nouveau),
+  planifié à l'heure comme les autres tâches de `index.js`, détruit réellement le namespace Kubernetes
+  provisionné (`kubernetesService.deleteNamespace`, nouveau) puis l'enregistrement en base — jamais
+  l'inverse, ne bloque jamais si Kubernetes n'est pas configuré/le namespace déjà absent. Vue
+  consolidée ajoutée dans `EnvironmentsPanel` (fiche projet, onglet Livraison) : branche, commit,
+  namespace, statut, expiration, lien PR et lien direct "Logs & pods" (`/kubernetes?ns=...`) sur une
+  seule ligne par preview — n'affiche ni URL de preview ni métriques par preview : aucune des deux
+  n'est réellement produite par NexUs aujourd'hui (pas de génération d'ingress automatique, pas de
+  métriques par environnement), les inventer aurait été pire que ne rien afficher. Non testé contre un
+  vrai cluster Kubernetes dans cette session. `backend/src/routes/kubernetes.routes.js`,
+  `backend/src/services/integrations/kubernetesService.js`, `frontend/src/pages/Kubernetes/
+  DiagnosticsModal.jsx`, `backend/src/services/previewEnvironmentCleanupService.js` (nouveau),
+  `backend/src/store/orgStore.js`, `backend/src/index.js`, `frontend/src/pages/Deployments/
+  ProjectDetailPage.jsx(.css)`.
+- [~] Observabilité centrée Service (Priorité 5) : jusqu'ici confirmé par audit (todo.md Lots
+  55/56-nav) que rien n'était scopable par composant du catalog. Migration
+  `0046_component_observability.sql` ajoute `incidents.component_id` (FK réelle, remplace le
+  `resource_ref` texte libre pour ce cas d'usage) et `components.{k8s_namespace,
+  grafana_dashboard_uid, slo_target}` (tous optionnels, jamais de valeur devinée). Panneau
+  "Observabilité" ajouté à la fiche composant du Catalog (`ObservabilityPanel.jsx`, nouveau) :
+  **SLO/disponibilité** calculée réellement à partir du temps d'impact des incidents rattachés
+  (`GET /catalog/components/:id/slo`, fenêtre 30/90j, tendance vs période précédente, budget
+  d'erreur si un objectif est défini — sinon "Aucun objectif défini", jamais 99.9% par défaut) ;
+  **Dashboards/Metrics** = lien direct vers le dashboard Grafana rattaché (`grafana_dashboard_uid`) ;
+  **Alertes** = alertes Grafana/Alertmanager filtrées côté client par namespace (best-effort,
+  affiché honnêtement "Non configuré" si Grafana absent) ; **Logs** = lien direct vers
+  `/kubernetes?ns=...` ; **Traces** = nouvelle intégration `tracingService.js` (Grafana Tempo ou
+  Jaeger, recherche réelle par tag `service.name` OpenTelemetry — décision actée au Lot 56-nav de
+  ne construire cette intégration qu'avec un vrai collecteur configurable, jamais de traces
+  inventées), routes `GET /tracing/status`, `GET /tracing/search`, `GET /catalog/components/:id/
+  traces`, ajoutée à `integrationForms.js`/`integrationRegistry.js` comme toute autre intégration.
+  Non testé contre une vraie instance Tempo/Jaeger/Grafana dans cette session. `backend/src/db/
+  migrations/0046_component_observability.sql`, `backend/src/services/integrations/
+  tracingService.js` (nouveau), `backend/src/routes/tracing.routes.js` (nouveau),
+  `backend/src/routes/{catalog,projects,index}.js`, `backend/src/store/{orgStore,
+  incidentStore,settingsStore}.js`, `backend/src/services/integrationRegistry.js`,
+  `frontend/src/pages/Deployments/ObservabilityPanel.jsx` (nouveau),
+  `frontend/src/pages/Deployments/CatalogComponentPage.jsx`, `frontend/src/config/
+  integrationForms.js`.
+- [x] **Sidebar fixe/scrollable — bug de navigation latérale (Lot A2)** : bug signalé « dans
+  Développement si on clique dans Catalogue puis dans Templates on a un bug sur la barre
+  latérale », plus largement « les barres latérales doivent rester fixes et si elles sont trop
+  grandes permettre de faire défiler ». Reproduit d'abord réellement via Playwright (Postgres
+  `nexus-dev-postgres` relancé, backend/frontend sur les ports standards 4000/5173) avant toute
+  correction. **Cause racine réelle, différente de la piste CSS initiale de l'audit** (qui
+  décrivait `DomainNav.css` comme déjà correct, ce qui a été confirmé) : `Shell.jsx` utilisait
+  `key={location.pathname}` sur le conteneur de page (`.shell-route-page`), uniquement pour
+  rejouer l'animation d'entrée `.route-page` à chaque navigation. Effet de bord non voulu : React
+  démonte et remonte **tout** l'arbre sous `<Outlet/>` à chaque changement d'URL, y compris entre
+  deux sous-pages d'un même layout à navigation latérale (ex. `/deployments/catalog` →
+  `/deployments/templates`, tous deux sous `DeploymentsLayout`) — ce qui détruisait et recréait la
+  sidebar latérale (`.dev-nav`) à chaque clic : re-fetch de `/status/overview` et `/teams/mine`,
+  perte de tout état transitoire, recalcul du `position: sticky`, visible comme un "bug"/flash sur
+  la barre. Confirmé par preuve DOM directe (les refs Playwright de `.dev-nav` changent
+  intégralement après le clic Templates alors que le layout parent n'aurait pas dû se recréer).
+  Corrigé dans `frontend/src/components/layout/Shell.jsx` : la clé de remontage n'est plus le
+  pathname complet mais son premier segment (`location.pathname.split('/')[1]`, le domaine) — les
+  layouts à sous-navigation restent montés lors d'une navigation interne (vérifié via Playwright :
+  `document.querySelector('.dev-nav')` retourne le **même nœud DOM** avant/après le clic
+  Catalogue→Templates, idem pour `.k8s-layout-nav` entre Charges de travail→Services), tout en
+  conservant l'animation d'entrée lors d'un vrai changement de domaine (ex. Développement→
+  Kubernetes). En complément, et conformément à la demande explicite ("rester fixes... permettre
+  de faire défiler si trop grandes"), les trois sidebars latérales à sous-navigation
+  (`.dev-nav` dans `DeploymentsLayout`, `.k8s-layout-nav` dans `KubernetesLayout`,
+  `.network-layout-nav` dans `NetworkLayout`) ont reçu `position: sticky; top: 24px; max-height:
+  calc(100vh - 104px); overflow-y: auto` — seule `.dev-nav` avait déjà `position: sticky` (sans
+  limite de hauteur ni défilement interne), `.k8s-layout-nav`/`.network-layout-nav` n'étaient même
+  pas fixes (elles défilaient avec le contenu). Le rail principal (`DomainNav.css`,
+  `.domnav-nav`) était déjà correct, non modifié. Le bandeau d'icônes horizontal en dessous de
+  860px (correctif mobile déjà existant, `todo.md` ligne 31) a été explicitement revérifié pour
+  ne pas régresser : les nouvelles règles `max-height`/`position`/`overflow-y` sont neutralisées
+  en `!important` dans les blocs `@media (max-width: 860px)` existants de `global.css` (nécessaire
+  car les CSS de layout, chargés après `global.css` dans l'arbre de modules, l'emportaient sinon en
+  cascade à spécificité égale) ; revérifié à 768px via Playwright (bandeau horizontal toujours en
+  ligne, `overflow-x: auto`, largeur 100 %). Vérifié à 1280px et 768px, sans erreur console
+  imputable au changement (les erreurs 502 `/api/kubernetes/*` observées sont l'absence attendue
+  de cluster K8s configuré dans cet environnement, préexistante et sans lien). **Limite
+  honnête** : les captures d'écran Playwright plein-page ont échoué systématiquement en fin de
+  session (`TimeoutError` sur "waiting for fonts to load", y compris après confirmation que
+  `document.fonts.ready` était résolu côté page — probablement une panne locale de l'outil de
+  capture, pas du rendu) ; la vérification visuelle a donc été faite via les positions/dimensions
+  DOM réelles (`getBoundingClientRect`, `getComputedStyle`) et l'identité de nœud avant/après
+  clic plutôt que par comparaison d'images, ce qui reste une preuve directe du comportement réel
+  mais pas une capture visuelle. Fichiers modifiés : `frontend/src/components/layout/Shell.jsx`,
+  `frontend/src/pages/Deployments/DeploymentsLayout.css`, `frontend/src/pages/Kubernetes/
+  KubernetesLayout.css`, `frontend/src/pages/Network/NetworkLayout.css`,
+  `frontend/src/styles/global.css`.
+- [x] **Dark/light mode lent (~10 s) — investigation approfondie, non reproduit (Lot A3)** : bug
+  signalé « lorsque l'on passe du mode sombre au mode clair certaines pages ont du mal à changer
+  de mode et prennent beaucoup de temps, environ 10 secondes ». Reproduction tentée en conditions
+  réelles (Postgres `nexus-dev-postgres`, backend/frontend démarrés, session connectée) via
+  Playwright sur 5 pages différentes et variées : Kubernetes (Charges de travail), Réseaux
+  (Topologie), fiche Projet, Catalogue logiciel. **La piste de l'audit précédent — `setTheme()`
+  attendrait la promesse réseau `updateProfile()` avant de re-render — s'est avérée fausse dès la
+  lecture du code** : `frontend/src/context/ThemeContext.jsx` applique déjà `data-theme` de façon
+  100% optimiste (`setThemeState(value)` synchrone, puis `updateProfile({theme:value}).catch(()
+  => {})` en tâche de fond, jamais attendu) ; `frontend/index.html` pose même déjà `data-theme`
+  avant le premier paint React pour éviter tout flash. Vérifié par preuve directe et non par
+  simple lecture : instrumentation d'un `MutationObserver` sur l'attribut `data-theme` de
+  `<html>` + horodatage `performance.now()` au clic, répétée sur les 5 pages — délai mesuré
+  **entre 1,7 ms et 3,9 ms** dans tous les cas, y compris après avoir intercepté `window.fetch`
+  pour retarder artificiellement la réponse de `PUT /api/auth/profile` de **10 secondes** (le
+  changement visuel de thème reste instantané, complètement découplé de la requête réseau,
+  confirmant que l'architecture attendue par le plan est déjà en place). Aucune autre page ni
+  composant ne consomme `useTheme()`/`resolved` à part `Header.jsx` (le bouton lui-même) et
+  `AccountPage.jsx` (les onglets de préférence) — pas de re-fetch de données ni de remontage
+  déclenché par un changement de thème ailleurs (vérifié : aucun `key={theme}`/`key={resolved}`
+  dans le code, et le `routeKey` de `Shell.jsx` — cf. entrée Lot A2 ci-dessus — ne dépend que de
+  `location.pathname`, jamais du thème). **Aucune correction de code appliquée** : le
+  comportement demandé par le plan (application optimiste + persistance en arrière-plan +
+  échec géré sans bloquer l'UI, ce dernier point déjà couvert par le toast global automatique de
+  `apiClient.js` sur toute erreur 5xx) est déjà celui du code existant. **Piste écartée
+  explicitement pour éviter qu'un futur audit ne la reprenne à tort** : une mesure basée sur
+  `requestAnimationFrame` (double rAF après clic) a d'abord semblé montrer ~1,4–1,7 s de délai
+  sur la page Réseaux — mais le même test donne un résultat quasi identique sur la page
+  Kubernetes sans aucun clic, et une mesure de FPS au repos (sans interaction, sur les deux pages)
+  donne ~1,5 fps de façon uniforme sur toutes les pages testées, y compris avant tout changement
+  de thème : c'est une limite du navigateur headless piloté par Playwright dans cet environnement
+  (compositeur/rAF fortement throttlé, cohérent avec l'échec systématique des captures d'écran
+  plein-page déjà documenté au Lot A2 — « TimeoutError… waiting for fonts to load »), pas un
+  ralentissement propre à l'app ou à une page en particulier. **Limite honnête** : le bug reste
+  possible en usage réel (navigateur non headless, réseau/backend réels plus lents que
+  localhost, ou un enchaînement d'actions non reproduit ici) ; faute de reproduction, aucun
+  correctif n'a pu être ciblé et testé. Si le ralentissement persiste côté utilisateur, il
+  faudrait idéalement une capture concrète (onglet Réseau du navigateur + Performance) au moment
+  du bug, avec la page exacte et la séquence d'actions précédant le changement de thème.
+  Aucune erreur console nouvelle introduite (les 502 `/api/kubernetes/*` observés sont l'absence
+  attendue de cluster K8s configuré, préexistante, sans lien). Aucun fichier modifié pour ce lot.
+- [x] **Clé d'accès (passkey) impossible à créer/utiliser sur Safari et « les autres navigateurs »
+  (Lot A4, bug bloquant identifié dans l'audit du plan "pare des agents pour Cosmic Shannon")** :
+  bug reproduit d'abord réellement plutôt que supposé — backend/frontend démarrés (Postgres
+  `nexus-dev-postgres`, ports standards 4000/5173), cycle complet enregistrement → connexion testé
+  via Playwright + API CDP `WebAuthn` de Chromium (`WebAuthn.enable` +
+  `addVirtualAuthenticator`, authentificateur virtuel `ctap2`/résident/vérification utilisateur) —
+  la seule façon de déclencher une vraie cérémonie WebAuthn (`navigator.credentials.create`/`get`)
+  sans authentificateur physique. **Piste de l'audit précédent (RP_ID dérivé de
+  `env.frontendOrigin`) écartée après vérification** : en dev (`FRONTEND_ORIGIN=http://
+  localhost:5173`), `localhost` est un secure context pour tous les navigateurs y compris Safari,
+  et `RP_ID` vaut bien `localhost` (simple hostname, sans port/protocole) — conforme à la doc
+  `@simplewebauthn/server`. Le format des identifiants (`credential.id` en base64url via
+  `@simplewebauthn` v13, jamais de base64 standard), `pubKeyCredParams` (Ed25519/-8, ES256/-7,
+  RS256/-257), `attestation: 'none'`, `userVerification: 'preferred'` : tous conformes à la doc, et
+  un premier test bout en bout (avec un correctif temporaire donnant le focus à la page) a
+  d'ailleurs prouvé que le backend (`backend/src/routes/webauthn.routes.js`, non modifié — cause
+  confirmée hors de ce fichier) fonctionne correctement de bout en bout une fois la cérémonie
+  déclenchée dans de bonnes conditions. **Cause racine réelle trouvée par instrumentation directe
+  de `navigator.credentials.create`/`get`** : les deux gestionnaires de clic
+  (`AccountPage.jsx` → `register()`, `LoginPage.jsx` → `onPasskey()`) attendaient
+  (`await api.post('/auth/webauthn/{register,login}-options')`) la réponse réseau du serveur AVANT
+  d'appeler `startRegistration`/`startAuthentication` (donc `navigator.credentials.create`/`get`).
+  C'est une limitation bien connue et documentée de WebKit/Safari : l'activation utilisateur
+  ("user gesture") issue du clic est considérée expirée dès qu'un aller-retour réseau s'intercale
+  avant l'appel WebAuthn, et l'API rejette alors avec `NotAllowedError` — silencieusement ici,
+  puisque le code des deux écrans ignore volontairement cette erreur précise (comportement correct
+  quand elle vient d'une vraie annulation utilisateur, mais qui masquait ce bug systémique).
+  Confirmé par preuve directe : en patchant temporairement `navigator.credentials.create` pour
+  logguer l'erreur réelle avant correctif, `NotAllowedError - The operation is not allowed at this
+  time because the page does not have focus` remontait de façon reproductible dès qu'un délai
+  s'intercalait avant l'appel — cohérent avec le mécanisme Safari documenté (Chrome est plus
+  tolérant sur la durée de l'activation utilisateur, ce qui explique que le bug soit systématique
+  sur Safari et seulement intermittent/dépendant de la latence réseau sur les autres navigateurs,
+  comme rapporté). **Correctif** : préchargement des options WebAuthn (`register-options` /
+  `login-options`) en tâche de fond — au montage du composant, puis rafraîchi toutes les 4 min
+  (le défi expire après 5 min côté serveur, `CHALLENGE_TTL_MS` dans `webauthn.routes.js`, non
+  modifié) et après chaque tentative/ajout/suppression de clé — de sorte que le clic déclenche
+  `startRegistration`/`startAuthentication` immédiatement à partir d'options déjà en cache, sans
+  attente réseau intercalée. Repli explicite si aucune option n'est encore en cache (échec réseau
+  ou clic immédiat avant la fin du premier préchargement) : tentative de récupération à la volée,
+  au lieu de bloquer silencieusement. `frontend/src/pages/Login/LoginPage.jsx` : premier correctif
+  qui plaçait les nouveaux hooks (`useRef`/`useEffect`) après le `return` anticipé
+  (`if (user) return <Navigate/>`) a cassé les règles des Hooks React (« Rendered fewer hooks than
+  expected », erreur reproduite et corrigée dans la même session avant validation finale) — les
+  hooks sont désormais déclarés avant ce retour anticipé, avec garde interne
+  (`if (user) return undefined`) dans l'effet pour ne pas précharger inutilement une fois connecté.
+  **Vérifié réellement sur Chromium** (authentificateur virtuel CDP) : cycle complet enregistrement
+  → suppression → nouvel enregistrement → déconnexion (cookies effacés) → connexion par clé
+  d'accès → session restaurée, avec chronométrage direct prouvant que `navigator.credentials.
+  create`/`get` sont désormais appelés 15-19 ms après le clic (au lieu d'attendre une réponse
+  réseau de ~150-600 ms avant), et confirmation qu'aucune requête réseau ne s'intercale plus entre
+  le clic et l'appel WebAuthn. **Non testé** : Safari/WebKit réel — Playwright ne supporte
+  l'émulation WebAuthn (CDP `WebAuthn` domain) que sur Chromium, WebKit n'a pas d'équivalent ; le
+  correctif s'appuie donc sur l'analyse du comportement documenté de WebKit (limitation de
+  l'activation utilisateur transitoire à travers un `await` réseau) et sur la reproduction du
+  symptôme exact (`NotAllowedError` sur perte de focus/activation) obtenue sur Chromium en
+  simulant les mêmes conditions de délai, pas sur un test direct contre Safari. Aucune instance
+  Safari disponible dans cet environnement pour validation finale ; recommandé de faire confirmer
+  par un utilisateur Safari réel si le comportement persiste. `frontend/src/pages/Account/
+  AccountPage.jsx`, `frontend/src/pages/Login/LoginPage.jsx` ; aucun fichier backend modifié
+  (`node --check` non applicable, aucun `.js` backend touché dans ce lot).
+- [x] **Badges d'intégration faussement rouges (« configuré et sans bug » affiché en échec), ex.
+  GitLab (Lot A5, bug bloquant identifié dans l'audit du plan "pare des agents pour Cosmic
+  Shannon")** : **piste de l'audit précédent (timeout 8000ms sans retry/cache dans
+  `httpClient.js` avant agrégation dans `integrationRegistry.js`) vérifiée puis écartée** —
+  `backend/src/routes/status.routes.js` (`GET /status/overview`, utilisé par le tableau de bord
+  « Vue générale » et par `InfrastructureStatusPanel.jsx`) appelle bien `getStatus()` une seule
+  fois par intégration sans retry, mais chaque échec y renvoie déjà un message précis
+  (`IntegrationError` dans `httpClient.js#request` distingue explicitement certificat non
+  vérifiable, 401/403 « non autorisé », et « connexion impossible (CODE) » avec le code Node
+  réel : `ETIMEDOUT`, `ENOTFOUND`, etc.) — ce n'est pas la source du symptôme rapporté ; aucun
+  retry/cache n'a donc été ajouté pour éviter de masquer par un correctif générique une cause
+  différente. **Cause racine réelle trouvée** (reproduite avec un objet simulant exactement les
+  deux formes de données envoyées par le backend) : la page Paramètres → « Intégrations & outils »
+  (`SettingsPage.jsx`, rendue via `IntegrationPanel.jsx`) et le panneau « Forges déclarées »
+  (`GitServicesPanel.jsx`) affichent le badge de statut à partir de `GET /settings`
+  (`getAllRedacted()`/`getRedactedIntegration()` dans `backend/src/store/settingsStore.js`), qui
+  ne renvoie QUE `configured` (présence des champs en base) — jamais de `ok`, puisque cette route
+  ne fait aucun appel réseau vers le service distant (à la différence de `/status/overview`, qui
+  lui fait un vrai test live et est correctement utilisé par `InfrastructureStatusPanel.jsx`, non
+  affecté par ce bug). Or `toneFromStatus()` dans
+  `frontend/src/components/ui/StatusBadge.jsx` faisait `entry.ok ? 'ok' : 'crit'` : avec
+  `entry.ok === undefined` (cas normal juste après avoir sauvegardé une config valide, avant tout
+  clic sur « Tester »), l'expression tombe dans la branche `'crit'` (rouge) — une intégration
+  fraîchement configurée avec un vrai token valide s'affichait donc systématiquement en rouge tant
+  que l'utilisateur n'avait pas explicitement cliqué sur « Tester la connexion », ce qui correspond
+  exactement au symptôme rapporté (« on connecte une source de dépôts » → rouge immédiat, GitLab
+  cité). Preuve directe (calcul reproduit dans `node -e`, avant/après) :
+  `toneFromStatus({configured:true})` → `'crit'` avant le correctif, `'mut'` (neutre, ni vert ni
+  rouge) après ; `toneFromStatus({configured:true, ok:true})` reste `'ok'` et
+  `toneFromStatus({configured:true, ok:false})` reste `'crit'` dans les deux cas — donc un vrai
+  échec testé continue d'afficher rouge, seul le cas « jamais testé » cesse d'être confondu avec
+  un échec. **Correctif** : `toneFromStatus()` distingue désormais explicitement les trois états
+  (`ok === true` → vert, `ok === false` → rouge, `ok` absent → neutre/gris, jamais rouge) au lieu
+  de traiter toute absence de `ok` comme un échec. `IntegrationPanel.jsx` et
+  `GitServicesPanel.jsx` affichent maintenant un libellé distinct par état (« Connecté » / «
+  Erreur » / « Configuré (non testé) » / « Non configuré ») au lieu du seul « Configuré » ambigu
+  d'avant (peu explicite sur un badge déjà rouge). Les deux composants mémorisent aussi
+  localement le résultat du dernier clic sur « Tester la connexion » (`lastTested` /
+  `testedStatus`) pour que le badge d'en-tête passe immédiatement au vert/rouge réel après un test
+  volontaire, sans attendre un rechargement complet de page — ce résultat local est réinitialisé
+  dès que la config sous-jacente change (nouvelle sauvegarde), pour ne jamais afficher un « vert »
+  qui daterait d'une configuration différente de celle actuellement enregistrée. Le message
+  d'erreur précis (cause exacte : certificat, 401, timeout réseau...) était déjà remonté
+  correctement par `httpClient.js` lors d'un test volontaire (affiché tel quel dans la zone de
+  résultat de test et dans le toast de `GitServicesPanel.jsx`) — non modifié, déjà conforme à
+  l'exigence de ne pas afficher un rouge générique sans explication. **Vérifié réellement** :
+  build frontend (`npx vite build`) sans erreur après les changements ; reproduction du bug et
+  de sa résolution par calcul direct de `toneFromStatus()` sur les deux formes de données
+  (`GET /settings` sans `ok`, et `POST /settings/:key/test` avec `ok` réel) montrant le
+  changement de comportement attendu. **Non testé** : cycle complet contre un vrai serveur GitLab
+  (ni serveur mock HTTP local monté — le bug étant purement un problème de contrat de données
+  frontend/backend au niveau de l'agrégation du badge, pas du tout du comportement réseau lui-même
+  qui était déjà correct et inchangé, un mock GitLab n'aurait rien démontré de plus que la preuve
+  directe ci-dessus) ; pas de test end-to-end Playwright de la page Paramètres (environnement
+  backend/Postgres non relancé pour ce lot). Fichiers modifiés :
+  `frontend/src/components/ui/StatusBadge.jsx`, `frontend/src/pages/Settings/IntegrationPanel.jsx`,
+  `frontend/src/pages/Settings/GitServicesPanel.jsx` ; aucun fichier backend modifié
+  (`node --check` non applicable, aucun `.js` backend touché dans ce lot).
+- [x] **Token GitLab personnel par utilisateur, distinct du token d'instance admin (Lot A6,
+  demande utilisateur : « le compte avec le token d'accès personnel est un compte unique qui ne
+  sert pas à la plateforme... chaque utilisateur a un compte GitLab personnel pour ses projets »)**
+  : confirmé par audit avant correctif que le token GitLab n'existait qu'en une seule intégration
+  d'instance partagée (Paramètres admin → Forges déclarées, `frontend/src/config/
+  integrationForms.js`, `backend/src/routes/settings.routes.js`) — aucun mécanisme pour qu'un
+  utilisateur stocke SON propre token. **Portée volontairement limitée** (base minimale réelle,
+  pas un brouillon jetable, mais pas non plus le vault multi-niveaux complet — celui-ci reste
+  prévu au Lot B2 séparé du plan, qui étendra ce mécanisme) : un seul provider (`gitlab`), un
+  token par utilisateur, pas de rotation ni d'historique. **Backend** : nouveau store
+  `backend/src/store/personalGitTokensStore.js`, qui réutilise tel quel `encryptSecret`/
+  `decryptSecret` (AES-256-GCM, `backend/src/utils/crypto.js`) déjà utilisé par `vaultStore.js` —
+  aucun nouvel utilitaire de chiffrement inventé. Stockage dans le magasin JSON existant
+  (`backend/src/store/jsonStore.js`, clé `personalGitTokens`), pas de migration SQL Postgres :
+  vérifié que les utilisateurs eux-mêmes (`usersStore.js`) et le vault (`vaultStore.js`) vivent
+  déjà dans ce même magasin JSON/SQLite, jamais dans le socle relationnel Postgres de
+  `backend/src/db/migrations/` (réservé aux organisations/projets/environnements, voir
+  commentaire de `backend/src/db/pool.js`) — y ajouter une table SQL aurait été incohérent avec
+  l'endroit où vivent déjà les comptes utilisateurs. Nouvelles routes
+  `GET/PUT/DELETE /api/personal-tokens/gitlab` (`backend/src/routes/personalTokens.routes.js`,
+  montées dans `backend/src/routes/index.js`), bornées strictement à `req.user.id` — **montées
+  hors du préfixe `/users`** après avoir découvert en testant qu'un montage initial sous
+  `/users/me/personal-tokens` était intercepté par le middleware `requirePermission('users',
+  'admin')` de `users.routes.js` (Express route tout `/users/*` vers ce routeur en premier, qui
+  répondait 403 avant même d'atteindre les routes non définies) ; corrigé en isolant le nouveau
+  routeur sous `/personal-tokens`. **Frontend** : nouveau panneau « Mon token GitLab personnel »
+  dans `frontend/src/pages/Account/AccountPage.jsx` (composant `PersonalGitTokenPanel`), masqué
+  par défaut (`type="password"`), avec bouton Enregistrer/Remplacer/Supprimer, dans le même style
+  que les panneaux Sécurité/Clés d'accès/MFA déjà présents sur cette page. **GitLab service** :
+  `backend/src/services/integrations/gitlabService.js` ajoute `clientForUser(userId)` — résout en
+  priorité le token personnel de l'utilisateur (même URL d'instance que la plateforme), avec repli
+  silencieux sur le client d'instance existant si l'utilisateur n'en a pas défini. Appliqué au
+  seul point d'entrée identifié comme une action véritablement personnelle plutôt qu'une action de
+  plateforme : l'approbation de merge request (`approveMergeRequest`, appelée depuis
+  `POST /projects/:id/workspace/reviews/:reviewKey/approve` dans
+  `backend/src/routes/projects.routes.js`, qui dispose de `req.user.id`) — approuver une revue est
+  un geste qui doit être attribué à la personne, pas au compte de service partagé ; les autres
+  fonctions de `gitlabService.js` (provisioning, pipelines, commits GitOps...) restent inchangées
+  sur le client d'instance, car ce sont des actions de plateforme/automatisation, pas des gestes
+  personnels — pas de refactor pervasif de tout le service pour rester strictement dans la portée
+  de ce lot. Le token GitLab d'instance en Paramètres admin n'a pas été touché (toujours utilisé
+  tel quel comme repli et pour toutes les autres opérations). **Vérifié réellement** : `node
+  --check` sur les 5 fichiers backend modifiés/créés (tous OK) ; build frontend (`npx vite build`)
+  sans erreur ; backend relancé (`node --watch src/index.js`, déjà actif en développement, a
+  rechargé automatiquement) et testé en direct par requêtes HTTP (`curl`, cookies de session
+  réels) : connexion d'un compte non-admin (`alice@homelab.local`), `PUT /api/personal-tokens/
+  gitlab` (avec jeton CSRF réel) → 200, `GET` renvoie `hasToken:true` sans jamais renvoyer le
+  token en clair, secret confirmé chiffré au repos par lecture directe du fichier de données
+  (format `iv:tag:données` identique à `vaultStore.js`) puis déchiffré correctement via
+  `revealPersonalToken()` en test direct (`glpat-alicesecret123` récupéré identique) ; connexion
+  d'un second compte (`admin@homelab.local`, administrateur) confirmant qu'il ne voit AUCUN token
+  d'un autre utilisateur (sa propre entrée, distincte et vide, `token:null`) — pas de lecture
+  croisée possible, même pour un admin ; `DELETE` confirmé (`GET` repasse à `token:null` après).
+  **Cycle complet testé via Playwright réel** (Chromium, pas seulement `curl`) : connexion
+  `alice@homelab.local` → page `/account` → panneau visible → saisie d'un token factice → clic
+  Enregistrer → toast "Token GitLab personnel enregistré" → panneau bascule en état
+  "enregistré" avec boutons Remplacer/Supprimer → navigation vers `/settings` confirmant qu'Alice
+  (non-admin) n'a accès à aucun onglet d'administration ("Aucune permission ne vous donne accès à
+  un onglet des paramètres d'administration"), donc bien retirée des Paramètres admin comme
+  demandé. Jeton de test supprimé après vérification pour ne pas laisser de faux secret en base
+  de développement. **Limite explicite** : ceci est la base minimale du token personnel, pas le
+  vault multi-niveaux complet — le Lot B2 du plan approuvé approfondira ce mécanisme (rotation,
+  plusieurs providers, historique/audit de lecture, éventuellement une URL d'instance personnelle
+  distincte de celle de la plateforme) en s'appuyant sur cette même base plutôt qu'en la
+  dupliquant. **Non testé** : l'approbation de merge request elle-même contre un vrai serveur
+  GitLab (aucune instance GitLab réelle disponible dans cet environnement) — seule la résolution
+  du bon client (`clientForUser`) a été vérifiée par lecture de code et par le test direct de
+  chiffrement/déchiffrement du token, pas par un appel API GitLab réel de bout en bout. Fichiers
+  modifiés/créés : `backend/src/store/jsonStore.js`, `backend/src/store/
+  personalGitTokensStore.js` (nouveau), `backend/src/routes/personalTokens.routes.js` (nouveau),
+  `backend/src/routes/index.js`, `backend/src/services/integrations/gitlabService.js`,
+  `backend/src/routes/projects.routes.js`, `frontend/src/pages/Account/AccountPage.jsx`.
+
+## Lot A7 — Blocage de la vérification de mise à jour + suivi de démarrage (2026-08-23)
+
+Deux signalements utilisateur : (1) « Dépôt en détachement HEAD ou hors dépôt git : vérification
+impossible » bloquait totalement le bouton « Vérifier les mises à jour » (Paramètres → Système),
+sans aucune solution proposée ; (2) impossible de suivre le démarrage de la plateforme depuis
+l'interface. **Cause réelle du blocage (1)** : `backend/src/services/updateService.js` (fonction
+`checkForUpdates`) utilisait `git rev-parse --abbrev-ref HEAD`, qui renvoie littéralement la
+chaîne `"HEAD"` (pas d'erreur, pas `null`) quand le HEAD est détaché — ce cas était traité comme
+un blocage sec, message informatif mais sans aucune action possible ensuite. Reproduit
+concrètement en clonant le dépôt dans un répertoire temporaire séparé (jamais le dépôt de travail
+principal) et en faisant `git checkout HEAD~1` dedans : `git symbolic-ref -q HEAD` échoue bien
+avec un code de sortie non nul dans ce cas, confirmant que HEAD détaché est un état parfaitement
+normal en production (déploiement d'un tag/commit figé) et pas une erreur du dépôt. Le second cas
+(dossier hors dépôt git, ex: déploiement depuis une archive/release sans `.git`) menait au même
+message trompeur car `git rev-parse --abbrev-ref HEAD` échoue aussi silencieusement (capturé par
+le `try/catch` de `git()`) et retombait sur la même branche de code que HEAD détaché, sans jamais
+distinguer les deux cas ni proposer d'alternative. **Correctif** : `updateService.js` distingue
+maintenant explicitement les trois états via `git rev-parse --is-inside-work-tree` (hors dépôt git
+détecté en premier) puis `git symbolic-ref -q --short HEAD` (détecte le HEAD détaché sans
+ambiguïté, contrairement à `--abbrev-ref` qui masque le cas en renvoyant `"HEAD"`). Hors dépôt git
+→ ne bloque plus : renvoie `{ alternative: 'download-archive', releasesUrl }` avec un lien vers la
+page GitHub Releases dérivé du remote `origin` (fonction `releasesUrlFromRemote()`, motif
+`github.com/<owner>/<repo>`, `null` si remote non-GitHub ou absent — jamais de lien mort inventé).
+HEAD détaché → ne bloque plus : renvoie `{ needsTargetBranch: true, currentCommit }`, et
+`checkForUpdates(targetBranch)` accepte désormais un paramètre optionnel pour comparer
+explicitement `HEAD` contre `origin/<targetBranch>` une fois la branche choisie par
+l'administrateur (jamais de branche devinée automatiquement — "main" par défaut aurait pu comparer
+contre la mauvaise ligne de publication). Nouvelle route `GET /api/system/updates/check?
+targetBranch=...` (`backend/src/routes/system.routes.js`). `getVersion()` renvoie aussi désormais
+`detached`/`gitAvailable` au lieu d'afficher la chaîne brute `"HEAD"` comme nom de branche.
+**Frontend** (`frontend/src/pages/Settings/SystemPanel.jsx`) : affichage `HEAD détaché (<commit>)`
+au lieu de `HEAD` ; nouveau champ + bouton « Comparer » quand `needsTargetBranch` est vrai ; lien
+« Voir les releases » quand `alternative === 'download-archive'`. **Suivi de démarrage (2)** :
+nouveau service `backend/src/services/startupStatusService.js` (en mémoire process, pas de
+persistance — repart de zéro à chaque redémarrage, ce n'est pas un historique) qui chronomètre
+chaque étape de démarrage réellement exécutée dans `backend/src/index.js` (migrations,
+`recoverInterruptedJobs`, `ensureBootstrapAdmin`, activation des planificateurs) via un helper
+`runStep(name, fn)`, et marque `readyAt` une fois `app.listen()` effectif. Exposé en lecture via
+nouvelle route `GET /api/system/status/startup` (admin uniquement, même garde que le reste de
+`system.routes.js`). **Limite explicite et volontaire** : ceci n'est PAS l'écran de bootstrap
+complet prévu au Lot D9 du plan approuvé (page dédiée affichée avant que l'app soit utilisable,
+avec progression visuelle) — ici on expose seulement un instantané JSON interrogeable après coup,
+le minimum viable demandé pour ce lot, sans dupliquer le travail futur du Lot D9. Concernant le
+« suivi en direct » (streaming façon `sshExecutor.js`) envisagé dans la demande initiale : après
+lecture du code, `checkForUpdates()` reste et est resté un mécanisme strictement en lecture seule
+— la console ne déclenche jamais elle-même `git pull`/`npm install`/redémarrage (commentaire
+explicite déjà présent dans le fichier : « la console ne se met jamais à jour ni ne se redémarre
+elle-même sans intervention humaine »), donc il n'existe aucun process de mise à jour à streamer
+dans ce lot ; inventer un flux SSE pour un process qui n'est jamais lancé aurait été un faux
+indicateur de progression. Si un mécanisme de mise à jour auto-exécutée est décidé plus tard, il
+devra réutiliser le pattern `sshExecutor.js`/EventSource déjà en place pour l'installation
+d'agents. **Vérifié réellement** : `node --check` sur les 4 fichiers backend modifiés/créés (tous
+OK) ; reproduction de la cause racine dans un clone temporaire séparé (`git symbolic-ref -q HEAD`
+confirmé en échec sur HEAD détaché, jamais testé sur le dépôt de travail principal qui est resté
+sur `main` sans aucun checkout) ; logique de détection (hors-dépôt / détaché / normal) rejouée
+directement en Node contre ce clone détaché et contre un dossier sans `.git` — les trois chemins
+produisent bien les branches de code attendues (`needsTargetBranch`, `alternative:
+'download-archive'`, comparaison normale) ; backend démarré réellement (`node src/index.js`) et
+les trois routes (`/api/system/version`, `/api/system/updates/check`,
+`/api/system/status/startup`) répondent `401` (authentification requise, comportement normal, pas
+de crash 500) puis process arrêté proprement. **Non testé** : parcours complet via Playwright
+authentifié sur la page Paramètres → Système (non exécuté par manque de temps dans ce lot — la
+logique backend et le rendu conditionnel frontend ont été vérifiés par lecture de code et tests
+directs plutôt que par un clic réel dans le navigateur) ; comportement réel en HEAD détaché sur
+une vraie instance de production (seul un clone de développement a été testé). Fichiers
+modifiés/créés : `backend/src/services/updateService.js`, `backend/src/services/
+startupStatusService.js` (nouveau), `backend/src/routes/system.routes.js`, `backend/src/index.js`,
+`frontend/src/pages/Settings/SystemPanel.jsx`.

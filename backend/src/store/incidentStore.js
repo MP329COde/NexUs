@@ -16,6 +16,17 @@ export async function listForProject(projectId, { status } = {}) {
   return rows;
 }
 
+// Observabilité centrée Service (Priorité 5) : base du calcul de
+// disponibilité/SLO réel par composant (voir routes/catalog.routes.js
+// GET /components/:id/slo) — migration 0046_component_observability.sql.
+export async function listForComponent(componentId, { limit = 200 } = {}) {
+  const { rows } = await query(
+    'SELECT * FROM incidents WHERE component_id = $1 ORDER BY created_at DESC LIMIT $2',
+    [componentId, limit]
+  );
+  return rows;
+}
+
 export async function listGlobal({ status, severity, limit = 100 } = {}) {
   const conditions = [];
   const params = [];
@@ -32,11 +43,11 @@ export async function getById(id) {
   return rows[0] || null;
 }
 
-export async function create({ projectId, jobId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy }) {
+export async function create({ projectId, jobId, componentId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy }) {
   const { rows } = await query(
-    `INSERT INTO incidents (project_id, job_id, title, description, severity, resource_type, resource_ref, runbook_url, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-    [projectId || null, jobId || null, title, description || '', severity, resourceType || null, resourceRef || null, runbookUrl || null, createdBy]
+    `INSERT INTO incidents (project_id, job_id, component_id, title, description, severity, resource_type, resource_ref, runbook_url, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [projectId || null, jobId || null, componentId || null, title, description || '', severity, resourceType || null, resourceRef || null, runbookUrl || null, createdBy]
   );
   return rows[0];
 }

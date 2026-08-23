@@ -24,6 +24,34 @@ export const REPOSITORY_TEMPLATES = [
     name: 'API Node (Express)',
     description: 'Service HTTP Express + migrations SQL, tests Jest/Vitest, CI lint/test/build préconfigurée.',
     stack: ['node', 'express', 'postgres']
+  },
+  {
+    key: 'docs-docusaurus',
+    name: 'Documentation (Docusaurus)',
+    description: 'Site de documentation Docusaurus, déployable indépendamment du dépôt applicatif.',
+    stack: ['docusaurus', 'react'],
+    annex: true
+  },
+  {
+    key: 'storybook',
+    name: 'Storybook',
+    description: 'Catalogue de composants Storybook, séparé du dépôt applicatif pour un cycle de publication indépendant.',
+    stack: ['storybook', 'react'],
+    annex: true
+  },
+  {
+    key: 'design-system',
+    name: 'Design System',
+    description: 'Bibliothèque de composants UI partagée (tokens, thèmes, composants), publiable en package.',
+    stack: ['react', 'css'],
+    annex: true
+  },
+  {
+    key: 'infra-iac',
+    name: 'Infrastructure / IaC',
+    description: 'Manifests Kubernetes/Terraform et pipelines GitOps associés au projet.',
+    stack: ['terraform', 'kubernetes'],
+    annex: true
   }
 ];
 
@@ -59,14 +87,14 @@ export async function getManagedRepository(id) {
 // un statut inventé comme "success" par défaut : rien n'a réellement été
 // créé chez le fournisseur externe à ce stade.
 export async function createProvisioningRequest({
-  provider = 'github', owner, name, orgId, projectId, teamId, componentId, templateKey, requestedBy
+  provider = 'github', account = 'personal', owner, name, orgId, projectId, teamId, componentId, templateKey, requestedBy, teamSlug, ciVariables
 }) {
   const { rows } = await query(
     `INSERT INTO managed_repositories
-       (provider, owner, name, org_id, project_id, team_id, component_id, template_key, status, requested_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+       (provider, account, owner, name, org_id, project_id, team_id, component_id, template_key, status, requested_by, team_slug, ci_variables)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, $11, $12)
      RETURNING *`,
-    [provider, owner, name, orgId || null, projectId || null, teamId || null, componentId || null, templateKey, requestedBy]
+    [provider, account, owner, name, orgId || null, projectId || null, teamId || null, componentId || null, templateKey, requestedBy, teamSlug || null, JSON.stringify(ciVariables || {})]
   );
   return rows[0];
 }

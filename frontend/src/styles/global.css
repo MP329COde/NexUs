@@ -222,10 +222,12 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
   .dev-layout { flex-direction: column; gap: 12px !important; }
   .dev-nav {
     width: 100% !important;
-    position: static;
+    max-height: none !important;
+    position: static !important;
     flex-direction: row;
     align-items: center;
     overflow-x: auto;
+    overflow-y: visible !important;
     padding: 8px;
     gap: 8px;
   }
@@ -248,8 +250,11 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
   }
   .k8s-layout-nav, .network-layout-nav {
     width: 100% !important;
+    max-height: none !important;
+    position: static !important;
     flex-direction: row;
     overflow-x: auto;
+    overflow-y: visible !important;
     gap: 4px;
   }
   .k8s-layout-nav-link, .network-layout-nav-link {

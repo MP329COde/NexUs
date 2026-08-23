@@ -23,6 +23,8 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
+import * as repoStore from '../store/managedRepositoriesStore.js';
+import { runProvisioning } from '../services/repositoryProvisioningService.js';
 import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp, rollbackEnvironment } from '../services/environmentPromotionService.js';
 import { provisionFromBlueprint } from '../services/environmentProvisioningService.js';
 import { checkQuotaBeforeCreate } from '../services/quotaService.js';
@@ -157,7 +159,7 @@ const ICON_PATTERN = /^\p{Extended_Pictographic}(‍\p{Extended_Pictographic})*$
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
-  const { name, description, tags, memberIds, repoKeys, icon, color, organizationId } = req.body || {};
+  const { name, description, tags, memberIds, repoKeys, icon, color, organizationId, repoProvisioning } = req.body || {};
   if (!name) return res.status(400).json({ ok: false, error: 'Nom requis' });
   if (icon && !ICON_PATTERN.test(icon)) return res.status(400).json({ ok: false, error: 'Icône invalide (un seul emoji attendu)' });
   if (color && !COLOR_PATTERN.test(color)) return res.status(400).json({ ok: false, error: 'Couleur invalide (format #RRGGBB attendu)' });
@@ -186,6 +188,36 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
       for (const memberId of (memberIds || [])) {
         if (memberId === req.user.id) continue;
         await orgStore.setMemberRole(pgProject.id, memberId, 'developer');
+      }
+
+      // Provisioning automatique des dépôts annexes (Priorité 1 — "Créer
+      // automatiquement les repositories annexes") : repoProvisioning est
+      // optionnel, l'utilisateur choisit explicitement provider/compte et
+      // quels dépôts annexes créer (doc/Storybook/Design System/IaC) — voir
+      // repoStore.REPOSITORY_TEMPLATES (annex: true). Best-effort : un échec
+      // ici (fournisseur non configuré, nom déjà pris...) ne bloque jamais
+      // la création du projet, chaque demande garde son statut réel.
+      if (repoProvisioning?.owner && Array.isArray(repoProvisioning.annexKeys) && repoProvisioning.annexKeys.length) {
+        const slug = slugify(name);
+        for (const key of repoProvisioning.annexKeys) {
+          const template = repoStore.getTemplate(key);
+          if (!template?.annex) continue;
+          try {
+            const item = await repoStore.createProvisioningRequest({
+              provider: repoProvisioning.provider || 'github',
+              account: repoProvisioning.account || 'personal',
+              owner: repoProvisioning.owner,
+              name: `${slug}-${key}`,
+              orgId: org.id,
+              projectId: pgProject.id,
+              templateKey: key,
+              requestedBy: req.user.id
+            });
+            await runProvisioning(item.id);
+          } catch (err) {
+            req.log?.warn({ err, key }, 'Provisioning du dépôt annexe échoué');
+          }
+        }
       }
     } catch (err) {
       // Le projet legacy reste valide même si le provisioning relationnel échoue
@@ -517,7 +549,7 @@ router.post('/:id/workspace/reviews/:reviewKey/approve', loadProjectAccess(), re
   if (provider === 'gitlab') {
     const [projectId, iid] = rest;
     assertRepoInProject(req.legacyProject, `gitlab:${projectId}`);
-    const result = await gitlab.approveMergeRequest(projectId, iid);
+    const result = await gitlab.approveMergeRequest(projectId, iid, req.user.id);
     logAudit(req, 'review.approved', { projectId: req.legacyProject.id, provider, repo: projectId, iid });
     return res.json({ ok: true, result });
   }
@@ -746,7 +778,7 @@ router.get('/:id/incidents', loadProjectAccess(), asyncHandler(async (req, res) 
 
 router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), asyncHandler(async (req, res) => {
   if (!req.pgProject) return res.status(409).json({ ok: false, error: "Projet non migré vers le socle relationnel" });
-  const { title, description, severity, resourceType, resourceRef, jobId, runbookUrl } = req.body || {};
+  const { title, description, severity, resourceType, resourceRef, jobId, runbookUrl, componentId } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'Titre requis' });
   if (!['low', 'medium', 'high', 'critical'].includes(severity)) {
     return res.status(400).json({ ok: false, error: 'Gravité invalide (low, medium, high, critical)' });
@@ -755,8 +787,15 @@ router.post('/:id/incidents', loadProjectAccess(), requireMinRole('developer'), 
     const job = await jobService.getJob(jobId);
     if (!job || job.project_id !== req.pgProject.id) return res.status(400).json({ ok: false, error: 'Job introuvable pour ce projet' });
   }
+  // Rattachement optionnel à un composant du catalog (Priorité 5,
+  // observabilité centrée Service) : vérifie qu'il appartient bien à ce
+  // projet, même défense en profondeur que pour jobId ci-dessus.
+  if (componentId) {
+    const component = await orgStore.getComponent(componentId);
+    if (!component || component.project_id !== req.pgProject.id) return res.status(400).json({ ok: false, error: 'Composant introuvable pour ce projet' });
+  }
   const incident = await incidentStore.create({
-    projectId: req.pgProject.id, jobId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy: req.user.id
+    projectId: req.pgProject.id, jobId, componentId, title, description, severity, resourceType, resourceRef, runbookUrl, createdBy: req.user.id
   });
   logAudit(req, 'incident.create', { projectId: req.legacyProject.id, incidentId: incident.id, severity });
   const owners = (await orgStore.listMembers(req.pgProject.id)).filter((m) => ['owner', 'maintainer'].includes(m.role) && m.user_id !== req.user.id);

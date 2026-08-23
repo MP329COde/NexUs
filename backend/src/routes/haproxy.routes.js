@@ -3,6 +3,9 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as haproxy from '../services/integrations/haproxyService.js';
 import { logAudit } from '../services/auditService.js';
+import * as configHistory from '../store/networkConfigHistoryStore.js';
+
+const MODULE = 'haproxy';
 
 const router = Router();
 router.use(requireAuth);
@@ -28,6 +31,46 @@ router.post('/frontends', requireRole('admin'), asyncHandler(async (req, res) =>
   const result = await haproxy.createFrontend(req.body || {});
   logAudit(req, 'haproxy.frontend.created', { name: req.body?.name, port: req.body?.port });
   res.json({ ok: true, ...result });
+}));
+
+// Éditeur sécurisé (Priorité 4) : lecture/validation/application/historique/
+// rollback de la config brute. Toute mutation est réservée admin, snapshotée
+// avant application (network_config_history) car la Data Plane API elle-même
+// ne garde qu'une seule "version courante" — voir haproxyService.js.
+router.get('/config/raw', requireRole('admin'), asyncHandler(async (req, res) => res.json({ ok: true, ...(await haproxy.getRawConfig()) })));
+
+router.post('/config/validate', requireRole('admin'), asyncHandler(async (req, res) => {
+  const result = await haproxy.validateRawConfig(req.body?.config || '');
+  res.json({ ok: true, ...result });
+}));
+
+router.post('/config/apply', requireRole('admin'), asyncHandler(async (req, res) => {
+  const { config, note } = req.body || {};
+  if (!config) return res.status(400).json({ ok: false, message: 'Configuration requise' });
+  const current = await haproxy.getRawConfig();
+  const snap = await configHistory.snapshot(MODULE, current.config, req.user?.email || req.user?.id, note || '');
+  const result = await haproxy.applyRawConfig(config);
+  logAudit(req, 'haproxy.config.applied', { snapshotId: snap.id, note: note || '' });
+  res.json({ ok: true, ...result, snapshotId: snap.id });
+}));
+
+router.get('/config/history', requireRole('admin'), asyncHandler(async (req, res) => res.json({ ok: true, items: await configHistory.listHistory(MODULE) })));
+
+router.get('/config/history/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  const entry = await configHistory.getEntry(MODULE, Number(req.params.id));
+  if (!entry) return res.status(404).json({ ok: false, message: 'Instantané introuvable' });
+  res.json({ ok: true, item: entry });
+}));
+
+router.post('/config/history/:id/rollback', requireRole('admin'), asyncHandler(async (req, res) => {
+  const entry = await configHistory.getEntry(MODULE, Number(req.params.id));
+  if (!entry) return res.status(404).json({ ok: false, message: 'Instantané introuvable' });
+  const current = await haproxy.getRawConfig();
+  await configHistory.snapshot(MODULE, current.config, req.user?.email || req.user?.id, `avant rollback #${entry.id}`);
+  const result = await haproxy.applyRawConfig(entry.content);
+  const rolledBack = await configHistory.snapshotRollback(MODULE, entry.content, req.user?.email || req.user?.id, entry.id, req.body?.note || '');
+  logAudit(req, 'haproxy.config.rollback', { fromSnapshotId: entry.id, newSnapshotId: rolledBack.id });
+  res.json({ ok: true, ...result, snapshotId: rolledBack.id });
 }));
 
 export default router;

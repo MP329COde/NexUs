@@ -5,6 +5,7 @@ import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
+import ObservabilityPanel from './ObservabilityPanel.jsx';
 import './CatalogComponentPage.css';
 
 const LIFECYCLE_BADGE = { experimental: 'warn', production: 'ok', deprecated: 'mut' };
@@ -119,6 +120,10 @@ export default function CatalogComponentPage() {
   const [addingLink, setAddingLink] = useState(false);
   const [linkForm, setLinkForm] = useState({ label: '', url: '' });
   const [linkBusy, setLinkBusy] = useState(false);
+  const images = useApi(() => api.get(`/catalog/components/${id}/images`), [id]);
+  const [addingImage, setAddingImage] = useState(false);
+  const [imageForm, setImageForm] = useState({ repository: '', tag: '', digest: '', pipelineProvider: '', pipelineUrl: '' });
+  const [imageBusy, setImageBusy] = useState(false);
 
   const component = data?.component;
   const canManage = component?.my_role === 'maintainer' || component?.my_role === 'owner';
@@ -199,6 +204,32 @@ export default function CatalogComponentPage() {
       notify(err.message, { type: 'crit' });
     } finally {
       setReleaseBusy(false);
+    }
+  }
+
+  async function addImage(e) {
+    e.preventDefault();
+    setImageBusy(true);
+    try {
+      await api.post(`/catalog/components/${id}/images`, imageForm);
+      notify('Image enregistrée', { type: 'ok' });
+      setImageForm({ repository: '', tag: '', digest: '', pipelineProvider: '', pipelineUrl: '' });
+      setAddingImage(false);
+      images.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  async function removeImage(imageId) {
+    try {
+      await api.del(`/catalog/components/${id}/images/${imageId}`);
+      notify('Image retirée', { type: 'info' });
+      images.reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
     }
   }
 
@@ -645,6 +676,55 @@ export default function CatalogComponentPage() {
                 {r.pipeline_url && <a href={r.pipeline_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Pipeline</a>}
                 {r.deployment_url && <a href={r.deployment_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Déploiement</a>}
                 <span className="faint" style={{ marginLeft: 'auto' }}>{new Date(r.created_at).toLocaleDateString('fr-FR')}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <ObservabilityPanel
+          componentId={id}
+          canManage={canManage}
+          onChanged={reload}
+          k8sNamespace={component.k8s_namespace}
+          grafanaDashboardUid={component.grafana_dashboard_uid}
+          sloTarget={component.slo_target}
+        />
+
+        <div className="card catalog-detail-card">
+          <div className="catalog-deps-header">
+            <span className="faint">Images Docker (Registry)</span>
+            {canManage && !addingImage && (
+              <span className="btn-outline catalog-deps-add-btn" onClick={() => setAddingImage(true)}>
+                <Icon name="plus" size={12} />Enregistrer une image
+              </span>
+            )}
+          </div>
+
+          {addingImage && (
+            <form onSubmit={addImage} className="catalog-deps-form">
+              <input className="input mono" required placeholder="dépôt/image (ex. myorg/myapp)" value={imageForm.repository} onChange={(e) => setImageForm((f) => ({ ...f, repository: e.target.value }))} />
+              <input className="input mono" placeholder="tag (défaut : latest)" value={imageForm.tag} onChange={(e) => setImageForm((f) => ({ ...f, tag: e.target.value }))} />
+              <input className="input mono" placeholder="digest (optionnel)" value={imageForm.digest} onChange={(e) => setImageForm((f) => ({ ...f, digest: e.target.value }))} />
+              <input className="input" placeholder="Pipeline (gitlab/github)" value={imageForm.pipelineProvider} onChange={(e) => setImageForm((f) => ({ ...f, pipelineProvider: e.target.value }))} />
+              <input className="input" placeholder="URL du pipeline" value={imageForm.pipelineUrl} onChange={(e) => setImageForm((f) => ({ ...f, pipelineUrl: e.target.value }))} />
+              <div className="projects-form-actions">
+                <span className="btn-outline" onClick={() => setAddingImage(false)}>Annuler</span>
+                <button className="btn" type="submit" disabled={imageBusy}>{imageBusy ? 'Enregistrement…' : 'Enregistrer'}</button>
+              </div>
+            </form>
+          )}
+
+          {(images.data?.items || []).length === 0 ? (
+            <p className="faint catalog-deps-empty">Aucune image Docker rattachée à ce service.</p>
+          ) : (
+            (images.data?.items || []).map((img) => (
+              <div key={img.id} className="catalog-deps-row">
+                <span className="catalog-deps-link mono">{img.repository}:{img.tag}</span>
+                {img.digest && <span className="faint mono">{img.digest.slice(0, 19)}</span>}
+                {img.registryTags && <span className="faint">{img.registryTags.length} tag(s) réels dans le registre</span>}
+                {img.pipeline_url && <a href={img.pipeline_url} target="_blank" rel="noreferrer" className="btn-outline catalog-deps-add-btn">Pipeline</a>}
+                {canManage && <span className="btn-outline catalog-deps-add-btn" onClick={() => removeImage(img.id)}>Retirer</span>}
+                <span className="faint" style={{ marginLeft: 'auto' }}>{new Date(img.created_at).toLocaleDateString('fr-FR')}</span>
               </div>
             ))
           )}

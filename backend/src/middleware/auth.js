@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { findUserById, validityWindowError } from '../store/usersStore.js';
 import { getSessionMinutes } from '../store/identityStore.js';
+import { createSession, getSession, touchSession } from '../store/sessionsStore.js';
 
 export const SESSION_COOKIE = 'nexus_session';
 // Cookie CSRF (double-submit) : volontairement PAS httpOnly — le frontend
@@ -15,8 +16,8 @@ export const CSRF_HEADER = 'x-csrf-token';
 
 const JWT_ALGORITHM = 'HS256';
 
-export function signSession(user) {
-  return jwt.sign({ sub: user.id, role: user.role, tv: user.tokenVersion || 0 }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
+export function signSession(user, sid) {
+  return jwt.sign({ sub: user.id, role: user.role, tv: user.tokenVersion || 0, sid }, env.jwtSecret, { expiresIn: `${getSessionMinutes()}m`, algorithm: JWT_ALGORITHM });
 }
 
 function baseCookieOptions(req) {
@@ -27,7 +28,8 @@ function baseCookieOptions(req) {
 // (httpOnly) et le cookie CSRF associé — appelé par les trois routes qui
 // délivrent une session (login classique, WebAuthn, configuration initiale).
 export function issueSessionCookies(res, req, user) {
-  const token = signSession(user);
+  const session = createSession(user.id, { ip: req.ip, userAgent: req.headers['user-agent'] });
+  const token = signSession(user, session.id);
   res.cookie(SESSION_COOKIE, token, { ...baseCookieOptions(req), httpOnly: true });
   res.cookie(CSRF_COOKIE, crypto.randomBytes(32).toString('hex'), { ...baseCookieOptions(req), httpOnly: false });
   return token;
@@ -109,9 +111,17 @@ export function requireAuth(req, res, next) {
     if ((payload.tv || 0) !== (user.tokenVersion || 0)) {
       return res.status(401).json({ ok: false, error: 'Session révoquée' });
     }
+    // Jetons émis avant l'introduction du suivi de session (payload.sid absent)
+    // restent valides jusqu'à expiration naturelle — pas de session à vérifier.
+    if (payload.sid) {
+      const session = getSession(payload.sid);
+      if (!session || session.revoked) return res.status(401).json({ ok: false, error: 'Session révoquée' });
+      touchSession(payload.sid);
+    }
     const validityError = validityWindowError(user);
     if (validityError) return res.status(401).json({ ok: false, error: validityError });
     req.user = toPublicUser(user);
+    req.sessionId = payload.sid || null;
     next();
   } catch {
     return res.status(401).json({ ok: false, error: 'Session expirée ou invalide' });

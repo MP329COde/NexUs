@@ -29,6 +29,14 @@ export function createLink(payload) {
     // rollback, et d'exiger le rôle owner sur un environnement de production.
     projectId: payload.projectId || null,
     environmentId: payload.environmentId || null,
+    // Ferme la chaîne Registry ↔ Projets côté Deployment (voir migration
+    // 0045_component_images.sql / catalog.routes.js) : rattachement optionnel
+    // à un composant du catalog et à l'image qu'il déploie effectivement.
+    // Non obligatoire — un lien créé avant ce chantier reste valide sans ces
+    // champs, jamais de valeur inventée si non fournie.
+    componentId: payload.componentId || null,
+    imageRepository: payload.imageRepository || null,
+    imageTag: payload.imageTag || null,
     createdAt: new Date().toISOString()
   };
   links.push(link);

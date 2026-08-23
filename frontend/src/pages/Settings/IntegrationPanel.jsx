@@ -15,11 +15,18 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // `initial` (issu de GET /settings) ne contient jamais `ok` — c'est de la
+  // config statique, pas un statut vérifié en direct. On mémorise ici le
+  // dernier résultat réel d'un clic "Tester la connexion" pour que le badge
+  // d'en-tête reflète un vrai test, jamais un statut inventé.
+  const [lastTested, setLastTested] = useState(null);
+  const badgeStatus = lastTested ? { ...initial, ok: lastTested.ok } : initial;
 
   useEffect(() => {
     const values = {};
     for (const f of schema.fields) values[f.key] = f.secret ? '' : (initial?.[f.key] ?? (f.type === 'checkbox' ? false : f.type === 'select' ? (f.options?.[0]?.value ?? '') : ''));
     setForm(values);
+    setLastTested(null);
   }, [initial, schema.fields]);
 
   function set(field, value) {
@@ -82,8 +89,11 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
     try {
       const res = await api.post(`/settings/${integrationKey}/test`, {});
       setTestResult(res.status);
+      setLastTested(res.status);
     } catch (err) {
-      setTestResult({ ok: false, message: err.message });
+      const failed = { ok: false, message: err.message };
+      setTestResult(failed);
+      setLastTested(failed);
     } finally {
       setTesting(false);
     }
@@ -93,7 +103,14 @@ export default function IntegrationPanel({ integrationKey, schema, initial, allI
     <div className="card integ-card">
       <div className="integ-header">
         <div className="integ-title">{schema.label}</div>
-        <StatusBadge tone={toneFromStatus(initial)} label={initial?.configured ? 'Configuré' : 'Non configuré'} />
+        <StatusBadge
+          tone={toneFromStatus(badgeStatus)}
+          label={
+            !badgeStatus?.configured
+              ? 'Non configuré'
+              : badgeStatus.ok === true ? 'Connecté' : badgeStatus.ok === false ? 'Erreur' : 'Configuré (non testé)'
+          }
+        />
       </div>
       {schema.hint && <div className="faint integ-hint">{schema.hint}</div>}
 

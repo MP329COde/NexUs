@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth, toPublicUser, issueSessionCookies, clearSessionCookies } from '../middleware/auth.js';
 import { findUserByEmail, findUserByIdentifier, findUserById, updateUser, updatePassword, clearOnboarding, getLockStatus, recordLoginFailure, recordLoginSuccess, validityWindowError, incrementTokenVersion, setPendingMfaSecret, enableMfa, disableMfa, consumeBackupCodeHash } from '../store/usersStore.js';
+import { listSessionsForUser, revokeSession, revokeAllSessionsForUser } from '../store/sessionsStore.js';
 import { verifyPassword, hashPassword, encryptSecret, decryptSecret } from '../utils/crypto.js';
 import { logAudit } from '../services/auditService.js';
 import { passwordPolicyError, getLoginCidrAllowlist } from '../store/identityStore.js';
@@ -230,7 +231,34 @@ router.post('/logout', requireAuth, (req, res) => {
   // requireAuth) : sans ça, un JWT volé avant le logout resterait exploitable
   // jusqu'à son expiration naturelle malgré le cookie effacé.
   incrementTokenVersion(req.user.id);
+  if (req.sessionId) revokeSession(req.sessionId, req.user.id);
   clearSessionCookies(res);
+  res.json({ ok: true });
+});
+
+// Sessions actives (Priorité 6 — durcissement sécurité) : device/IP/dernière
+// activité par session ouverte, avec révocation individuelle — jusqu'ici
+// seule une révocation globale (tokenVersion, déconnexion partout) existait.
+router.get('/sessions', requireAuth, (req, res) => {
+  const sessions = listSessionsForUser(req.user.id).map((s) => ({
+    id: s.id, ip: s.ip, userAgent: s.userAgent, createdAt: s.createdAt, lastSeenAt: s.lastSeenAt,
+    current: s.id === req.sessionId
+  }));
+  res.json({ ok: true, items: sessions });
+});
+
+router.delete('/sessions/:id', requireAuth, (req, res) => {
+  const ok = revokeSession(req.params.id, req.user.id);
+  if (!ok) return res.status(404).json({ ok: false, error: 'Session introuvable' });
+  logAudit(req, 'auth.session.revoked', { sessionId: req.params.id, self: req.params.id === req.sessionId });
+  res.json({ ok: true });
+});
+
+// Déconnecte toutes les autres sessions (garde la session courante) — utile
+// après un vol de session suspecté sans se déconnecter soi-même.
+router.post('/sessions/revoke-others', requireAuth, (req, res) => {
+  revokeAllSessionsForUser(req.user.id, req.sessionId);
+  logAudit(req, 'auth.session.revoked_others', {});
   res.json({ ok: true });
 });
 

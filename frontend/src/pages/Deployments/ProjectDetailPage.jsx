@@ -19,6 +19,7 @@ import ProjectActivityPanel from './ProjectActivityPanel.jsx';
 import EntityCommentsPanel from './EntityCommentsPanel.jsx';
 import IncidentCommentsModal from './IncidentCommentsModal.jsx';
 import ProjectPresenceBar from './ProjectPresenceBar.jsx';
+import ManagedRepositoriesPanel from './ManagedRepositoriesPanel.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import './ProjectDetailPage.css';
 
@@ -284,6 +285,10 @@ export default function ProjectDetailPage() {
 
       <div className="pd-grid-row">
         <RepoActivityPanel repos={workspace.data?.repos || []} loading={workspace.loading} projectId={id} onChanged={workspace.reload} />
+      </div>
+
+      <div className="pd-grid-row">
+        <ManagedRepositoriesPanel projectId={p.relationalProjectId} orgId={p.orgId} canManage={user?.role === 'admin'} />
       </div>
       </>)}
 
@@ -1362,6 +1367,7 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
                   <span className="pd-env-name">{env.name}</span>
                   <span className="faint pd-env-links-count">{links.length} déploiement(s) rattaché(s)</span>
                 </div>
+                {env.kind === 'preview' && <PreviewInfoRow env={env} />}
                 {links.map((link) => (
                   <div key={link.id} className="pd-env-link-row">
                     <Icon name="box" size={12} className="pd-repo-link-icon" />
@@ -1387,6 +1393,37 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
       )}
       {pipelineLink && <PipelineModal link={pipelineLink} projectId={projectId} onClose={() => setPipelineLink(null)} />}
     </Panel>
+  );
+}
+
+// Consolide en une seule ligne les champs demandés pour une preview de PR
+// (commit, branche, namespace, statut, expiration, lien PR, logs) — jusqu'ici
+// dispersés entre EnvironmentsPage.jsx et MyWorkPage.jsx (voir todo.md).
+// N'affiche jamais "URL preview" ni "métriques" : NexUs ne provisionne aucune
+// route/ingress automatique pour les previews (voir environmentProvisioningService.js,
+// seul le namespace est créé) et aucune métrique par preview individuelle
+// n'existe — un champ inventé serait pire qu'un champ absent.
+function PreviewInfoRow({ env }) {
+  const expired = env.expires_at && new Date(env.expires_at) < new Date();
+  return (
+    <div className="pd-env-link-row" style={{ flexWrap: 'wrap', rowGap: 4 }}>
+      {env.source_branch && <span className="mono faint">{env.source_branch}</span>}
+      {env.source_commit && <span className="mono faint">{env.source_commit.slice(0, 7)}</span>}
+      {env.provisioned_namespace && (
+        <span className={`badge badge-${env.provisioning_status === 'created' ? 'ok' : env.provisioning_status === 'failed' ? 'crit' : 'mut'}`}>
+          {env.provisioned_namespace}
+        </span>
+      )}
+      {env.expires_at && (
+        <span className={`faint pd-row-date${expired ? ' pd-env-expired' : ''}`}>
+          {expired ? 'Expiré le ' : 'Expire le '}{new Date(env.expires_at).toLocaleString('fr-FR')}
+        </span>
+      )}
+      {env.source_pr_url && <a href={env.source_pr_url} target="_blank" rel="noreferrer" className="btn-outline pd-action-btn">PR</a>}
+      {env.provisioned_namespace && (
+        <Link to={`/kubernetes?ns=${encodeURIComponent(env.provisioned_namespace)}`} className="btn-outline pd-action-btn">Logs & pods</Link>
+      )}
+    </div>
   );
 }
 

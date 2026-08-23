@@ -1,10 +1,10 @@
 import { getRawIntegration } from '../../store/settingsStore.js';
-import { buildClient, request, notConfigured, IntegrationError } from './httpClient.js';
+import { buildClient, request, notConfigured, IntegrationError, buildHttpsAgentFromConfig } from './httpClient.js';
 
 function client() {
   const cfg = getRawIntegration('argocd');
   if (!cfg.baseUrl) return null;
-  return { http: buildClient(cfg.baseUrl, { headers: { Authorization: cfg.token ? `Bearer ${cfg.token}` : undefined } }), cfg };
+  return { http: buildClient(cfg.baseUrl, { headers: { Authorization: cfg.token ? `Bearer ${cfg.token}` : undefined }, httpsAgent: buildHttpsAgentFromConfig(cfg) }), cfg };
 }
 
 export async function getStatus() {

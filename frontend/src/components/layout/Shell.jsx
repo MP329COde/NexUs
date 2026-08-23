@@ -14,6 +14,20 @@ export default function Shell() {
   const location = useLocation();
   const title = [...matches].reverse().find((m) => m.handle?.title)?.handle?.title ?? 'Nexus Console';
 
+  // Clé de remontage de la page : volontairement basée sur le seul premier
+  // segment du chemin (le domaine, ex. "deployments", "kubernetes") et non
+  // sur `location.pathname` complet. Avec le pathname entier, chaque clic sur
+  // une sous-page d'un même layout à navigation latérale (ex. Développement >
+  // Catalogue > Templates) démontait/remontait tout l'arbre sous <Outlet/> —
+  // y compris la sidebar de sous-navigation (`DeploymentsLayout`,
+  // `KubernetesLayout`, `NetworkLayout`, etc.), qui se réinitialisait
+  // visiblement (re-fetch, ré-animation, recalcul du `position: sticky`) à
+  // chaque clic. En ne changeant la clé qu'au changement de domaine, les
+  // sous-layouts restent montés lors de la navigation interne tout en
+  // conservant l'animation d'entrée `.route-page` lors d'un vrai changement
+  // de section.
+  const routeKey = location.pathname.split('/')[1] || 'home';
+
   // Titre de l'onglet navigateur : "Nexus Console" seul sur la page d'accueil
   // (déjà explicite), "Nexus Console - <page>" partout ailleurs — dérivé du
   // même `handle.title` que celui affiché dans le header, pour rester toujours
@@ -68,7 +82,7 @@ export default function Shell() {
           />
         </div>
         <main className="app-main shell-main">
-          <div key={location.pathname} className="route-page shell-route-page">
+          <div key={routeKey} className="route-page shell-route-page">
             <Outlet />
           </div>
         </main>

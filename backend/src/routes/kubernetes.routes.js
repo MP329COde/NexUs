@@ -6,6 +6,8 @@ import * as k8s from '../services/integrations/kubernetesService.js';
 import { logAudit } from '../services/auditService.js';
 import * as deploymentStore from '../store/deploymentStore.js';
 import { getRawIntegration } from '../store/settingsStore.js';
+import * as github from '../services/integrations/githubService.js';
+import * as gitlab from '../services/integrations/gitlabService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -55,6 +57,13 @@ router.get('/deployments/:namespace/:name/links', asyncHandler(async (req, res) 
   );
   if (!link) return res.json({ ok: true, link: null });
   const argocdCfg = getRawIntegration('argocd');
+  // gitWebUrl résolu ici (pas reconstruit côté frontend, cf. bug corrigé dans
+  // DiagnosticsModal.jsx qui supposait `https://github.com/{owner}/{repo}`
+  // en dur et ne gérait jamais GitLab) : on redemande l'URL réelle du dépôt
+  // à l'intégration configurée, GitHub Enterprise/GitLab self-hosted inclus.
+  const gitWebUrl = await (link.gitProvider === 'github'
+    ? (link.githubOwner && link.githubRepo ? github.getRepo(link.githubOwner, link.githubRepo).then((r) => r.webUrl).catch(() => null) : null)
+    : (link.gitlabProjectId ? gitlab.getProject(link.gitlabProjectId).then((p) => p.webUrl).catch(() => null) : null));
   res.json({
     ok: true,
     link: {
@@ -65,7 +74,8 @@ router.get('/deployments/:namespace/:name/links', asyncHandler(async (req, res) 
       gitProvider: link.gitProvider,
       gitlabProjectId: link.gitlabProjectId || null,
       githubOwner: link.githubOwner || null,
-      githubRepo: link.githubRepo || null
+      githubRepo: link.githubRepo || null,
+      gitWebUrl
     }
   });
 }));

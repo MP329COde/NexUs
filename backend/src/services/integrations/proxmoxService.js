@@ -1,11 +1,11 @@
 import { getRawIntegration } from '../../store/settingsStore.js';
-import { buildClient, request, notConfigured, IntegrationError } from './httpClient.js';
+import { buildClient, request, notConfigured, IntegrationError, buildHttpsAgentFromConfig } from './httpClient.js';
 
 function client() {
   const cfg = getRawIntegration('proxmox');
   if (!cfg.baseUrl) return null;
   const authHeader = cfg.tokenId && cfg.tokenSecret ? `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}` : undefined;
-  return { http: buildClient(cfg.baseUrl, { headers: { Authorization: authHeader } }), cfg };
+  return { http: buildClient(cfg.baseUrl, { headers: { Authorization: authHeader }, httpsAgent: buildHttpsAgentFromConfig(cfg) }), cfg };
 }
 
 export async function getStatus() {

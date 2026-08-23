@@ -25,6 +25,7 @@ const DEFAULTS = {
   volumes: [], // suivi déclaratif des volumes de stockage (voir store/volumeStore.js)
   firewall: {}, // réglages du pare-feu applicatif : blocage automatique (voir store/firewallStore.js)
   vault: [], // secrets dev/prod chiffrés au repos (voir store/vaultStore.js)
+  personalGitTokens: [], // tokens d'accès personnels par utilisateur (ex: GitLab), chiffrés au repos (voir store/personalGitTokensStore.js)
   serviceHistory: [], // relevés horaires par service marqué important (voir services/statusHistoryService.js)
   projects: [], // projets de développement + membres (voir store/projectsStore.js)
   tasks: [], // tâches/backlog par projet (voir store/projectsStore.js)
@@ -39,7 +40,8 @@ const DEFAULTS = {
   iacScans: [], // historique des scans Checkov IaC (voir store/iacScansStore.js)
   sboms: [], // historique des SBOM générés via Syft (voir store/sbomStore.js)
   signatures: {}, // signatures cosign des SBOM, indexées par id de SBOM (voir store/signaturesStore.js)
-  webauthnCredentials: [] // clés d'accès (passkeys) enregistrées par utilisateur (voir store/webauthnStore.js)
+  webauthnCredentials: [], // clés d'accès (passkeys) enregistrées par utilisateur (voir store/webauthnStore.js)
+  sessions: [] // sessions actives émises (une par login), pour la vue "Sessions actives" (voir store/sessionsStore.js)
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

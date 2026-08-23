@@ -18,23 +18,43 @@ import { scheduleVaultRotation } from './services/vaultRotationService.js';
 import { scheduleDailySecretLeakScan } from './services/secretLeakScanService.js';
 import { scheduleHourlyTrivyScan } from './services/scheduledTrivyScanService.js';
 import { scheduleClusterHealthChecks } from './services/kubernetesAlertService.js';
+import { scheduleHourlyPreviewCleanup } from './services/previewEnvironmentCleanupService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
 import { csrfProtection } from './middleware/auth.js';
 import router from './routes/index.js';
+import { beginStep, markReady } from './services/startupStatusService.js';
 
-await runMigrations();
-await recoverInterruptedJobs();
-ensureBootstrapAdmin();
-scheduleDailyBackups();
-scheduleHourlyStatusSnapshot();
-scheduleCriticalHostsRefresh();
-scheduleInfraLoadSampling();
-scheduleVaultRotation();
-scheduleDailySecretLeakScan();
-scheduleHourlyTrivyScan();
-scheduleClusterHealthChecks();
+// Chaque étape de démarrage est chronométrée et son issue mémorisée pour
+// GET /api/system/status/startup (voir startupStatusService.js) — c'est le
+// minimum viable demandé au Lot A7 pour rendre le démarrage observable
+// depuis l'UI, pas l'écran de bootstrap complet du Lot D9.
+async function runStep(name, fn) {
+  const step = beginStep(name);
+  try {
+    await fn();
+    step.ok();
+  } catch (err) {
+    step.fail(err);
+    throw err;
+  }
+}
+
+await runStep('migrations', runMigrations);
+await runStep('recoverInterruptedJobs', recoverInterruptedJobs);
+await runStep('ensureBootstrapAdmin', () => ensureBootstrapAdmin());
+await runStep('schedulers', () => {
+  scheduleDailyBackups();
+  scheduleHourlyStatusSnapshot();
+  scheduleCriticalHostsRefresh();
+  scheduleInfraLoadSampling();
+  scheduleVaultRotation();
+  scheduleDailySecretLeakScan();
+  scheduleHourlyTrivyScan();
+  scheduleClusterHealthChecks();
+  scheduleHourlyPreviewCleanup();
+});
 
 const app = express();
 
@@ -147,5 +167,6 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 app.listen(env.port, () => {
+  markReady();
   logger.info(`Nexus Console API démarrée sur http://localhost:${env.port}`);
 });
