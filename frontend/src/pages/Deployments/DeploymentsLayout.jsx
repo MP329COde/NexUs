@@ -37,7 +37,7 @@ const GROUPS = [
   },
   {
     label: 'Outils',
-    items: [{ to: '/deployments', label: 'Outils', icon: 'globe', end: true }]
+    items: [{ to: '/deployments/tools', label: 'Outils', icon: 'globe' }]
   }
 ];
 

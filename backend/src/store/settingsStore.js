@@ -16,6 +16,12 @@ export const SECRET_FIELDS = {
   certManager: [],
   grafana: ['apiKey'],
   wazuh: ['password'],
+  // Indexeur Wazuh (OpenSearch, port 9200 par défaut) : intégration séparée
+  // du gestionnaire (port 55000, clé `wazuh` ci-dessus) — c'est là que
+  // vivent les alertes brutes (rule.level, description, agent source),
+  // contrairement au SCA qui reste sur l'API du gestionnaire. Authentification
+  // souvent distincte (utilisateur OpenSearch dédié plutôt que wazuh-wui).
+  wazuhIndexer: ['password'],
   registry: ['password'],
   notificationsWebhook: ['url'],
   ovh: ['appSecret', 'consumerKey'],
@@ -256,6 +262,41 @@ export function setDefaultK8sCluster(id) {
   return listK8sClustersRedacted();
 }
 
+// --- Autorisation de mise à jour des services du catalogue (Lot D3 —
+// Groupe D) ---------------------------------------------------------------
+// Par défaut, AUCUNE mise à jour n'est autorisée (globalEnabled: false) :
+// même avec une nouvelle version détectée, le bouton "Mettre à jour" reste
+// désactivé côté frontend et la route backend refuse l'action (403) tant que
+// ce réglage n'a pas été explicitement activé par un admin — "si autorisé"
+// dans la demande initiale. `perService` permet d'affiner service par
+// service une fois l'autorisation globale activée (un service peut être
+// explicitement exclu même si globalEnabled=true), même pattern de store
+// dédié que tlsSettings/networkConfig ci-dessus.
+export function getServiceUpdatePolicy() {
+  const s = readStore('serviceUpdatePolicy') || {};
+  return { globalEnabled: Boolean(s.globalEnabled), perService: s.perService || {} };
+}
+
+export function setServiceUpdatePolicy(payload) {
+  const current = getServiceUpdatePolicy();
+  const next = {
+    globalEnabled: payload.globalEnabled !== undefined ? Boolean(payload.globalEnabled) : current.globalEnabled,
+    perService: payload.perService !== undefined ? { ...payload.perService } : current.perService
+  };
+  writeStore('serviceUpdatePolicy', next);
+  return next;
+}
+
+// Autorisation effective pour un service donné : globale ET (pas d'override
+// explicite à false pour ce service). Un override explicite à true n'a de
+// sens que si globalEnabled l'est aussi (pas de contournement par service).
+export function isServiceUpdateAllowed(serviceId) {
+  const policy = getServiceUpdatePolicy();
+  if (!policy.globalEnabled) return false;
+  const override = policy.perService[serviceId];
+  return override === undefined ? true : Boolean(override);
+}
+
 function isConfigured(key, entry) {
   const required = {
     kubernetes: ['apiServer'],
@@ -270,6 +311,7 @@ function isConfigured(key, entry) {
     certManager: [],
     grafana: ['baseUrl'],
     wazuh: ['baseUrl'],
+    wazuhIndexer: ['baseUrl'],
     registry: ['baseUrl'],
     notificationsWebhook: ['url'],
     ovh: ['appKey', 'appSecret', 'consumerKey'],

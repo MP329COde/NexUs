@@ -10,11 +10,13 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 import './SecurityPage.css';
 
 const SEC_TABS = [
   { id: 'overview', label: "Vue d'ensemble" },
   { id: 'agents', label: 'Agents Wazuh' },
+  { id: 'alerts', label: 'Alertes' },
   { id: 'compliance', label: 'Conformité' },
   { id: 'scans', label: 'IPs bannies & scans' }
 ];
@@ -92,6 +94,8 @@ export default function SecurityPage() {
       )}
       </>)}
 
+      {tab === 'alerts' && <AlertsPanel />}
+
       {tab === 'compliance' && (wazuhConfigured ? <SCAPanel data={sca.data} /> : (
         <div className="card security-empty-wrap">
           <EmptyState title="Wazuh n'est pas configuré" hint="La conformité (SCA) dépend des mêmes agents Wazuh que l'onglet précédent." />
@@ -156,6 +160,136 @@ function SCAPanel({ data }) {
         />
       )}
     </Panel>
+  );
+}
+
+const ALERT_SEVERITIES = [
+  { key: 'all', label: 'Toutes' },
+  { key: 'critical', label: 'Critique' },
+  { key: 'high', label: 'Élevée' },
+  { key: 'medium', label: 'Moyenne' },
+  { key: 'low', label: 'Faible' }
+];
+
+const ALERT_SEVERITY_TINT = { critical: 'crit', high: 'crit', medium: 'warn', low: 'mut', unknown: 'mut' };
+
+// Alertes Wazuh en temps quasi réel (indexeur OpenSearch, GET /wazuh/alerts)
+// — intégration distincte du gestionnaire (onglet "Agents Wazuh" ci-dessus),
+// c'était le manque signalé ("il manque les alertes réellement exploitables").
+// L'historique EST l'index OpenSearch lui-même (pas de store séparé côté
+// NexUs) : la pagination/tri par date interroge donc directement l'indexeur.
+function AlertsPanel() {
+  const [q, setQ] = useState('');
+  const [qInput, setQInput] = useState('');
+  const [severity, setSeverity] = useState('all');
+  const [agentId, setAgentId] = useState('');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(null);
+  const pageSize = 25;
+
+  const { data, loading, reload } = useApi(() => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (severity !== 'all') params.set('severity', severity);
+    if (agentId) params.set('agentId', agentId);
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+    return api.get(`/wazuh/alerts?${params.toString()}`);
+  }, [q, severity, agentId, page], { pollMs: 30000 });
+
+  const configured = data?.configured;
+  const items = data?.items || [];
+  const total = data?.total || 0;
+
+  function submitSearch(e) {
+    e.preventDefault();
+    setPage(1);
+    setQ(qInput.trim());
+  }
+
+  if (data && !configured) {
+    return (
+      <div className="card security-empty-wrap">
+        <EmptyState title="L'indexeur Wazuh (alertes) n'est pas configuré" hint="Renseignez l'URL de l'indexeur OpenSearch et des identifiants depuis Paramètres → Wazuh · Indexeur (alertes) pour voir les alertes en temps réel." />
+      </div>
+    );
+  }
+
+  return (
+    <Panel
+      title="Alertes Wazuh"
+      sub={data ? `${total} alerte(s)${total > 0 ? ` — page ${page}/${Math.max(1, Math.ceil(total / pageSize))}` : ''}` : 'Chargement…'}
+      span={12}
+      style={{ marginBottom: 16 }}
+      actions={
+        <span className="btn-outline" onClick={reload}><Icon name="refresh" size={13} /> Actualiser</span>
+      }
+    >
+      <div className="security-panel-body">
+        <form onSubmit={submitSearch} className="security-form-row">
+          <input className="input security-form-input-wide" placeholder="Recherche (description, agent…)" value={qInput} onChange={(e) => setQInput(e.target.value)} />
+          <select className="input" value={severity} onChange={(e) => { setSeverity(e.target.value); setPage(1); }}>
+            {ALERT_SEVERITIES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <input className="input security-form-input-narrow" placeholder="ID agent (optionnel)" value={agentId} onChange={(e) => { setAgentId(e.target.value); setPage(1); }} />
+          <button className="btn" type="submit">Rechercher</button>
+        </form>
+
+        {!loading && items.length === 0 ? (
+          <div className="faint security-list-empty">Aucune alerte {q || severity !== 'all' || agentId ? 'pour ces filtres' : "remontée par l'indexeur pour le moment"}.</div>
+        ) : (
+          <DataTable
+            columns={['Sévérité', 'Description', 'Agent', 'Machine liée', 'Horodatage']}
+            rows={items}
+            renderRow={(a) => (
+              <tr key={a.id} onClick={() => setSelected(a)} style={{ cursor: 'pointer' }}>
+                <td><span className={`badge badge-${ALERT_SEVERITY_TINT[a.severity] || 'mut'}`}><span className="dot" />{a.level ?? '?'} · {a.severity}</span></td>
+                <td className="security-cell-name">{a.description}</td>
+                <td className="mono muted">{a.agentName || a.agentId || '—'}</td>
+                <td>{a.host ? a.host.name : <span className="faint">non liée</span>}</td>
+                <td className="mono faint">{a.timestamp ? new Date(a.timestamp).toLocaleString('fr-FR') : '—'}</td>
+              </tr>
+            )}
+          />
+        )}
+
+        {total > pageSize && (
+          <div className="security-form-row" style={{ marginTop: 12 }}>
+            <button className="btn-outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Précédent</button>
+            <span className="faint">Page {page} / {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <button className="btn-outline" disabled={page * pageSize >= total} onClick={() => setPage((p) => p + 1)}>Suivant →</button>
+          </div>
+        )}
+      </div>
+
+      {selected && <AlertDetailModal alert={selected} onClose={() => setSelected(null)} />}
+    </Panel>
+  );
+}
+
+function AlertDetailModal({ alert, onClose }) {
+  return (
+    <Modal title="Détail de l'alerte" sub={alert.description} onClose={onClose} width={640}>
+      <div className="security-panel-body">
+        <div className="security-list-row"><span className="faint">Sévérité</span><span className={`badge badge-${ALERT_SEVERITY_TINT[alert.severity] || 'mut'}`}><span className="dot" />niveau {alert.level ?? '?'} · {alert.severity}</span></div>
+        <div className="security-list-row"><span className="faint">Règle</span><span className="mono">{alert.ruleId ?? '—'}</span></div>
+        <div className="security-list-row"><span className="faint">Groupes</span><span>{alert.groups?.join(', ') || '—'}</span></div>
+        <div className="security-list-row"><span className="faint">Agent source</span><span>{alert.agentName || '—'} {alert.agentIp ? `(${alert.agentIp})` : ''}</span></div>
+        <div className="security-list-row"><span className="faint">Machine liée</span><span>{alert.host ? `${alert.host.name} (${alert.host.address})` : 'Aucune correspondance trouvée dans Infrastructure → Hôtes'}</span></div>
+        <div className="security-list-row"><span className="faint">Emplacement</span><span className="mono faint">{alert.location || '—'}</span></div>
+        <div className="security-list-row"><span className="faint">Horodatage</span><span className="mono">{alert.timestamp ? new Date(alert.timestamp).toLocaleString('fr-FR') : '—'}</span></div>
+        {alert.fullLog && (
+          <div style={{ marginTop: 8 }}>
+            <div className="faint" style={{ marginBottom: 4 }}>Journal complet</div>
+            <pre className="mono" style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: 'var(--surface-2, rgba(128,128,128,0.08))', padding: 8, borderRadius: 6, maxHeight: 200, overflow: 'auto' }}>{alert.fullLog}</pre>
+          </div>
+        )}
+        <div style={{ marginTop: 8 }}>
+          <div className="faint" style={{ marginBottom: 4 }}>Payload brut (indexeur)</div>
+          <pre className="mono" style={{ whiteSpace: 'pre-wrap', fontSize: 11, background: 'var(--surface-2, rgba(128,128,128,0.08))', padding: 8, borderRadius: 6, maxHeight: 240, overflow: 'auto' }}>{JSON.stringify(alert.raw, null, 2)}</pre>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

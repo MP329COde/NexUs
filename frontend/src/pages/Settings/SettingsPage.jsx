@@ -79,8 +79,13 @@ export default function SettingsPage() {
   const uncategorized = visibleTabs.filter((t) => !TAB_CATEGORIES.some((c) => c.tabIds.includes(t.id)));
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab = visibleIds.has(tabParam) ? tabParam : (visibleTabs[0]?.id || null);
-  const setTab = (id) => setSearchParams(id === visibleTabs[0]?.id ? {} : { tab: id }, { replace: true });
+  // Onglet par défaut (sans ?tab=) : "Plateforme" si l'admin y a accès, sinon
+  // repli sur le premier onglet visible — un admin qui clique sur
+  // "Paramètres" doit arriver directement sur Plateforme, pas sur le premier
+  // onglet de TABS (qui était "Intégrations & outils" par accident d'ordre).
+  const defaultTabId = visibleIds.has('platform') ? 'platform' : (visibleTabs[0]?.id || null);
+  const tab = visibleIds.has(tabParam) ? tabParam : defaultTabId;
+  const setTab = (id) => setSearchParams(id === defaultTabId ? {} : { tab: id }, { replace: true });
 
   return (
     <>

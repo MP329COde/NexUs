@@ -199,6 +199,23 @@ export const INTEGRATION_FORMS = {
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'wazuh', port: 55000 }
   },
+  wazuhIndexer: {
+    label: 'Wazuh · Indexeur (alertes)',
+    hint: "Alertes de sécurité en temps réel (OpenSearch, port 9200 par défaut) — intégration séparée du gestionnaire ci-dessus, souvent avec des identifiants distincts.",
+    guide: [
+      "L'indexeur Wazuh (OpenSearch) écoute par défaut sur le port 9200, distinct du gestionnaire (port 55000).",
+      "Utilisez un utilisateur OpenSearch dédié en lecture seule si possible (ex. via un rôle limité à wazuh-alerts-*) plutôt que « admin ».",
+      "Le motif d'index par défaut est « wazuh-alerts-* » (un index par jour) — à ajuster seulement si votre déploiement utilise un motif personnalisé."
+    ],
+    fields: [
+      { key: 'baseUrl', label: "URL de l'indexeur", placeholder: 'https://wazuh.homelab.local:9200' },
+      { key: 'username', label: "Nom d'utilisateur", placeholder: 'admin' },
+      { key: 'password', label: 'Mot de passe', type: 'password', secret: true },
+      { key: 'index', label: "Motif d'index", placeholder: 'wazuh-alerts-*' },
+      { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté.' }
+    ],
+    hostSuggestion: { field: 'baseUrl', subdomain: 'wazuh', port: 9200 }
+  },
   registry: {
     label: 'Registre privé',
     hint: 'Registre d\'images Docker privé (service "registry" de docker-compose.yml) — pour vos builds propriétaires.',
@@ -281,7 +298,7 @@ export const INTEGRATION_FORMS = {
 // mémoire mais n'est plus rendue nulle part — le backend ne lit plus jamais
 // `integrations.kubernetes` après la migration automatique vers `k8sClusters`
 // (voir store/settingsStore.js#migrateK8sClusters côté backend).
-export const INTEGRATION_ORDER = ['argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'tracing', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
+export const INTEGRATION_ORDER = ['argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'tracing', 'wazuh', 'wazuhIndexer', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
 
 // Regroupement purement visuel de INTEGRATION_ORDER ci-dessus (mêmes clés,
 // même ordre au sein de chaque catégorie) — la grille était une liste plate
@@ -291,7 +308,7 @@ export const INTEGRATION_ORDER = ['argocd', 'haproxy', 'gitlab', 'github', 'gith
 export const INTEGRATION_CATEGORIES = [
   { label: 'Source Control', keys: ['gitlab', 'github', 'githubPlatform', 'gitea'] },
   { label: 'Runtime', keys: ['argocd', 'proxmox'] },
-  { label: 'Observability', keys: ['grafana', 'tracing', 'wazuh'] },
+  { label: 'Observability', keys: ['grafana', 'tracing', 'wazuh', 'wazuhIndexer'] },
   { label: 'Networking', keys: ['haproxy', 'traefik', 'certManager', 'ovh', 'duckdns'] },
   { label: 'Plateforme', keys: ['registry', 'notificationsWebhook', 'gitBackup'] }
 ];

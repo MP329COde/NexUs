@@ -102,13 +102,41 @@ const STACK_SIGNALS = [
   { file: 'docker-compose.yaml', label: 'Docker Compose' },
   { file: 'Makefile', label: 'Make' },
   { file: '.gitlab-ci.yml', label: 'GitLab CI' },
-  { file: 'terraform.tf', label: 'Terraform' }
+  { file: 'terraform.tf', label: 'Terraform' },
+  { file: 'main.tf', label: 'Terraform' },
+  { file: 'Chart.yaml', label: 'Helm' }
 ];
 const PACKAGE_MANAGER_SIGNALS = [
   { file: 'pnpm-lock.yaml', manager: 'pnpm' },
   { file: 'yarn.lock', manager: 'yarn' },
   { file: 'package-lock.json', manager: 'npm' }
 ];
+// Signaux par extension (nom de fichier variable, ex: MonProjet.csproj) — un
+// simple Set de noms exacts ne suffit pas pour .NET/Terraform génériques.
+const EXTENSION_STACK_SIGNALS = [
+  { ext: '.csproj', label: '.NET' },
+  { ext: '.sln', label: '.NET' },
+  { ext: '.tf', label: 'Terraform' }
+];
+function detectExtensionStack(root) {
+  return EXTENSION_STACK_SIGNALS.filter((s) => root.some((i) => i.name.endsWith(s.ext))).map((s) => s.label);
+}
+// Frameworks front Node détectés depuis les dépendances réelles de
+// package.json (jamais depuis un fichier de config seul, qui peut être
+// absent) — utilisé par ciWorkflowService.js pour afficher la stack détectée
+// avec précision (React/Vite/Next.js/Vue), les commandes npm run
+// build/test/lint restant les mêmes car ce sont déjà les vraies commandes de
+// ces écosystèmes.
+function detectNodeFrameworks(deps) {
+  if (!deps) return [];
+  const names = new Set(Object.keys(deps));
+  const found = [];
+  if (names.has('next')) found.push('Next.js');
+  if (names.has('vite')) found.push('Vite');
+  if (names.has('vue')) found.push('Vue');
+  if (names.has('react') && !names.has('next')) found.push('React');
+  return found;
+}
 
 router.get('/:key/structure', asyncHandler(async (req, res) => {
   const { provider, id } = parseKey(req.params.key);
@@ -131,7 +159,7 @@ router.get('/:key/structure', asyncHandler(async (req, res) => {
   const root = await readTree('');
   const names = new Set(root.map((i) => i.name));
 
-  const stack = STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label);
+  const stack = [...new Set([...STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label), ...detectExtensionStack(root)])];
   const packageManager = PACKAGE_MANAGER_SIGNALS.find((s) => names.has(s.file))?.manager || null;
 
   let hasCI = names.has('.gitlab-ci.yml');
@@ -143,16 +171,19 @@ router.get('/:key/structure', asyncHandler(async (req, res) => {
   }
 
   let packageJson = null;
+  let nodeFrameworks = [];
   if (names.has('package.json')) {
     try {
       const f = await readFile('package.json');
       const parsed = JSON.parse(f.content);
+      const allDeps = { ...(parsed.dependencies || {}), ...(parsed.devDependencies || {}) };
       packageJson = {
         name: parsed.name || null,
         scripts: parsed.scripts || {},
         dependenciesCount: Object.keys(parsed.dependencies || {}).length,
         devDependenciesCount: Object.keys(parsed.devDependencies || {}).length
       };
+      nodeFrameworks = detectNodeFrameworks(allDeps);
     } catch { /* package.json illisible/invalide, on l'ignore silencieusement */ }
   }
 
@@ -160,7 +191,7 @@ router.get('/:key/structure', asyncHandler(async (req, res) => {
     ok: true,
     structure: {
       root: root.map((i) => ({ name: i.name, type: i.type, path: i.path })),
-      stack,
+      stack: [...stack, ...nodeFrameworks],
       packageManager,
       hasCI,
       dockerCompose: names.has('docker-compose.yml') || names.has('docker-compose.yaml'),
@@ -273,11 +304,20 @@ router.post('/:key/workflows/generate-ci', asyncHandler(async (req, res) => {
   const [owner, repo] = id.split('/');
   const root = await github.listTree(owner, repo, '', baseBranch);
   const names = new Set(root.map((i) => i.name));
-  const stack = STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label);
+  const stack = [...new Set([...STACK_SIGNALS.filter((s) => names.has(s.file)).map((s) => s.label), ...detectExtensionStack(root)])];
   const packageManager = PACKAGE_MANAGER_SIGNALS.find((s) => names.has(s.file))?.manager || null;
 
+  let nodeFrameworks = [];
+  if (names.has('package.json')) {
+    try {
+      const f = await github.getFileContent(owner, repo, 'package.json', baseBranch);
+      const parsed = JSON.parse(f.content);
+      nodeFrameworks = detectNodeFrameworks({ ...(parsed.dependencies || {}), ...(parsed.devDependencies || {}) });
+    } catch { /* package.json illisible/invalide, on l'ignore silencieusement — pas de framework fictif */ }
+  }
+
   const branch = `nexus/github-actions-ci-${Date.now()}`;
-  const workflow = buildCiWorkflow({ stack, packageManager, hasDockerfile: names.has('Dockerfile') });
+  const workflow = buildCiWorkflow({ stack: [...stack, ...nodeFrameworks], packageManager, hasDockerfile: names.has('Dockerfile') });
   await github.createBranch(owner, repo, branch, baseBranch);
   await github.commitFile(owner, repo, branch, '.github/workflows/ci.yml', workflow, 'Ajoute un workflow CI (Nexus Console)');
   const pr = await github.createPullRequest(owner, repo, branch, baseBranch, 'Ajoute un workflow GitHub Actions CI');

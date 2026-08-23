@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { api } from '../../lib/apiClient.js';
+import { useApi } from '../../hooks/useApi.js';
+import { useNotify } from '../../context/NotificationContext.jsx';
 import BrandMark from '../../components/ui/BrandMark.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import InstallScreen from './InstallScreen.jsx';
 import IntegrationPanel from '../Settings/IntegrationPanel.jsx';
 import { INTEGRATION_FORMS, INTEGRATION_ORDER } from '../../config/integrationForms.js';
+import '../Infrastructure/InfrastructureShared.css';
 import './SetupPage.css';
 
 const TIMEZONES = ['Europe/Paris', 'Europe/London', 'UTC', 'America/New_York', 'America/Los_Angeles'];
@@ -58,7 +61,13 @@ const TOOL_CATALOG = [
   { id: 'harbor', label: 'Harbor', category: 'Livraison · registre d’images', url: 'https://goharbor.io', installable: false }
 ];
 
-const DEFAULT_TOOL_CONFIG = { address: '', port: 22, sshUser: 'root', autoInstall: false };
+// Lot D5 (Groupe D) — `targetType` distingue la cible d'installation, sur le
+// même principe honnête que le sélecteur du Lot D4 (GET
+// /hosts/services/install-targets) : 'ssh' reste le comportement historique
+// (adresse/port/utilisateur SSH, via /setup/provision), 'kubernetes' déploie
+// directement sur un cluster déjà configuré via POST
+// /hosts/services/:serviceId/install — jamais de cible inventée.
+const DEFAULT_TOOL_CONFIG = { address: '', port: 22, sshUser: 'root', autoInstall: false, targetType: 'ssh', hostId: '', clusterId: '' };
 
 const STEPS = [
   { key: 'organisation', label: 'Organisation', title: 'Organisation', sub: "Identité de l'instance, langue et fuseau horaire." },
@@ -92,6 +101,13 @@ export default function SetupPage() {
   // connexion réelle (Kubernetes, GitLab, Proxmox...) pendant l'assistant.
   const [accountCreated, setAccountCreated] = useState(false);
   const [settingsData, setSettingsData] = useState(null);
+  const notify = useNotify();
+  // Lot D5 — clé SSH de la console et cibles d'installation réellement
+  // disponibles (hôtes déjà gérés, clusters Kubernetes configurés) : chargées
+  // seulement une fois le compte administrateur créé, puisque ces routes sont
+  // authentifiées (mêmes routes que Infrastructure → Hôtes et le Lot D4).
+  const sshKey = useApi(() => (accountCreated ? api.get('/hosts/ssh-public-key') : Promise.resolve(null)), [accountCreated]);
+  const installTargets = useApi(() => (accountCreated ? api.get('/hosts/services/install-targets') : Promise.resolve(null)), [accountCreated]);
 
   async function reloadSettings() {
     try {
@@ -191,15 +207,34 @@ export default function SetupPage() {
     goTo(accountCreated ? STEPS.length - 1 : 1);
   }
 
+  // Lot D5 — les outils ciblant un cluster Kubernetes ne passent pas par
+  // /setup/provision (SSH uniquement) : ils réutilisent directement POST
+  // /hosts/services/:serviceId/install avec target:{type:'kubernetes'}, la
+  // même route que le sélecteur de cible du Lot D4. Déclenché en tâche de
+  // fond (best-effort) : un échec ne bloque jamais l'ouverture de la console,
+  // l'outil reste installable plus tard depuis Paramètres ou Infrastructure.
+  function launchKubernetesInstalls(tools) {
+    tools.forEach(({ id, cfg }) => {
+      api.post(`/hosts/services/${id}/install`, { target: { type: 'kubernetes', clusterId: cfg.clusterId } })
+        .then(() => notify(`Déploiement de ${TOOL_CATALOG.find((t) => t.id === id)?.label || id} lancé sur le cluster Kubernetes`, { type: 'ok' }))
+        .catch((err) => notify(err.message, { type: 'crit', title: `Échec du déploiement de ${id}` }));
+    });
+  }
+
   function submit() {
     // Le compte, l'identité, la forge Git et les services réels sont déjà
     // enregistrés au fil de l'assistant (voir next()) : il ne reste plus qu'à
     // lancer l'installation automatique des outils sélectionnés, s'il y en a.
-    const toInstall = form.tools
+    const active = form.tools
       .map((id) => ({ id, cfg: form.toolsConfig[id] }))
-      .filter(({ id, cfg }) => TOOL_CATALOG.find((t) => t.id === id)?.installable && cfg?.autoInstall && cfg?.address?.trim());
+      .filter(({ id, cfg }) => TOOL_CATALOG.find((t) => t.id === id)?.installable && cfg?.autoInstall);
 
-    if (toInstall.length === 0) {
+    const k8sTools = active.filter(({ cfg }) => cfg.targetType === 'kubernetes' && cfg.clusterId);
+    const sshTools = active.filter(({ cfg }) => (cfg.targetType || 'ssh') !== 'kubernetes' && cfg.address?.trim());
+
+    if (k8sTools.length > 0) launchKubernetesInstalls(k8sTools);
+
+    if (sshTools.length === 0) {
       // Rechargement complet plutôt qu'une navigation client : SetupGate ne
       // revérifie needsSetup qu'au montage, ce qui provoquerait sinon une
       // redirection immédiate vers /setup juste après sa propre résolution.
@@ -214,7 +249,7 @@ export default function SetupPage() {
   if (installing) {
     const jobsToStart = form.tools
       .map((id) => ({ id, label: TOOL_CATALOG.find((t) => t.id === id)?.label || id, ...form.toolsConfig[id] }))
-      .filter((t) => TOOL_CATALOG.find((cat) => cat.id === t.id)?.installable && t.autoInstall && t.address?.trim());
+      .filter((t) => TOOL_CATALOG.find((cat) => cat.id === t.id)?.installable && t.autoInstall && (t.targetType || 'ssh') !== 'kubernetes' && t.address?.trim());
     return <InstallScreen tools={jobsToStart} onFinish={() => { window.location.href = '/'; }} />;
   }
 
@@ -287,7 +322,14 @@ export default function SetupPage() {
                 : <Card><p className="faint setup-services-blocked-note">Le compte administrateur doit être créé avant de pouvoir connecter un service (retournez à l'étape précédente).</p></Card>
             )}
             {current.key === 'tools' && (
-              <StepTools selected={form.tools} onToggle={toggleTool} toolsConfig={form.toolsConfig} setToolConfig={setToolConfig} />
+              <StepTools
+                selected={form.tools}
+                onToggle={toggleTool}
+                toolsConfig={form.toolsConfig}
+                setToolConfig={setToolConfig}
+                sshKey={sshKey}
+                installTargets={installTargets}
+              />
             )}
             {current.key === 'ready' && <StepReady form={form} settingsData={settingsData} />}
 
@@ -429,8 +471,9 @@ function StepGit({ form, set }) {
   );
 }
 
-function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
+function StepTools({ selected, onToggle, toolsConfig, setToolConfig, sshKey, installTargets }) {
   const selectedTools = TOOL_CATALOG.filter((t) => selected.includes(t.id));
+  const anyInstallable = selectedTools.some((t) => t.installable);
   return (
     <div>
       <div className="setup-tools-grid">
@@ -464,10 +507,22 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
         <div className="setup-tools-config">
           <div className="setup-tools-config-title">Configuration des outils sélectionnés</div>
           <p className="faint setup-tools-config-desc">
-            Renseignez la machine cible pour installer automatiquement un outil à l'ouverture de la
-            console, ou laissez « Installer automatiquement » désactivé pour le configurer plus tard
-            manuellement depuis Paramètres.
+            Choisissez une cible pour installer automatiquement un outil à l'ouverture de la console
+            (un hôte SSH ou un cluster Kubernetes déjà configuré), ou laissez « Installer automatiquement »
+            désactivé pour le configurer plus tard manuellement depuis Paramètres.
           </p>
+
+          {/* Lot D5 — clé SSH de la console, réutilisée à l'identique du
+              panneau "Clé publique de la console" d'Infrastructure → Hôtes
+              (même route GET /hosts/ssh-public-key, même geste copier). Le
+              blocage évident du lot précédent : impossible d'installer quoi
+              que ce soit via SSH tant que cette clé n'a pas été copiée sur la
+              machine cible — elle est donc affichée en tête, avant tout choix
+              de machine, plutôt que noyée dans la doc. */}
+          {anyInstallable && (
+            <SetupSshKeyPanel sshKey={sshKey} />
+          )}
+
           <div className="setup-tools-config-list">
             {selectedTools.map((tool) => (
               <ToolConfigRow
@@ -475,6 +530,7 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
                 tool={tool}
                 cfg={{ ...DEFAULT_TOOL_CONFIG, ...toolsConfig[tool.id] }}
                 setCfg={(patch) => setToolConfig(tool.id, patch)}
+                installTargets={installTargets}
               />
             ))}
           </div>
@@ -484,7 +540,29 @@ function StepTools({ selected, onToggle, toolsConfig, setToolConfig }) {
   );
 }
 
-function ToolConfigRow({ tool, cfg, setCfg }) {
+function SetupSshKeyPanel({ sshKey }) {
+  const notify = useNotify();
+  function copyKey() {
+    navigator.clipboard.writeText(sshKey.data?.publicKey || '');
+    notify('Clé publique copiée dans le presse-papiers', { type: 'ok' });
+  }
+  return (
+    <div className="card setup-ssh-key-panel">
+      <div className="setup-tool-row-title-sm">Clé publique de la console</div>
+      <p className="faint setup-tools-config-desc">
+        À copier dans <code className="mono">~/.ssh/authorized_keys</code> de chaque machine à installer
+        via SSH (utilisateur renseigné ci-dessous) — la même clé que celle affichée dans
+        Infrastructure → Hôtes &amp; agents une fois la console ouverte.
+      </p>
+      <div className="infra-key-panel-body">
+        <code className="mono infra-key-code">{sshKey.loading ? 'Chargement…' : (sshKey.data?.publicKey || '—')}</code>
+        <span className="btn-outline infra-key-copy-btn" onClick={copyKey}>Copier</span>
+      </div>
+    </div>
+  );
+}
+
+function ToolConfigRow({ tool, cfg, setCfg, installTargets }) {
   if (!tool.installable) {
     return (
       <div className="card setup-tool-row-noninstall">
@@ -501,28 +579,78 @@ function ToolConfigRow({ tool, cfg, setCfg }) {
       </div>
     );
   }
+
+  // Lot D5 — mêmes cibles honnêtes que le sélecteur du Lot D4 : un cluster
+  // Kubernetes n'est proposé que s'il est réellement configuré
+  // (installTargets.data.kubernetes.clusters), jamais une option qui
+  // échouerait faute d'intégration branchée.
+  const hosts = installTargets?.data?.sshHost?.hosts || [];
+  const clusters = installTargets?.data?.kubernetes?.clusters || [];
+  const targetType = cfg.targetType || 'ssh';
+
   return (
     <div className="card setup-tool-row">
       <div className={`setup-tool-row-head${cfg.autoInstall ? ' setup-tool-row-head-expanded' : ''}`}>
         <div className="setup-tool-row-title-sm">{tool.label}</div>
         <Toggle
           label="Installer automatiquement"
-          hint="Déploie l'image Docker officielle sur la machine indiquée via la clé SSH de la console"
+          hint="Déploie l'image Docker officielle sur la cible choisie ci-dessous"
           checked={cfg.autoInstall}
           onChange={(v) => setCfg({ autoInstall: v })}
         />
       </div>
       {cfg.autoInstall && (
         <div className="setup-tool-row-fields">
-          <Field label="Adresse IP / hôte" hint="Machine cible, doit accepter la clé SSH de la console">
-            <input className="input" placeholder="10.0.0.42" value={cfg.address} onChange={(e) => setCfg({ address: e.target.value })} />
+          <Field label="Cible d'installation">
+            <select
+              className="input"
+              value={targetType}
+              onChange={(e) => setCfg({ targetType: e.target.value })}
+            >
+              <option value="ssh">Machine via SSH (nouvelle adresse ou hôte déjà géré)</option>
+              <option value="kubernetes" disabled={clusters.length === 0}>
+                Cluster Kubernetes{clusters.length === 0 ? ' (aucun cluster configuré)' : ''}
+              </option>
+            </select>
           </Field>
-          <Field label="Port SSH">
-            <input className="input" type="number" min={1} max={65535} value={cfg.port} onChange={(e) => setCfg({ port: Number(e.target.value) })} />
-          </Field>
-          <Field label="Utilisateur SSH">
-            <input className="input" value={cfg.sshUser} onChange={(e) => setCfg({ sshUser: e.target.value })} />
-          </Field>
+
+          {targetType === 'ssh' && (
+            <>
+              {hosts.length > 0 && (
+                <Field label="Hôte déjà géré" hint="Ou laissez sur « Nouvelle adresse » pour en saisir une">
+                  <select
+                    className="input"
+                    value={cfg.hostId || ''}
+                    onChange={(e) => {
+                      const h = hosts.find((x) => x.id === e.target.value);
+                      setCfg({ hostId: e.target.value, address: h ? h.address : cfg.address });
+                    }}
+                  >
+                    <option value="">Nouvelle adresse…</option>
+                    {hosts.map((h) => <option key={h.id} value={h.id}>{h.name} ({h.address})</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label="Adresse IP / hôte" hint="Machine cible, doit accepter la clé SSH de la console ci-dessus">
+                <input className="input" placeholder="10.0.0.42" value={cfg.address} onChange={(e) => setCfg({ address: e.target.value, hostId: '' })} />
+              </Field>
+              <Field label="Port SSH">
+                <input className="input" type="number" min={1} max={65535} value={cfg.port} onChange={(e) => setCfg({ port: Number(e.target.value) })} />
+              </Field>
+              <Field label="Utilisateur SSH">
+                <input className="input" value={cfg.sshUser} onChange={(e) => setCfg({ sshUser: e.target.value })} />
+              </Field>
+            </>
+          )}
+
+          {targetType === 'kubernetes' && (
+            <Field label="Cluster" hint="Déploiement Deployment + Service, image officielle — voir Paramètres → Kubernetes">
+              <select className="input" value={cfg.clusterId || ''} onChange={(e) => setCfg({ clusterId: e.target.value })}>
+                <option value="">Choisir un cluster…</option>
+                {clusters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          )}
         </div>
       )}
     </div>

@@ -1,0 +1,60 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - img "Nexus Console" [ref=f1e7]
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]: Nexus Console
+        - generic [ref=f1e10]: homelab.local
+    - generic [ref=f1e11]: Cybersécurité
+    - generic [ref=f1e13]:
+      - generic "Santé globale de l'infrastructure" [ref=f1e15] [cursor=pointer]:
+        - text: Santé globale
+        - generic [ref=f1e17]: 25 %
+      - button "Command Center... ⌘K" [ref=f1e18] [cursor=pointer]:
+        - generic [ref=f1e21]: Command Center...
+        - generic [ref=f1e22]: ⌘K
+      - link "Manuel d'utilisation" [ref=f1e23] [cursor=pointer]:
+        - /url: /manual
+      - button "Passer en thème clair" [ref=f1e26] [cursor=pointer]
+      - button "Notifications" [ref=f1e30] [cursor=pointer]
+      - generic "Administrateur" [ref=f1e35] [cursor=pointer]: AD
+  - generic [ref=f1e37]:
+    - navigation [ref=f1e39]:
+      - generic [ref=f1e40]:
+        - link "Vue générale" [ref=f1e41] [cursor=pointer]:
+          - /url: /
+        - link "Développement" [ref=f1e46] [cursor=pointer]:
+          - /url: /deployments
+        - link "Infrastructure" [ref=f1e51] [cursor=pointer]:
+          - /url: /infrastructure
+        - link "Kubernetes" [ref=f1e56] [cursor=pointer]:
+          - /url: /kubernetes
+        - link "Réseaux" [ref=f1e61] [cursor=pointer]:
+          - /url: /network
+        - link "Monitoring" [ref=f1e66] [cursor=pointer]:
+          - /url: /monitoring
+        - link "Cybersécurité" [ref=f1e71] [cursor=pointer]:
+          - /url: /security
+        - link "Stockage" [ref=f1e76] [cursor=pointer]:
+          - /url: /storage
+        - link "Accès administrateur Paramètres" [ref=f1e81] [cursor=pointer]:
+          - /url: /settings
+          - generic "Accès administrateur" [ref=f1e85]
+          - generic [ref=f1e86]: Paramètres
+      - generic [ref=f1e87]:
+        - button "Personnaliser la navigation" [ref=f1e88] [cursor=pointer]
+        - button "Réduire la barre latérale" [ref=f1e91] [cursor=pointer]
+    - main [ref=f1e94]:
+      - generic [ref=f1e95]:
+        - generic [ref=f1e98]:
+          - heading "Cybersécurité" [level=1] [ref=f1e99]
+          - paragraph [ref=f1e100]: Agents, IPs bannies, scans réseau et conformité
+        - generic [ref=f1e101]:
+          - generic [ref=f1e102] [cursor=pointer]: Vue d'ensemble
+          - generic [ref=f1e103] [cursor=pointer]: Agents Wazuh
+          - generic [ref=f1e104] [cursor=pointer]: Alertes
+          - generic [ref=f1e105] [cursor=pointer]: Conformité
+          - generic [ref=f1e106] [cursor=pointer]: IPs bannies & scans
+        - generic [ref=f1e108]:
+          - generic [ref=f1e109]: Tableau de sécurité
+          - generic [ref=f1e112]: Chargement…

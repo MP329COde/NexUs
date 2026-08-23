@@ -19,6 +19,7 @@ import { scheduleDailySecretLeakScan } from './services/secretLeakScanService.js
 import { scheduleHourlyTrivyScan } from './services/scheduledTrivyScanService.js';
 import { scheduleClusterHealthChecks } from './services/kubernetesAlertService.js';
 import { scheduleHourlyPreviewCleanup } from './services/previewEnvironmentCleanupService.js';
+import { scheduleWazuhAlertChecks } from './services/wazuhAlertNotificationService.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { banlistGuard } from './middleware/banlist.js';
 import { trafficLogger } from './middleware/trafficLogger.js';
@@ -54,6 +55,7 @@ await runStep('schedulers', () => {
   scheduleHourlyTrivyScan();
   scheduleClusterHealthChecks();
   scheduleHourlyPreviewCleanup();
+  scheduleWazuhAlertChecks();
 });
 
 const app = express();

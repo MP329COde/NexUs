@@ -313,6 +313,11 @@
   gap: 10px;
 }
 
+.setup-ssh-key-panel {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
 .setup-tool-row-noninstall {
   padding: 10px 14px;
   display: flex;

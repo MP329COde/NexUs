@@ -1,0 +1,26 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img "Nexus Console" [ref=e7]
+      - generic [ref=e8]:
+        - generic [ref=e9]: Nexus Console
+        - generic [ref=e10]: homelab.local
+    - paragraph [ref=e11]: Connectez-vous pour accéder à votre infrastructure.
+    - generic [ref=e12]: E-mail ou nom de connexion
+    - textbox [active] [ref=e13]
+    - generic [ref=e14]: Mot de passe
+    - textbox [ref=e15]
+    - button "Se connecter" [ref=e16] [cursor=pointer]
+    - generic [ref=e17]: ou
+    - button "Se connecter avec une clé d'accès" [ref=e21] [cursor=pointer]
+  - generic [ref=e23]:
+    - generic [ref=e27]: Kubernetes
+    - generic [ref=e32]: Réseaux
+    - generic [ref=e37]: Développement
+    - generic [ref=e42]: Infrastructure
+    - generic [ref=e47]: Sécurité
+    - generic [ref=e52]: Monitoring
+    - generic [ref=e57]:
+      - img "Nexus Console" [ref=e58]
+      - heading "Le centre de contrôle de votre infrastructure" [level=1] [ref=e59]
+      - paragraph [ref=e60]: Kubernetes, Argo CD, HAProxy, Traefik, GitLab, GitHub, Proxmox, Wazuh et Grafana, réunis dans une seule console.

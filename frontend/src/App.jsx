@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import RequireAuth from './components/layout/RequireAuth.jsx';
 import RequirePermission from './components/layout/RequirePermission.jsx';
 import RequireHomeAccess from './components/layout/RequireHomeAccess.jsx';
@@ -79,7 +79,8 @@ export const router = createBrowserRouter([
             element: <DeploymentsLayout />,
             handle: { title: 'Développement' },
             children: [
-              { index: true, element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
+              { index: true, element: <Navigate to="my-work" replace /> },
+              { path: 'tools', element: <ToolsAccessPage />, handle: { title: 'Accès aux outils' } },
               { path: 'my-work', element: <MyWorkPage />, handle: { title: 'Mon travail' } },
               {
                 element: <CatalogLayout />,

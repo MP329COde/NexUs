@@ -1909,3 +1909,358 @@ Fichiers modifiés/créés : `backend/src/store/vaultStore.js`, `backend/src/sto
   positif — même limite d'environnement que documentée pour Kubernetes/HAProxy/Proxmox dans les lots
   précédents, pas une lacune du correctif. Fichiers modifiés : `backend/src/routes/terminal.routes.js`,
   `backend/src/services/terminalService.js`, `frontend/src/pages/Kubernetes/TerminalPage.jsx`.
+
+## Lot D1 — Page "Mon travail" repensée + page par défaut (2026-08-23)
+
+**Demande** : (1) la première page affichée dans la partie Développement doit être "Mon travail" ;
+(2) le design de cette page était trop pauvre (simples lignes de liste sans hiérarchie visuelle,
+badges bruts non cohérents avec le reste de l'app) et devait être approfondi, sans inventer de
+nouvelles données.
+
+**Page par défaut** : la route index de `/deployments` affichait jusqu'ici `ToolsAccessPage` (liens
+rapides vers GitLab/Grafana/etc.). `frontend/src/App.jsx` : la route `index: true` du groupe
+`deployments` redirige désormais vers `my-work` (`<Navigate to="my-work" replace />`), et
+`ToolsAccessPage` a été déplacée sur un chemin explicite `path: 'tools'` pour rester accessible (le
+lien de nav "Outils" dans `DeploymentsLayout.jsx` a été mis à jour de `/deployments` (avec `end:
+true`) vers `/deployments/tools`). Toutes les autres routes/breadcrumbs qui pointaient vers
+`/deployments` (fils d'Ariane "Développement" dans `TeamWorkspacePage.jsx`, `WikiPage.jsx`,
+`OrganizationDetailPage.jsx`, `GettingStartedPage.jsx`, `CatalogComponentPage.jsx`,
+`RepoDetailPage.jsx`, `ProjectDetailPage.jsx`, et `RequireHomeAccess.jsx`) atterrissent maintenant
+sur Mon travail plutôt que sur Accès aux outils — cohérent avec la demande.
+
+**Retravail visuel de `MyWorkPage.jsx`** — même source de données qu'avant (aucun nouvel endpoint,
+aucun chiffre inventé), uniquement une meilleure présentation :
+- Nouveau bandeau de synthèse en tête de page (`mywork-summary`, 5 tuiles cliquables en ancre vers
+  chaque panneau) : Tâches en cours, Revues à effectuer, Incidents ouverts, Changements en attente,
+  Environnements preview — tous calculés à partir des `useApi` déjà chargés (`myTasks.length`,
+  `myReviews.length`, etc.), pas de nouvel appel réseau. Les tuiles se colorent (`tone`) selon un
+  seuil simple : `ok` (vert) si le compteur "problème" est à 0, `warn`/`crit` sinon.
+- Hiérarchie explicite en deux zones avec libellés de section : "Demande une action de votre part"
+  (Mes revues à effectuer + Changements en attente de ma décision, remontés en premier — ce sont les
+  deux seuls panneaux où l'utilisateur est bloquant) puis "Informatif" (Mes tâches, Mes incidents,
+  Mes environnements, Mes projets). Le libellé de section "action" ne s'affiche que si au moins un
+  élément est réellement en attente (`actionRequiredCount > 0`), pas un texte figé.
+- Badges : remplacement de tous les `<span className="badge badge-x">texte brut</span>` par le
+  composant `StatusBadge` du design system (Lot A5, `components/ui/StatusBadge.jsx`) pour rester
+  visuellement cohérent avec le reste de l'app (Vue générale, Paramètres…). Ajout de libellés FR plus
+  parlants pour la sévérité incident (`SEVERITY_LABELS` : Critique/Élevée/Moyenne/Faible au lieu du
+  code brut `critical`/`high`/…) et un ton dédié par statut de tâche (`TASK_STATUS_TONE`).
+  Le badge "PR" cliquable existant dans le panneau "Mes environnements" (`e.source_pr_url`) a été
+  répliqué dans "Mes tâches" pour `t.prUrl` (champ déjà présent dans la réponse
+  `GET /projects/mine/tasks`, jamais affiché jusqu'ici dans cette page — même pattern que dans
+  `ProjectDetailPage.jsx`/`ProjectBoard.jsx`, lien direct sans clic supplémentaire).
+- Nouveau CSS (`MyWorkPage.css`) : tuiles de synthèse (`.mywork-tile*`, bordure gauche colorée par
+  ton, hover), libellés de section (`.mywork-section-label*`), flèche visuelle sur les lignes
+  "action requise". Le grid des tuiles passe de 5 à 2 colonnes sous 860px puis 1 colonne sous 390px
+  (mêmes seuils que documentés ailleurs dans le projet) ; les panneaux `Panel span=…` continuent de
+  s'empiler en pleine largeur sous 860px via la règle générique déjà existante
+  (`.panel-span { grid-column: span 12 !important; }` dans `styles/global.css`), pas dupliquée ici.
+
+**Testé réellement** : `npx vite build` sans erreur (bundle 1.17 MB, warning de taille préexistant
+non lié à ce lot). Vérification Playwright en direct avec `admin@homelab.local` sur le serveur de dev
+déjà lancé : navigation vers `/deployments` confirmée redirigée vers `/deployments/my-work` (URL et
+titre d'onglet "Mon travail"), page affichée avec de vraies données de ce compte (1 tâche "À faire",
+2 incidents ouverts de sévérité Moyenne/Élevée, 1 projet, 0 revue/changement/environnement — état
+vide honnête pour ces trois derniers, aucune donnée inventée), tuiles de synthèse cohérentes avec les
+panneaux détaillés en dessous. Testé à 768px (viewport mobile) : nav bascule en tiroir hamburger
+(comportement préexistant), contenu de Mon travail reste lisible et non cassé, aucune erreur console
+supplémentaire. Lien "Outils" de la nav latérale vérifié pointant vers `/deployments/tools` et
+distinct de "Mon travail".
+
+**Limites** : le compte de test admin n'a qu'1 tâche/1 projet et 0 revue/changement assignés dans cet
+environnement — le rendu du panneau "Demande une action" avec du contenu réel (revues/changements
+non vides) n'a donc pas pu être vérifié visuellement en direct, seulement par lecture du code (la
+condition d'affichage et le mapping des données sont identiques à ceux déjà utilisés avant ce lot,
+qui fonctionnaient). Capture d'écran plein format non obtenue (timeout de l'outil Playwright sur
+l'attente de polices, indépendant du code) — la vérification s'est appuyée sur le snapshot
+d'accessibilité (structure DOM + textes réels), jugé suffisant pour confirmer l'absence de régression
+et la présence des vraies données. Le responsive complet (dont l'affichage détaillé à 390px de cette
+page précise) reste couvert par le futur lot dédié D12, non dupliqué ici. Fichiers modifiés :
+`frontend/src/App.jsx`, `frontend/src/pages/Deployments/DeploymentsLayout.jsx`,
+`frontend/src/pages/Deployments/MyWorkPage.jsx`, `frontend/src/pages/Deployments/MyWorkPage.css`.
+
+- [x] **Lot D2 — Paramètres admin arrivée directe sur Plateforme**, 2026-08-23. Constat : contrairement
+à `/deployments` (Lot D1, redirection explicite `<Navigate to="my-work" replace />`), la page
+`/settings` (`frontend/src/pages/Settings/SettingsPage.jsx`) n'a pas de routes enfants séparées par
+onglet — un seul composant gère les 15 onglets via un état `?tab=` en query string, et l'onglet par
+défaut (sans `?tab=`) était calculé comme `visibleTabs[0]`, c'est-à-dire le premier élément visible du
+tableau `TABS` dans son ordre de déclaration — qui se trouve être "Intégrations & outils", pas
+"Plateforme", par simple accident d'ordre du tableau (aucune intention). Un clic sur "Paramètres"
+(lien `/settings` dans `Header.jsx`) atterrissait donc sur Intégrations, pas sur Plateforme comme
+demandé. Corrigé en calculant explicitement `defaultTabId = 'platform'` si l'admin y a accès (sinon
+repli sur `visibleTabs[0]` comme avant, pour ne pas casser un compte qui n'aurait pas la permission
+`settings:admin`), utilisé à la fois pour déterminer l'onglet affiché sans `?tab=` et pour décider
+quand `setTab()` doit nettoyer l'URL (clic sur Plateforme ⇒ `/settings` propre, sans query string
+résiduelle). Pas de nouvelle route ajoutée (pattern différent du Lot D1 car l'architecture existante
+de cette page est différente : un seul composant + query param, pas des routes enfants React Router) —
+solution volontairement minimale et cohérente avec l'existant. **Testé réellement** avec
+`admin@homelab.local` via Playwright : clic sur "ADM" dans la nav principale ⇒ atterrit directement sur
+le panneau Plateforme ("Organisation & régionalisation", onglet actif visible dans la barre) avec URL
+`/settings` sans `?tab=` ; accès direct par URL à un autre onglet (`/settings?tab=certificates`) vérifié
+intact — affiche bien le panneau Certificats correspondant, aucune régression sur les onglets
+non-défaut. `npx vite build` sans erreur (493 modules, aucun changement au nombre d'erreurs/warnings
+préexistants). **Limites** : n'affecte que l'onglet par défaut de la page `/settings` elle-même — les
+liens externes déjà en place vers des onglets précis (`/settings?tab=platform`,
+`/settings?tab=system`, palette de commandes) restaient et restent inchangés, non concernés par ce lot.
+Fichier modifié : `frontend/src/pages/Settings/SettingsPage.jsx`.
+
+- [x] **Lot D3 — Mise à jour de services autorisée**, 2026-08-23. Demande : "l'application doit
+pouvoir mettre à jour certains services si autorisé", pour les services du catalogue
+(`backend/src/services/serviceCatalog.js` — Prometheus, Grafana, Loki, Uptime Kuma, Gitea,
+SonarQube, Jenkins, Keycloak, GitLab, Woodpecker, step-ca, Trivy, Vault, CrowdSec, Netdata,
+InfluxDB, Alertmanager) installés a posteriori sur un hôte géré via
+`POST /hosts/:id/services/:serviceId/install`. **Vérification de version** : tous les services de ce
+catalogue sont des conteneurs Docker uniques taguée `:latest` (ou version majeure fixe type
+`1`/`2`/`lts`/`community`) — pas de fichier VERSION exposé simplement. Méthode retenue, honnête et
+sans interruption de service : `dockerCheckUpdate()` (nouveau, `serviceCatalog.js`) fait un
+`docker pull` du tag de l'image (télécharge sans toucher au conteneur en cours) puis compare l'ID
+d'image du conteneur en marche (`docker inspect --format='{{.Image}}'`) à l'ID d'image fraîchement
+tiré (`docker inspect --format='{{.Id}}' <image>`) — `UP_TO_DATE`/`UPDATE_AVAILABLE`/`NOT_INSTALLED`.
+Si le script échoue (hôte ou registre injoignable, pull refusé...), la route renvoie le statut
+`error` avec le détail de l'échec — **jamais** de statut à jour/nouvelle version inventé sur un échec
+(contrainte explicite du lot). Les 17 services du catalogue supportent tous cette méthode de la même
+façon (aucun service "non supporté" à ce jour dans ce catalogue, car tous sont des conteneurs Docker
+uniques — voir commentaire d'en-tête de `serviceCatalog.js`) ; `supportsUpdateCheck()` reste exposé
+pour un futur service qui ne s'y prêterait pas. **Mise à jour contrôlée** : `dockerUpdate()` (nouveau)
+fait `docker pull` (image complète) puis `docker stop`/`docker rm`/`docker run` avec la même config
+canonique (ports/env/volumes du catalogue, volumes nommés préservés) — jamais déclenchée
+automatiquement. **Autorisation "si autorisé"** : nouveau réglage `serviceUpdatePolicy`
+(`backend/src/store/settingsStore.js` : `getServiceUpdatePolicy`/`setServiceUpdatePolicy`/
+`isServiceUpdateAllowed`, même pattern de store dédié que `tlsSettings`/`networkConfig`),
+**désactivé par défaut** (`globalEnabled: false`), avec possibilité d'exclusion par service
+(`perService`). La route `POST /hosts/:id/services/:serviceId/update` renvoie 403 tant que ce
+réglage n'est pas explicitement activé par un admin. Même avec le réglage activé, aucune mise à jour
+n'est déclenchée automatiquement : un bouton "Mettre à jour" par service (désactivé tant qu'aucun
+"UPDATE_AVAILABLE" n'a été détecté par un check explicite) avec confirmation JS (`confirm()`) reste
+requis à chaque fois — pas de mode "auto" implémenté dans ce lot (non demandé au minimum, cf. "au
+minimum, un bouton... avec confirmation" dans la demande). **Traçage par hôte** : nouvelle table
+`host_services` (migration `0047_host_services.sql`, FK `host_id UUID` vers `hosts.id`) et store
+`backend/src/store/hostServicesStore.js` (`listByHost`/`get`/`recordInstalled`/`recordCheck`/
+`recordUpdate`) — l'ancien `hosts.last_install` (un seul champ, écrasé à chaque action) ne permettait
+pas de lister plusieurs services installés sur un même hôte avec un état de version par service ;
+`recordInstalled()` est maintenant aussi appelé depuis la route d'installation existante. **Audit** :
+`logAudit()` sur les 4 nouvelles actions sensibles (`host.service.update-policy.set`,
+`host.service.check-update`, `host.service.update`, en plus de `host.service.install` déjà existant),
+même pattern que le reste du projet. **Frontend** (`frontend/src/pages/Infrastructure/HostsPage.jsx`)
+: nouveau panneau "Mises à jour de services" avec la case à cocher globale (confirmation à
+l'activation, rappelant explicitement qu'aucune mise à jour n'est automatique) ; nouveau bouton
+"Services" par hôte ouvrant `HostServicesDialog.jsx` (nouveau) qui liste les services installés avec
+badge d'état (À jour / Nouvelle version disponible / Conteneur introuvable / Vérification non
+disponible — jamais de "à jour" par défaut, `lastCheckStatus` reste `null`/"Jamais vérifié" tant
+qu'aucun check n'a été exécuté), bouton "Vérifier la version" et bouton "Mettre à jour" (désactivé
+si le réglage global est éteint ou si le dernier check ne dit pas `UPDATE_AVAILABLE`), confirmation
+avant toute mise à jour. **Testé réellement** avec `admin@homelab.local` via Playwright sur les
+serveurs de dev déjà lancés (`localhost:5173`/`:4000` — un des processus backend tournait sans
+`--watch` et avec l'ancien code, redémarré pour charger les nouvelles routes) : migration
+`0047_host_services.sql` appliquée avec succès après correction du type de clé (`host_id` doit être
+`UUID`, pas `INTEGER`, pour matcher `hosts.id` — erreur Postgres `42804` détectée puis corrigée) ;
+panneau "Mises à jour de services" affiché avec case décochée par défaut ; activation de la case
+déclenche bien la confirmation JS puis persiste (`PUT /hosts/services/update-policy` → 200, rechargé
+après F5, case toujours cochée) ; hôte de test créé (adresse non routable `192.0.2.10`, TEST-NET-1,
+volontairement injoignable) puis dialogue "Services" ouvert : état vide honnête "Aucun service du
+catalogue installé sur cet hôte via NexUs" (aucun service fictif affiché) ; hôte de test et réglage
+remis à l'état initial après vérification. `node --check` OK sur tous les fichiers backend modifiés/
+créés. `node --test` : 133 pass / 4 fail / 3 skipped (140 total) — mêmes 4 échecs préexistants que la
+base établie au Lot C5 (backups sans Postgres, jobs sans DATABASE_URL), aucune régression introduite.
+**Non testé réellement** (pas d'hôte SSH joignable dans cet environnement de dev) : l'exécution SSH
+réelle des scripts `dockerCheckUpdate`/`dockerUpdate` contre un hôte Docker vivant — seule la
+génération des scripts et le routage (403 si non autorisé, 404 si hôte/service introuvable, mapping
+de statut honnête sur échec de script) ont été vérifiés en conditions réelles ou par lecture de code ;
+la commande `docker manifest inspect`/`docker pull` suppose un accès réseau sortant depuis l'hôte
+cible vers le registre de l'image (Docker Hub pour la plupart des services, quay.io pour Keycloak) —
+un hôte behind proxy/air-gapped renverra honnêtement `error`, pas de statut inventé. Fichiers créés :
+`backend/src/db/migrations/0047_host_services.sql`, `backend/src/store/hostServicesStore.js`,
+`frontend/src/pages/Infrastructure/HostServicesDialog.jsx`. Fichiers modifiés :
+`backend/src/services/serviceCatalog.js`, `backend/src/routes/hosts.routes.js`,
+`backend/src/store/settingsStore.js`, `frontend/src/pages/Infrastructure/HostsPage.jsx`.
+
+- [x] **Lot D4 — Installation d'outils sans machine imposée**, 2026-08-23. Demande : "l'application ne
+doit pas imposer l'installation d'outils" + "si on souhaite installer un outil mais sans créer de
+machine spécialement, proposer, si Kubernetes est connecté et configuré, de le créer via Kubernetes,
+ou si Proxmox est configuré, via Proxmox, ou encore de l'installer localement (hôte déjà géré)".
+**Audit du flux existant** (aucune modification nécessaire pour ce point) : `SetupPage.jsx` (assistant
+de première configuration) n'a jamais bloqué l'installation d'un outil — bouton "Configurer plus
+tard" par étape + "passer" global présents, "Continuer" désactivé seulement pendant un appel réseau
+en cours (`busy`), jamais par un outil non installé ; aucune case à cocher "Installer automatiquement"
+n'est pré-activée. Aucune autre page (ProjectDetailPage, CatalogComponentPage, pages Kubernetes)
+n'impose d'installation. Le vrai manque identifié : le seul point d'entrée d'installation hors setup
+(`InstallGrafanaDialog.jsx`, déclenché depuis Monitoring quand Grafana n'est pas configuré) exigeait
+un hôte SSH déjà géré, sans jamais proposer Kubernetes/Proxmox même quand configurés — corrigé ici.
+**Backend** : `serviceCatalog.js` — nouvelle fonction `buildK8sManifests(toolId, {namespace})` qui
+convertit la même config `container()` (image/ports/env, déjà utilisée pour les scripts Docker SSH)
+en un Deployment + Service Kubernetes minimal, réutilisant le fait que les 17 outils du catalogue
+sont tous de simples conteneurs Docker uniques. **Limite assumée et documentée** : les volumes
+déclarés dans `container()` (ex. `grafana-data:/var/lib/grafana`) ne sont **pas** traduits en volumes
+K8s persistants (pas de PVC — la classe de stockage du cluster cible est inconnue de la console) :
+les données ne survivent pas à un redémarrage du pod tant que cette limite n'est pas levée. Seuls les
+outils du catalogue ont donc un chemin d'installation Kubernetes fonctionnel (mais non persistant) ;
+aucun n'a de chemin Proxmox fonctionnel (voir ci-dessous). Nouvelles routes dans
+`hosts.routes.js` : `GET /hosts/services/install-targets` (liste honnêtement ce qui est réellement
+disponible dans l'environnement courant — hôtes déjà gérés, clusters Kubernetes avec `apiServer`
+configuré via `listK8sClustersRedacted().filter(configured)`, Proxmox via `getRawIntegration('proxmox').baseUrl`
+— jamais une option inventée) et `POST /hosts/services/:serviceId/install` (cible explicite
+`{type:'ssh-host'|'kubernetes'|'proxmox', ...}` : `ssh-host` réutilise soit un hôte existant
+(`target.hostId`, même script/route qu'avant), soit crée l'hôte à la volée depuis une adresse
+(`target.address`, réutilise `provisioningService.startInstall`, même logique que l'assistant de
+setup) ; `kubernetes` appelle deux fois `kubernetesService.applyManifest` (Deployment puis Service)
+sur `target.clusterId`, après avoir revérifié côté serveur que ce cluster est bien configuré — jamais
+une confiance aveugle dans ce que le frontend envoie ; `proxmox` renvoie explicitement 501 avec un
+message clair, **volontairement non implémenté** : `proxmoxService.js` n'expose aucune fonction de
+création de VM/LXC (seulement lecture + start/stop/reboot de VMs déjà existantes), et créer une VM
+demanderait de connaître le nœud/template/stockage/réseau cibles côté cluster réel — un choix
+raisonnable et testable n'était pas possible sans un vrai Proxmox pour valider le flux, donc pas codé
+en simulation. **Frontend** (`InstallGrafanaDialog.jsx`, réécrit) : nouvelle première étape "Choisissez
+où installer Grafana" interrogeant `GET /hosts/services/install-targets` — n'affiche l'option
+Kubernetes que si au moins un cluster configuré existe réellement (bouton cliquable listant les
+clusters), affiche l'option Proxmox toujours visible mais grisée avec la raison exacte renvoyée par
+le backend (jamais un bouton qui échouerait silencieusement), option "Hôte déjà géré (SSH)" toujours
+proposée (état vide honnête si aucun hôte). Les étapes suivantes (choix d'hôte + script, ou choix de
+cluster) et l'écran de résultat sont inchangés dans leur logique, juste routés via le nouvel endpoint
+unifié. **Testé réellement** avec `admin@homelab.local` via Playwright sur les serveurs de dev déjà
+lancés (un des deux processus backend tournait sans `--watch` avec l'ancien code — redémarré pour
+charger les nouvelles routes, même situation que Lot D3) : `GET /hosts/services/install-targets`
+interrogé directement — a renvoyé un état honnête et non trivial pour cet environnement : `sshHost`
+vide (aucun hôte géré à ce moment), **`kubernetes.available:true`** avec un cluster réel
+("Cluster par défaut", configuré depuis une session précédente, `apiServer` renseigné), `proxmox`
+correctement `available:false` avec la raison "Proxmox non configuré". Dans l'UI : ouverture du
+sélecteur de cible depuis Monitoring → "Installer Grafana automatiquement" confirmée conforme à cette
+réponse (Kubernetes proposé et cliquable avec le nom du cluster, Proxmox grisé avec le message exact,
+SSH vide) ; clic sur le cluster Kubernetes déclenche bien un appel réel `applyManifest` côté backend,
+qui échoue proprement (`ECONNREFUSED` vers l'`apiServer` factice de l'environnement de dev, pas un
+vrai cluster joignable) et remonte un message d'erreur exact côté UI (toast + carte d'erreur), sans
+jamais afficher un succès inventé. `node --check` OK sur les fichiers backend modifiés. `node --test` :
+133 pass / 4 fail / 3 skipped (140 total) — mêmes 4 échecs préexistants qu'aux Lots C5/D3 (backups
+sans Postgres, jobs sans DATABASE_URL), aucune régression. `npx vite build` sans erreur (494 modules).
+**Non testé réellement** : le déploiement Kubernetes contre un vrai cluster joignable (aucun cluster
+réel dans cet environnement de dev, seule l'entrée de configuration existe) — le chemin de code a été
+vérifié jusqu'à l'appel HTTP sortant réel (échec réseau propre, pas un mock) ; l'installation Proxmox
+n'est pas implémentée (501 volontaire, voir ci-dessus). Fichier modifié :
+`backend/src/services/serviceCatalog.js` (ajout `buildK8sManifests`/`isK8sInstallable`),
+`backend/src/routes/hosts.routes.js` (nouvelles routes `install-targets` et `install` unifiée),
+`frontend/src/pages/Monitoring/InstallGrafanaDialog.jsx` (réécrit avec sélecteur de cible).
+
+## Lot D5 — Setup : clé SSH manquante + choix Kubernetes/local (2026-08-23)
+
+**Demande** : à l'étape "Outils à installer" de l'assistant de setup (`SetupPage.jsx`), un outil
+`installable` ne pouvait être installé que via une adresse IP saisie à la main, sans jamais montrer la
+clé SSH publique de la console à copier sur la machine cible (l'utilisateur ne pouvait donc "rien
+faire" faute de savoir quelle clé autoriser côté machine), et sans possibilité de cibler un cluster
+Kubernetes déjà configuré (choix implicitement SSH-only), alors même que le Lot D4 avait déjà ajouté
+ce choix ailleurs dans l'app (`InstallGrafanaDialog.jsx`, route `GET
+/hosts/services/install-targets`). **Aucun nouveau mécanisme de clé SSH créé** : réutilisation stricte
+de la route déjà existante `GET /hosts/ssh-public-key` (`utils/sshKeypair.js#getConsolePublicKey`,
+même clé que celle affichée dans Infrastructure → Hôtes & agents) et des classes CSS
+`.infra-key-panel-body`/`.infra-key-code`/`.infra-key-copy-btn` (import de
+`Infrastructure/InfrastructureShared.css` dans `SetupPage.jsx`, pas de duplication de styles).
+**Frontend (`SetupPage.jsx`)** : `SetupSshKeyPanel` (nouveau composant local) affiche cette clé avec
+bouton "Copier" (`navigator.clipboard`), positionné en tête de la section "Configuration des outils
+sélectionnés" dès qu'au moins un outil `installable` est coché — chargée via `useApi` seulement une
+fois le compte administrateur créé (`accountCreated`), puisque la route est authentifiée comme le
+reste de l'assistant (mêmes routes que Paramètres pendant le setup, cf. commentaire existant sur
+`accountCreated`). `ToolConfigRow` gagne un sélecteur "Cible d'installation" (`cfg.targetType`,
+`'ssh'` par défaut ou `'kubernetes'`) alimenté par la même route `GET /hosts/services/install-targets`
+que le Lot D4 (chargée une fois au niveau de `SetupPage` via `installTargets`, transmise en prop) :
+l'option Kubernetes reste désactivée (`disabled`) tant qu'aucun cluster configuré n'existe réellement
+— jamais une cible inventée qui échouerait. Pour `targetType:'ssh'`, un nouveau menu déroulant "Hôte
+déjà géré" (rempli depuis `installTargets.sshHost.hosts`) préremplit l'adresse en un clic si un hôte
+existe déjà, sans rien changer au flux adresse/port/utilisateur existant pour une nouvelle machine.
+**submit()** distingue désormais les outils ciblant Kubernetes (`k8sTools`) des outils SSH
+(`sshTools`) : les premiers sont envoyés directement à `POST /hosts/services/:serviceId/install` avec
+`target:{type:'kubernetes', clusterId}` (même route que le Lot D4, en tâche de fond, best-effort —
+un échec notifie un toast d'erreur mais n'empêche jamais l'ouverture de la console) ; les seconds
+continuent d'utiliser le chemin historique `/setup/provision` → `InstallScreen.jsx` (job SSH suivi
+avec polling), inchangé. Rien de nouveau n'est obligatoire : le toggle "Installer automatiquement"
+reste désactivé par défaut, "Configurer plus tard" et "passer" restent disponibles à chaque étape —
+cohérent avec l'audit du Lot D4 qui confirmait déjà l'assistant entièrement skippable. **Testé
+réellement** : `npx vite build` sans erreur (494 modules, `dist/assets/index-*.js` généré). `node
+--test` côté backend (aucun fichier backend modifié dans ce lot) : 133 pass / 4 fail / 3 skipped (140
+total) — mêmes 4 échecs préexistants, aucune régression. **Non testé réellement en conditions
+Playwright bout en bout** : relancer l'assistant de setup depuis zéro nécessite de vider la table
+`users` de l'environnement de dev (aucun flag `mustOnboard` ni route de "forçage" du setup initial
+n'existe dans le code — `GET /setup/status` ne renvoie `needsSetup:true` que si `hasAnyUser()` est
+faux) ; vider cette table aurait supprimé le compte admin réel de cet environnement de dev partagé, ce
+qui a été jugé trop risqué pour ce lot. La vérification s'est donc limitée à une relecture complète du
+JSX modifié, à la construction Vite réussie, et à la confirmation que les routes backend réutilisées
+(`GET /hosts/ssh-public-key`, `GET /hosts/services/install-targets`, `POST
+/hosts/services/:serviceId/install`) existent déjà et sont déjà exercées par les Lots précédents
+(Infrastructure → Hôtes, Lot D4) — aucune n'est nouvelle ni non testée dans l'absolu. Un test manuel
+complet (nouvel environnement/nouvelle base) reste à faire avant mise en production. Fichiers
+modifiés : `frontend/src/pages/Setup/SetupPage.jsx` (clé SSH + sélecteur de cible dans l'étape
+"Outils à installer"), `frontend/src/pages/Setup/SetupPage.css` (styles `.setup-ssh-key-panel`).
+
+- [x] **CI/CD étendu — détection multi-écosystème + déploiement dev/staging/production/rollback (Lot D6)** :
+`backend/src/services/ciWorkflowService.js#buildCiWorkflow` ne reconnaissait que Node.js/JavaScript et
+Python (tout le reste retombait sur un job générique). Détection étendue avec de VRAIES commandes
+standards par écosystème (jamais une commande générique inventée pour un langage qui a ses propres
+outils) : Java Maven (`mvn -B compile/test/package`), Java/Kotlin Gradle (`./gradlew build`), .NET
+(`dotnet restore/build/test`), Go (`go build/vet/test ./...`), Rust (`cargo build/test/clippy`), PHP
+Composer (`composer install` + exécution conditionnelle de `vendor/bin/phpunit` si présent — pas de
+`composer test` halluciné, cette commande n'existe pas nativement), Terraform (`terraform init
+-backend=false && fmt -check && validate`, job dédié `terraform-validate` indépendant du langage
+applicatif car un repo Node/Go peut contenir un dossier `terraform/`), Helm (`helm lint`, job dédié
+`helm-lint`). React/Vite/Next.js/Vue : détectés depuis les VRAIES dépendances de `package.json`
+(`backend/src/routes/repos.routes.js#detectNodeFrameworks`, lu sur la branche par défaut réelle du
+dépôt, jamais deviné) et affichés en commentaire dans le YAML généré — les commandes restent `npm run
+build/test/lint --if-present` car ce sont déjà les vraies commandes de ces frameworks (aucune commande
+"native" séparée à leur substituer, contrairement à Java/Go/Rust/etc.). Détection de stack étendue côté
+`repos.routes.js` : `STACK_SIGNALS` complété (Terraform `main.tf`, Helm `Chart.yaml`), et nouveau
+`EXTENSION_STACK_SIGNALS` (recherche par suffixe de nom de fichier, pas seulement nom exact) pour .NET
+(`*.csproj`/`*.sln`, noms variables) et Terraform (`*.tf`, tout fichier). Appliqué aux deux routes qui
+utilisaient déjà `STACK_SIGNALS` (`/:key/structure` et `/:key/workflows/generate-ci`), avec dédoublonnage
+via `Set`.
+Déploiement : ajout de 4 jobs réels GitHub Actions — `deploy-dev` (déclenché sur push branche `develop`,
+`environment: dev`), `deploy-staging` (push branche `staging`, `environment: staging`),
+`promote-production` (`needs: deploy-staging`, `environment: production` — l'approbation manuelle est la
+protection GitHub Actions native "Required reviewers" à déclarer sur l'environnement `production` du
+dépôt, documentée en commentaire dans le YAML généré, pas simulée dans le code puisque c'est une
+configuration côté GitHub, pas côté workflow), et `rollback` (`workflow_dispatch` avec input `image_tag`,
+`environment: production`). La mise à jour réelle du manifeste GitOps (dépôt GitOps séparé + Argo CD,
+kustomize, Helm values...) n'est PAS générée en dur : la convention dépend de l'organisation et personne
+ne peut la deviner depuis la structure d'un dépôt applicatif seul — chaque job contient donc la commande
+`echo` réelle (branche/référence) et un bloc de commentaires avec l'exemple concret à adapter
+(`git clone`/`yq`/`git push` vers le dépôt GitOps, ou `argocd app sync`/`argocd app rollback` si Argo CD
+est directement la source de vérité). Documenté explicitement pourquoi un vrai rollback automatique
+n'est pas réalisable en pure CI GitHub Actions (pas d'état natif du "tag précédent") et recommandé
+`argocd app rollback` comme option la plus fiable puisque l'historique de révisions y est déjà tenu.
+Liaison pipeline → projet → dépôt → environnement → Argo CD : **non dupliquée** — confirmé par relecture
+de `PipelineView.jsx`/`GET /deployments/:linkId/pipeline` (todo.md, entrée Pipeline Timeline/Lot
+précédent) que cette chaîne existe déjà et est câblée à l'échelle d'un déploiement précis ; les nouveaux
+jobs de déploiement se contentent de produire de vrais événements de pipeline (noms de jobs contenant
+`deploy`/`staging`/`production`, déjà reconnus par `STAGE_KEYWORDS` de `PipelinesPage.jsx` → catégorie
+"Déploiement") pour que cette chaîne existante ait quelque chose à afficher, sans réinventer le lien.
+Testé réellement : `node --check` sur les deux fichiers modifiés ; script Node isolé (hors suite) appelant
+`buildCiWorkflow()` avec 8 combinaisons (React+Vite, Java Maven, Go, Rust, PHP, Terraform+Helm, .NET,
+stack inconnue) — YAML validé syntaxiquement avec `js-yaml` pour chacune, et présence vérifiée des
+commandes attendues par écosystème (`mvn -B test`, `go test ./...`, `cargo test`, `composer install`,
+`terraform validate`, `helm lint`, `dotnet test`) ainsi que des 4 jobs de déploiement + `workflow_dispatch`
+dans le YAML généré. `node --test` : 133/140 (identique au plancher attendu ; les 2 tests
+`ciWorkflowService.test.js` préexistants qui échouaient après une première version du message générique
+ont été corrigés pour rester alignés avec le comportement testé — le message "Aucune stack détectée
+automatiquement" et l'absence de `ghcr.io` en dehors du job Docker sont conservés à l'identique). Vérifié
+via Playwright (`admin@homelab.local`) : `/deployments/repos` recharge sans erreur console, état vide
+honnête conservé ("Aucune forge configurée (GitLab/GitHub) — voir Paramètres → Intégrations") — aucune
+forge réelle connectée dans cet environnement de dev, donc le déclenchement effectif de
+`POST /:key/workflows/generate-ci` sur un vrai dépôt (et la génération visible d'un YAML contenant les
+nouveaux jobs) n'a pas pu être exercé au-delà du test Node isolé, comme pour les lots CI/CD précédents.
+**Limites** : Ruby (Bundler) reste sur le job générique honnête (pas dans la liste demandée par
+l'utilisateur, non ajouté pour ne pas dépasser le périmètre) ; Kubernetes en tant que tel n'a pas de
+commande de build/test propre (un manifeste ne se "build" pas) — non ajouté comme écosystème `buildJob`
+séparé, seul Helm (qui a de vraies commandes `lint`/`template`) l'est ; le rollback reste une procédure
+documentée avec un point d'entrée `workflow_dispatch` réel, pas un vrai rollback automatique déclenché
+par un clic (techniquement irréaliste à garantir en pure CI GitHub Actions sans état externe fiable,
+documenté comme tel plutôt que simulé). Fichiers modifiés : `backend/src/services/ciWorkflowService.js`,
+`backend/src/routes/repos.routes.js` (`backend/test/ciWorkflowService.test.js` non modifié — le service a
+été ajusté pour rester conforme à ses assertions existantes).
+
+- [x] **Cybersécurité : Wazuh — alertes exploitables (Lot D7 — Groupe D), complète l'entrée « Cybersécurité : intégration Wazuh approfondie » ci-dessus.** L'entrée précédente laissait explicitement les alertes temps réel hors périmètre ("intégration séparée du gestionnaire, non traitée") — traité ici.
+  - **Nouvelle intégration `wazuhIndexer`** (`backend/src/store/settingsStore.js`) : connexion séparée à l'indexeur Wazuh (OpenSearch, port 9200 par défaut, auth basique potentiellement différente du gestionnaire) — champs `baseUrl`/`username`/`password`/`index` (motif d'index, défaut `wazuh-alerts-*`)/`allowSelfSigned`. Formulaire ajouté dans Paramètres → Intégrations (`frontend/src/config/integrationForms.js`, catégorie Observability, à côté de `wazuh`), réutilise `buildHttpsAgentFromConfig` (Lot A1) pour le TLS.
+  - **`backend/src/services/integrations/wazuhService.js`** : `searchAlerts({ q, severity, agentId, from, to, page, pageSize })` interroge `POST /<index>/_search` (query DSL réel : `query_string` pour la recherche texte sur `rule.description`/`full_log`/`agent.name`, `range` sur `rule.level` pour la sévérité, `range` sur `@timestamp` pour la plage temporelle, tri `@timestamp desc`, pagination `from`/`size`). `getAlertById(id)` récupère une alerte précise. Mapping honnête des champs réels de la réponse OpenSearch (`rule.level`, `rule.description`, `rule.id`, `rule.groups`, `agent.id`/`name`/`ip`, `location`, `full_log`, timestamp) — aucun champ absent n'est fabriqué (`—` ou `null` sinon). `levelToSeverity()` traduit `rule.level` en `low`/`medium`/`high`/`critical` selon les seuils documentés Wazuh (0-3/4-7/8-11/12-15).
+  - **Route** `backend/src/routes/wazuh.routes.js` : `GET /wazuh/alerts` (renvoie `configured:false` avec message si l'indexeur n'est pas configuré, jamais une erreur brute — état vide honnête côté frontend) et `GET /wazuh/alerts/:id`.
+  - **Frontend** : nouvel onglet « Alertes » dans Cybersécurité (`frontend/src/pages/Security/SecurityPage.jsx`, `AlertsPanel`) à côté de l'onglet Conformité existant — recherche texte, filtre sévérité, filtre par ID agent, pagination, tableau (sévérité/description/agent/machine liée/horodatage), clic sur une ligne → modale de détail (`AlertDetailModal`, réutilise `components/ui/Modal.jsx`) affichant règle, groupes, agent source, machine liée, emplacement, log complet et payload JSON brut.
+  - **Liaison alerte → machine** : `matchHost()` dans `wazuhService.js` relie `agent.ip`/`agent.name` de l'alerte à un hôte de `hostsStore.js` (Infrastructure → Hôtes) par IP puis par nom — retourne `null` (affiché "non liée"/"aucune correspondance") si rien ne correspond, aucun lien fabriqué.
+  - **Liaison alerte → utilisateur/projet : non réalisable proprement, documentée comme limite plutôt qu'implémentée avec une fausse correspondance.** `hostsStore.js` (table `hosts`, migration `0028_hosts.sql`) n'a **aucune colonne `project_id`/`organization_id`** — les hôtes sont une ressource de plateforme, pas rattachée à un projet ni à un utilisateur. Il n'existe donc aucune donnée réelle permettant de dériver alerte→projet ou alerte→utilisateur à partir d'un agent Wazuh. Établir un tel lien aurait nécessité soit d'inventer une correspondance (interdit par les contraintes du projet), soit d'ajouter un champ de rattachement hôte→projet hors périmètre de ce lot (changement de schéma plus large, à évaluer séparément si le besoin est confirmé).
+  - **Notification NexUs** : `backend/src/services/wazuhAlertNotificationService.js` (nouveau), même schéma que `kubernetesAlertService.js` — poller toutes les 60s (`scheduleWazuhAlertChecks`, câblé dans `backend/src/index.js`), interroge les alertes de sévérité `critical` (niveau ≥ 12) et notifie via `createNotification()` (`store/notificationsStore.js`, même mécanisme que le Lot D3) chaque alerte une seule fois (dédoublonnage par `_id` OpenSearch en mémoire process, capé à 2000 entrées comme le service Kubernetes). Ne fait rien si l'indexeur n'est pas configuré.
+  - **Historique** : l'historique EST l'index OpenSearch lui-même (pas de duplication dans un store NexUs) — pagination/tri par `@timestamp desc` directement sur l'indexeur via `GET /wazuh/alerts?page=...`.
+  - **Corrélation avec incidents : évaluée, non implémentée dans ce lot.** `incidentStore.js` (table `incidents`) exige un `project_id` (et souvent un `component_id`) à la création — un incident n'existe qu'à l'intérieur d'un projet. Un bouton « Créer un incident depuis cette alerte » nécessiterait donc de faire choisir un projet cible à l'utilisateur (l'alerte, elle, n'a pas de projet — voir limite ci-dessus) : faisable en théorie mais qui dépasse le temps disponible pour ce lot et n'a pas été fait pour ne pas livrer une fonctionnalité à moitié pensée. Documenté comme travail futur plutôt que bâclé.
+  - **Vérifié réellement** : `node --check` sur tous les fichiers backend modifiés/créés (OK). `node --test` : 133/140 (aucune régression — mêmes 4 échecs préexistants qu'avant ce lot, tous dans `backupService.test.js`/`jobService.test.js`, sans rapport avec Wazuh). Build frontend (`vite build`) sans erreur. Vérifié en direct via Playwright avec `admin@homelab.local` : onglet « Alertes » affiche l'état vide honnête *"L'indexeur Wazuh (alertes) n'est pas configuré"* (aucun indexeur réel disponible dans cet environnement de dev, comme attendu) ; formulaire Paramètres → Intégrations → « Wazuh · Indexeur (alertes) » présent et fonctionnel (URL, utilisateur, mot de passe, motif d'index, case certificat auto-signé). **Non testable dans cet environnement** : le comportement avec de vraies alertes (mapping des champs sur une réponse OpenSearch réelle, liaison alerte→machine avec une correspondance IP effective, notification déclenchée sur une alerte critique réelle) n'a pas pu être exercé faute d'indexeur Wazuh réel accessible ici — le code suit fidèlement le format de réponse documenté d'OpenSearch/Wazuh (`hits.hits[]._source`, `hits.total.value`), mais reste à valider contre une instance réelle.
+  - **Fichiers** : `backend/src/store/settingsStore.js`, `backend/src/services/integrations/wazuhService.js`, `backend/src/routes/wazuh.routes.js`, `backend/src/services/wazuhAlertNotificationService.js` (nouveau), `backend/src/index.js`, `frontend/src/config/integrationForms.js`, `frontend/src/pages/Security/SecurityPage.jsx`.

@@ -1,0 +1,166 @@
+- generic [ref=e61]:
+  - banner [ref=e63]:
+    - generic [ref=e64]:
+      - img "Nexus Console" [ref=e65]
+      - generic [ref=e66]:
+        - generic [ref=e67]: Nexus Console
+        - generic [ref=e68]: homelab.local
+    - generic [ref=e69]: Vue générale
+    - generic [ref=e71]:
+      - generic "Santé globale de l'infrastructure" [ref=e73] [cursor=pointer]:
+        - text: Santé globale
+        - generic [ref=e75]: 25 %
+      - button "Command Center... ⌘K" [ref=e76] [cursor=pointer]:
+        - generic [ref=e79]: Command Center...
+        - generic [ref=e80]: ⌘K
+      - link "Manuel d'utilisation" [ref=e81] [cursor=pointer]:
+        - /url: /manual
+      - button "Passer en thème clair" [ref=e84] [cursor=pointer]
+      - button "Notifications" [ref=e88] [cursor=pointer]
+      - generic "Administrateur" [ref=e93] [cursor=pointer]: AD
+  - generic [ref=e95]:
+    - navigation [ref=e97]:
+      - generic [ref=e98]:
+        - link "Vue générale" [ref=e99] [cursor=pointer]:
+          - /url: /
+        - link "Développement" [ref=e104] [cursor=pointer]:
+          - /url: /deployments
+        - link "Infrastructure" [ref=e109] [cursor=pointer]:
+          - /url: /infrastructure
+        - link "Kubernetes" [ref=e114] [cursor=pointer]:
+          - /url: /kubernetes
+        - link "Réseaux" [ref=e119] [cursor=pointer]:
+          - /url: /network
+        - link "Monitoring" [ref=e124] [cursor=pointer]:
+          - /url: /monitoring
+        - link "Cybersécurité" [ref=e129] [cursor=pointer]:
+          - /url: /security
+        - link "Stockage" [ref=e134] [cursor=pointer]:
+          - /url: /storage
+        - link "Accès administrateur Paramètres" [ref=e139] [cursor=pointer]:
+          - /url: /settings
+          - generic "Accès administrateur" [ref=e143]
+          - generic [ref=e144]: Paramètres
+      - generic [ref=e145]:
+        - button "Personnaliser la navigation" [ref=e146] [cursor=pointer]
+        - button "Réduire la barre latérale" [ref=e149] [cursor=pointer]
+    - main [ref=e152]:
+      - generic [ref=e153]:
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - heading "Vue générale" [level=1] [ref=e157]
+            - paragraph [ref=e158]: "État global de l'infrastructure : Kubernetes, Argo CD, HAProxy, GitLab, Proxmox, Traefik, Cert-Manager et Grafana."
+          - generic [ref=e160]:
+            - link "Rapport" [ref=e161] [cursor=pointer]:
+              - /url: /report
+            - button "Actualiser" [ref=e164] [cursor=pointer]
+        - generic [ref=e167]:
+          - generic [ref=e168]:
+            - generic [ref=e169]: Santé globale
+            - generic [ref=e172]:
+              - generic [ref=e173]: "25"
+              - generic [ref=e174]: "%"
+            - generic [ref=e175]: pondérée sur les intégrations configurées
+          - generic [ref=e177]:
+            - generic [ref=e178]: Nœuds en ligne
+            - generic [ref=e181]: —
+            - generic [ref=e183]: Non configuré (Proxmox)
+          - generic [ref=e185]:
+            - generic [ref=e186]: Alertes ouvertes
+            - generic [ref=e189]: "0"
+            - generic [ref=e191]: Grafana + agents Wazuh déconnectés
+          - generic [ref=e193]:
+            - generic [ref=e194]: Dernière actualisation
+            - generic [ref=e197]: 15:49:43
+        - generic [ref=e200]:
+          - generic [ref=e202]:
+            - generic [ref=e203]: Vue d'ensemble administrateur
+            - generic [ref=e204]: 7 point(s) à vérifier
+          - generic [ref=e205]:
+            - 'generic "Kubernetes — Kubernetes · version: request to https://127.0.0.1:64580/api/v1/namespaces failed, reason: connect ECONNREFUSED 127.0.0.1:64580" [ref=e209]'
+            - 'generic "HAProxy — HAProxy: connexion impossible (ECONNREFUSED)" [ref=e213]'
+            - 'generic "Cert-Manager — Kubernetes · cert-manager: request to https://127.0.0.1:64580/apis/cert-manager.io/v1/certificates failed, reason: connect ECONNREFUSED 127.0.0.1:64580" [ref=e217]'
+            - 'generic "Incident ouvert : Pipeline GitLab en échec — main" [ref=e221]'
+            - 'generic "Incident ouvert : Test notif incident" [ref=e225]'
+            - 'generic "Job en échec : catalog.scaffold — GitHub non configuré" [ref=e229]'
+            - generic "Dernière sauvegarde vieille de 85 h" [ref=e233]
+        - generic [ref=e234]:
+          - generic [ref=e235]:
+            - generic [ref=e237]:
+              - generic [ref=e238]: Charge de l'infrastructure
+              - generic [ref=e239]: CPU et mémoire agrégés
+            - generic [ref=e240]: Non configuré — nécessite l'intégration Proxmox (Paramètres → Intégrations)
+          - generic [ref=e241]:
+            - generic [ref=e243]:
+              - generic [ref=e244]: Répartition des charges
+              - generic [ref=e245]: Par type de workload
+            - generic [ref=e246]:
+              - generic [ref=e250]:
+                - generic [ref=e251]: —
+                - generic [ref=e252]: workloads
+              - generic [ref=e254]:
+                - generic [ref=e255]:
+                  - generic [ref=e257]: Machines virtuelles
+                  - generic [ref=e258]: —
+                - generic [ref=e259]:
+                  - generic [ref=e261]: Conteneurs LXC
+                  - generic [ref=e262]: —
+                - generic [ref=e263]:
+                  - generic [ref=e265]: Docker
+                  - generic [ref=e266]: —
+                - generic [ref=e267]:
+                  - generic [ref=e269]: Pods K3s
+                  - generic [ref=e270]: —
+            - generic [ref=e271]: Aucune donnée (Proxmox et Kubernetes non configurés)
+        - generic [ref=e272]:
+          - generic [ref=e273]:
+            - generic [ref=e274]:
+              - generic [ref=e275]:
+                - generic [ref=e276]: Hôtes critiques
+                - generic [ref=e277]: Nœuds portant des services de production
+              - generic [ref=e278]:
+                - textbox "Filtrer…" [ref=e279]
+                - generic [ref=e280]: 0 / 0
+            - generic [ref=e281]: Aucun hôte marqué critique — cochez « Hôte critique » depuis Infrastructure → Hôtes & agents.
+          - generic [ref=e282]:
+            - generic [ref=e284]:
+              - generic [ref=e285]: Activité en direct
+              - generic [ref=e286]: Derniers événements du parc
+            - generic [ref=e287]:
+              - generic [ref=e290]:
+                - generic [ref=e291]: Connexion
+                - generic [ref=e292]: auth · à l'instant
+              - generic [ref=e295]:
+                - generic [ref=e296]: host.service.update-policy.set
+                - generic [ref=e297]: host · il y a 25 min
+              - generic [ref=e300]:
+                - generic [ref=e301]: Hôte retiré
+                - generic [ref=e302]: host · il y a 25 min
+              - generic [ref=e305]:
+                - generic [ref=e306]: Connexion
+                - generic [ref=e307]: auth · il y a 25 min
+              - generic [ref=e310]:
+                - generic [ref=e311]: Hôte ajouté
+                - generic [ref=e312]: host · il y a 26 min
+              - generic [ref=e315]:
+                - generic [ref=e316]: host.service.update-policy.set
+                - generic [ref=e317]: host · il y a 27 min
+              - generic [ref=e320]:
+                - generic [ref=e321]: terminal.command
+                - generic [ref=e322]: terminal · il y a 43 min
+              - generic [ref=e325]:
+                - generic [ref=e326]: kubernetes.cluster.deleted
+                - generic [ref=e327]: kubernetes · il y a 52 min
+        - generic [ref=e328]:
+          - generic [ref=e329]:
+            - generic [ref=e330]:
+              - generic [ref=e331]:
+                - generic [ref=e332]: Disponibilité 24h
+                - generic [ref=e333]: Par service exposé
+              - button "?" [ref=e335] [cursor=pointer]
+            - generic [ref=e336]: Aucun service marqué important — cochez « Important » depuis Réseaux → Proxies & domaines.
+          - generic [ref=e337]:
+            - generic [ref=e339]:
+              - generic [ref=e340]: Alertes ouvertes
+              - generic [ref=e341]: Triées par sévérité
+            - generic [ref=e342]: Aucune alerte ouverte
