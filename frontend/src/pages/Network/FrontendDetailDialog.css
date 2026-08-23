@@ -1,0 +1,63 @@
+.fdd-card {
+  width: 640px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.fdd-error {
+  color: var(--crit, #dc2626);
+  font-size: 13px;
+}
+
+.fdd-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.fdd-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.fdd-desc {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.fdd-bind-row,
+.fdd-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.fdd-input-sm { width: 140px; }
+.fdd-input-xs { width: 80px; }
+.fdd-input-cert { width: 220px; }
+
+.fdd-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.fdd-remove {
+  cursor: pointer;
+  color: var(--crit, #dc2626);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.fdd-row-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}

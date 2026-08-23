@@ -23,6 +23,8 @@ import * as incidentStore from '../store/incidentStore.js';
 import * as changeStore from '../store/changeStore.js';
 import * as maintenanceStore from '../store/maintenanceStore.js';
 import { getPipeline as getDeploymentPipeline } from '../services/deploymentService.js';
+import { getDevUrlForLink } from '../services/devUrlService.js';
+import * as haproxy from '../services/integrations/haproxyService.js';
 import * as repoStore from '../store/managedRepositoriesStore.js';
 import { runProvisioning } from '../services/repositoryProvisioningService.js';
 import { listEnvironmentsWithStatus, linkEnvironment, promote, listPromotions, provisionArgocdApp, rollbackEnvironment } from '../services/environmentPromotionService.js';
@@ -993,6 +995,35 @@ router.get('/:id/deployments/:linkId/history', loadProjectAccess(), asyncHandler
 // besoin explicite du brief de partir d'un déploiement et comprendre son
 // exposition réseau jusqu'au service, dans le contexte du projet plutôt que
 // par un id de lien deviné.
+// URL dev/staging générée pour ce déploiement (Lot C3, Groupe C) : jamais pour
+// la production (voir devUrlService.js#generateDevUrl), disponible seulement
+// si un domaine central est configuré ET qu'un reverse proxy (HAProxy ou
+// Traefik) l'est aussi. `available: false` avec `reason` explicite sinon —
+// aucune URL fabriquée quand les prérequis manquent.
+router.get('/:id/deployments/:linkId/dev-url', loadProjectAccess(), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  res.json({ ok: true, ...(await getDevUrlForLink(link.id)) });
+}));
+
+// Applique la proposition de frontend HAProxy pour l'URL dev/staging générée
+// ci-dessus : validation explicite admin requise (pas d'application
+// automatique silencieuse, voir consigne), réutilise
+// haproxyService.js#createFrontend du Lot C2 plutôt que de dupliquer la
+// logique de création de frontend/binding.
+router.post('/:id/deployments/:linkId/dev-url/apply-proxy', loadProjectAccess(), requireRole('admin'), asyncHandler(async (req, res) => {
+  const link = await loadDeploymentLink(req, res);
+  if (!link) return;
+  const devUrl = await getDevUrlForLink(link.id);
+  if (!devUrl.available || !devUrl.haproxyProposal) {
+    return res.status(409).json({ ok: false, error: devUrl.reason || 'Aucune proposition de configuration disponible pour ce déploiement' });
+  }
+  const { name, mode } = devUrl.haproxyProposal;
+  const result = await haproxy.createFrontend({ name, port: Number(req.body?.port) || 80, mode: mode || 'http' });
+  logAudit(req, 'haproxy.frontend.created_from_dev_url', { linkId: link.id, name, structure: devUrl.structure, url: devUrl.url });
+  res.json({ ok: true, ...result, devUrl: devUrl.url });
+}));
+
 router.get('/:id/deployments/:linkId/pipeline', loadProjectAccess(), asyncHandler(async (req, res) => {
   const link = await loadDeploymentLink(req, res);
   if (!link) return;

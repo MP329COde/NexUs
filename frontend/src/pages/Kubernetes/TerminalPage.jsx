@@ -30,6 +30,8 @@ export default function TerminalPage() {
   const notify = useNotify();
   const perms = useApi(() => api.get('/terminal/permissions'), []);
   const accessRequest = useApi(() => api.get('/terminal/access-request'), []);
+  const clusters = useApi(() => api.get('/kubernetes/clusters'), []);
+  const [clusterId, setClusterId] = useState('');
   const [requestedTier, setRequestedTier] = useState('developer');
   const [reason, setReason] = useState('');
   const [requesting, setRequesting] = useState(false);
@@ -57,6 +59,11 @@ export default function TerminalPage() {
 
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [history]);
   useEffect(() => { if (searchParams.get('prefill')) setSearchParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!clusterId && clusters.data?.items?.length) {
+      setClusterId((clusters.data.items.find((c) => c.isDefault) || clusters.data.items[0]).id);
+    }
+  }, [clusters.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tier = perms.data?.tier;
   const verbs = perms.data?.verbs || [];
@@ -67,7 +74,7 @@ export default function TerminalPage() {
     setBusy(true);
     const entry = { command, manifest: command.trim() === 'apply' ? manifest : null, at: new Date().toISOString() };
     try {
-      const res = await api.post('/terminal/run', { command, manifest: command.trim().startsWith('apply') ? manifest : undefined });
+      const res = await api.post('/terminal/run', { command, manifest: command.trim().startsWith('apply') ? manifest : undefined, clusterId: clusterId || undefined });
       entry.result = res.result;
     } catch (err) {
       entry.error = err.message;
@@ -94,6 +101,12 @@ export default function TerminalPage() {
         <div className="card term-noaccess-card">
           <Icon name="lock" size={22} className="term-noaccess-icon" />
           <div className="term-noaccess-title">Aucun accès au terminal</div>
+          <div className="faint term-noaccess-rules">
+            Qui peut quoi : tout compte connecté peut demander un palier ci-dessous. Seul un administrateur
+            (permission RBAC « terminal » = Admin) peut approuver ou refuser une demande, depuis Paramètres →
+            Utilisateurs. Une fois approuvé, le palier accordé (Developer/Maintainer/Admin) détermine les verbes
+            kubectl-like disponibles ; les comptes admin de la plateforme ont toujours le palier Admin.
+          </div>
           {accessRequest.data?.pending ? (
             <div className="faint term-noaccess-pending">
               Demande de palier <strong>{TIER_LABEL[accessRequest.data.pending.requestedTier]}</strong> envoyée le {new Date(accessRequest.data.pending.createdAt).toLocaleString('fr-FR')} — en attente d'un administrateur.
@@ -120,7 +133,23 @@ export default function TerminalPage() {
 
       {tier && (
         <div className="term-grid">
-          <Panel title="Session" sub={`Verbes autorisés : ${verbs.join(', ')}`} span={9}>
+          <Panel
+            title="Session"
+            sub={`Verbes autorisés : ${verbs.join(', ')}`}
+            span={9}
+            actions={clusters.data?.items?.length > 1 && (
+              <select
+                className="input term-cluster-select"
+                value={clusterId}
+                onChange={(e) => setClusterId(e.target.value)}
+                title="Cluster ciblé par les commandes"
+              >
+                {clusters.data.items.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.isDefault ? ' (défaut)' : ''}</option>
+                ))}
+              </select>
+            )}
+          >
             <div ref={scrollRef} className="mono term-session">
               {history.length === 0 && <div className="faint">Tapez une commande ci-dessous — {VERB_HELP[verbs[0]]}</div>}
               {history.map((h, i) => (

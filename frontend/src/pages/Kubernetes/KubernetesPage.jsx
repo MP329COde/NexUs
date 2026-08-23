@@ -8,6 +8,7 @@ import ActionConfirmModal from '../../components/ui/ActionConfirmModal.jsx';
 import Icon from '../../components/ui/Icon.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
+import { getActiveK8sCluster, setActiveK8sCluster } from '../../lib/k8sCluster.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import { useCommandCenter } from '../../context/CommandCenterContext.jsx';
 import PodLogsDialog from './PodLogsDialog.jsx';
@@ -22,20 +23,40 @@ export default function KubernetesPage() {
   // sans ça, le lien "N pod(s) Running" ouvrait la page sans jamais filtrer
   // sur le namespace annoncé.
   const [namespace, setNamespace] = useState(() => searchParams.get('ns') || '');
+  // Lot C4 (multi-cluster) : cluster actif, pré-rempli depuis ?cluster=<id>
+  // (lien direct, ex: sélecteur de la topologie réseau) sinon depuis le
+  // dernier cluster choisi (lib/k8sCluster.js, persistance navigateur).
+  // Passer par `setActiveK8sCluster` fait que lib/apiClient.js ajoute
+  // automatiquement `?cluster=<id>` à tout appel /kubernetes/* qui suit,
+  // y compris ceux des dialogues (logs, describe, diagnostics...) sans
+  // avoir à leur faire porter cet identifiant individuellement.
+  const [clusterId, setClusterId] = useState(() => {
+    const fromUrl = searchParams.get('cluster');
+    if (fromUrl) setActiveK8sCluster(fromUrl);
+    return fromUrl || getActiveK8sCluster();
+  });
   const [logsPod, setLogsPod] = useState(null);
   const [detailPod, setDetailPod] = useState(null); // { pod, tab }
   const [diagnosing, setDiagnosing] = useState(null); // { namespace, name }
   const [scaling, setScaling] = useState(null); // "ns/name" en cours d'édition
   const [scaleValue, setScaleValue] = useState('');
   const [pending, setPending] = useState(null); // action en attente de confirmation
-  const status = useApi(() => api.get('/kubernetes/status'), []);
-  const namespaces = useApi(() => api.get('/kubernetes/namespaces'), [], { pollMs: 30000 });
-  const deployments = useApi(() => api.get(`/kubernetes/deployments${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
-  const pods = useApi(() => api.get(`/kubernetes/pods${namespace ? `?namespace=${namespace}` : ''}`), [namespace], { pollMs: 15000 });
+  const clusters = useApi(() => api.get('/kubernetes/clusters'), []);
+  const status = useApi(() => api.get('/kubernetes/status'), [clusterId]);
+  const namespaces = useApi(() => api.get('/kubernetes/namespaces'), [clusterId], { pollMs: 30000 });
+  const deployments = useApi(() => api.get(`/kubernetes/deployments${namespace ? `?namespace=${namespace}` : ''}`), [namespace, clusterId], { pollMs: 15000 });
+  const pods = useApi(() => api.get(`/kubernetes/pods${namespace ? `?namespace=${namespace}` : ''}`), [namespace, clusterId], { pollMs: 15000 });
   const notify = useNotify();
   const { openPalette } = useCommandCenter();
 
+  function changeCluster(id) {
+    setActiveK8sCluster(id);
+    setClusterId(id);
+    setNamespace('');
+  }
+
   const configured = status.data?.status?.configured;
+  const clusterItems = clusters.data?.items || [];
 
   async function scale(ns, name) {
     const replicas = Number(scaleValue);
@@ -177,7 +198,7 @@ export default function KubernetesPage() {
     return (
       <>
         <PageHeader title="Kubernetes" sub="Cluster K3s/K8s, charges de travail et GitOps" />
-        <div className="card"><EmptyState title="Kubernetes n'est pas configuré" hint="Renseignez l'URL du serveur API et un token de service depuis Paramètres → Kubernetes." /></div>
+        <div className="card"><EmptyState title="Kubernetes n'est pas configuré" hint="Ajoutez un cluster (URL du serveur API + token de service) depuis Paramètres → Kubernetes." /></div>
       </>
     );
   }
@@ -188,10 +209,24 @@ export default function KubernetesPage() {
         title="Kubernetes"
         sub={status.data?.status?.message}
         actions={(
-          <select className="input k8s-namespace-select" value={namespace} onChange={(e) => setNamespace(e.target.value)}>
-            <option value="">Tous les namespaces</option>
-            {namespaces.data?.items.map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
-          </select>
+          <>
+            {clusterItems.length > 1 && (
+              <select
+                className="input k8s-namespace-select"
+                value={clusterId || clusterItems.find((c) => c.isDefault)?.id || ''}
+                onChange={(e) => changeCluster(e.target.value)}
+                title="Cluster Kubernetes actif"
+              >
+                {clusterItems.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.isDefault ? ' (défaut)' : ''}</option>
+                ))}
+              </select>
+            )}
+            <select className="input k8s-namespace-select" value={namespace} onChange={(e) => setNamespace(e.target.value)}>
+              <option value="">Tous les namespaces</option>
+              {namespaces.data?.items.map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
+            </select>
+          </>
         )}
       />
 

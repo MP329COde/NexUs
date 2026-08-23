@@ -81,7 +81,7 @@ function splitKindName(token) {
 // non) doit être journalisé par l'appelant (routes/terminal.routes.js) via
 // logAudit — auteur, IP et date viennent déjà de la requête, ce module ne
 // s'occupe que de la commande et de son résultat.
-export async function runCommand(user, line, manifestText) {
+export async function runCommand(user, line, manifestText, clusterId) {
   const tokens = tokenize(line.trim());
   const verb = tokens[0];
   if (!verb) throw new IntegrationError('Commande vide', { status: 400 });
@@ -100,45 +100,45 @@ export async function runCommand(user, line, manifestText) {
   switch (verb) {
     case 'get': {
       const resource = positional[0];
-      if (resource === 'pods') return { rows: await k8s.listPods(namespace) };
-      if (resource === 'deployments') return { rows: await k8s.listDeployments(namespace) };
-      if (resource === 'services') return { rows: await k8s.listServices(namespace) };
+      if (resource === 'pods') return { rows: await k8s.listPods(namespace, clusterId) };
+      if (resource === 'deployments') return { rows: await k8s.listDeployments(namespace, clusterId) };
+      if (resource === 'services') return { rows: await k8s.listServices(namespace, clusterId) };
       throw new IntegrationError(`get : ressource inconnue "${resource}" (pods, deployments, services)`, { status: 400 });
     }
     case 'logs': {
       const pod = positional[0];
       if (!pod || !namespace) throw new IntegrationError('logs <pod> -n <namespace> requis', { status: 400 });
-      return { text: await k8s.getPodLogs(namespace, pod, flags.container, flags.tail || 200) };
+      return { text: await k8s.getPodLogs(namespace, pod, flags.container, flags.tail || 200, clusterId) };
     }
     case 'describe': {
       const { kind, name } = splitKindName(positional[1] ? `${positional[0]}/${positional[1]}` : positional[0]);
       if (!name || !namespace) throw new IntegrationError('describe pod <nom> -n <namespace> requis', { status: 400 });
       if (kind && kind !== 'pod') throw new IntegrationError('describe ne supporte que "pod" pour le moment', { status: 400 });
-      return { object: await k8s.describePod(namespace, name) };
+      return { object: await k8s.describePod(namespace, name, clusterId) };
     }
     case 'scale': {
       const { kind, name } = splitKindName(positional[0]);
       if (kind !== 'deployment' || !name || !namespace || !Number.isInteger(flags.replicas)) {
         throw new IntegrationError('scale deployment/<nom> --replicas=<n> -n <namespace> requis', { status: 400 });
       }
-      return await k8s.scaleDeployment(namespace, name, flags.replicas);
+      return await k8s.scaleDeployment(namespace, name, flags.replicas, clusterId);
     }
     case 'restart': {
       const { kind, name } = splitKindName(positional[0]);
       if (kind !== 'deployment' || !name || !namespace) throw new IntegrationError('restart deployment/<nom> -n <namespace> requis', { status: 400 });
-      return await k8s.restartDeployment(namespace, name);
+      return await k8s.restartDeployment(namespace, name, clusterId);
     }
     case 'delete': {
       const { kind, name } = splitKindName(positional[0]);
       if (kind !== 'pod' || !name || !namespace) throw new IntegrationError('delete pod/<nom> -n <namespace> requis (seul "pod" est supporté)', { status: 400 });
-      return await k8s.deletePod(namespace, name);
+      return await k8s.deletePod(namespace, name, clusterId);
     }
     case 'exec': {
       const pod = positional[0];
       if (!pod || !namespace || !flags.execCommand?.length) {
         throw new IntegrationError('exec <pod> -n <namespace> [-c <conteneur>] -- <commande> requis', { status: 400 });
       }
-      return await k8s.execInPod(namespace, pod, flags.container, flags.execCommand);
+      return await k8s.execInPod(namespace, pod, flags.container, flags.execCommand, clusterId);
     }
     case 'apply': {
       if (!manifestText?.trim()) throw new IntegrationError('apply requiert un manifest (YAML ou JSON)', { status: 400 });
@@ -155,7 +155,7 @@ export async function runCommand(user, line, manifestText) {
           { status: 403 }
         );
       }
-      return { object: await k8s.applyManifest(manifest) };
+      return { object: await k8s.applyManifest(manifest, clusterId) };
     }
     default:
       throw new IntegrationError('Verbe non implémenté', { status: 500 });

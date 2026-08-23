@@ -14,10 +14,11 @@ export const INTEGRATION_FORMS = {
       "Si le certificat du cluster n'est pas reconnu (CA auto-signée), cochez « Ignorer la vérification TLS » (labo uniquement)."
     ],
     fields: [
-      { key: 'apiServer', label: 'URL du serveur API', placeholder: 'https://10.0.0.10:6443', hint: 'Visible avec `kubectl cluster-info`.' },
+      { key: 'apiServer', label: 'URL du serveur API', placeholder: 'https://10.0.0.10:6443', hint: 'Visible avec `kubectl cluster-info`. Souvent une adresse interne (IP privée, DNS de cluster) non joignable depuis un navigateur — voir "URL du tableau de bord" ci-dessous pour le lien cliquable.' },
       { key: 'namespace', label: 'Namespace par défaut', placeholder: 'default' },
       { key: 'token', label: 'Token du ServiceAccount', type: 'password', secret: true, hint: 'Généré via `kubectl create token`.' },
-      { key: 'insecureSkipTlsVerify', label: 'Ignorer la vérification TLS (labo uniquement)', type: 'checkbox' }
+      { key: 'insecureSkipTlsVerify', label: 'Ignorer la vérification TLS (labo uniquement)', type: 'checkbox' },
+      { key: 'dashboardUrl', label: 'URL du tableau de bord (optionnel)', placeholder: 'https://k8s-dashboard.example.com', hint: 'URL publique/accessible au navigateur d\'un tableau de bord Kubernetes (ex: Headlamp, K8s Dashboard). Distincte de l\'URL du serveur API ci-dessus, qui n\'est en général joignable que depuis le backend NexUs. Laissez vide si aucun tableau de bord n\'est exposé — aucun lien ne sera alors proposé.' }
     ]
   },
   argocd: {
@@ -30,8 +31,9 @@ export const INTEGRATION_FORMS = {
       "L'URL du serveur est celle de votre interface Argo CD (avec https://)."
     ],
     fields: [
-      { key: 'baseUrl', label: 'URL du serveur', placeholder: 'https://argocd.homelab.local' },
+      { key: 'baseUrl', label: 'URL du serveur (API)', placeholder: 'https://argocd.homelab.local', hint: 'Utilisée par le backend NexUs pour appeler l\'API Argo CD. Si votre Argo CD n\'est joignable que depuis le réseau interne (IP privée, VPN, DNS interne), renseignez aussi "URL publique" ci-dessous — sinon le lien "Ouvrir dans Argo CD" pointera vers une adresse inaccessible depuis votre navigateur.' },
       { key: 'token', label: 'Token API', type: 'password', secret: true, hint: 'Généré via `argocd account generate-token`.' },
+      { key: 'publicUrl', label: 'URL publique (optionnel)', placeholder: 'https://argocd.mondomaine.com', hint: 'URL accessible depuis le navigateur de l\'administrateur, si différente de l\'URL du serveur API ci-dessus (cas fréquent : API interne + reverse proxy externe). Utilisée à la place de l\'URL du serveur pour les liens "Ouvrir dans Argo CD". Laissez vide si l\'URL du serveur est déjà accessible publiquement.' },
       { key: 'allowSelfSigned', label: 'Ignorer la vérification du certificat (certificat auto-signé)', type: 'checkbox', hint: '⚠️ Désactive la vérification TLS pour cette intégration — n\'activez que si vous faites confiance au certificat présenté (ex: CA interne, certificat auto-signé de votre labo).' }
     ],
     hostSuggestion: { field: 'baseUrl', subdomain: 'argocd' }
@@ -271,7 +273,15 @@ export const INTEGRATION_FORMS = {
   }
 };
 
-export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'tracing', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
+// 'kubernetes' n'est plus une intégration "clé unique" gérée par ce formulaire
+// générique depuis le Lot C4 (multi-cluster) : elle est devenue une LISTE de
+// clusters nommés, avec son propre panneau dédié (voir
+// pages/Settings/K8sClustersPanel.jsx, catégorie "Runtime" de SettingsPage).
+// La définition ci-dessus (INTEGRATION_FORMS.kubernetes) reste présente pour
+// mémoire mais n'est plus rendue nulle part — le backend ne lit plus jamais
+// `integrations.kubernetes` après la migration automatique vers `k8sClusters`
+// (voir store/settingsStore.js#migrateK8sClusters côté backend).
+export const INTEGRATION_ORDER = ['argocd', 'haproxy', 'gitlab', 'github', 'githubPlatform', 'gitea', 'proxmox', 'traefik', 'certManager', 'grafana', 'tracing', 'wazuh', 'registry', 'notificationsWebhook', 'ovh', 'duckdns', 'gitBackup'];
 
 // Regroupement purement visuel de INTEGRATION_ORDER ci-dessus (mêmes clés,
 // même ordre au sein de chaque catégorie) — la grille était une liste plate
@@ -280,7 +290,7 @@ export const INTEGRATION_ORDER = ['kubernetes', 'argocd', 'haproxy', 'gitlab', '
 // Networking / Plateforme).
 export const INTEGRATION_CATEGORIES = [
   { label: 'Source Control', keys: ['gitlab', 'github', 'githubPlatform', 'gitea'] },
-  { label: 'Runtime', keys: ['kubernetes', 'argocd', 'proxmox'] },
+  { label: 'Runtime', keys: ['argocd', 'proxmox'] },
   { label: 'Observability', keys: ['grafana', 'tracing', 'wazuh'] },
   { label: 'Networking', keys: ['haproxy', 'traefik', 'certManager', 'ovh', 'duckdns'] },
   { label: 'Plateforme', keys: ['registry', 'notificationsWebhook', 'gitBackup'] }

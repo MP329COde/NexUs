@@ -37,6 +37,23 @@ router.post('/frontends', requireRole('admin'), asyncHandler(async (req, res) =>
 // rollback de la config brute. Toute mutation est réservée admin, snapshotée
 // avant application (network_config_history) car la Data Plane API elle-même
 // ne garde qu'une seule "version courante" — voir haproxyService.js.
+// Édition visuelle d'un frontend (bindings, règles ACL/use_backend) : détail
+// complet, puis remplacement des bindings ou des règles. Réservé admin, même
+// politique que la création de frontend (impact direct sur le routage).
+router.get('/frontends/:name', requireRole('admin'), asyncHandler(async (req, res) => res.json({ ok: true, item: await haproxy.getFrontendDetail(req.params.name) })));
+
+router.put('/frontends/:name/binds', requireRole('admin'), asyncHandler(async (req, res) => {
+  const result = await haproxy.setFrontendBinds(req.params.name, req.body?.binds || []);
+  logAudit(req, 'haproxy.frontend.binds_updated', { name: req.params.name, count: (req.body?.binds || []).length });
+  res.json({ ok: true, ...result });
+}));
+
+router.put('/frontends/:name/rules', requireRole('admin'), asyncHandler(async (req, res) => {
+  const result = await haproxy.setFrontendRules(req.params.name, req.body?.rules || []);
+  logAudit(req, 'haproxy.frontend.rules_updated', { name: req.params.name, count: (req.body?.rules || []).length });
+  res.json({ ok: true, ...result });
+}));
+
 router.get('/config/raw', requireRole('admin'), asyncHandler(async (req, res) => res.json({ ok: true, ...(await haproxy.getRawConfig()) })));
 
 router.post('/config/validate', requireRole('admin'), asyncHandler(async (req, res) => {

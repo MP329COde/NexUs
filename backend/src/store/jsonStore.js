@@ -43,7 +43,9 @@ const DEFAULTS = {
   webauthnCredentials: [], // clés d'accès (passkeys) enregistrées par utilisateur (voir store/webauthnStore.js)
   sessions: [], // sessions actives émises (une par login), pour la vue "Sessions actives" (voir store/sessionsStore.js)
   permissionOverrides: {}, // permissions individuelles hors groupe, indexées par userId (voir store/groupsStore.js)
-  tlsSettings: { mode: 'strict' } // mode TLS global par défaut (strict|permissive), voir store/settingsStore.js (Lot B4)
+  tlsSettings: { mode: 'strict' }, // mode TLS global par défaut (strict|permissive), voir store/settingsStore.js (Lot B4)
+  k8sClusters: [], // liste des clusters Kubernetes déclarés (Lot C4 — multi-cluster), voir store/settingsStore.js. Migré automatiquement depuis l'ancienne config unique `integrations.kubernetes` au premier accès (voir migrateK8sClusters).
+  networkConfig: {} // domaine central de la plateforme (Lot C3), voir store/settingsStore.js#getNetworkConfig
 };
 
 // SQLite (module natif node:sqlite, aucune dépendance de compilation) utilisée

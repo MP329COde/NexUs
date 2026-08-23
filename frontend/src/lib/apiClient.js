@@ -1,5 +1,6 @@
 // Client HTTP minimal vers le backend. Le frontend ne parle jamais directement
 // aux services d'infrastructure : tout transite par /api (cf. consigne de sécurité).
+import { getActiveK8sCluster } from './k8sCluster.js';
 
 // Notifications globales (toasts) sur les vraies pannes — réseau injoignable,
 // erreurs serveur 5xx — pas sur les 4xx : ce sont pour la plupart des états
@@ -41,6 +42,20 @@ export function markBackground() {
   nextRequestIsBackground = true;
 }
 
+// Lot C4 (multi-cluster Kubernetes) : toute requête vers /kubernetes/* reçoit
+// automatiquement le cluster actif sélectionné dans la page (voir
+// lib/k8sCluster.js) en query param `cluster` — évite de faire porter cet
+// identifiant par chaque appelant individuel (page principale + dialogues
+// logs/describe/metrics/owners/diagnostics...). Absent (aucune sélection,
+// ou un seul cluster configuré), le backend retombe sur le cluster par
+// défaut : comportement identique à avant ce lot.
+function withActiveK8sCluster(path) {
+  if (!path.startsWith('/kubernetes/') || path.includes('cluster=')) return path;
+  const clusterId = getActiveK8sCluster();
+  if (!clusterId) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}cluster=${encodeURIComponent(clusterId)}`;
+}
+
 async function request(path, options = {}) {
   let res;
   try {
@@ -48,6 +63,7 @@ async function request(path, options = {}) {
     const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null;
     const isBackground = nextRequestIsBackground;
     nextRequestIsBackground = false;
+    path = withActiveK8sCluster(path);
     res = await fetch(`/api${path}`, {
       credentials: 'include',
       headers: {

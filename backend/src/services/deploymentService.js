@@ -54,6 +54,22 @@ export async function getPipeline(id) {
   const gitConfigured = isGithub ? Boolean(link.githubOwner && link.githubRepo) : Boolean(link.gitlabProjectId);
   const latest = pipelines.value?.[0] || null;
   const argocdCfg = getRawIntegration('argocd');
+  const k8sCfg = getRawIntegration('kubernetes');
+
+  // webUrl doit être une adresse joignable depuis le NAVIGATEUR de l'admin,
+  // pas depuis le backend NexUs. Pour les outils "vraiment externes" (GitHub/
+  // GitLab), `webUrl` est déjà une URL publique fournie telle quelle par leur
+  // API. Pour les outils internes (Argo CD, Kubernetes), l'URL configurée
+  // (`baseUrl`/`apiServer`) est celle utilisée par le backend pour APPELER
+  // l'API — souvent une IP privée / DNS interne / VPN, jamais pensée pour
+  // être ouverte dans un navigateur externe. C'est la cause identifiée du
+  // bug "impossible d'accéder depuis une redirection" (Lot C3) : le frontend
+  // réutilisait tel quel `argocdCfg.baseUrl` comme lien cliquable. On préfère
+  // désormais un champ `publicUrl`/`dashboardUrl` distinct, dédié au lien
+  // navigateur, quand l'admin l'a renseigné — sinon on retombe sur l'URL API
+  // (comportement historique, inchangé si non configuré différemment).
+  const argocdWebBase = argocdCfg.publicUrl || argocdCfg.baseUrl;
+  const k8sDashboardBase = k8sCfg.dashboardUrl || null;
 
   return {
     link,
@@ -70,10 +86,18 @@ export async function getPipeline(id) {
         configured: Boolean(link.argocdAppName),
         syncStatus: application.value?.status?.sync?.status,
         healthStatus: application.value?.status?.health?.status,
-        webUrl: link.argocdAppName && argocdCfg.baseUrl ? `${argocdCfg.baseUrl.replace(/\/$/, '')}/applications/${link.argocdAppName}` : null,
+        webUrl: link.argocdAppName && argocdWebBase ? `${argocdWebBase.replace(/\/$/, '')}/applications/${link.argocdAppName}` : null,
         error: application.error
       },
-      kubernetes: { configured: Boolean(link.k8sNamespace && link.k8sDeployment), deployment, error: deployments.error },
+      kubernetes: {
+        configured: Boolean(link.k8sNamespace && link.k8sDeployment),
+        deployment,
+        // Absent tant qu'aucune `dashboardUrl` n'est configurée : NexUs n'a
+        // aucune URL de tableau de bord Kubernetes à proposer par défaut
+        // (l'URL du serveur API n'en est pas une — voir commentaire ci-dessus).
+        webUrl: k8sDashboardBase && link.k8sNamespace ? `${k8sDashboardBase.replace(/\/$/, '')}/#/workloads?namespace=${encodeURIComponent(link.k8sNamespace)}` : null,
+        error: deployments.error
+      },
       proxy: { configured: Boolean(link.proxyId), proxy: proxy.value, error: proxy.error }
     }
   };

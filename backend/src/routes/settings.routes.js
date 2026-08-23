@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
-import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS, SECRET_FIELDS } from '../store/settingsStore.js';
+import { getAllRedacted, getRedactedIntegration, saveIntegration, INTEGRATION_KEYS, SECRET_FIELDS, getNetworkConfig, setCentralDomain, getRawIntegration } from '../store/settingsStore.js';
 import { integrations, notificationWebhookService } from '../services/integrationRegistry.js';
 import { readStore, writeStore } from '../store/jsonStore.js';
 import { logAudit } from '../services/auditService.js';
@@ -19,6 +19,35 @@ router.get('/', asyncHandler(async (req, res) => {
 router.put('/console', asyncHandler(async (req, res) => {
   const next = writeStore('console', { ...readStore('console'), ...req.body });
   res.json({ ok: true, console: next });
+}));
+
+// Domaine central (Lot C3) : n'est réellement exploitable que si HAProxy OU
+// Traefik est configuré (même logique de détection que
+// services/networkTopologyService.js#getTopology, réutilisée ici plutôt que
+// dupliquée : `dataPlaneUrl` pour HAProxy, `apiUrl` pour Traefik).
+router.get('/network', asyncHandler(async (req, res) => {
+  const haproxyCfg = getRawIntegration('haproxy');
+  const traefikCfg = getRawIntegration('traefik');
+  const ovhCfg = getRawIntegration('ovh');
+  const duckdnsCfg = getRawIntegration('duckdns');
+  res.json({
+    ok: true,
+    network: {
+      ...getNetworkConfig(),
+      proxyAvailable: Boolean(haproxyCfg.dataPlaneUrl || traefikCfg.apiUrl),
+      haproxyConfigured: Boolean(haproxyCfg.dataPlaneUrl),
+      traefikConfigured: Boolean(traefikCfg.apiUrl),
+      ovhConfigured: Boolean(ovhCfg.appKey && ovhCfg.appSecret && ovhCfg.consumerKey),
+      duckdnsConfigured: Boolean(duckdnsCfg.token)
+    }
+  });
+}));
+
+router.put('/network', asyncHandler(async (req, res) => {
+  const before = getNetworkConfig();
+  const next = setCentralDomain(req.body?.centralDomain);
+  logAudit(req, 'settings.network.central_domain_set', { from: before.centralDomain, to: next.centralDomain });
+  res.json({ ok: true, network: next });
 }));
 
 router.get('/:key', asyncHandler(async (req, res) => {

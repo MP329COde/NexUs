@@ -9,12 +9,16 @@ import { createNotification } from '../store/notificationsStore.js';
 import { listPending, findPendingForUser, createRequest, decideRequest } from '../store/terminalAccessRequestsStore.js';
 
 const router = Router();
-// Porte d'entrée du terminal : la granularité fine (quel verbe kubectl est
-// autorisé) reste gérée par terminalTier/TIER_VERBS (voir runCommand ci-
-// dessous), mais l'accès à la route elle-même exige désormais la permission
-// RBAC 'terminal' comme le reste de la console (cohérence avec settings,
-// vault, kubernetes...).
-router.use(requireAuth, requirePermission('terminal', 'read'));
+// Porte d'entrée du terminal : seule l'authentification est exigée au niveau
+// du routeur. La permission RBAC 'terminal' (read/admin) est vérifiée route
+// par route ci-dessous, car /permissions et /access-request font partie du
+// parcours self-service et doivent rester atteignables par un utilisateur
+// qui n'a *justement pas encore* la permission 'terminal' — sans quoi la
+// demande d'accès elle-même est bloquée par un 403 avant d'exister (bug
+// corrigé : le garde global `requirePermission('terminal','read')` cassait
+// intégralement ce parcours pour tout utilisateur sans accès préexistant).
+// Seule l'exécution réelle de commandes (POST /run) exige 'terminal:read'.
+router.use(requireAuth);
 
 const REQUESTABLE_TIERS = ['developer', 'maintainer'];
 
@@ -69,15 +73,15 @@ router.post('/access-requests/:id/decide', requirePermission('terminal', 'admin'
 // refus de permission) — "audit, utilisateur, IP, date, commande, résultat"
 // vit dans le même journal que le reste de la console (logAudit), pas un
 // système séparé qui pourrait être oublié en cours de route.
-router.post('/run', asyncHandler(async (req, res) => {
-  const { command, manifest } = req.body || {};
+router.post('/run', requirePermission('terminal', 'read'), asyncHandler(async (req, res) => {
+  const { command, manifest, clusterId } = req.body || {};
   if (!command || typeof command !== 'string') return res.status(400).json({ ok: false, error: 'command requis' });
   try {
-    const result = await runCommand(req.user, command, manifest);
-    logAudit(req, 'terminal.command', { command, tier: resolveTier(req.user), ok: true });
+    const result = await runCommand(req.user, command, manifest, clusterId || undefined);
+    logAudit(req, 'terminal.command', { command, tier: resolveTier(req.user), ok: true, clusterId: clusterId || 'default' });
     res.json({ ok: true, result });
   } catch (err) {
-    logAudit(req, 'terminal.command', { command, tier: resolveTier(req.user), ok: false, error: err.message });
+    logAudit(req, 'terminal.command', { command, tier: resolveTier(req.user), ok: false, error: err.message, clusterId: clusterId || 'default' });
     throw err;
   }
 }));

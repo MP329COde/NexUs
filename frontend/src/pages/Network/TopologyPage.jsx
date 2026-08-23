@@ -16,13 +16,15 @@ export default function TopologyPage() {
   const navigate = useNavigate();
   const [view, setView] = useState('graph');
   const layers = data?.layers || [];
+  const graph = data?.graph || { nodes: [], edges: [] };
+  const hasData = layers.length > 0 || graph.nodes.length > 0;
 
   return (
     <>
       <PageHeader
         title="Topologie"
-        sub="Chaîne réseau reconstituée à partir des intégrations configurées : proxies, HAProxy, Traefik, Kubernetes, Proxmox"
-        actions={layers.length > 0 && (
+        sub="Chaîne réseau reconstituée à partir des intégrations configurées : proxies, HAProxy, Traefik, Kubernetes, Argo CD, Proxmox"
+        actions={hasData && (
           <div className="topo-view-toggle">
             <span className={`btn-outline net-action-btn${view === 'graph' ? ' topo-view-active' : ''}`} onClick={() => setView('graph')}>Graphique</span>
             <span className={`btn-outline net-action-btn${view === 'list' ? ' topo-view-active' : ''}`} onClick={() => setView('list')}>Liste</span>
@@ -31,10 +33,10 @@ export default function TopologyPage() {
       />
 
       <Panel span={12}>
-        {layers.length === 0 ? (
-          <EmptyState title="Aucune donnée à afficher" hint="Configurez au moins un proxy ou une intégration réseau (HAProxy, Traefik, Kubernetes, Proxmox) pour voir apparaître la topologie." />
+        {!hasData ? (
+          <EmptyState title="Aucune donnée à afficher" hint="Configurez au moins un proxy ou une intégration réseau (HAProxy, Traefik, Kubernetes, Argo CD, Proxmox) pour voir apparaître la topologie." />
         ) : view === 'graph' ? (
-          <TopologyGraph layers={layers} />
+          <TopologyGraph graph={graph} />
         ) : (
           <div className="topo-scroll">
             {layers.map((layer, i) => (

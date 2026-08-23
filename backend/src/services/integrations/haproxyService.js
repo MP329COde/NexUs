@@ -245,3 +245,103 @@ export async function createFrontend({ name, port, mode = 'http', defaultBackend
 
   return { ok: true, message: `Frontend HAProxy ${name} créé sur le port ${port}` };
 }
+
+// --- Édition visuelle d'un frontend (bindings, règles ACL/use_backend) ---
+// La Data Plane API v3 ne permet pas de PATCH élément par élément sur ces
+// sous-collections (405, voir attachProxyToFrontend ci-dessus) : toute
+// modification remplace la collection entière via PUT avec des index
+// recalculés. C'est pourquoi les fonctions ci-dessous prennent/retournent des
+// tableaux complets plutôt que des opérations "ajouter un élément".
+
+export async function getFrontendDetail(name) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  const [frontend, binds, acls, rules] = await Promise.all([
+    request(c.http, { method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}` }, 'HAProxy'),
+    request(c.http, { method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/binds` }, 'HAProxy'),
+    request(c.http, { method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/acls` }, 'HAProxy'),
+    request(c.http, { method: 'GET', url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/backend_switching_rules` }, 'HAProxy')
+  ]);
+  return {
+    name: frontend?.name || name,
+    mode: frontend?.mode || 'tcp',
+    defaultBackend: frontend?.default_backend || null,
+    binds: (binds || []).map((b) => ({ name: b.name, address: b.address, port: b.port, ssl: !!b.ssl, sslCertificate: b.ssl_certificate || '' })),
+    acls: (acls || []).map((a, index) => ({ index: a.index ?? index, aclName: a.acl_name, criterion: a.criterion, value: a.value })),
+    rules: (rules || []).map((r, index) => ({ index: r.index ?? index, cond: r.cond || '', condTest: r.cond_test || '', backend: r.name }))
+  };
+}
+
+function validateBind({ address, port, ssl, sslCertificate }) {
+  if (!address) throw new IntegrationError('Adresse de bind requise', { status: 400 });
+  const portNum = Number(port);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) throw new IntegrationError('Port de bind invalide (1-65535)', { status: 400 });
+  if (ssl && !sslCertificate) throw new IntegrationError('Chemin du certificat requis quand SSL est activé (ex: /etc/haproxy/certs/site.pem)', { status: 400 });
+}
+
+// Remplace tous les bindings/listeners d'un frontend. Chaque élément :
+// { name, address, port, ssl, sslCertificate }. NexUs ne gère aucun store de
+// certificats HAProxy (aucun mécanisme d'upload/chemin découvert lors de
+// l'audit) : le chemin du certificat est saisi librement par l'utilisateur et
+// doit déjà exister sur l'hôte HAProxy — non vérifié côté NexUs.
+export async function setFrontendBinds(name, binds) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  if (!Array.isArray(binds) || binds.length === 0) throw new IntegrationError('Au moins un binding est requis', { status: 400 });
+  binds.forEach(validateBind);
+  const payload = binds.map((b, index) => ({
+    name: b.name || `${name}_bind${index}`,
+    address: b.address,
+    port: Number(b.port),
+    ...(b.ssl ? { ssl: true, ssl_certificate: b.sslCertificate } : {})
+  }));
+  const version = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'PUT',
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/binds`,
+    params: { version, force_reload: true },
+    data: payload
+  }, 'HAProxy');
+  return { ok: true, message: `Bindings du frontend ${name} mis à jour (${payload.length})` };
+}
+
+// Remplace toutes les règles ACL + use_backend (backend_switching_rules) d'un
+// frontend. rules: [{ aclName, criterion, value, backend }] — une ACL et sa
+// règle de commutation sont créées ensemble par simplicité d'édition visuelle
+// (une règle sans ACL/condition, backend seul, agit comme use_backend
+// inconditionnel).
+export async function setFrontendRules(name, rules) {
+  const c = client();
+  if (!c) throw new IntegrationError('HAProxy non configuré', { status: 409 });
+  if (!Array.isArray(rules)) throw new IntegrationError('Liste de règles invalide', { status: 400 });
+  for (const r of rules) {
+    if (!r.backend) throw new IntegrationError('Backend cible requis pour chaque règle', { status: 400 });
+    if (r.aclName && (!r.criterion || !r.value)) throw new IntegrationError(`Règle "${r.aclName}" : critère et valeur requis`, { status: 400 });
+  }
+
+  const acls = rules
+    .filter((r) => r.aclName)
+    .map((r, index) => ({ acl_name: r.aclName, criterion: r.criterion, value: r.value, index }));
+  const v1 = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'PUT',
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/acls`,
+    params: { version: v1, force_reload: true },
+    data: acls
+  }, 'HAProxy');
+
+  const switchRules = rules.map((r, index) => ({
+    index,
+    name: r.backend,
+    ...(r.aclName ? { cond: 'if', cond_test: r.aclName } : {})
+  }));
+  const v2 = await getConfigVersion(c);
+  await request(c.http, {
+    method: 'PUT',
+    url: `/v3/services/haproxy/configuration/frontends/${encodeURIComponent(name)}/backend_switching_rules`,
+    params: { version: v2, force_reload: true },
+    data: switchRules
+  }, 'HAProxy');
+
+  return { ok: true, message: `Règles du frontend ${name} mises à jour (${switchRules.length})` };
+}

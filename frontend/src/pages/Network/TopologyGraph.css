@@ -1,0 +1,136 @@
+/* Rendu react-flow de la topologie (Lot C1) — thème aligné sur les variables
+   CSS existantes du projet plutôt que sur le thème par défaut de la lib. */
+
+.rf-topo-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rf-topo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.rf-topo-search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.rf-topo-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rf-topo-filter-btn {
+  white-space: nowrap;
+}
+
+.rf-topo-canvas {
+  height: 560px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2, var(--surface));
+}
+
+.rf-topo-node {
+  min-width: 180px;
+  max-width: 210px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 2px solid var(--tone-mut-dot);
+  background: var(--surface);
+  cursor: pointer;
+  transition: opacity .15s ease, box-shadow .15s ease;
+}
+
+.rf-topo-node-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rf-topo-node-meta {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rf-topo-dimmed { opacity: .25; }
+
+.rf-topo-highlighted {
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.rf-topo-tone-ok { border-color: var(--tone-ok-dot); }
+.rf-topo-tone-crit { border-color: var(--tone-crit-dot); }
+.rf-topo-tone-warn { border-color: var(--tone-warn-dot); }
+.rf-topo-tone-info { border-color: var(--tone-info-dot); }
+.rf-topo-tone-vio { border-color: var(--tone-vio-dot); }
+.rf-topo-tone-mut { border-color: var(--tone-mut-dot); }
+
+.rf-topo-minimap {
+  background: var(--surface) !important;
+}
+
+.rf-topo-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .35);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  z-index: 200;
+}
+
+.rf-topo-detail {
+  width: 320px;
+  max-width: 90vw;
+  height: 100%;
+  padding: 20px;
+  overflow-y: auto;
+  border-radius: 0;
+  animation: riseIn .18s ease both;
+}
+
+.rf-topo-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rf-topo-detail-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rf-topo-detail-meta {
+  font-size: 12.5px;
+  margin: 6px 0;
+}
+
+.rf-topo-detail-link {
+  margin-top: 16px;
+  width: 100%;
+  height: 34px;
+}

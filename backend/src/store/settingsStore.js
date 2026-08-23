@@ -101,6 +101,161 @@ export function setTlsMode(mode) {
   return { mode };
 }
 
+// Domaine central de la plateforme (Lot C3 — Groupe C) : un seul domaine
+// racine (ex: nexus.example.com) utilisé pour générer les URLs dev/staging
+// par déploiement (voir services/devUrlService.js) et affiché dans
+// Paramètres → Réseau. Stocké séparément des intégrations car ce n'est pas
+// une intégration en soi (pas de token/URL d'API), même pattern de stockage
+// que `tlsSettings` ci-dessus (store dédié, pas de chiffrement nécessaire :
+// un nom de domaine n'est pas un secret).
+export function getNetworkConfig() {
+  const s = readStore('networkConfig') || {};
+  return { centralDomain: s.centralDomain || null };
+}
+
+export function setCentralDomain(domain) {
+  const trimmed = (domain || '').trim().toLowerCase();
+  if (trimmed && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(trimmed)) {
+    throw Object.assign(new Error('Domaine invalide (ex attendu : nexus.example.com)'), { status: 400 });
+  }
+  const next = { centralDomain: trimmed || null };
+  writeStore('networkConfig', next);
+  return next;
+}
+
+// --- Multi-cluster Kubernetes (Lot C4 — Groupe C) --------------------------
+// Avant ce lot, Kubernetes n'existait qu'en une seule config globale, stockée
+// comme n'importe quelle autre intégration (`integrations.kubernetes`, voir
+// ci-dessus). Ce lot fait évoluer ce modèle vers une LISTE de clusters nommés
+// (store dédié `k8sClusters`, même pattern que `tlsSettings`/`networkConfig`
+// ci-dessus : config structurée hors du bloc `integrations` générique, car
+// ce n'est plus une intégration unique). Un seul cluster peut être marqué
+// `isDefault` — c'est celui utilisé par tout appelant qui ne précise pas de
+// cluster explicitement (rétrocompatibilité avec les routes/services
+// existants avant ce lot, voir kubernetesService.js).
+//
+// Migration : au premier accès, si `k8sClusters` est vide ET qu'une config
+// Kubernetes unique existait déjà (`integrations.kubernetes.apiServer`), elle
+// est copiée telle quelle comme premier cluster (id `default-cluster`,
+// marqué par défaut) plutôt que d'être perdue. La config legacy
+// `integrations.kubernetes` n'est pas supprimée (aucune route ne la lit plus
+// après ce lot, mais on évite une suppression destructive non demandée).
+const K8S_SECRET_FIELDS = ['token', 'caCert'];
+
+function decryptClusterSecrets(cluster) {
+  const out = { ...cluster };
+  for (const field of K8S_SECRET_FIELDS) {
+    if (out[field]) out[field] = decryptSecret(out[field]);
+  }
+  return out;
+}
+
+function encryptClusterSecrets(cluster, existing) {
+  const out = { ...cluster };
+  for (const field of K8S_SECRET_FIELDS) {
+    if (cluster[field]) out[field] = encryptSecret(cluster[field]);
+    else out[field] = existing?.[field] ?? null;
+  }
+  return out;
+}
+
+function migrateK8sClusters() {
+  let clusters = readStore('k8sClusters');
+  if (!Array.isArray(clusters)) clusters = [];
+  if (clusters.length === 0) {
+    const legacyAll = readStore('integrations');
+    const legacy = legacyAll.kubernetes;
+    if (legacy?.apiServer) {
+      clusters = [{
+        id: 'default-cluster',
+        name: 'Cluster par défaut',
+        apiServer: legacy.apiServer,
+        namespace: legacy.namespace || 'default',
+        token: legacy.token || null, // déjà chiffré (copié tel quel depuis le store chiffré)
+        caCert: legacy.caCert || null,
+        insecureSkipTlsVerify: Boolean(legacy.insecureSkipTlsVerify),
+        dashboardUrl: legacy.dashboardUrl || null,
+        isDefault: true
+      }];
+      writeStore('k8sClusters', clusters);
+    }
+  }
+  return clusters;
+}
+
+// Liste complète, secrets déchiffrés — usage interne uniquement (services
+// d'intégration), jamais renvoyé tel quel au frontend.
+export function listK8sClusters() {
+  return migrateK8sClusters().map(decryptClusterSecrets);
+}
+
+// Version sûre pour le frontend (Paramètres → Kubernetes) : secrets remplacés
+// par un booléen, même pattern que getRedactedIntegration ci-dessus.
+export function listK8sClustersRedacted() {
+  return listK8sClusters().map(({ token, caCert, ...rest }) => ({
+    ...rest,
+    tokenSet: Boolean(token),
+    caCertSet: Boolean(caCert),
+    configured: Boolean(rest.apiServer)
+  }));
+}
+
+// Résout un cluster par id, ou le cluster par défaut si aucun id n'est
+// précisé — c'est le point de rétrocompatibilité utilisé par
+// kubernetesService.js pour tout appelant antérieur à ce lot.
+export function getK8sCluster(id) {
+  const clusters = listK8sClusters();
+  if (!clusters.length) return null;
+  if (!id) return clusters.find((c) => c.isDefault) || clusters[0];
+  return clusters.find((c) => c.id === id) || null;
+}
+
+export function saveK8sCluster(payload) {
+  const clusters = migrateK8sClusters().slice();
+  if (!payload?.name || !payload?.apiServer) {
+    throw Object.assign(new Error('Nom et URL du serveur API requis'), { status: 400 });
+  }
+  const id = payload.id || `k8s-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const idx = clusters.findIndex((c) => c.id === id);
+  const existing = idx >= 0 ? clusters[idx] : null;
+  const next = encryptClusterSecrets({
+    id,
+    name: payload.name,
+    apiServer: payload.apiServer,
+    namespace: payload.namespace || 'default',
+    token: payload.token,
+    caCert: payload.caCert,
+    insecureSkipTlsVerify: Boolean(payload.insecureSkipTlsVerify),
+    dashboardUrl: payload.dashboardUrl || null,
+    isDefault: existing?.isDefault ?? clusters.length === 0
+  }, existing);
+  if (idx >= 0) clusters[idx] = next; else clusters.push(next);
+  if (payload.setDefault) {
+    for (const c of clusters) c.isDefault = c.id === id;
+  }
+  writeStore('k8sClusters', clusters);
+  return listK8sClustersRedacted().find((c) => c.id === id);
+}
+
+export function deleteK8sCluster(id) {
+  const clusters = migrateK8sClusters().slice();
+  const idx = clusters.findIndex((c) => c.id === id);
+  if (idx < 0) throw Object.assign(new Error('Cluster introuvable'), { status: 404 });
+  const wasDefault = clusters[idx].isDefault;
+  clusters.splice(idx, 1);
+  if (wasDefault && clusters.length) clusters[0].isDefault = true;
+  writeStore('k8sClusters', clusters);
+  return { ok: true };
+}
+
+export function setDefaultK8sCluster(id) {
+  const clusters = migrateK8sClusters().slice();
+  if (!clusters.some((c) => c.id === id)) throw Object.assign(new Error('Cluster introuvable'), { status: 404 });
+  for (const c of clusters) c.isDefault = c.id === id;
+  writeStore('k8sClusters', clusters);
+  return listK8sClustersRedacted();
+}
+
 function isConfigured(key, entry) {
   const required = {
     kubernetes: ['apiServer'],

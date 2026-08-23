@@ -1384,6 +1384,7 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
                     ) : (
                       <span className="faint pd-row-date">Aucune app Argo CD associée</span>
                     )}
+                    {!env.is_production && <DevUrlBadge projectId={projectId} link={link} />}
                   </div>
                 ))}
               </div>
@@ -1393,6 +1394,51 @@ function EnvironmentsPanel({ environments, migrated, deployments, projectId, rol
       )}
       {pipelineLink && <PipelineModal link={pipelineLink} projectId={projectId} onClose={() => setPipelineLink(null)} />}
     </Panel>
+  );
+}
+
+// URL dev/staging générée pour ce déploiement (Lot C3, Groupe C) — jamais
+// affichée pour un environnement de production (voir EnvironmentsPanel, qui
+// ne rend ce composant que pour env.is_production === false). L'état "non
+// disponible" est affiché honnêtement (domaine central non configuré, aucun
+// reverse proxy configuré, etc.) plutôt que d'être masqué silencieusement.
+// L'application réelle de la config HAProxy proposée exige une confirmation
+// explicite de l'admin (pas d'application automatique) et réutilise
+// haproxyService.js#createFrontend du Lot C2 côté backend.
+function DevUrlBadge({ projectId, link }) {
+  const { user } = useAuth();
+  const notify = useNotify();
+  const { data, loading, reload } = useApi(() => api.get(`/projects/${projectId}/deployments/${link.id}/dev-url`), [link.id]);
+  const [applying, setApplying] = useState(false);
+
+  if (loading || !data) return null;
+  if (!data.available) {
+    return <span className="faint pd-row-date" title={data.reason}>URL dev/staging indisponible</span>;
+  }
+
+  async function applyProxy() {
+    if (!window.confirm(`Créer/mettre à jour le frontend HAProxy proposé pour ${data.url} ?\nCette action modifie le routage réel du reverse proxy.`)) return;
+    setApplying(true);
+    try {
+      await api.post(`/projects/${projectId}/deployments/${link.id}/dev-url/apply-proxy`, {});
+      notify('Frontend HAProxy créé/mis à jour', { type: 'ok' });
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'crit' });
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <span className="pd-devurl-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <a href={data.url} target="_blank" rel="noreferrer" title={data.structureReason}>{data.url}</a>
+      {user?.role === 'admin' && data.haproxyProposal && (
+        <button className="btn-outline pd-action-btn" disabled={applying} onClick={applyProxy} title="Propose la création du frontend HAProxy correspondant — validation admin requise, non appliqué automatiquement">
+          {applying ? '…' : 'Proposer la config HAProxy'}
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -1459,6 +1505,7 @@ function PipelineModal({ link, projectId, onClose }) {
             label="Kubernetes"
             configured={stages.kubernetes.configured}
             detail={stages.kubernetes.deployment ? `${stages.kubernetes.deployment.replicas ?? '?'} réplique(s)` : null}
+            webUrl={stages.kubernetes.webUrl}
             error={stages.kubernetes.error}
           />
           <PipelineStageRow

@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { api } from '../../lib/apiClient.js';
 import { useNotify } from '../../context/NotificationContext.jsx';
 import CreateFrontendDialog from './CreateFrontendDialog.jsx';
+import FrontendDetailDialog from './FrontendDetailDialog.jsx';
 import './NetworkShared.css';
 
 const STATES = ['ready', 'drain', 'maint'];
@@ -17,6 +18,7 @@ export default function HAProxyPage() {
   const frontends = useApi(() => api.get('/haproxy/frontends'), [], { pollMs: 20000 });
   const [selected, setSelected] = useState(null);
   const [showCreateFrontend, setShowCreateFrontend] = useState(false);
+  const [editFrontend, setEditFrontend] = useState(null);
   const servers = useApi(() => (selected ? api.get(`/haproxy/backends/${selected}/servers/runtime`) : Promise.resolve(null)), [selected], { pollMs: 10000 });
   const notify = useNotify();
 
@@ -49,16 +51,20 @@ export default function HAProxyPage() {
       {showCreateFrontend && (
         <CreateFrontendDialog onClose={() => setShowCreateFrontend(false)} onCreated={() => frontends.reload()} />
       )}
+      {editFrontend && (
+        <FrontendDetailDialog name={editFrontend} onClose={() => setEditFrontend(null)} onChanged={() => frontends.reload()} />
+      )}
       <div className="net-panel-grid">
-        <Panel title="Frontends" sub="Points d'écoute HAProxy" span={12}>
+        <Panel title="Frontends" sub="Points d'écoute HAProxy — cliquez pour éditer bindings et règles" span={12}>
           <DataTable
-            columns={['Nom', 'Mode']}
+            columns={['Nom', 'Mode', '']}
             rows={frontends.data?.items}
             emptyTitle="Aucun frontend"
             renderRow={(f) => (
-              <tr key={f.name}>
+              <tr key={f.name} className="haproxy-row-selectable" onClick={() => setEditFrontend(f.name)}>
                 <td className="net-cell-name">{f.name}</td>
                 <td>{f.mode}</td>
+                <td><span className="haproxy-view-servers">Bindings / règles →</span></td>
               </tr>
             )}
           />

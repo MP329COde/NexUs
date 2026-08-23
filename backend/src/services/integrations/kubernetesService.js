@@ -1,11 +1,11 @@
 import * as k8s from '@kubernetes/client-node';
 import { Writable } from 'node:stream';
-import { getRawIntegration } from '../../store/settingsStore.js';
+import { getK8sCluster } from '../../store/settingsStore.js';
 import { IntegrationError, notConfigured } from './httpClient.js';
 
-function buildKubeConfig() {
-  const cfg = getRawIntegration('kubernetes');
-  if (!cfg.apiServer) return null;
+function buildKubeConfig(clusterId) {
+  const cfg = getK8sCluster(clusterId);
+  if (!cfg || !cfg.apiServer) return null;
   const kc = new k8s.KubeConfig();
   kc.loadFromOptions({
     clusters: [{ name: 'nexus', server: cfg.apiServer, skipTLSVerify: Boolean(cfg.insecureSkipTlsVerify) }],
@@ -16,8 +16,8 @@ function buildKubeConfig() {
   return kc;
 }
 
-function clients() {
-  const kc = buildKubeConfig();
+function clients(clusterId) {
+  const kc = buildKubeConfig(clusterId);
   if (!kc) return null;
   return {
     kc,
@@ -40,8 +40,8 @@ async function wrap(label, fn) {
   }
 }
 
-export async function getStatus() {
-  const c = clients();
+export async function getStatus(clusterId) {
+  const c = clients(clusterId);
   if (!c) return notConfigured('Kubernetes');
   return wrap('version', async () => {
     const res = await c.core.listNamespace();
@@ -49,8 +49,25 @@ export async function getStatus() {
   });
 }
 
-export async function listNamespaces() {
-  const c = clients();
+// Nœuds physiques du cluster (kubectl get nodes) — utilisé par la topologie
+// graphique (networkTopologyService.js) pour représenter le cluster K8s comme
+// un vrai sous-graphe (cluster → nœuds → pods), pas seulement une liste de
+// services. Aucun autre appelant avant ce lot.
+export async function listClusterNodes(clusterId) {
+  const c = clients(clusterId);
+  if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
+  return wrap('nodes', async () => (await c.core.listNode()).items.map((n) => ({
+    name: n.metadata.name,
+    ready: (n.status.conditions || []).some((cond) => cond.type === 'Ready' && cond.status === 'True'),
+    roles: Object.keys(n.metadata.labels || {})
+      .filter((k) => k.startsWith('node-role.kubernetes.io/'))
+      .map((k) => k.replace('node-role.kubernetes.io/', '')) || [],
+    kubeletVersion: n.status.nodeInfo?.kubeletVersion
+  })));
+}
+
+export async function listNamespaces(clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('namespaces', async () => (await c.core.listNamespace()).items.map((n) => ({
     name: n.metadata.name,
@@ -64,8 +81,8 @@ export async function listNamespaces() {
 // provisionné, pas seulement l'enregistrement en base — sans quoi les
 // ressources restaient orphelines indéfiniment (limite documentée dans
 // todo.md, "aucune infrastructure cron/setInterval n'existe").
-export async function deleteNamespace(namespace) {
-  const c = clients();
+export async function deleteNamespace(namespace, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('delete namespace', async () => {
     await c.core.deleteNamespace({ name: namespace });
@@ -73,8 +90,8 @@ export async function deleteNamespace(namespace) {
   });
 }
 
-export async function listPods(namespace) {
-  const c = clients();
+export async function listPods(namespace, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('pods', async () => {
     const res = namespace ? await c.core.listNamespacedPod({ namespace }) : await c.core.listPodForAllNamespaces();
@@ -92,8 +109,8 @@ export async function listPods(namespace) {
 // "Décrire" : équivalent réduit de `kubectl describe pod`, reconstruit à
 // partir de l'objet Pod complet (pas seulement les champs déjà retenus par
 // listPods) — conteneurs, conditions, événements liés au pod.
-export async function describePod(namespace, name) {
-  const c = clients();
+export async function describePod(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('describe pod', async () => {
     const pod = await c.core.readNamespacedPod({ name, namespace });
@@ -125,8 +142,8 @@ export async function describePod(namespace, name) {
 // selector est un sous-ensemble des labels du pod) — c'est ce qui permet aux
 // actions contextuelles "Voir Deployment"/"Voir Service" du Command Center
 // de pointer vers la bonne ressource plutôt que de deviner à partir du nom.
-export async function getPodOwners(namespace, name) {
-  const c = clients();
+export async function getPodOwners(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('pod owners', async () => {
     const pod = await c.core.readNamespacedPod({ name, namespace });
@@ -154,8 +171,8 @@ export async function getPodOwners(namespace, name) {
 // Événements Kubernetes liés à un objet précis (pod, deployment...) — utiles
 // pour diagnostiquer un CrashLoopBackOff, un échec de scheduling, une image
 // introuvable, etc. sans avoir besoin des logs applicatifs.
-export async function listEvents(namespace, involvedObjectName) {
-  const c = clients();
+export async function listEvents(namespace, involvedObjectName, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('events', async () => {
     const fieldSelector = involvedObjectName ? `involvedObject.name=${involvedObjectName}` : undefined;
@@ -172,8 +189,8 @@ export async function listEvents(namespace, involvedObjectName) {
 // Métriques instantanées (metrics-server, API metrics.k8s.io) — absentes si
 // metrics-server n'est pas installé sur le cluster : erreur propre remontée
 // telle quelle plutôt qu'une valeur inventée.
-export async function getPodMetrics(namespace, name) {
-  const c = clients();
+export async function getPodMetrics(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('pod metrics', async () => {
     const res = await c.custom.getNamespacedCustomObject({ group: 'metrics.k8s.io', version: 'v1beta1', namespace, plural: 'pods', name });
@@ -184,8 +201,8 @@ export async function getPodMetrics(namespace, name) {
   });
 }
 
-export async function listDeployments(namespace) {
-  const c = clients();
+export async function listDeployments(namespace, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('deployments', async () => {
     const res = namespace ? await c.apps.listNamespacedDeployment({ namespace }) : await c.apps.listDeploymentForAllNamespaces();
@@ -206,8 +223,8 @@ export async function listDeployments(namespace) {
 // cause ici — c'est lib/diagnostics.js (frontend) qui applique les règles,
 // pour que la logique de diagnostic reste testable et visible indépendamment
 // de la collecte de données.
-export async function getDeploymentDiagnostics(namespace, name) {
-  const c = clients();
+export async function getDeploymentDiagnostics(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('deployment diagnostics', async () => {
     const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
@@ -249,8 +266,8 @@ export async function getDeploymentDiagnostics(namespace, name) {
   });
 }
 
-export async function listServices(namespace) {
-  const c = clients();
+export async function listServices(namespace, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('services', async () => {
     const res = namespace ? await c.core.listNamespacedService({ namespace }) : await c.core.listServiceForAllNamespaces();
@@ -264,8 +281,8 @@ export async function listServices(namespace) {
   });
 }
 
-export async function restartDeployment(namespace, name) {
-  const c = clients();
+export async function restartDeployment(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('restart deployment', async () => {
     // JSON Patch (RFC 6902) plutôt qu'un merge-patch : le client v1 négocie
@@ -288,8 +305,8 @@ export async function restartDeployment(namespace, name) {
 // d'avant le dernier déploiement — on le recopie dans le Deployment. Kubernetes
 // ne conserve que les ReplicaSets gardés par `revisionHistoryLimit` (10 par
 // défaut) : au-delà, il n'y a plus rien à restaurer.
-export async function rollbackDeployment(namespace, name) {
-  const c = clients();
+export async function rollbackDeployment(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('rollback deployment', async () => {
     const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
@@ -316,8 +333,8 @@ export async function rollbackDeployment(namespace, name) {
 // au redémarrage progressif de restartDeployment). Coupe la disponibilité
 // le temps que le contrôleur recrée les pods — action volontairement plus
 // radicale, à réserver aux cas où un rolling restart ne suffit pas.
-export async function purgeDeploymentPods(namespace, name) {
-  const c = clients();
+export async function purgeDeploymentPods(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('purge deployment pods', async () => {
     const deployment = await c.apps.readNamespacedDeployment({ name, namespace });
@@ -328,14 +345,14 @@ export async function purgeDeploymentPods(namespace, name) {
   });
 }
 
-export async function getPodLogs(namespace, pod, container, tailLines = 200) {
-  const c = clients();
+export async function getPodLogs(namespace, pod, container, tailLines = 200, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('logs', async () => c.core.readNamespacedPodLog({ name: pod, namespace, container, tailLines }));
 }
 
-export async function scaleDeployment(namespace, name, replicas) {
-  const c = clients();
+export async function scaleDeployment(namespace, name, replicas, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('scale deployment', async () => {
     // Comme restartDeployment : le client v1 négocie "application/json-patch+json"
@@ -355,8 +372,8 @@ export async function scaleDeployment(namespace, name, replicas) {
 // Suppression directe (pas d'éviction) : le contrôleur du deployment/replicaset
 // recrée immédiatement un pod de remplacement. Sans danger pour un pod géré,
 // mais définitif pour un pod nu (rare dans cette console orientée deployments).
-export async function deletePod(namespace, name) {
-  const c = clients();
+export async function deletePod(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('delete pod', async () => {
     await c.core.deleteNamespacedPod({ name, namespace });
@@ -369,8 +386,8 @@ export async function deletePod(namespace, name) {
 // qui patche un sous-objet interne). Le mécanisme réel et supporté est de
 // supprimer le Secret TLS associé : cert-manager le détecte manquant et
 // réémet immédiatement un certificat.
-export async function renewCertificate(namespace, name) {
-  const c = clients();
+export async function renewCertificate(namespace, name, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('renew certificate', async () => {
     const cert = await c.custom.getNamespacedCustomObject({ group: 'cert-manager.io', version: 'v1', namespace, plural: 'certificates', name });
@@ -381,8 +398,8 @@ export async function renewCertificate(namespace, name) {
   });
 }
 
-export async function listCertManagerCertificates(namespace) {
-  const c = clients();
+export async function listCertManagerCertificates(namespace, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   return wrap('cert-manager', async () => {
     const res = namespace
@@ -421,8 +438,8 @@ class CappedWritable extends Writable {
   text() { return Buffer.concat(this.chunks).toString('utf8').slice(0, EXEC_OUTPUT_LIMIT); }
 }
 
-export async function execInPod(namespace, pod, container, command) {
-  const c = clients();
+export async function execInPod(namespace, pod, container, command, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   const exec = new k8s.Exec(c.kc);
   const stdout = new CappedWritable();
@@ -441,8 +458,8 @@ export async function execInPod(namespace, pod, container, command) {
   return { stdout: stdout.text(), stderr: stderr.text(), status: exitStatus?.status || 'Unknown', message: exitStatus?.message };
 }
 
-export async function applyManifest(manifest) {
-  const c = clients();
+export async function applyManifest(manifest, clusterId) {
+  const c = clients(clusterId);
   if (!c) throw new IntegrationError('Kubernetes non configuré', { status: 409 });
   if (!manifest?.apiVersion || !manifest?.kind || !manifest?.metadata?.name) {
     throw new IntegrationError('Manifest invalide : apiVersion, kind et metadata.name sont requis', { status: 400 });

@@ -5,11 +5,13 @@ import { api } from '../../lib/apiClient.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { INTEGRATION_FORMS, INTEGRATION_ORDER, INTEGRATION_CATEGORIES } from '../../config/integrationForms.js';
 import IntegrationPanel from './IntegrationPanel.jsx';
+import K8sClustersPanel from './K8sClustersPanel.jsx';
 import InfrastructureStatusPanel from './InfrastructureStatusPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
 import GroupsPanel from './GroupsPanel.jsx';
 import InventoryPanel from './InventoryPanel.jsx';
 import PlatformPanel from './PlatformPanel.jsx';
+import NetworkPanel from './NetworkPanel.jsx';
 import PluginsPanel from './PluginsPanel.jsx';
 import FeatureFlagsPanel from './FeatureFlagsPanel.jsx';
 import EnvironmentBlueprintsPanel from './EnvironmentBlueprintsPanel.jsx';
@@ -32,6 +34,7 @@ const TABS = [
   { id: 'groups', label: 'Groupes & permissions', domain: 'users', level: 'admin' },
   { id: 'inventory', label: 'Inventaire', domain: 'inventory', level: 'admin', primaryAdminOnly: true },
   { id: 'platform', label: 'Plateforme', domain: 'settings', level: 'admin' },
+  { id: 'network', label: 'Réseau', domain: 'settings', level: 'admin' },
   { id: 'plugins', label: 'Plugins', domain: 'plugins', level: 'read' },
   { id: 'feature-flags', label: 'Feature flags', adminOnly: true },
   { id: 'environment-blueprints', label: "Blueprints d'environnement", domain: 'settings', level: 'admin' },
@@ -49,7 +52,7 @@ const TABS = [
 // intégrations, identité...), un développeur devait déjà savoir dans quel
 // onglet chercher. Catégories reprises du plan de refonte de navigation.
 const TAB_CATEGORIES = [
-  { label: 'Général', tabIds: ['platform', 'inventory'] },
+  { label: 'Général', tabIds: ['platform', 'network', 'inventory'] },
   { label: 'Identité & accès', tabIds: ['users', 'groups', 'identity'] },
   { label: 'Intégrations', tabIds: ['integrations', 'git', 'certificates'] },
   { label: 'Plateforme', tabIds: ['plugins', 'feature-flags', 'environment-blueprints'] },
@@ -122,6 +125,7 @@ export default function SettingsPage() {
       {tab === 'integrations' && (
         <div className="settings-integrations-grid">
           <div className="settings-integrations-full"><InfrastructureStatusPanel /></div>
+          <div className="settings-integrations-full"><K8sClustersPanel /></div>
           {INTEGRATION_CATEGORIES.map((cat) => {
             const keys = cat.keys.filter((k) => INTEGRATION_ORDER.includes(k));
             if (keys.length === 0) return null;
@@ -146,6 +150,7 @@ export default function SettingsPage() {
       {tab === 'groups' && <GroupsPanel />}
       {tab === 'inventory' && <InventoryPanel />}
       {tab === 'platform' && <PlatformPanel data={data} error={error} reload={reload} />}
+      {tab === 'network' && <NetworkPanel />}
       {tab === 'plugins' && <PluginsPanel />}
       {tab === 'feature-flags' && <FeatureFlagsPanel />}
       {tab === 'environment-blueprints' && <EnvironmentBlueprintsPanel />}
