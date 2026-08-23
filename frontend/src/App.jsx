@@ -57,6 +57,7 @@ import SecurityPage from './pages/Security/SecurityPage.jsx';
 import SettingsPage from './pages/Settings/SettingsPage.jsx';
 import AccountPage from './pages/Account/AccountPage.jsx';
 import ManualPage from './pages/Manual/ManualPage.jsx';
+import MonitorWallPage from './pages/Deployments/MonitorWallPage.jsx';
 import ReportPage from './pages/Report/ReportPage.jsx';
 import StoragePage from './pages/Storage/StoragePage.jsx';
 import StartupStatusPage from './pages/System/StartupStatusPage.jsx';
@@ -177,6 +178,7 @@ export const router = createBrowserRouter([
           { path: 'security', element: <RequirePermission domain="security" level="read"><SecurityPage /></RequirePermission>, handle: { title: 'Cybersécurité' } },
           { path: 'storage', element: <StoragePage />, handle: { title: 'Stockage' } },
           { path: 'account', element: <AccountPage />, handle: { title: 'Mon compte' } },
+          { path: 'monitor-wall', element: <MonitorWallPage />, handle: { title: 'Mur de surveillance' } },
           { path: 'manual', element: <ManualPage />, handle: { title: "Manuel d'utilisation" } },
           { path: 'report', element: <ReportPage />, handle: { title: 'Rapport de santé' } },
           { path: 'system/startup', element: <RequirePermission domain="settings" level="admin"><StartupStatusPage /></RequirePermission>, handle: { title: 'Démarrage & système' } },

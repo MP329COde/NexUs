@@ -180,6 +180,10 @@ export default function Header({ title, onOpenSearch, onOpenNav }) {
           </span>
         </button>
 
+        <Link to="/monitor-wall" title="Mur de surveillance (à laisser ouvert sur un écran dédié)" className="icon-btn header-manual-link">
+          <Icon name="gauge" size={16} />
+        </Link>
+
         <Link to="/manual" title="Manuel d'utilisation" className="icon-btn header-manual-link">
           <Icon name="book" size={16} />
         </Link>

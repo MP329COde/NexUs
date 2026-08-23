@@ -193,10 +193,17 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
   .header-manual-link { display: none !important; }
 }
 
-/* Sous 480px, la recherche pleine largeur (220px) fait déborder le header et
+/* Sous 600px, la recherche pleine largeur (220px) fait déborder le header et
    pousse thème/notifications/avatar hors écran : elle se réduit à une simple
-   icône, comme les autres actions, pour que tout reste accessible d'un tap. */
-@media (max-width: 480px) {
+   icône, comme les autres actions, pour que tout reste accessible d'un tap.
+   Seuil relevé de 480 à 620px (audit responsive « toutes tailles » ; mesuré
+   par `getBoundingClientRect()` sur `.header-actions`, marge de sécurité
+   incluse) : entre 481 et ~619px, la recherche pleine largeur restait active
+   alors que le reste du header (marque + 3 icônes) ne laissait déjà plus
+   assez de place — `.header-actions` débordait hors du viewport (clippé,
+   sans provoquer de scroll horizontal global puisque `header-bar` masque son
+   propre dépassement, mais le bouton compte devenait inatteignable). */
+@media (max-width: 620px) {
   .header-title-wrap { display: none; }
   .header-search-bar {
     width: 36px;
@@ -204,6 +211,21 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
     justify-content: center;
   }
   .header-search-text { display: none; }
+}
+
+/* Sous 400px (iPhone SE 375px, Galaxy Fold 320px...) : même après le
+   correctif ci-dessus, le nom "Nexus Console" + sous-titre du bloc marque
+   (~134px) laisse trop peu de place aux 3 icônes d'actions (thème,
+   notifications, compte) qui se retrouvent partiellement hors du header
+   (clippées par `overflow` du conteneur plutôt que de provoquer un scroll
+   horizontal global — donc invisibles pour un rapport document.scrollWidth,
+   mais bien inatteignables). Le texte de la marque est masqué, ne laissant
+   que le logo, pour libérer cette place ; les actions elles-mêmes sont aussi
+   resserrées pour marger davantage sur les tailles les plus étroites (320px). */
+@media (max-width: 400px) {
+  .header-brand-text { display: none; }
+  .header-bar { gap: 8px; padding: 0 10px; }
+  .header-actions { gap: 4px; }
 }
 
 /* Layouts à deux colonnes (Manuel, futures pages similaires) : empilées sous
@@ -219,7 +241,18 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
    tout le contenu hors écran sur mobile. Repliée en un bandeau de icônes
    défilable horizontalement au-dessus du contenu plutôt qu'à côté. */
 @media (max-width: 860px) {
-  .dev-layout { flex-direction: column; gap: 12px !important; }
+  /* `.dev-layout` a `align-items: flex-start` en desktop (colonnes rail +
+     contenu de hauteurs différentes). Passé en `flex-direction: column`
+     ici, cette même valeur devient l'alignement de l'axe transversal
+     (largeur) : les enfants ne sont plus étirés à la largeur du conteneur
+     mais réduits à leur taille de contenu intrinsèque — un tableau large
+     dans `.dev-layout-content` fait alors déborder toute la colonne (au
+     lieu d'être limité à la largeur disponible et de scroller localement
+     via son propre `overflow-x: auto`), et ce débordement ne devient
+     scrollable qu'au niveau de `.shell-main` (toute la page glisse,
+     bandeau de sous-nav compris) plutôt que dans le tableau seul. Repéré
+     par audit responsive (table `/deployments/releases` à 375px). */
+  .dev-layout { flex-direction: column; align-items: stretch; gap: 12px !important; }
   .dev-nav {
     width: 100% !important;
     max-height: none !important;
@@ -246,6 +279,7 @@ tbody tr:nth-child(5) { animation-delay: .09s; }
 @media (max-width: 860px) {
   .k8s-layout, .network-layout {
     flex-direction: column;
+    align-items: stretch;
     gap: 12px !important;
   }
   .k8s-layout-nav, .network-layout-nav {

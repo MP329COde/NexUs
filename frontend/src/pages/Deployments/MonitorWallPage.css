@@ -1,0 +1,240 @@
+/* Mur de surveillance (Lot D13) : pensé pour être lu de loin sur un écran
+   dédié, jamais manipulé — polices plus grandes que le reste de
+   l'application, contraste fort, aucune pagination (les listes affichent
+   directement les N plus récents, défilement vertical naturel si besoin). */
+
+.monwall-root {
+  min-height: 100vh;
+  width: 100%;
+  padding: 20px 28px 32px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.monwall-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.monwall-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.monwall-header-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.monwall-clock {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.monwall-refresh {
+  font-size: 13px;
+}
+
+.monwall-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.monwall-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.monwall-kpi-value {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.monwall-kpi-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.monwall-kpi.tone-ok .monwall-kpi-value { color: var(--tone-ok-fg); }
+.monwall-kpi.tone-warn .monwall-kpi-value { color: var(--tone-warn-fg); }
+.monwall-kpi.tone-crit .monwall-kpi-value { color: var(--tone-crit-fg); }
+.monwall-kpi.tone-info .monwall-kpi-value { color: var(--tone-info-fg); }
+
+.monwall-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.monwall-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  min-width: 0;
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.monwall-col-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.monwall-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.monwall-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.monwall-item:last-child {
+  border-bottom: none;
+}
+
+.monwall-item-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.monwall-item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.monwall-item-title {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.monwall-item-sub {
+  font-size: 12.5px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.monwall-dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: var(--tone-mut-dot);
+}
+
+.monwall-dot.tone-ok { background: var(--tone-ok-dot); }
+.monwall-dot.tone-warn { background: var(--tone-warn-dot); }
+.monwall-dot.tone-crit { background: var(--tone-crit-dot); }
+.monwall-dot.tone-info { background: var(--tone-info-dot); }
+.monwall-dot.tone-mut { background: var(--tone-mut-dot); }
+
+.monwall-empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 24px 4px;
+  text-align: center;
+}
+
+.monwall-empty-ok {
+  color: var(--tone-ok-fg);
+}
+
+.monwall-footer {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.monwall-integration-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface);
+}
+
+.monwall-integration-badge.tone-ok { border-color: var(--tone-ok-br); color: var(--tone-ok-fg); background: var(--tone-ok-bg); }
+.monwall-integration-badge.tone-crit { border-color: var(--tone-crit-br); color: var(--tone-crit-fg); background: var(--tone-crit-bg); }
+.monwall-integration-badge.tone-mut { color: var(--text-muted); }
+
+.monwall-integration-state {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+@media (max-width: 1100px) {
+  .monwall-grid {
+    grid-template-columns: 1fr;
+  }
+  .monwall-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .monwall-col {
+    max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .monwall-root {
+    padding: 14px 14px 24px;
+  }
+  .monwall-kpis {
+    grid-template-columns: 1fr;
+  }
+  .monwall-kpi-value {
+    font-size: 32px;
+  }
+}
+
+/* Très grand écran (mur / TV) : on privilégie une densité de lecture encore
+   plus confortable plutôt que d'étirer les cartes à l'infini. */
+@media (min-width: 1800px) {
+  .monwall-kpi-value {
+    font-size: 48px;
+  }
+  .monwall-item-title {
+    font-size: 17px;
+  }
+  .monwall-item-sub {
+    font-size: 14px;
+  }
+}
