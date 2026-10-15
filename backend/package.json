@@ -15,7 +15,7 @@
     "migrate:postgres": "node src/scripts/migrate-to-postgres.js"
   },
   "dependencies": {
-    "@kubernetes/client-node": "^1.4.0",
+    "@kubernetes/client-node": "^2.0.0",
     "@simplewebauthn/server": "^13.3.2",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
